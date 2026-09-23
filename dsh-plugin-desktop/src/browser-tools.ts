@@ -87,7 +87,7 @@ export function buildBrowserCommand(opencliCommand: string, args: BrowserArgs): 
     if (!value) throw new Error(`browser ${args.action} requires ${name}`)
     return shellQuote(value)
   }
-  const parts = [opencliCommand, 'browser', shellQuote(args.session ?? 'yootun-agent')]
+  const parts = [opencliCommand, 'browser', shellQuote(args.session ?? 'sensteed-agent')]
   if (args.action === 'navigate') parts.push('open', required(args.url, 'url'), '--window', 'foreground')
   else if (args.action === 'state' || args.action === 'back') parts.push(args.action)
   else if (args.action === 'extract') {

@@ -65,7 +65,7 @@ export async function apply(ctx: Context): Promise<void> {
       enabledPlugins: z.array(z.string()).default(DEFAULT_DOFE_PLUGIN_IDS),
       modelId: z.string().default(''),
       protocol: z.union(['chat-completions', 'messages', 'responses']).default('chat-completions'),
-      authMode: z.union(['feishu', 'manual']).default('manual'),
+      authMode: z.union(['feishu', 'manual']).default('feishu'),
       identity: z.any().default(undefined),
       entitlements: z.object({ plugins: z.array(z.string()), defaultModel: z.string(), allowedProtocols: z.array(z.string()) }).default({ plugins: [], defaultModel: '', allowedProtocols: [] }),
     }),
@@ -142,7 +142,7 @@ export async function apply(ctx: Context): Promise<void> {
     await Promise.all(old.map(client => client.dispose()))
     if (!next || !accessSettings.setupComplete
       || accessSettings.validationVersion !== DOFE_ACCESS_VALIDATION_VERSION
-      || (BRAND_VARIANT === 'sensteed' && (accessSettings.authMode !== 'feishu' || !accessSettings.identity?.ssoSub))) {
+      || accessSettings.authMode !== 'feishu' || !accessSettings.identity?.ssoSub) {
       tray?.refresh()
       return
     }

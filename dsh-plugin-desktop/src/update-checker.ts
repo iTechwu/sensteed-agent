@@ -116,7 +116,7 @@ export function compareSemVerVersions(left: string, right: string): number | nul
 }
 
 /**
- * Check the fixed Yootun-Agent version endpoint for a release in one channel.
+ * Check the fixed Sensteed-Agent version endpoint for a release in one channel.
  * @param options - installed version, caller-owned signal, and optional request adapter.
  * @returns a successful comparison, or null when any request or validation step fails.
  */

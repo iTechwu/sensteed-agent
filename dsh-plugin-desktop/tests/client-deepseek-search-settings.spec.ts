@@ -12,7 +12,7 @@ import { zh, type DesktopSettingsLocaleKey } from '../src/client/desktop-setting
 const t = (key: DesktopSettingsLocaleKey): string => zh[key]
 
 describe('DeepSeek Search settings', () => {
-  it('renders a masked Search API Key control in Yootun-Agent settings', () => {
+  it('renders a masked Search API Key control in Sensteed-Agent settings', () => {
     const markup = renderToStaticMarkup(createElement(DeepSeekSearchSettings, {
       credentials: {
         describe: vi.fn(),

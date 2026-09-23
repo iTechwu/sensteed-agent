@@ -31,7 +31,7 @@ function fakeChild(): FakeChild {
 
 function options(spawn: ProfileMaterializerSpawn): ProfileMaterializerOptions {
   return {
-    appExecutable: '/Applications/Yootun-Agent.app/Contents/MacOS/Yootun-Agent',
+    appExecutable: '/Applications/Sensteed-Agent.app/Contents/MacOS/Sensteed-Agent',
     clearEnvironmentPath: '/private/clear-env.mjs',
     pnpmBinPath: '/private/pnpm/bin/pnpm.mjs',
     nodeBinDir: '/private/node-bin',
@@ -62,7 +62,7 @@ describe('profile materializer', () => {
     child.emit('close', 0, null)
     const result = await resultPromise
 
-    expect(command).toBe('/Applications/Yootun-Agent.app/Contents/MacOS/Yootun-Agent')
+    expect(command).toBe('/Applications/Sensteed-Agent.app/Contents/MacOS/Sensteed-Agent')
     expect(args).toEqual([
       '--import',
       pathToFileURL('/private/clear-env.mjs').href,

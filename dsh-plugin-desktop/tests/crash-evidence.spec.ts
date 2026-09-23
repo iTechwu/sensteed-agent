@@ -9,14 +9,14 @@ describe('desktop crash evidence', () => {
     const reporter = { start: vi.fn() }
 
     startDesktopCrashReporting(reporter, {
-      productName: 'Yootun-Agent',
+      productName: 'Sensteed-Agent',
       version: '2.0.1',
       platform: 'win32',
       arch: 'x64',
     })
 
     expect(reporter.start).toHaveBeenCalledWith({
-      productName: 'Yootun-Agent',
+      productName: 'Sensteed-Agent',
       uploadToServer: false,
       globalExtra: {
         appVersion: '2.0.1',

@@ -1,4 +1,4 @@
-/** Headless-safe npm launcher for the Yootun-Agent Electron executable. */
+/** Headless-safe npm launcher for the Sensteed-Agent Electron executable. */
 
 import { spawn } from 'node:child_process'
 import { readFileSync } from 'node:fs'
@@ -23,7 +23,7 @@ export interface DesktopCliRequest {
 /** Human-readable launcher help. */
 export const DESKTOP_CLI_HELP = `Usage: dsh-plugin-desktop [options] [folder]
 
-Launch Yootun-Agent with the selected Web-capable profile.
+Launch Sensteed-Agent with the selected Web-capable profile.
 
 Arguments:
   folder                register the folder as a workspace and open it
@@ -80,13 +80,13 @@ export function defaultDesktopUserDataDirectory(
   if (platform === 'win32') {
     const appData = environment.APPDATA
     if (appData === undefined || appData.length === 0) {
-      throw new Error('APPDATA is unavailable; cannot locate Yootun-Agent diagnostics')
+      throw new Error('APPDATA is unavailable; cannot locate Sensteed-Agent diagnostics')
     }
-    return path.join(appData, 'Yootun-Agent')
+    return path.join(appData, 'Sensteed-Agent')
   }
-  if (platform === 'darwin') return path.join(homeDirectory, 'Library', 'Application Support', 'Yootun-Agent')
+  if (platform === 'darwin') return path.join(homeDirectory, 'Library', 'Application Support', 'Sensteed-Agent')
   const config = environment.XDG_CONFIG_HOME
-  return path.join(config === undefined || config.length === 0 ? path.join(homeDirectory, '.config') : config, 'Yootun-Agent')
+  return path.join(config === undefined || config.length === 0 ? path.join(homeDirectory, '.config') : config, 'Sensteed-Agent')
 }
 
 export interface DesktopCliOptions {
@@ -114,7 +114,7 @@ async function launchElectron(workspacePath?: string): Promise<number> {
       + `  npm install -g ${DESKTOP_PACKAGE_NAME}\n`
       + 'Or add electron to the profile before launching:\n'
       + '  dsh plugin --profile <name> add electron\n'
-      + 'Or use the packaged Yootun-Agent application.\n',
+      + 'Or use the packaged Sensteed-Agent application.\n',
     )
     return 1
   }

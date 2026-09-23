@@ -95,8 +95,8 @@ describe('mandatory DoFe access gate', () => {
 
   it('renders a dedicated non-dismissible activation dialog', () => {
     const markup = renderToStaticMarkup(createElement(DofeOnboardingModal, {
-      eyebrow: 'Yootun Agent',
-      title: '激活 Yootun-Agent',
+      eyebrow: 'Sensteed Agent',
+      title: '激活 Sensteed-Agent',
       description: '验证访问凭据并选择能力。',
       children: createElement('div', null, '表单'),
     }))
@@ -105,8 +105,8 @@ describe('mandatory DoFe access gate', () => {
     expect(markup).toContain('aria-modal="true"')
     expect(markup).toContain('dshDofeModalHeader')
     expect(markup).toContain('dshDofeModalBody')
-    expect(markup).toContain('Yootun Agent')
-    expect(markup).toContain('激活 Yootun-Agent')
+    expect(markup).toContain('Sensteed Agent')
+    expect(markup).toContain('激活 Sensteed-Agent')
     expect(markup).not.toContain('aria-label="关闭"')
   })
 

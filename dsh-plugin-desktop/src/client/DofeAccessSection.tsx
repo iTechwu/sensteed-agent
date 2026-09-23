@@ -194,7 +194,7 @@ export async function removeDofeAccess(settingsApi: SettingsApi, credentials: Cr
     await mutateDofeAccessSettings(settingsApi, [
       { op: 'unset', path: ['identity'] },
       { op: 'unset', path: ['entitlements'] },
-      { op: 'set', path: ['authMode'], value: 'manual' },
+      { op: 'set', path: ['authMode'], value: 'feishu' },
     ])
   }
   const result = await credentials.unset(DOFE_ACCESS_KEY)
@@ -228,7 +228,7 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
   const [revealKey, setRevealKey] = useState(false)
   const settingsStore = useMemo(() => dofeAccessSettingsStore(settingsScope), [settingsScope])
   const settings = useSyncExternalStore(settingsStore.subscribe, settingsStore.getSnapshot, settingsStore.getSnapshot)
-  const availablePlugins = useMemo(() => dofePluginsForBrand(BRAND_VARIANT).filter(plugin => !plugin.builtIn && (BRAND_VARIANT !== 'sensteed' || settings.value?.entitlements?.plugins.includes(plugin.id))), [settings.value?.entitlements])
+  const availablePlugins = useMemo(() => dofePluginsForBrand(BRAND_VARIANT).filter(plugin => !plugin.builtIn && settings.value?.entitlements?.plugins.includes(plugin.id)), [settings.value?.entitlements])
   const defaultPluginIds = useMemo(() => normalizeDofePluginIds(DEFAULT_DOFE_PLUGIN_IDS, BRAND_VARIANT), [])
   const [enabledPlugins, setEnabledPlugins] = useState<DofePluginId[]>(() => normalizeDofePluginIds(settings.value?.enabledPlugins ?? defaultPluginIds, BRAND_VARIANT))
   const [models, setModels] = useState<readonly DofeModel[]>([])
@@ -408,10 +408,10 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
       await mutateDofeAccessSettings(settingsApi, [
         { op: 'set', path: ['setupComplete'], value: true },
         { op: 'set', path: ['validationVersion'], value: DOFE_ACCESS_VALIDATION_VERSION },
-        { op: 'set', path: ['enabledPlugins'], value: normalizeDofePluginIds(enabledPlugins, BRAND_VARIANT).filter(id => BRAND_VARIANT !== 'sensteed' || settings.value?.entitlements?.plugins.includes(id)) },
+        { op: 'set', path: ['enabledPlugins'], value: normalizeDofePluginIds(enabledPlugins, BRAND_VARIANT).filter(id => settings.value?.entitlements?.plugins.includes(id)) },
         { op: 'set', path: ['modelId'], value: selectedModel },
         { op: 'set', path: ['protocol'], value: protocol },
-        { op: 'set', path: ['authMode'], value: ssoBound ? 'feishu' : 'manual' },
+        { op: 'set', path: ['authMode'], value: 'feishu' },
       ])
     } catch (cause) {
       busyRef.current = false
@@ -518,7 +518,8 @@ export function DofeAccessGate({ credentials, settingsApi, settingsScope, t, onA
   const authorized = credentialConfigured === true
     && settings.value?.setupComplete === true
     && settings.value.validationVersion === DOFE_ACCESS_VALIDATION_VERSION
-    && (BRAND_VARIANT !== 'sensteed' || (settings.value.authMode === 'feishu' && Boolean(settings.value.identity?.ssoSub)))
+    && settings.value.authMode === 'feishu'
+    && Boolean(settings.value.identity?.ssoSub)
   useEffect(() => { onAuthorizationChange?.(authorized) }, [authorized, onAuthorizationChange])
   if (authorized) return success ? <Toast text={t('loginSuccess')} icon={<Check size={18} />} onDone={() => setSuccess(false)} /> : null
   // Do not flash onboarding while the persisted account/credential is loading.

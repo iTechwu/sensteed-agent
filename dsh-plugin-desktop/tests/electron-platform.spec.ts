@@ -49,7 +49,7 @@ describe('electronPlatformStrategy', () => {
     expect(strategy.canToggleShellMode).toBe(true)
     expect(strategy.hidesWindowOnClose).toBe(true)
 
-    strategy.configureApplication(icon, 'Yootun-Agent')
+    strategy.configureApplication(icon, 'Sensteed-Agent')
     strategy.configureWindow(window as never)
     strategy.refreshThemeMaterial(window as never, 'mica')
 
@@ -72,7 +72,7 @@ describe('electronPlatformStrategy', () => {
     expect(strategy.canToggleShellMode).toBe(true)
     expect(strategy.hidesWindowOnClose).toBe(true)
 
-    strategy.configureApplication(icon, 'Yootun-Agent')
+    strategy.configureApplication(icon, 'Sensteed-Agent')
     strategy.configureWindow(window as never)
     strategy.refreshThemeMaterial(window as never, 'transparent')
 
@@ -103,7 +103,7 @@ describe('electronPlatformStrategy', () => {
     // no way back. Linux generations minimize on close instead.
     expect(strategy.hidesWindowOnClose).toBe(false)
 
-    strategy.configureApplication({} as never, 'Yootun-Agent')
+    strategy.configureApplication({} as never, 'Sensteed-Agent')
     strategy.configureWindow(window as never)
     strategy.refreshThemeMaterial(window as never, 'off')
 

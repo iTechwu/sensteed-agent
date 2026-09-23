@@ -79,7 +79,7 @@ describe('DesktopDialogWindow', () => {
     const parent = new electron.BrowserWindow({})
     const dialog = new DesktopDialogWindow({
       type: 'question',
-      title: 'Restart Yootun-Agent',
+      title: 'Restart Sensteed-Agent',
       message: 'Restart now?',
       detail: 'Running operations may be interrupted.',
       buttons: ['Restart', 'Cancel'],

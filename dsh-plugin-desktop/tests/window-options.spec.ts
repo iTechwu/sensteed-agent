@@ -30,7 +30,7 @@ const spec: DesktopShellSpec = {
     name: 'x-sensteed-agent-renderer',
     value: Buffer.alloc(32, 8).toString('base64url'),
   },
-  productName: 'Yootun-Agent',
+  productName: 'Sensteed-Agent',
   windowTitle: 'DeepSeek Harness Desktop',
   iconPath: '/tmp/app-icon.png',
   trayIcons: {

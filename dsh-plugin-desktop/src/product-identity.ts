@@ -21,7 +21,7 @@ export const DESKTOP_RELEASE_CHANNEL = DESKTOP_PRODUCT_IDENTITY.releaseChannel
 export const DESKTOP_HOME_DIRECTORY_NAME = DESKTOP_PRODUCT_IDENTITY.homeDirectoryName
 
 /**
- * Artifact filename prefix of the active channel, e.g. "Yootun-Agent-Beta" —
+ * Artifact filename prefix of the active channel, e.g. "Sensteed-Agent-Beta" —
  * the stem of the Portable/Setup/DMG artifact names.
  */
 export const DESKTOP_ARTIFACT_PREFIX = BRAND_ARTIFACT_PREFIX

@@ -13,7 +13,7 @@ import {
 
 describe('Desktop relaunch arguments', () => {
   const argv = [
-    '/Applications/Yootun-Agent.app/Contents/MacOS/Yootun-Agent',
+    '/Applications/Sensteed-Agent.app/Contents/MacOS/Sensteed-Agent',
     'desktop-main.cjs',
     '--profile=work',
     DESKTOP_RECOVERY_MODE_ARGUMENT,

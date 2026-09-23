@@ -262,14 +262,14 @@ function verifyCloudflaredArch(binary: string, arch: MacUniversalArch): void {
 
 function ensureCloudflaredBinary(version: string, arch: MacUniversalArch): string {
   const assetArch = arch === 'x86_64' ? 'amd64' : 'arm64'
-  const cacheDir = join(tmpdir(), 'yootun-agent-cloudflared', version, arch)
+  const cacheDir = join(tmpdir(), 'sensteed-agent-cloudflared', version, arch)
   const cachedBinary = join(cacheDir, 'cloudflared')
   if (existsSync(cachedBinary)) {
     verifyCloudflaredArch(cachedBinary, arch)
     return cachedBinary
   }
 
-  const temporary = mkdtempSync(join(tmpdir(), 'yootun-agent-cloudflared-download-'))
+  const temporary = mkdtempSync(join(tmpdir(), 'sensteed-agent-cloudflared-download-'))
   try {
     const archive = join(temporary, 'cloudflared.tgz')
     const url = `https://github.com/cloudflare/cloudflared/releases/download/${version}/cloudflared-darwin-${assetArch}.tgz`
@@ -359,7 +359,7 @@ function ensureElectronNativeAddonBinary(options: ElectronNativeAddonBuildOption
   ) as { version: string }).version
   const cacheDir = join(
     tmpdir(),
-    `yootun-agent-${options.cacheName}`,
+    `sensteed-agent-${options.cacheName}`,
     options.version,
     `electron-${electronVersion}`,
     options.arch,
@@ -375,7 +375,7 @@ function ensureElectronNativeAddonBinary(options: ElectronNativeAddonBuildOption
     throw new Error(`cannot resolve installed ${options.packageName} ${options.version} source`)
   }
 
-  const temporary = mkdtempSync(join(tmpdir(), `yootun-agent-${options.cacheName}-build-`))
+  const temporary = mkdtempSync(join(tmpdir(), `sensteed-agent-${options.cacheName}-build-`))
   try {
     const temporaryModules = join(temporary, 'node_modules')
     const buildPackage = join(temporaryModules, options.packageName)

@@ -44,7 +44,7 @@ describe('desktop npm launcher', () => {
   })
 
   it('names the installed product and selected profile behavior', () => {
-    expect(DESKTOP_CLI_HELP).toContain('Yootun-Agent')
+    expect(DESKTOP_CLI_HELP).toContain('Sensteed-Agent')
     expect(DESKTOP_CLI_HELP).toContain('[folder]')
     expect(DESKTOP_CLI_HELP).toContain('register the folder as a workspace')
     expect(DESKTOP_CLI_HELP).toContain('selected Web-capable profile')
@@ -53,9 +53,9 @@ describe('desktop npm launcher', () => {
 
   it('resolves the packaged Desktop user-data directory without Electron', () => {
     expect(defaultDesktopUserDataDirectory('win32', { APPDATA: 'C:\\Users\\Example\\AppData\\Roaming' }, 'ignored'))
-      .toBe('C:\\Users\\Example\\AppData\\Roaming\\Yootun-Agent')
+      .toBe('C:\\Users\\Example\\AppData\\Roaming\\Sensteed-Agent')
     expect(defaultDesktopUserDataDirectory('darwin', {}, '/Users/example'))
-      .toBe('/Users/example/Library/Application Support/Yootun-Agent')
+      .toBe('/Users/example/Library/Application Support/Sensteed-Agent')
   })
 
   it('exports diagnostics without launching Electron', async () => {

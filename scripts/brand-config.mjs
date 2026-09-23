@@ -18,8 +18,7 @@ import { resolve } from 'node:path'
 
 export const DEFAULT_BRAND_CONFIG_PATH = 'brand/brand.config.json'
 export const BRAND_CONFIG_PATHS = Object.freeze({
-  yootun: DEFAULT_BRAND_CONFIG_PATH,
-  sensteed: 'brand/sensteed/brand.config.json',
+  sensteed: DEFAULT_BRAND_CONFIG_PATH,
 })
 
 const APP_ID_PATTERN = /^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)+$/
@@ -37,9 +36,9 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3
 export function resolveBrandConfigPath(environment = process.env, root = process.cwd()) {
   const override = environment.BRAND_CONFIG
   if (override !== undefined && override.length > 0) return resolve(root, override)
-  const brand = environment.BRAND ?? 'yootun'
+  const brand = environment.BRAND ?? 'sensteed'
   const selected = BRAND_CONFIG_PATHS[brand]
-  if (selected === undefined) throw new Error(`unknown BRAND ${JSON.stringify(brand)}; expected yootun or sensteed`)
+  if (selected === undefined) throw new Error(`unknown BRAND ${JSON.stringify(brand)}; expected sensteed`)
   return resolve(root, selected)
 }
 

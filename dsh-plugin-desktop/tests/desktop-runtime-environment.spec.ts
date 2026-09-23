@@ -39,10 +39,10 @@ function options(
   return {
     platform,
     appExecutable: platform === 'win32'
-      ? 'C:\\Program Files\\DSH 100% Desktop\\Yootun-Agent.exe'
-      : "/Applications/DSH O'Brien.app/Contents/MacOS/Yootun-Agent",
+      ? 'C:\\Program Files\\DSH 100% Desktop\\Sensteed-Agent.exe'
+      : "/Applications/DSH O'Brien.app/Contents/MacOS/Sensteed-Agent",
     pnpmBinPath: platform === 'win32'
-      ? 'C:\\Program Files\\Yootun-Agent\\resources\\app.asar.unpacked\\node_modules\\pnpm\\bin\\pnpm.mjs'
+      ? 'C:\\Program Files\\Sensteed-Agent\\resources\\app.asar.unpacked\\node_modules\\pnpm\\bin\\pnpm.mjs'
       : "/Applications/DSH O'Brien.app/Contents/Resources/app.asar.unpacked/node_modules/pnpm/bin/pnpm.mjs",
     electronVersion: '43.4.0',
     stateDir,

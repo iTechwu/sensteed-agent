@@ -1,4 +1,4 @@
-/** Yootun-Agent Host plugin: owns the selected native shell generation. */
+/** Sensteed-Agent Host plugin: owns the selected native shell generation. */
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { fileURLToPath } from 'node:url'
@@ -194,8 +194,8 @@ export function apply(ctx: Context, config: DesktopShellConfig): void {
   const runtime = ctx.get('desktopRuntime')
   if (runtime === undefined) {
     process.stderr.write(
-      'dsh-plugin-desktop: this profile is composed with the Yootun-Agent shell, which requires the desktop launcher (desktopRuntime).\n'
-      + 'Start it with `sensteed-agent`, or select this profile inside the packaged Yootun-Agent application.\n'
+      'dsh-plugin-desktop: this profile is composed with the Sensteed-Agent shell, which requires the desktop launcher (desktopRuntime).\n'
+      + 'Start it with `sensteed-agent`, or select this profile inside the packaged Sensteed-Agent application.\n'
       + 'The desktop terminal, profile, and update rows stay inactive in an ordinary DSH boot.\n',
     )
     return

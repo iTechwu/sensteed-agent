@@ -1,30 +1,30 @@
 {
-  "variant": "yootun",
-  "tenant": "yootun",
-  "tenantId": "869856a5-760a-4570-9177-8823ed84da78",
+  "variant": "sensteed",
+  "tenant": "sensteed",
+  "tenantId": "7a8866f9-3994-4341-ade6-b9fa942efe99",
   "activeChannel": "beta",
   "channels": {
     "stable": {
-      "productName": "Yootun-Agent",
-      "appId": "ai.yootun.agent",
-      "artifactPrefix": "Yootun-Agent",
-      "homeDirectoryName": ".dsh"
+      "productName": "Sensteed-Agent",
+      "appId": "com.sensteed.agent",
+      "artifactPrefix": "Sensteed-Agent",
+      "homeDirectoryName": ".sensteed-agent"
     },
     "beta": {
-      "productName": "Yootun-Agent Beta",
-      "appId": "ai.yootun.agent.beta",
-      "artifactPrefix": "Yootun-Agent-Beta",
-      "homeDirectoryName": ".dsh-beta"
+      "productName": "Sensteed-Agent Beta",
+      "appId": "com.sensteed.agent.beta",
+      "artifactPrefix": "Sensteed-Agent-Beta",
+      "homeDirectoryName": ".sensteed-agent-beta"
     }
   },
   "packageName": "dsh-plugin-desktop",
   "displayName": {
-    "titlebar": "Yootun-Agent",
-    "locale": "Yootun-Agent"
+    "titlebar": "山子Agent",
+    "locale": "山子Agent"
   },
   "mission": {
-    "zh": "青年人买车就到优惠豚",
-    "en": "The destination for young car buyers"
+    "zh": "成就中国智造的全球竞争力",
+    "en": "Serve and advance the global competitiveness of Chinese intelligent manufacturing"
   },
   "artwork": {
     "appIconSource": "brand/assets/app-icon-source.jpg",
@@ -41,8 +41,8 @@
   "wordmark": {
     "image": "brand/assets/wordmark.png",
     "text": {
-      "zh": "优惠豚AI",
-      "en": "Yootun AI"
+      "zh": "山子高科",
+      "en": "SENSTEED HI-TECH"
     },
     "color": "#0F172A",
     "fontFile": "brand/assets/wordmark-font/STHeiti Medium.ttf",
@@ -57,8 +57,8 @@
   },
   "updates": {
     "endpoint": "https://ixicai.cn/api/desktop/version",
-    "versionHeader": "X-Yootun-Agent-Version",
-    "channelHeader": "X-Yootun-Agent-Channel"
+    "versionHeader": "X-Sensteed-Agent-Version",
+    "channelHeader": "X-Sensteed-Agent-Channel"
   },
   "docs": {
     "siteUrl": "https://dshdesktop.cn",
@@ -72,9 +72,9 @@
       "zh": "Anywhere Labs 项目维护团队",
       "en": "Anywhere Labs project maintainer team"
     },
-    "noticesHeader": "Yootun-Agent distributes the following third-party packages inside its installers."
+    "noticesHeader": "Sensteed-Agent distributes the following third-party packages inside its installers."
   },
   "nsis": {
-    "shortcutName": "Yootun-Agent Beta"
+    "shortcutName": "Sensteed-Agent Beta"
   }
 }

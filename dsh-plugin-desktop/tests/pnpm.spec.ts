@@ -46,7 +46,7 @@ function bootstrap(root = '/desktop runtime'): DesktopPnpmBootstrap {
     activeProfileName: 'work',
     activeProfileDir: join(root, 'profiles', 'work'),
     homeDir: join(root, 'harness home'),
-    appExecutable: join(root, 'Yootun-Agent'),
+    appExecutable: join(root, 'Sensteed-Agent'),
     pnpmBinPath: join(root, 'node_modules', 'pnpm', 'bin', 'pnpm.mjs'),
     electronVersion: '43.4.0',
     nodeBinDir: join(root, 'private', 'node-bin'),

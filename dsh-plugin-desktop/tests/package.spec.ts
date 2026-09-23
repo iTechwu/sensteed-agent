@@ -236,7 +236,7 @@ describe('published package surface', () => {
       type?: unknown
     }
     expect(snapshotManifest.type).toBe('module')
-    for (const file of ['index.js', 'capture-sdk.js', 'probe.js', 'adapter/yootun-agent.js']) {
+    for (const file of ['index.js', 'capture-sdk.js', 'probe.js', 'adapter/sensteed-agent.js']) {
       const source = readFileSync(new URL(`dist/${file}`, snapshotRoot), 'utf8')
       expect(source).not.toMatch(/(?:from|import) ['"]\.\.?(?:\/[^'"]+)+(?<!\.js)['"]/u)
     }

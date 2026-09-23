@@ -57,7 +57,7 @@ await page.route('**/api/desktop/dofe/validate', async route => {
 
 try {
   await page.goto(`http://127.0.0.1:${address.port}`)
-  let dialog = page.getByRole('dialog', { name: '激活 Yootun-Agent' })
+  let dialog = page.getByRole('dialog', { name: '激活 Sensteed-Agent' })
   await dialog.waitFor()
   await assertAccessibleSurface(page)
   const desktopCard = await dialog.boundingBox()
@@ -66,7 +66,7 @@ try {
 
   await page.setViewportSize({ width: 320, height: 720 })
   await page.reload()
-  dialog = page.getByRole('dialog', { name: '激活 Yootun-Agent' })
+  dialog = page.getByRole('dialog', { name: '激活 Sensteed-Agent' })
   await dialog.waitFor()
   await page.waitForFunction(() => document.activeElement?.id === 'yu-model-key')
   await assertAccessibleSurface(page)

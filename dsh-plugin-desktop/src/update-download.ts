@@ -1,4 +1,4 @@
-/** Headless, confirmation-gated downloads for Yootun-Agent installers. */
+/** Headless, confirmation-gated downloads for Sensteed-Agent installers. */
 
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto'
 import { chmod, lstat, mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
@@ -237,7 +237,7 @@ export function desktopUpdateFilename(
   validatedVersion(version, channel)
   const extension = platform === 'darwin' ? 'dmg' : 'exe'
   const platformName = platform === 'darwin' ? 'mac' : 'windows'
-  const product = channel === 'next' ? 'Yootun-Agent-Next' : channel === 'beta' ? 'Yootun-Agent-Beta' : 'Yootun-Agent'
+  const product = channel === 'next' ? 'Sensteed-Agent-Next' : channel === 'beta' ? 'Sensteed-Agent-Beta' : 'Sensteed-Agent'
   return `${product}-${version}-${platformName}.${extension}`
 }
 

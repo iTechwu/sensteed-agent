@@ -1,4 +1,4 @@
-/** Private, local-only sales workspace for Yootun-Agent. */
+/** Private, local-only sales workspace for Sensteed-Agent. */
 
 import { randomUUID } from 'node:crypto'
 import { chmod, lstat, mkdir, readFile } from 'node:fs/promises'

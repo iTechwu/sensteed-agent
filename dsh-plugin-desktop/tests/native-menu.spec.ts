@@ -17,13 +17,13 @@ describe('native macOS application menu', () => {
   })
 
   it('localizes the complete Simplified Chinese menu while retaining native roles', () => {
-    const template = macApplicationMenuTemplate('Yootun-Agent', 'zh-CN')
+    const template = macApplicationMenuTemplate('Sensteed-Agent', 'zh-CN')
 
     expect(template.map(item => item.label)).toEqual([
-      'Yootun-Agent', '文件', '编辑', '显示', '窗口',
+      'Sensteed-Agent', '文件', '编辑', '显示', '窗口',
     ])
     expect(submenu(template[0]!).map(item => item.label).filter(Boolean)).toEqual([
-      '关于 Yootun-Agent', '服务', '隐藏 Yootun-Agent', '隐藏其他', '全部显示', '退出 Yootun-Agent',
+      '关于 Sensteed-Agent', '服务', '隐藏 Sensteed-Agent', '隐藏其他', '全部显示', '退出 Sensteed-Agent',
     ])
     expect(submenu(template[1]!)).toEqual([
       expect.objectContaining({ label: '关闭窗口', role: 'close' }),
@@ -41,20 +41,20 @@ describe('native macOS application menu', () => {
   })
 
   it('keeps the English fallback complete', () => {
-    const template = macApplicationMenuTemplate('Yootun-Agent', 'en')
+    const template = macApplicationMenuTemplate('Sensteed-Agent', 'en')
 
     expect(template.map(item => item.label)).toEqual([
-      'Yootun-Agent', 'File', 'Edit', 'View', 'Window',
+      'Sensteed-Agent', 'File', 'Edit', 'View', 'Window',
     ])
     expect(submenu(template[0]!)).toEqual(expect.arrayContaining([
-      expect.objectContaining({ label: 'About Yootun-Agent', role: 'about' }),
-      expect.objectContaining({ label: 'Quit Yootun-Agent', role: 'quit' }),
+      expect.objectContaining({ label: 'About Sensteed-Agent', role: 'about' }),
+      expect.objectContaining({ label: 'Quit Sensteed-Agent', role: 'quit' }),
     ]))
   })
 
   it('places trusted desktop actions in the application submenu', () => {
     const invokeTerminal = vi.fn()
-    const template = macApplicationMenuTemplate('Yootun-Agent', 'en', [{
+    const template = macApplicationMenuTemplate('Sensteed-Agent', 'en', [{
       label: 'Open DSH Terminal',
       click: invokeTerminal,
     }, {

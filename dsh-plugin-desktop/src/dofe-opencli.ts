@@ -1,4 +1,4 @@
-/** Built-in, read-only OpenCLI bridge shipped with Yootun-Agent. */
+/** Built-in, read-only OpenCLI bridge shipped with Sensteed-Agent. */
 import { execFile } from 'node:child_process'
 import type { Context } from '@deepseek-ai/cordis'
 import { DOFE_ACCESS_SETTINGS_NAMESPACE, DOFE_ACCESS_VALIDATION_VERSION, type DofeAccessSettings } from './dofe-plugins.ts'

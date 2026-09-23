@@ -104,7 +104,7 @@ describe('desktop update installer download', () => {
       request,
     })
 
-    expect(result).toBe(join(directory, 'Yootun-Agent-2.1.0-mac.dmg'))
+    expect(result).toBe(join(directory, 'Sensteed-Agent-2.1.0-mac.dmg'))
     expect(await readFile(result)).toEqual(Buffer.from(artifact))
     expect(calls).toHaveLength(1)
     expect(calls[0]?.url).toBe(DESKTOP_DOWNLOAD_URLS.darwin)
@@ -125,7 +125,7 @@ describe('desktop update installer download', () => {
       },
     })
 
-    expect(result).toBe(join(directory, 'Yootun-Agent-2.2.0-windows.exe'))
+    expect(result).toBe(join(directory, 'Sensteed-Agent-2.2.0-windows.exe'))
     expect(await readFile(result)).toEqual(Buffer.from(artifact))
     await expectNoPartialFiles(directory)
   })
@@ -263,7 +263,7 @@ describe('desktop update installer download', () => {
 
     expect(result).toBe(join(
       directory,
-      'Yootun-Agent-2.8.0+build-mac.dmg',
+      'Sensteed-Agent-2.8.0+build-mac.dmg',
     ))
   })
 
@@ -501,7 +501,7 @@ it('downloads Next with a pinned release, a distinct filename and byte progress'
   const progress = vi.fn();
   const request = vi.fn<UpdateArtifactRequest>(async () => chunkedResponse([dmgArtifact()], {'content-length':'1024'}));
   const filename = desktopUpdateFilename('darwin', '2.0.14-next', 'next');
-  expect(filename).toContain('Yootun-Agent-Next-2.0.14-next');
+  expect(filename).toContain('Sensteed-Agent-Next-2.0.14-next');
   const path = await downloadDesktopUpdate({platform:'darwin',version:'2.0.14-next',channel:'next',destinationPath:join(root,filename),request,onProgress:progress});
   expect((await readFile(path)).byteLength).toBe(1024);
   expect(progress).toHaveBeenLastCalledWith(1024,1024);

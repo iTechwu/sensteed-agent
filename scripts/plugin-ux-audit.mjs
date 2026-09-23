@@ -306,7 +306,9 @@ if (!deliverablesStyles.includes('[data-ds-dark-theme]')) {
 }
 // Sibling 0.1.5-rc.2 aligned delivery cards with the upstream 18px/10px radius
 // and static-neutral fills (deepseek-harness 215bf40ad3); the audit follows.
-for (const [selector, radius] of [['.file', '18px'], ['.fileIcon', '10px'], ['.split', '10px']]) {
+// 0.1.7 dropped the `.split` surface entirely, so only the surviving classes
+// are audited.
+for (const [selector, radius] of [['.file', '18px'], ['.fileIcon', '10px']]) {
   const selectorRule = deliverablesStyles.match(new RegExp(`\\${selector} \\{[^}]*\\}`, 'u'))?.[0] || ''
   if (!selectorRule.includes(`border-radius: ${radius}`)) {
     failures.push(`ui-deliverables: ${selector} does not follow the ${radius} surface radius contract`)
@@ -449,5 +451,5 @@ if (failures.length) {
   for (const failure of failures) console.error(`- ${failure}`)
   process.exitCode = 1
 } else {
-  console.log(`Plugin UX audit passed for ${clientPlugins.length} Yootun client plugins and the native access surface.`)
+  console.log(`Plugin UX audit passed for ${clientPlugins.length} Sensteed client plugins and the native access surface.`)
 }

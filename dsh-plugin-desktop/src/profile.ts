@@ -142,7 +142,7 @@ const YOOTUN_PRIVATE_PLUGIN_ROW_IDS = new Set([
   'dofe-yootun-supply-watch', 'dofe-yootun-content-command', 'dofe-yootun-audit',
   'dofe-yootun-retrofit', 'dofe-yootun-daily-report', 'dofe-yootun-lead-discovery',
   'dofe-yootun-xhs-operation', 'dofe-yootun-douyin-operation', 'desktop-yootun-recruiter-tools',
-  'dofe-yootun-finops', 'dofe-yootun-tos-upload', 'yootun-agent-knowledge-capture',
+  'dofe-yootun-finops', 'dofe-yootun-tos-upload', 'sensteed-agent-knowledge-capture',
 ])
 
 /** Sensteed-only datasource plugins: never composed into the yootun build. */

@@ -146,7 +146,7 @@ export function requestDesktopArtifact(url: string, init: RequestInit = {}): Pro
 /** Main-process deadline for one Renderer generation to settle its client Loader. */
 export const RENDERER_BOOT_TIMEOUT_MS = 30_000
 
-/** Native adapter used by the Yootun-Agent launcher and owned by its Cordis shell plugin. */
+/** Native adapter used by the Sensteed-Agent launcher and owned by its Cordis shell plugin. */
 export class ElectronDesktopRuntime implements DesktopRuntime {
   readonly platform: DesktopPlatform
   readonly windowsBuild: number | undefined
