@@ -2,13 +2,40 @@
 import { act, createElement, Fragment } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, expect, it, vi } from 'vitest'
-import { DofeAccessGate, DofeAccessSection } from '../src/client/DofeAccessSection.tsx'
+import { DofeAccessGate, DofeAccessSection, removeDofeAccess } from '../src/client/DofeAccessSection.tsx'
 
 vi.mock('../src/generated-product-identity.ts', async importOriginal => ({
   ...await importOriginal<typeof import('../src/generated-product-identity.ts')>(),
   BRAND_VARIANT: 'sensteed', BRAND_TENANT: 'sensteed',
 }))
 afterEach(() => vi.unstubAllGlobals())
+
+it('clears the rendered SSO identity in the same revocation write', async () => {
+  const writes: Array<Array<{ op: string; path: string[]; value?: unknown }>> = []
+  const calls: string[] = []
+  vi.stubGlobal('fetch', vi.fn(async () => {
+    calls.push('logout')
+    return Response.json({ status: 'idle' })
+  }))
+  const settingsApi = {
+    describe: vi.fn(async () => ({ ok: true, value: { namespaces: [{ ns: 'dofe-access', revision: 4 }] } })),
+    mutate: vi.fn(async (_namespace: string, operations: Array<{ op: string; path: string[]; value?: unknown }>) => {
+      calls.push('settings')
+      writes.push(operations)
+      return { ok: true, value: {} }
+    }),
+  }
+  const credentials = { unset: vi.fn(async () => { calls.push('credentials'); return { ok: true, value: undefined } }) }
+
+  await removeDofeAccess(settingsApi as never, credentials as never)
+
+  expect(writes).toHaveLength(1)
+  expect(writes[0]).toEqual(expect.arrayContaining([
+    { op: 'unset', path: ['identity'] },
+    { op: 'unset', path: ['entitlements'] },
+  ]))
+  expect(calls).toEqual(['settings', 'logout', 'credentials'])
+})
 
 it('requires login before showing model setup and commits authorization only after setup', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)

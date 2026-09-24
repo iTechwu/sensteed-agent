@@ -177,26 +177,33 @@ export async function mutateDofeAccessSettings(settingsApi: SettingsApi, operati
 }
 
 export async function removeDofeAccess(settingsApi: SettingsApi, credentials: Credentials): Promise<void> {
-  // Fail closed: authorization must be revoked before the underlying key is removed.
-  await mutateDofeAccessSettings(settingsApi, [
+  // Clear the local authorization state in the same revision as the gate
+  // revocation. The gate is rendered from this settings snapshot; leaving the
+  // identity for a later request makes a successful logout look ineffective
+  // while that request is pending or when the settings mirror is delayed.
+  const revokeOperations: SettingsOperations = [
     { op: 'set', path: ['setupComplete'], value: false },
     { op: 'set', path: ['validationVersion'], value: 0 },
     { op: 'set', path: ['modelId'], value: '' },
     { op: 'set', path: ['protocol'], value: DEFAULT_DOFE_PROTOCOL },
-  ])
+  ]
+  if (BRAND_VARIANT === 'sensteed') {
+    revokeOperations.push(
+      { op: 'unset', path: ['identity'] },
+      { op: 'unset', path: ['entitlements'] },
+      { op: 'set', path: ['authMode'], value: 'feishu' },
+    )
+  }
+  await mutateDofeAccessSettings(settingsApi, revokeOperations)
   if (BRAND_VARIANT === 'sensteed') {
     const response = await fetch(DOFE_AUTH_LOGOUT_PATH, {
       method: 'POST', credentials: 'same-origin', redirect: 'error',
       signal: AbortSignal.timeout(ACCESS_REQUEST_TIMEOUT_MS),
-      headers: { 'Content-Type': 'application/json' }, body: '{}',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: '{}',
     })
     if (!response.ok) throw new Error('退出登录未完成，请重试')
-    await mutateDofeAccessSettings(settingsApi, [
-      { op: 'unset', path: ['identity'] },
-      { op: 'unset', path: ['entitlements'] },
-      { op: 'set', path: ['authMode'], value: 'feishu' },
-    ])
   }
+  // Fail closed: authorization is revoked before the underlying key is removed.
   const result = await credentials.unset(DOFE_ACCESS_KEY)
   if (!result.ok) throw new Error(result.error.message)
 }
