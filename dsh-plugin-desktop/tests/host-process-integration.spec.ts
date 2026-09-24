@@ -1,4 +1,4 @@
-import { fork, type Serializable } from 'node:child_process'
+import { execSync, fork, type Serializable } from 'node:child_process'
 import { once } from 'node:events'
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -12,6 +12,12 @@ import { HostRpc } from '../src/host-rpc.ts'
 import { bindNativeRuntime, runtimeSnapshot } from '../src/host-runtime-bridge.ts'
 import type { DesktopRuntime, DesktopShellSpec } from '../src/runtime.ts'
 
+/** Diagnostic-only: list every process holding a TCP listener on one port. */
+function portListeners(port: string | number): string {
+  const out = execSync(`lsof -nP -iTCP:${String(port)} -sTCP:LISTEN || true`, { encoding: 'utf8' })
+  return out.trim() === '' ? `(nothing listening on ${String(port)})` : out.trim()
+}
+
 it.each(['disabled', 'missing', 'installed'] as const)('boots a separate Web Host with client plugins (AA provider: %s)', async aaProvider => {
   const aaRequested = aaProvider !== 'disabled'
   const aaEnabled = aaProvider === 'installed'
@@ -20,6 +26,7 @@ it.each(['disabled', 'missing', 'installed'] as const)('boots a separate Web Hos
   let child: ReturnType<typeof fork> | undefined
   let rpc: HostRpc | undefined
   let releaseNative: (() => Promise<void>) | undefined
+  let shell: DesktopShellSpec | undefined
   let pnpm: ReturnType<typeof installDesktopPnpmRuntime> | undefined
   let stderr = ''
   let stdoutLog = ''
@@ -43,7 +50,14 @@ it.each(['disabled', 'missing', 'installed'] as const)('boots a separate Web Hos
     expect(prepared.aaEnabled).toBe(aaEnabled)
     if (aaProvider === 'missing') expect(prepared.aaFailure).toBeTruthy()
     else expect(prepared.aaFailure).toBeUndefined()
-    prepared.port = 0
+    // dsh 0.1.7 imports the home settings document during every first boot and
+    // reconciles profile patches, which restarts the Web server with the
+    // command-line port winning over the composed row. The row default and the
+    // command line must therefore agree — keep the composed default (43120) on
+    // both sides instead of the pre-0.1.7 `prepared.port = 0` ephemeral trick;
+    // any other port here makes the scheduled shell spec stale after the
+    // import restart and the first renderer fetch hits a closed port.
+    expect(prepared.port).toBe(43_120)
     const plugin = join(prepared.profile.dir, 'node_modules', 'isolated-client-fixture')
     mkdirSync(plugin, { recursive: true })
     writeFileSync(join(plugin, 'package.json'), JSON.stringify({ name: 'isolated-client-fixture', version: '1.0.0', type: 'module',
@@ -51,13 +65,23 @@ it.each(['disabled', 'missing', 'installed'] as const)('boots a separate Web Hos
     writeFileSync(join(plugin, 'index.js'), 'export function apply() {}\n')
     writeFileSync(join(plugin, 'client.js'), 'export function apply(ctx) { ctx.provide("isolatedClientFixture", true) }\n')
     prepared.patches.push({ insert: [{ id: 'isolated-client-fixture', name: 'isolated-client-fixture' }] })
+    // The boot-time settings import reconciles through the launcher's
+    // `readPatches`, which re-prepares the profile from disk. Persist the
+    // fixture row into the profile patch layer so it survives that
+    // recomposition instead of living only in this in-memory document.
+    writeFileSync(join(prepared.profile.dir, 'cordis.patch.yml'),
+      '- insert:\n    - id: isolated-client-fixture\n      name: isolated-client-fixture\n')
     const packageRoot = new URL('../', import.meta.url)
     const pnpmBinPath = fileURLToPath(new URL('node_modules/pnpm/bin/pnpm.mjs', packageRoot))
     const electronVersion = JSON.parse(readFileSync(new URL('node_modules/electron/package.json', packageRoot), 'utf8')).version
     pnpm = installDesktopPnpmRuntime({ platform: process.platform, appExecutable: process.execPath, pnpmBinPath,
       electronVersion, stateDir: join(home, 'runtime'), environment: process.env })
     child = fork(fileURLToPath(new URL('./fixtures/isolated-host/child.mjs', import.meta.url)), [], {
-      execArgv: [], stdio: ['ignore', 'pipe', 'pipe', 'ipc'], serialization: 'advanced',
+      // dsh 0.1.7's HMR service refuses to mount without the internal loader
+      // seam; the production supervisor (src/host-process.ts) passes the same
+      // flag, and the boot-time settings import depends on the HMR entry to
+      // reconcile profile patches without dropping the web server.
+      execArgv: ['--expose-internals'], stdio: ['ignore', 'pipe', 'pipe', 'ipc'], serialization: 'advanced',
     })
     child.stdout?.on('data', data => { stdoutLog += String(data) })
     child.stderr?.on('data', data => { stderr += String(data) })
@@ -71,13 +95,16 @@ it.each(['disabled', 'missing', 'installed'] as const)('boots a separate Web Hos
       listen: receive => { worker.on('message', receive); return () => { worker.off('message', receive) } },
     }, 120_000)
     child.on('exit', () => rpc?.close(stderr || 'worker exited'))
-    let shell: DesktopShellSpec | undefined
     const runtime = {
       platform: 'win32', windowsBuild: 22631, locale: 'en',
       updates: { isPackaged: false, canDownload: false, currentVersion: '2.0.7-beta.1', statePath: join(home, 'updates') },
       schedule(spec: DesktopShellSpec) { shell = spec; return async () => {} },
       registerTrayItem() { return { refresh() {}, dispose() {} } },
       setLocalePreference() {}, setThemeSource() {},
+      // dsh 0.1.7's settings import schedules a generation restart through the
+      // native bridge after reconciling the imported document; the bridge
+      // attaches its own error logging to the returned promise.
+      requestRestart: async () => {}, requestRecoveryRestart: async () => {},
     } as unknown as DesktopRuntime
     releaseNative = bindNativeRuntime(rpc, runtime)
     rpc.handle('certificate', () => ({ failureCode: 'test-disabled' }))
@@ -128,7 +155,20 @@ it.each(['disabled', 'missing', 'installed'] as const)('boots a separate Web Hos
     await expect(fetch(spec.url, { headers })).rejects.toThrow()
   } catch (error) {
     const cause = (error as { cause?: unknown }).cause
-    throw new Error(`${error instanceof Error ? error.stack : String(error)}\ncause=${String(cause)}\nexit=${String(child.exitCode ?? child.signalCode)}\nstdout:\n${stdoutLog}\nstderr:\n${stderr}`)
+    const probeUrl = shell ? `${shell.url} (auth=${shell.authenticationUrl})` : 'spec missing'
+    let listeners = 'lsof unavailable'
+    try {
+      const probePort = shell ? new URL(shell.url).port : ''
+      const all = child?.pid === undefined ? '' : execSync(`lsof -nP -a -p ${String(child.pid)} -iTCP -sTCP:LISTEN || true`, { encoding: 'utf8' })
+      listeners = `${portListeners(probePort)}\nchild listeners:\n${all.trim() === '' ? `(child holds no TCP listener)` : all.trim()}`
+    } catch { /* diagnostic only */ }
+    let hostLogs = '(no host logs read)'
+    try {
+      const logsRoot = join(home, 'logs')
+      const files = execSync(`find ${JSON.stringify(logsRoot)} -type f 2>/dev/null | head -8`, { encoding: 'utf8' }).trim()
+      hostLogs = files === '' ? '(logs dir empty)' : files.split('\n').map(file => `\n--- ${file} ---\n${readFileSync(file, 'utf8').slice(-12_000)}`).join('')
+    } catch { /* diagnostic only */ }
+    throw new Error(`${error instanceof Error ? error.stack : String(error)}\ncause=${String(cause)}\nurl=${probeUrl}\nlisteners:\n${listeners}\nexit=${String(child?.exitCode ?? child?.signalCode)}\nstdout:\n${stdoutLog}\nstderr:\n${stderr}\nhost logs:\n${hostLogs}`)
   } finally {
     await releaseNative?.()
     rpc?.close()
