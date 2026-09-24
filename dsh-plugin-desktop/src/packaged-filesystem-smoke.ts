@@ -6,7 +6,8 @@ import * as SkillFileSystem from '@deepseek-ai/dsh-skill-filesystem'
 import { dirname, join } from 'node:path'
 
 export async function verifyBundledSkills(applicationRoot: string): Promise<void> {
-  const skillsRoot = join(applicationRoot, 'node_modules', '@deepseek-ai', 'dsh-agent-presets', 'presets', 'cordis', 'skills')
+  // dsh 0.1.7 ships the Cordis skill tree from `@deepseek-ai/dsh-agent-preset/skills`.
+  const skillsRoot = join(applicationRoot, 'node_modules', '@deepseek-ai', 'dsh-agent-preset', 'skills')
   const ctx = new Context()
   try {
     await ctx.plugin(LocalFileSystem, { cwd: applicationRoot })

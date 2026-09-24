@@ -141,3 +141,10 @@
     printUrl: false
     surfaceContext: true
     trustedHosts: []
+
+# The isolated desktop Host never mounts Node's internal loader seam, so the
+# module-HMR service cannot activate; profile reloads ride the settings
+# document and the desktop-owned reload path instead. Overrides the
+# base-bundle row in place (top-level patch statement, applied last).
+- id: hmr
+  disabled: true

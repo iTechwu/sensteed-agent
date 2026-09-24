@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   desktopSetupWizardRequiresLanAcknowledgement,
@@ -42,7 +41,6 @@ describe('Desktop Setup Wizard copy and contract', () => {
   it('uses the generated brand name throughout the first-run experience', () => {
     const english = desktopSetupWizardCopy('en')
     const chinese = desktopSetupWizardCopy('zh')
-    const currentName: string = BRAND_DISPLAY_NAME.locale
     // Sensteed is the single brand: the retired Yootun name must not appear
     // anywhere in the first-run copy.
     const otherBrandNames = ['Yootun-Agent', '优惠豚']

@@ -194,6 +194,7 @@
     "dsh-plugin-desktop/tests/profile-selection-window.spec.ts": 2,
     "dsh-plugin-desktop/tests/profile.spec.ts": 2,
     "dsh-plugin-desktop/tests/relaunch-arguments.spec.ts": 2,
+    "dsh-plugin-desktop/tests/setup-wizard-copy.spec.ts": 3,
     "dsh-plugin-desktop/tests/update-download.spec.ts": 11,
     "dsh-plugin-desktop/tests/updates.spec.ts": 10,
     "dsh-plugin-desktop/tests/white-label-roundtrip.spec.ts": 1,

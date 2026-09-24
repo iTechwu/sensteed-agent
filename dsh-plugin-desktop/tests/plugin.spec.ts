@@ -133,6 +133,11 @@ type AccountView = { attempt: { id: string; phase: string; authorizeUrl?: string
 interface PluginHarness {
   ctx: Context
   platformLogin: ReturnType<typeof vi.fn<(request: DesktopPlatformLoginRequest) => void>>
+  pickFile: DesktopRuntime['pickFile']
+  openOpenMontage: DesktopRuntime['openOpenMontage']
+  openExternal: DesktopRuntime['openExternal']
+  openBossWeb: DesktopRuntime['openBossWeb']
+  openContentPlatformWeb: DesktopRuntime['openContentPlatformWeb']
   /** Publish one `deepseekAccount.watch` view to every open watcher. */
   emitAccount(view: AccountView): void
   config: DesktopConfig
@@ -222,6 +227,12 @@ function createHarness(
     platform,
     windowsBuild: platform === 'win32' ? 22_631 : undefined,
     locale: 'en',
+    pickFile: vi.fn(async () => null),
+    confirmRestart: vi.fn(async () => true),
+    openOpenMontage: vi.fn(async () => {}),
+    openExternal: vi.fn(async () => {}),
+    openBossWeb: vi.fn(async () => {}),
+    openContentPlatformWeb: vi.fn(async () => {}),
     updates: {
       isPackaged: false,
       canDownload: platform === 'darwin' || platform === 'win32',
@@ -327,6 +338,11 @@ function createHarness(
     emitAccount: (view) => { for (const push of accountWatchers) push(view) },
     config: fixture.config,
     runtime,
+    pickFile: runtime.pickFile,
+    openOpenMontage: runtime.openOpenMontage,
+    openExternal: runtime.openExternal,
+    openBossWeb: runtime.openBossWeb,
+    openContentPlatformWeb: runtime.openContentPlatformWeb,
     shell: () => shell,
     update,
     restart,
