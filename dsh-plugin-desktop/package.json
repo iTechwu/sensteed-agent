@@ -363,6 +363,7 @@
     "@deepseek-ai/dsh-schedule": "workspace:*",
     "@deepseek-ai/dsh-scope": "workspace:*",
     "@deepseek-ai/dsh-sdk-app": "workspace:*",
+    "@deepseek-ai/dsh-sdk-client": "workspace:*",
     "@deepseek-ai/dsh-sdk-jsonrpc-server": "workspace:*",
     "@deepseek-ai/dsh-sdk-minimal": "workspace:*",
     "@deepseek-ai/dsh-sdk-protocol": "workspace:*",

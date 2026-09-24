@@ -1356,6 +1356,9 @@ importers:
       '@deepseek-ai/dsh-sdk-app':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/bundle/sdk-app
+      '@deepseek-ai/dsh-sdk-client':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/sdk/client
       '@deepseek-ai/dsh-sdk-jsonrpc-server':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/sdk/server

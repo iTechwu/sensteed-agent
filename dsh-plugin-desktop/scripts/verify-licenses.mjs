@@ -48,6 +48,9 @@ const NOTICE_LICENSES = new Set([
   'Apache-2.0 AND LGPL-3.0-or-later',
   // pnpm installs the wasm32 sharp variant on every host; yarn never sees it.
   'Apache-2.0 AND LGPL-3.0-or-later AND MIT',
+  // trycua computer-use drivers: MPL-2.0 is file-level copyleft; binary
+  // redistribution with the required notices satisfies both licenses.
+  'MIT AND MPL-2.0',
 ])
 
 /**
