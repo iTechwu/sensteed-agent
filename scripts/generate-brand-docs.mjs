@@ -29,7 +29,9 @@ const DOCUMENTS = [
       { path: 'README.md', lang: 'zh' },
       { path: 'README.en.md', lang: 'en' },
     ],
-    blocks: ['brand-title', 'download-cta', 'download-table'],
+    // 'download-table' is no longer managed: the internal README carries a
+    // hand-maintained packaging matrix instead of download-site links.
+    blocks: ['brand-title', 'download-cta'],
   },
   {
     record: 'PRIVACY.i18n.yaml',
@@ -61,23 +63,23 @@ function packageVersion() {
 const BLOCKS = {
   'brand-title': ({ config, lang }) => config.docs.communityName[lang],
   'download-cta': ({ config, lang }) => lang === 'zh'
-    ? `<h3 align="center"><a href="${config.docs.siteUrl}">一键下载，开箱即用。</a></h3>`
-    : `<h3 align="center"><a href="${config.docs.siteUrl}">One-click download, ready to use out of the box.</a></h3>`,
+    ? `<h3 align="center"><a href="${config.docs.repoUrl}/-/releases">安装包从 GitLab Releases 获取。</a></h3>`
+    : `<h3 align="center"><a href="${config.docs.repoUrl}/-/releases">Installer artifacts are published on GitLab Releases.</a></h3>`,
   'download-table': ({ config, lang }) => {
     const community = config.docs.communityName[lang]
     if (lang === 'zh') {
       return [
-        '| 平台 | 下载 | 安装方式 |',
+        '| 平台 | 产物 | 安装方式 |',
         '| --- | --- | --- |',
-        `| Windows x64 | [下载安装程序](${config.docs.downloadBase}/windows) | 运行 NSIS 安装程序并按提示完成安装 |`,
-        `| macOS Universal | [下载 DMG](${config.docs.downloadBase}/mac) | 打开 DMG，将 ${community} 拖入 Applications |`,
+        '| Windows x64 | NSIS 安装程序（`dist` 产物，随版本发布上传） | 运行安装程序并按提示完成安装 |',
+        `| macOS Universal | DMG（\`dist\` 产物） | 打开 DMG，将 ${community} 拖入 Applications |`,
       ].join('\n')
     }
     return [
-      '| Platform | Download | Installation |',
+      '| Platform | Artifact | Installation |',
       '| --- | --- | --- |',
-      `| Windows x64 | [Download installer](${config.docs.downloadBase}/windows) | Run the NSIS installer and follow its prompts |`,
-      `| macOS Universal | [Download DMG](${config.docs.downloadBase}/mac) | Open the DMG and drag ${community} into Applications |`,
+      '| Windows x64 | NSIS installer (uploaded with each release from `dist`) | Run the installer and follow its prompts |',
+      `| macOS Universal | DMG (\`dist\` artifact) | Open the DMG and drag ${community} into Applications |`,
     ].join('\n')
   },
   'privacy-maintainer': ({ config, lang }) => lang === 'zh'

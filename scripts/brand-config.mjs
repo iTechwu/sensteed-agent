@@ -24,7 +24,7 @@ export const BRAND_CONFIG_PATHS = Object.freeze({
 const APP_ID_PATTERN = /^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)+$/
 const HEADER_NAME_PATTERN = /^X-[A-Za-z0-9-]+$/
 const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/
-const URL_PATTERN = /^https:\/\/[A-Za-z0-9.-]+(:\d+)?(\/[^\s"']*)?$/
+const URL_PATTERN = /^https?:\/\/[A-Za-z0-9.-]+(:\d+)?(\/[^\s"']*)?$/u
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 /**
@@ -149,16 +149,16 @@ export function validateBrandConfig(document, sourcePath = 'brand.config.json') 
 
   const updates = requireObject(config, 'updates', push)
   if (updates !== undefined) {
-    requirePattern(updates, 'endpoint', URL_PATTERN, 'updates.', push, 'expected an https:// URL')
+    requirePattern(updates, 'endpoint', URL_PATTERN, 'updates.', push, 'expected an http(s):// URL')
     requirePattern(updates, 'versionHeader', HEADER_NAME_PATTERN, 'updates.', push, 'expected an X-* header name')
     requirePattern(updates, 'channelHeader', HEADER_NAME_PATTERN, 'updates.', push, 'expected an X-* header name')
   }
 
   const docs = requireObject(config, 'docs', push)
   if (docs !== undefined) {
-    requirePattern(docs, 'siteUrl', URL_PATTERN, 'docs.', push, 'expected an https:// URL')
-    requirePattern(docs, 'downloadBase', URL_PATTERN, 'docs.', push, 'expected an https:// URL')
-    requirePattern(docs, 'repoUrl', URL_PATTERN, 'docs.', push, 'expected an https:// URL')
+    requirePattern(docs, 'siteUrl', URL_PATTERN, 'docs.', push, 'expected an http(s):// URL')
+    requirePattern(docs, 'downloadBase', URL_PATTERN, 'docs.', push, 'expected an http(s):// URL')
+    requirePattern(docs, 'repoUrl', URL_PATTERN, 'docs.', push, 'expected an http(s):// URL')
     const communityName = requireObject(docs, 'communityName', push)
     communityName !== undefined && requireNonEmptyString(communityName, 'zh', 'docs.communityName.', push)
     communityName !== undefined && requireNonEmptyString(communityName, 'en', 'docs.communityName.', push)

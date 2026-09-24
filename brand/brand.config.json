@@ -61,16 +61,16 @@
     "channelHeader": "X-Sensteed-Agent-Channel"
   },
   "docs": {
-    "siteUrl": "https://dshdesktop.cn",
-    "downloadBase": "https://www.dshdesktop.cn/api/downloads",
-    "repoUrl": "https://github.com/anywhere-labs/deepseek-harness-desktop",
+    "siteUrl": "http://10.30.30.212/wumin1/sensteed-agent",
+    "downloadBase": "http://10.30.30.212/wumin1/sensteed-agent/-/releases",
+    "repoUrl": "http://10.30.30.212/wumin1/sensteed-agent",
     "communityName": {
       "zh": "Sensteed Agent",
       "en": "Sensteed Agent"
     },
     "maintainer": {
-      "zh": "Anywhere Labs 项目维护团队",
-      "en": "Anywhere Labs project maintainer team"
+      "zh": "Sensteed 团队（山子高科）",
+      "en": "Sensteed team (Shandzi High-Tech)"
     },
     "noticesHeader": "Sensteed-Agent distributes the following third-party packages inside its installers."
   },
