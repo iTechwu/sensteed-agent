@@ -49,6 +49,9 @@ const IMMUTABLE_BUNDLES = new Set([
   ...(PROFILE_TEMPLATES.web?.bundles ?? []),
   '@deepseek-ai/sensteed-agent-app',
   ...DESKTOP_PACKAGE_NAMES,
+  // Retired second-channel npm name: historical profiles must keep treating
+  // it as a launcher-owned bundle even though the brand no longer ships it.
+  'dsh-plugin-desktop-beta',
   'dsh-community-market',
 ])
 

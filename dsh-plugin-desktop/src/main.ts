@@ -8,6 +8,9 @@
 // runner child alone.
 
 import { formatUnexpectedHostExit, startIsolatedDesktopHost } from './host-process.ts'
+import { createDesktopProfileBoot } from './profile-context.ts'
+import type { Context } from '@deepseek-ai/cordis'
+import { logInactiveStartupEntries } from './startup-audit.ts'
 import { app, crashReporter, safeStorage, session, shell } from 'electron'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { randomUUID } from 'node:crypto'
@@ -1648,6 +1651,7 @@ async function start(): Promise<void> {
     if (profilePreferences === undefined) {
       throw new Error(`${BIN_NAME}: active Profile preferences were not initialized`)
     }
+    const profileBoot = createDesktopProfileBoot(prepared, desktopPnpmBootstrap)
     if (process.env.DSH_DESKTOP_ISOLATED_HOST !== '0') {
       startupStage = 'host-boot'
       lifecycleRecorder.transitionStartupStage(startupStage)
@@ -1658,7 +1662,7 @@ async function start(): Promise<void> {
           desktopPnpmBootstrap, logDirectory: join(desktopUserDataDir, 'logs', 'host') },
         runtime, rendererToken: browserAccess.rendererHeader.value,
         prepareCertificate: prepareHostCertificate,
-        bindHost: host => generation.bindHost(host), requestQuit,
+        bindHost: host => { generation.bindHost(host); profileBoot.prepare(host as unknown as Context) }, requestQuit,
         onFailure: (error, exit) => {
           electronLogger.error(formatUnexpectedHostExit(error, exit))
           lifecycleRecorder.recordHostExit({
@@ -1876,7 +1880,9 @@ async function start(): Promise<void> {
         throw cause
       })
       generation.bindHost(ctx)
+      profileBoot.markReady()
       observeDesktopPreferenceSettings(ctx, fileExporter, enqueueProfilePreferencesWrite)
+      void logInactiveStartupEntries(ctx, BIN_NAME)
     }
     startupStage = 'renderer-startup'
     lifecycleRecorder.transitionStartupStage(startupStage)

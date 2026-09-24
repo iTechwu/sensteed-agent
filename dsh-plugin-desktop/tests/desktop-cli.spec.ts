@@ -66,7 +66,9 @@ describe('packaged dsh bootstrap', () => {
       expect(asarProcess.noAsar).toBe(true)
       return { runCli: async () => {} }
     })
-    await runDesktopDshCli({}, load, ['node', 'desktop-cli', '--version'], undefined, asarProcess)
+    // A plain command reaches the unpacked CLI through load; `--version` is
+    // answered by the fork's fast path without ever loading it.
+    await runDesktopDshCli({}, load, ['node', 'desktop-cli', '--dump-config'], undefined, asarProcess)
     expect(load).toHaveBeenCalledOnce()
   })
 

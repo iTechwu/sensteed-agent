@@ -196,8 +196,13 @@ describe('Windows x64 installer packaging', () => {
 
     packageWindowsArtifact(value, 'zip', 'portable archive')
 
-    expect(calls).toHaveLength(2)
-    expect(calls[0]?.args.at(-1)).toBe('--config.win.compression=store')
+    // Rebuild, builder, then the packaged-runtime verifier that follows every build.
+    expect(calls).toHaveLength(3)
+    expect(calls[0]?.command).toBe(options(calls).commandShell)
+    expect(calls[1]?.command).toBe(options(calls).nodeExecutable)
+    expect(calls[1]?.args.at(-1)).toBe('--config.win.compression=store')
+    expect(calls[2]?.command).toBe(options(calls).nodeExecutable)
+    expect(calls[2]?.args).toEqual([options(calls).verifier])
     expect(logs).toContain('Packaging the portable archive with store compression.')
   })
 

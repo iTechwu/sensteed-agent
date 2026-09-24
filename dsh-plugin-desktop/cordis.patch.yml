@@ -82,8 +82,8 @@
       name: dsh-plugin-desktop/updates
     - id: desktop-browser-tools
       name: dsh-plugin-desktop/browser-tools
-    - id: desktop-ci-tools
-      name: dsh-plugin-desktop/ci-tools
+    # 0.1.7 ships the ci tools natively (@deepseek-ai/dsh-tool-ci); the
+    # desktop duplicate register would collide on `ci_run`.
     - id: desktop-yootun-recruiter-tools
       name: dsh-plugin-desktop/yootun-recruiter-tools
     - id: dofe-managed

@@ -43,10 +43,9 @@ describe('Desktop Setup Wizard copy and contract', () => {
     const english = desktopSetupWizardCopy('en')
     const chinese = desktopSetupWizardCopy('zh')
     const currentName: string = BRAND_DISPLAY_NAME.locale
-    const otherBrandNames = ['../../brand/brand.config.json', '../../brand/sensteed/brand.config.json']
-      .map(path => JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8')).displayName.locale as string)
-      .filter(name => name !== currentName)
-    expect(otherBrandNames.length).toBeGreaterThan(0)
+    // Sensteed is the single brand: the retired Yootun name must not appear
+    // anywhere in the first-run copy.
+    const otherBrandNames = ['Yootun-Agent', '优惠豚']
     expect(english.title).toContain(BRAND_DISPLAY_NAME.locale)
     expect(english.welcomeTitle).toContain(BRAND_DISPLAY_NAME.locale)
     expect(english.successBody).toContain(BRAND_DISPLAY_NAME.locale)

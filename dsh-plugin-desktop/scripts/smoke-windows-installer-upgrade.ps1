@@ -1,5 +1,5 @@
 param(
-$ProductName = if ($env:DESKTOP_PRODUCT_NAME) { $env:DESKTOP_PRODUCT_NAME } else { 'Yootun-Agent' }
+$ProductName = if ($env:DESKTOP_PRODUCT_NAME) { $env:DESKTOP_PRODUCT_NAME } else { 'Sensteed-Agent' }
   [Parameter(Mandatory = $true)]
   [string]$BaseInstaller,
 
@@ -40,7 +40,7 @@ $taskUserData = Join-Path $env:APPDATA $ProductName
 $taskDshHome = Join-Path $taskRoot 'dsh-home'
 $taskActiveRunMarker = Join-Path $taskUserData 'crash-evidence\active-run.json'
 $taskAppPath = Join-Path $taskInstallRoot '$ProductName.exe'
-$taskUninstallerPath = Join-Path $taskInstallRoot 'Uninstall Yootun-Agent.exe'
+$taskUninstallerPath = Join-Path $taskInstallRoot 'Uninstall Sensteed-Agent.exe'
 if (Test-Path -LiteralPath $taskActiveRunMarker) {
   throw 'Refusing to overwrite an existing $ProductName active run marker.'
 }
@@ -116,7 +116,7 @@ function Wait-TaskProcess([bool]$taskShouldExist, [int]$taskTimeoutSeconds = 30)
     }
     Start-Sleep -Milliseconds 250
   } while ([DateTime]::UtcNow -lt $taskDeadline)
-  throw "Timed out waiting for Yootun-Agent process state: shouldExist=$taskShouldExist"
+  throw "Timed out waiting for Sensteed-Agent process state: shouldExist=$taskShouldExist"
 }
 
 function Wait-TaskActiveRunMarker([bool]$taskShouldExist, [int]$taskTimeoutSeconds = 30) {
@@ -247,7 +247,7 @@ try {
     [Environment]::GetFolderPath('CommonStartMenu')
   ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) }
   $taskRemainingShortcuts = @($taskShortcutRoots | ForEach-Object {
-    Get-ChildItem -LiteralPath $_ -Filter '*Yootun-Agent*' -Recurse -ErrorAction SilentlyContinue
+    Get-ChildItem -LiteralPath $_ -Filter '*Sensteed-Agent*' -Recurse -ErrorAction SilentlyContinue
   })
   $taskResult.shortcutsRemoved = $taskRemainingShortcuts.Count -eq 0
 

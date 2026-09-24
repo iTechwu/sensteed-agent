@@ -141,6 +141,7 @@ describe('desktop direct bundle management', () => {
       expect.objectContaining({ status: 'active', mutable: false }),
     )
     expect(desktopPluginBundleMutable('dsh-plugin-desktop')).toBe(false)
+    // The retired second-channel npm name stays immutable for legacy profiles.
     expect(desktopPluginBundleMutable('dsh-plugin-desktop-beta')).toBe(false)
     expect(desktopPluginBundleMutable('dsh-community-market')).toBe(false)
     expect(desktopPluginBundleMutable('@linxin666/dsh-web-ui-all')).toBe(true)

@@ -33,9 +33,9 @@ type NotificationOutcome = 'turn-completed' | 'turn-failed' | 'job-completed' | 
 const NOTIFICATION_COPY: Record<DesktopLocale, Record<NotificationOutcome, DesktopNotification>> = {
   en: {
     'turn-completed': { title: 'User Turn Completed', body: 'A user-initiated turn has finished.' },
-    'turn-failed': { title: 'User Turn Failed', body: 'A user-initiated turn could not finish. Open DSH Desktop for details.' },
+    'turn-failed': { title: 'User Turn Failed', body: 'A user-initiated turn could not finish. Open Sensteed-Agent for details.' },
     'job-completed': { title: 'Background Job Completed', body: 'A background job has finished.' },
-    'job-failed': { title: 'Background Job Failed', body: 'A background job could not finish. Open DSH Desktop for details.' },
+    'job-failed': { title: 'Background Job Failed', body: 'A background job could not finish. Open Sensteed-Agent for details.' },
   },
   zh: {
     'turn-completed': { title: '用户回合已完成', body: '一个由你发起的回合已完成。' },
