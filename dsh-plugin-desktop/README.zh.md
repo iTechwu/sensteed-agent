@@ -5,6 +5,25 @@
 `dsh-plugin-desktop` 在 Electron 中运行 DSH，同时仍然参与普通 Cordis 组合。<!-- brand:plugin-identity:start -->
 安装后的应用名称为 **Sensteed-Agent Beta**。<!-- brand:plugin-identity:end -->该包提供 `dsh-plugin-desktop` 可执行命令和 `sensteed-agent` 别名；已注册的 npm 包名是可靠的 `npx` 入口。
 
+## 包概览
+
+| 能力域 | 内容 |
+| --- | --- |
+| 桌面壳 | Electron 宿主、三种呈现模式（兼容/扩展/增强）、系统托盘、原生菜单、通知、对话与看板表面 |
+| DoFe 访问 | 强制飞书 SSO 登录、租户与授权校验、接口协议与默认模型、内置能力开关 |
+| 业务插件 | 抖音运营、招聘、销售、供方观察、内容指令、看板、FinOps、审计、知识采集等数据源 |
+| 运维与恢复 | profile 管理与切换、三槽检查点回滚、恢复助手、Safe Mode、日志与诊断导出 |
+| 更新与分发 | stable/beta 通道检查、应用内下载与升级交接、NSIS/便携版/DMG 打包 |
+| 网络与安全 | 回环绑定、连接栅栏、LAN HTTPS、系统代理继承、沙箱 renderer |
+
+### DoFe 访问（强制飞书登录）
+
+首次使用必须完成飞书 SSO 登录：应用根界面被访问门禁阻塞，直到登录绑定与企业授权校验通过。「用户设置」页承载租户身份、授权插件组、接口协议（Chat Completions / Messages）与默认模型选择；凭据进入系统凭据存储，操作事件写入审计 outbox 并按配置同步 Models。登录未完成时，手动凭据模式不可用，也不存在绕过登录的路径。
+
+### 审计与看板
+
+`yootunAudit` 服务收集操作审计事件：本地暂存、按 `auditSyncEnabled` 同步 Models，并为招聘/销售/供方观察/内容指令等业务路由提供统一审计出口。财务看板、运营看板与招聘工作台作为桌面私有路由内置。
+
 ## 架构
 
 Electron 可执行文件只包含最小启动代码。它获取单实例锁、解析当前选中的 DSH profile、提供原生运行时能力，并在 Electron main 进程中启动 Host Cordis 根。`desktop-shell` Host 插件通过 Cordis effect 拥有 `BrowserWindow`、导航策略、settings namespace，以及关闭与退出生命周期。原生 runtime 拥有实体托盘；`desktop-shell`、`desktop-profiles`、`desktop-terminal` 与 `desktop-updates` 则通过有序 item registry 提供 effect-scoped 命令。
@@ -35,16 +54,18 @@ Login-shell 恢复完成后，Launcher 才创建 layered launch-environment snap
 
 ## 模式设置与重启边界
 
-DSH home `settings.yaml` 文档中的 `sensteed-agent.mode` 字段是单一事实源：
+桌面呈现偏好（`mode`、三种材质、`port`、`openBrowser`、`networkExposure`、`logLevel`）以组合后的 `desktop-shell` 行为单一事实源：0.1.7 起这些字段是 `desktop-shell` entry 的 volatile 配置，由配置编辑器写入 profile 自身的 patch 层。旧的 harness-home `settings.yaml` 中的 `sensteed-agent` 分节会在首启导入时迁移到该 entry，`settings.yaml` 随后被改名归档。
 
 ```yaml
-sensteed-agent:
-  mode: compatibility # compatibility、extended 或 advanced
-  macosMaterial: transparent # off 或 transparent
-  windowsMaterial: acrylic # off、acrylic，系统支持时还可用 mica
+# profile cordis.patch.yml（用户层）
+- id: desktop-shell
+  config:
+    mode: compatibility # compatibility、extended 或 advanced
+    macosMaterial: transparent # off 或 transparent
+    windowsMaterial: acrylic # off、acrylic，系统支持时还可用 mica
 ```
 
-Launcher 会在组合一个 generation 之前，读取当前 `@deepseek-ai/dsh-settings-file` row 解析到的同一份文件。Host 通过标准 settings service 注册 `sensteed-agent` namespace。profile manifest 中没有平行的模式值。
+修改提交后会请求一次有序重启；托盘与设置页写的是同一份 volatile 配置。
 
 用户可以从托盘选择另一种模式，也可以手工编辑 DSH home 中的 `settings.yaml` 文档。托盘会更新已注册的 `sensteed-agent` settings namespace，手工编辑则修改 settings provider 观察的同一文件。修改提交后会请求一次有序重启：先 dispose 当前 Cordis 树，仅当零退出码的 shutdown 成功时才让 Electron relaunch。应用绝不会在存活的 renderer generation 中热切换 root slot、原生窗口材质或 Loader row。
 
@@ -138,7 +159,7 @@ dsh plugin update
 
 显式 `--profile <name>` 始终具有更高优先级，可用于在切换前准备其他 profile。
 
-`dshmarket@1.2.3` 尚未预装，也不是 Sensteed Agent 的 dependency。该版本仍从 config/argv 解析 profile，并通过私有 child-process 代码启动 `dsh plugin`；它既不读取 `desktopProfiles`，也不使用 `desktopPnpm`，package exports 也没有 runner injection seam。后续兼容版本必须动态探测 Desktop service，同时在普通 DSH 中保留现有 CLI fallback。此外，`1.2.3` 的源码仓库与 npm tarball 均未包含完整 MIT 许可文本或版权通知，因此该版本尚未通过内置再分发 gate。用户主动安装第三方 package 与 Desktop 将其嵌入 application archive 或 installer 是两个独立边界。
+`dshmarket@1.2.3` 是用户可选安装的第三方 package，不是内置组件：它不消费 Desktop 的 `desktopProfiles`/`desktopPnpm` service，也未通过再分发许可审计（详见「已知限制」）。插件市场能力由内置的 DSH Community Market 提供。
 
 Required injection、可选 Desktop 适配、TypeScript 示例、cancellation 与 fallback 指南详见[面向插件作者的 service 文档](docs/plugin-services.zh.md)。
 
@@ -169,7 +190,7 @@ npx dsh-plugin-desktop
 
 ## 桌面操作
 
-当 Desktop 窗口没有焦点时，直接用户发起的回合到达 `completed` 会显示原生完成通知；以 `error` 或 `max-tokens` 结束时则显示需要处理的通知。后台任务完成或失败也使用同一条原生注意力路径。取消、阻塞、中断、被终止的任务、插件发起、仅 continuation、turn 不匹配及 subagent 活动都保持静默。点击通知会显示并聚焦窗口。macOS 与 Linux 会递增应用角标，Windows 会闪烁任务栏按钮；显示、聚焦或释放窗口时会清除这些提示。实时生效的 `sensteed-agent-notifications` settings namespace 提供相互独立的 `notifyOnTurnCompletion`、`notifyOnTurnFailure`、`notifyOnJobCompletion` 与 `notifyOnJobFailure` 开关，默认全部开启。通知文案刻意保持通用，不会包含提示词、回复、错误、任务标签、命令、路径、会话 ID、模型或 provider 名称、工具数据及输出。
+当 Desktop 窗口没有焦点时，直接用户发起的回合到达 `completed` 会显示原生完成通知；以 `error` 或 `max-tokens` 结束时则显示需要处理的通知。后台任务完成或失败也使用同一条原生注意力路径。取消、阻塞、中断、被终止的任务、插件发起、仅 continuation、turn 不匹配及 subagent 活动都保持静默。点击通知会显示并聚焦窗口。macOS 与 Linux 会递增应用角标，Windows 会闪烁任务栏按钮；显示、聚焦或释放窗口时会清除这些提示。实时生效的通知设置提供相互独立的 `notifyOnTurnCompletion`、`notifyOnTurnFailure`、`notifyOnJobCompletion` 与 `notifyOnJobFailure` 开关，默认全部开启。通知文案刻意保持通用，不会包含提示词、回复、错误、任务标签、命令、路径、会话 ID、模型或 provider 名称、工具数据及输出。
 
 <!-- brand:plugin-update-endpoint:start -->
 打包后的 macOS 与 Windows 应用会在启动 60 秒后查询 `https://ixicai.cn/api/desktop/version`，并在每次检查完成六小时后再次查询。每次 no-cache 请求的期限为 15 秒，会携带 `X-Sensteed-Agent-Channel: beta` 和 X-Sensteed-Agent-Version 请求头中的当前安装版本，并与托盘中的 **Check for Updates…** 命令共用一个 in-flight operation。<!-- brand:plugin-update-endpoint:end -->稳定版只接受规范的正式 SemVer，绝不会发现 Beta 响应。后台失败和非更新版本保持静默；手工检查一定会显示原生结果对话框。开发运行、未打包启动与 Linux 不会下载安装包。
@@ -262,9 +283,9 @@ corepack.cmd pnpm dist:win-portable
 - Linux 不支持扩展窗口与增强模式。Linux 继续使用兼容呈现。
 - macOS 与 Windows 托盘终端会提供私有 `dsh`、`pnpm` 与 `node` shim。除此之外，Host runtime 会在当前 Electron 进程的 `PATH` 中公开内置 `pnpm` 命令作为 ambient compatibility，并提供受管 `desktopPnpm` service；这些命令都不会加入系统 `PATH`，Linux 目前也没有 desktop 终端命令。
 - 在 Windows 上，ambient `pnpm` 命令与 lifecycle Node helper 是 `.cmd` shim。`desktopPnpm.run()` 会启动准确的已打包 pnpm entry，从而避免 manager process 的 shell lookup；上游 `dsh plugin`、PowerShell 与命令提示符则可通过 command interpreter 解析 ambient shim。第三方插件直接调用 Node `spawn('pnpm', { shell: false })`，或 lifecycle script 直接以 `shell: false` 执行其 `.cmd` `npm_node_execpath`，仍属于不可移植行为，应改用该 service 或 shell-aware 启动路径。
-- `dshmarket@1.2.3` 仍是用户可选安装的第三方 package，而不是内置 marketplace。只有重新审计的版本同时消费可选 Desktop service、保留普通 DSH fallback，并包含再分发所需的完整 license notice 后，才会重新评估预装。
+- `dshmarket@1.2.3` 仍是用户可选安装的第三方 package，而不是内置 marketplace；重新预装需先通过再分发许可审计并消费 Desktop service。
 - 更新交接只验证下载容器，不验证 publisher 身份。macOS 仍要求用户从已打开的 DMG 替换应用；Windows 会运行已下载的 NSIS 安装器，但本地 `dist:win` 产物没有签名。签名产物、Authenticode/publisher 校验、SmartScreen 信誉与原生升级测试仍是发布 gate。
 - 共享 carrier 使用 HTTP 与 WebSocket，而不是 Electron IPC；默认只绑定 loopback，并支持经过明确确认的全接口局域网监听。替换 carrier 需要上游 DSH 提供 transport 扩展点，不属于该独立包的范围。
-- 该项目同时固定到已发布的 DSH `0.1.5-rc.2` family 及其对应的官方 `deepseek-harness/` release 源码。产品构建使用 `upstream.json` 记录并提交到仓库的官方 profile 运行时包，不会直接链接源码 checkout。
-- DSH `0.1.5-rc.2` 会将受支持的历史会话迁移至 V3，并保留原始日志。升级后写入的会话无法由旧版 `0.1.2-rc.1` 运行时读取。
+- 该项目固定到 `upstream.json` 记录的 DSH `0.1.7-rc.1`（内核 fork dev 分支，symlink 进 workspace），产品构建使用 fork 原生构建产物。
+- 0.1.7 会将受支持的历史会话迁移至 V4 并保留原始日志；升级后写入的会话无法由更旧的运行时读取。
 - `package:dir` 是用于 smoke 的未封装产物。`dist:win` 会额外生成未签名的 NSIS 测试安装包，但不会建立 Authenticode 身份或 SmartScreen 信誉。安装与升级行为、原生通知与终端、Windows ACL sandbox，以及每台目标机器上的原生材质外观仍属于目标平台验证边界。

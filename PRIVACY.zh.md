@@ -9,6 +9,7 @@ Sensteed Agent 是一个本地优先的开源桌面应用。本政策说明 Sens
 
 ## 1. 适用范围
 
+<!-- brand:privacy-maintainer:start -->
 **Sensteed 团队（山子高科）**<!-- brand:privacy-maintainer:end -->。项目是独立的社区开源项目，与 DeepSeek 不存在隶属、合作、授权或背书关系。
 
 ## 2. 摘要

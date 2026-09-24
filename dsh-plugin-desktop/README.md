@@ -5,6 +5,25 @@ English | [中文](README.zh.md)
 `dsh-plugin-desktop` runs DSH in Electron while remaining part of the ordinary Cordis composition. <!-- brand:plugin-identity:start -->
 The installed application is named **Sensteed-Agent Beta**.<!-- brand:plugin-identity:end --> The package provides the `dsh-plugin-desktop` executable and the `sensteed-agent` alias; the registered npm package name is the reliable `npx` entry.
 
+## Package overview
+
+| Domain | Content |
+| --- | --- |
+| Desktop shell | Electron host, three presentation modes (compatibility / extended / advanced), system tray, native menus, notifications, chat and dashboard surfaces |
+| DoFe access | Mandatory Feishu SSO login, tenant and entitlement verification, protocol and default model selection, built-in capability switches |
+| Business plugins | Douyin operations, recruiting, sales, supply watch, content command, dashboards, FinOps, audit, and knowledge-capture data sources |
+| Operations and recovery | Profile management and switching, three-slot checkpoint rollback, recovery assistant, Safe Mode, logs and diagnostics export |
+| Updates and distribution | stable/beta channel checks, in-app download and upgrade hand-off, NSIS/portable/DMG packaging |
+| Network and security | Loopback binding, connection fence, LAN HTTPS, system proxy inheritance, sandboxed renderer |
+
+### DoFe access (Feishu login required)
+
+First use requires Feishu SSO login: the application root is blocked by an access gate until login binding and enterprise entitlement verification pass. The "User settings" page carries tenant identity, entitled plugin groups, protocol (Chat Completions / Messages) and default model selection; credentials go into the system credential store, and operation events are written to the audit outbox and synced to Models by configuration. Until login completes, the manual credential mode is unavailable, and there is no path around the login.
+
+### Audit and dashboards
+
+The `yootunAudit` service collects operation-audit events: staged locally, synced to Models per `auditSyncEnabled`, and shared as the single audit outlet for the recruiting, sales, supply-watch, and content-command business routes. The finance dashboard, operations dashboard, and recruiting workbench are built into the desktop as private routes.
+
 ## Architecture
 
 The Electron executable is minimal bootstrap code. It acquires the single-instance lock, resolves the selected DSH profile, provides the native runtime capability, and boots the Host Cordis root in the Electron main process. The `desktop-shell` Host plugin owns the `BrowserWindow`, navigation policy, settings namespace, and close-versus-quit lifecycle through Cordis effects. The native runtime owns the physical tray, while `desktop-shell`, `desktop-profiles`, `desktop-terminal`, and `desktop-updates` contribute effect-scoped commands through its ordered item registry.
@@ -35,16 +54,18 @@ Plugin authors should use the supported contract imports, lifecycle rules, and a
 
 ## Mode setting and restart boundary
 
-The `sensteed-agent.mode` field in the DSH home `settings.yaml` document is the single source of truth:
+Desktop presentation preferences (`mode`, the three materials, `port`, `openBrowser`, `networkExposure`, `logLevel`) are sourced from the composed `desktop-shell` row: since 0.1.7 these fields are volatile config of the `desktop-shell` entry, written by the config editor into the profile's own patch layer. The legacy `sensteed-agent` section of the harness-home `settings.yaml` migrates into that entry during first-boot import, and the document is then renamed away.
 
 ```yaml
-sensteed-agent:
-  mode: compatibility # compatibility, extended, or advanced
-  macosMaterial: transparent # off or transparent
-  windowsMaterial: acrylic # off, acrylic, or mica when supported
+# profile cordis.patch.yml (user layer)
+- id: desktop-shell
+  config:
+    mode: compatibility # compatibility, extended, or advanced
+    macosMaterial: transparent # off or transparent
+    windowsMaterial: acrylic # off, acrylic, or mica when supported
 ```
 
-The launcher reads the same file resolved by the active `@deepseek-ai/dsh-settings-file` row before composing a generation. The Host registers the `sensteed-agent` namespace with the standard settings service. There is no parallel mode value in the profile manifest.
+A committed change requests one orderly restart; the tray and the settings page write the same volatile configuration.
 
 Users can select the other mode from the tray or edit the DSH home `settings.yaml` document by hand. The tray updates the registered `sensteed-agent` settings namespace, while a manual edit changes the same file observed by the settings provider. A committed change requests one orderly restart: the current Cordis tree disposes first, then Electron relaunches only after a successful zero-code shutdown. The application never hot-swaps root slots, native window materials, or Loader rows inside a live renderer generation.
 
@@ -138,7 +159,7 @@ dsh plugin update
 
 An explicit `--profile <name>` remains authoritative and is useful for preparing another profile before selecting it.
 
-`dshmarket@1.2.3` is not preinstalled and is not a dependency of Sensteed Agent. That release still resolves a profile from config/argv and starts `dsh plugin` through private child-process code; it neither reads `desktopProfiles` nor uses `desktopPnpm`, and its package exports no runner injection seam. A later compatible release must detect the Desktop services dynamically and retain its existing CLI fallback under ordinary DSH. In addition, the `1.2.3` source repository and npm tarball contain no complete MIT license text or copyright notice, so that version does not pass the bundled-redistribution gate. User-directed installation of a third-party package is separate from Desktop embedding it in the application archive or installer.
+`dshmarket@1.2.3` is an optional user-installed third-party package, not a bundled component: it consumes neither the Desktop `desktopProfiles`/`desktopPnpm` services nor the redistribution license audit (see Known limitations). Marketplace capability is provided by the built-in DSH Community Market.
 
 See [Plugin services for authors](docs/plugin-services.md) for required injection, optional Desktop adaptation, TypeScript examples, cancellation, and fallback guidance.
 
@@ -169,7 +190,7 @@ A third-party Host plugin only needs its normal `dsh.bundle` patch. A plugin wit
 
 ## Desktop operations
 
-When the Desktop window is unfocused, a direct user turn that reaches `completed` raises a native completion notification; `error` and `max-tokens` endings raise a needs-attention notification. Completed and failed background jobs use the same native attention path. Aborted, blocked, interrupted, killed, plugin-initiated, continuation-only, mismatched, and subagent activity stays silent. Clicking a notification reveals and focuses the window. macOS and Linux increment the application badge, while Windows flashes the taskbar button; showing, focusing, or releasing the window clears that attention. The live `sensteed-agent-notifications` settings namespace provides independent `notifyOnTurnCompletion`, `notifyOnTurnFailure`, `notifyOnJobCompletion`, and `notifyOnJobFailure` switches, all enabled by default. Notification text is deliberately generic and never includes prompts, responses, errors, job labels, commands, paths, session IDs, model or provider names, tool data, or output.
+When the Desktop window is unfocused, a direct user turn that reaches `completed` raises a native completion notification; `error` and `max-tokens` endings raise a needs-attention notification. Completed and failed background jobs use the same native attention path. Aborted, blocked, interrupted, killed, plugin-initiated, continuation-only, mismatched, and subagent activity stays silent. Clicking a notification reveals and focuses the window. macOS and Linux increment the application badge, while Windows flashes the taskbar button; showing, focusing, or releasing the window clears that attention. The live notification settings provide independent `notifyOnTurnCompletion`, `notifyOnTurnFailure`, `notifyOnJobCompletion`, and `notifyOnJobFailure` switches, all enabled by default. Notification text is deliberately generic and never includes prompts, responses, errors, job labels, commands, paths, session IDs, model or provider names, tool data, or output.
 
 <!-- brand:plugin-update-endpoint:start -->
 Packaged macOS and Windows applications query `https://ixicai.cn/api/desktop/version` 60 seconds after startup and every six hours after a completed check. Each no-cache request has a 15-second deadline, sends `X-Sensteed-Agent-Channel: beta` together with the installed version in the `X-Sensteed-Agent-Version` header, and shares one in-flight operation with the **Check for Updates…** tray command.<!-- brand:plugin-update-endpoint:end --> Stable accepts only canonical release SemVer and never discovers a Beta response. Background failures and non-newer versions remain silent; a manual check always opens a native result dialog. Development, unpackaged, and Linux launches do not download an installer.
@@ -262,9 +283,9 @@ None. The same DSH Host and client feature plugins assemble model requests.
 - Extended and enhanced modes are unavailable on Linux. Linux continues to use the compatibility presentation.
 - The macOS and Windows tray terminal exposes private `dsh`, `pnpm`, and `node` shims. Separately, the Host runtime exposes the bundled `pnpm` command on the current Electron process `PATH` for ambient compatibility and provides the managed `desktopPnpm` service; none of these commands are added to the system `PATH`, and Linux currently has no desktop terminal command.
 - On Windows, the ambient `pnpm` command and lifecycle Node helper are `.cmd` shims. `desktopPnpm.run()` avoids shell lookup for the manager process by launching the exact packaged pnpm entry, while upstream `dsh plugin`, PowerShell, and Command Prompt can resolve ambient shims through a command interpreter. A third-party plugin that calls Node `spawn('pnpm', { shell: false })`, or a lifecycle script that directly executes its `.cmd` `npm_node_execpath` with `shell: false`, remains non-portable and should use the service or a shell-aware launch path.
-- `dshmarket@1.2.3` remains an optional user-installed third-party package, not a bundled marketplace. Preinstallation is deferred until an audited release consumes the optional Desktop services while preserving ordinary DSH fallback and includes the complete license notice required for redistribution.
+- `dshmarket@1.2.3` remains an optional user-installed third-party package, not a bundled marketplace; preinstallation requires passing the redistribution license audit and consuming the Desktop services first.
 - The update handoff validates the download container, not publisher identity. macOS still requires the user to replace the application from the opened DMG; Windows runs the downloaded NSIS installer but the local `dist:win` artifact is unsigned. Signed artifacts, Authenticode/publisher verification, SmartScreen reputation, and native upgrade testing remain release gates.
 - The shared carrier is HTTP and WebSocket, not Electron IPC. It defaults to loopback and supports an explicitly confirmed all-interface LAN bind. Replacing the carrier requires transport extension points in upstream DSH and is outside this standalone package.
-- This project pins both the published DSH `0.1.5-rc.2` family and the corresponding official `deepseek-harness/` release source. Product builds consume the checked-in official-profile runtime tarballs recorded in `upstream.json`, rather than linking the source checkout.
-- DSH `0.1.5-rc.2` migrates supported historical sessions to V3 while preserving the original logs. Sessions written after upgrading cannot be read by the previous `0.1.2-rc.1` runtime.
+- This project pins DSH `0.1.7-rc.1` recorded in `upstream.json` (kernel fork dev branch, symlinked into the workspace); product builds consume the fork's native build output.
+- 0.1.7 migrates supported historical sessions to V4 while preserving the original logs; sessions written after the upgrade cannot be read by older runtimes.
 - `package:dir` is an unpacked smoke artifact. `dist:win` adds an unsigned NSIS test installer but does not establish Authenticode identity or SmartScreen reputation. Installation and upgrade behavior, native notifications and terminals, the Windows ACL sandbox, and native-material appearance remain target-platform verification boundaries.

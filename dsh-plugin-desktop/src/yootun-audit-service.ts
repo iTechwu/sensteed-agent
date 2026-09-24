@@ -80,7 +80,7 @@ export interface YootunAuditReader {
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
-    yootunAudit: YootunAuditRecorder & YootunAuditReader
+    sensteedAudit: YootunAuditRecorder & YootunAuditReader
   }
 }
 

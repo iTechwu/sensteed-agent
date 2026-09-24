@@ -23,26 +23,26 @@ const repositoryRoot = process.cwd()
 
 /** Fenced document regions, keyed by brand block name. */
 const DOCUMENTS = [
+  // The distribution ships a single-language README per locale root; the
+  // bilingual pair records were removed with the public-repo framing.
   {
-    record: 'README.i18n.yaml',
+    record: null,
     files: [
       { path: 'README.md', lang: 'zh' },
-      { path: 'README.en.md', lang: 'en' },
     ],
     // 'download-table' is no longer managed: the internal README carries a
     // hand-maintained packaging matrix instead of download-site links.
     blocks: ['brand-title', 'download-cta'],
   },
   {
-    record: 'PRIVACY.i18n.yaml',
+    record: null,
     files: [
       { path: 'PRIVACY.zh.md', lang: 'zh' },
-      { path: 'PRIVACY.md', lang: 'en' },
     ],
     blocks: ['privacy-maintainer'],
   },
   {
-    record: 'dsh-plugin-desktop/README.i18n.yaml',
+    record: null,
     files: [
       { path: 'dsh-plugin-desktop/README.zh.md', lang: 'zh' },
       { path: 'dsh-plugin-desktop/README.md', lang: 'en' },

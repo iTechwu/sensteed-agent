@@ -255,7 +255,7 @@ export function apply(ctx: Context, config: DesktopShellConfig): void {
     enabled: resolved.auditSyncEnabled,
     logger: ctx.logger,
   })
-  ctx.provide('yootunAudit', audit)
+  ctx.provide('sensteedAudit', audit)
   if (BRAND_VARIANT === 'sensteed') {
     ctx.effect(() => watchDofeAuthAudit(ctx.dofeAuth, audit), 'dsh-plugin-desktop: SSO audit binding')
   }
@@ -398,7 +398,7 @@ export function apply(ctx: Context, config: DesktopShellConfig): void {
           credentials: ctx.credentials,
           knowledgePublisher: createRecruiterKnowledgePublisher(ctx.tools),
           openBossWeb: async url => { await ctx.get('desktopRuntime')?.openBossWeb(url) },
-          audit: ctx.yootunAudit,
+          audit: ctx.sensteedAudit,
         })
       },
     }),
@@ -413,7 +413,7 @@ export function apply(ctx: Context, config: DesktopShellConfig): void {
         return handleYootunSalesRequest(req, res, rendererOrigin, {
           statePath: ctx.get('dshHomePath')?.('storages', 'yootun-sales', 'state.json'),
           tools: ctx.tools,
-          audit: ctx.yootunAudit,
+          audit: ctx.sensteedAudit,
         })
       },
     }),
@@ -427,7 +427,7 @@ export function apply(ctx: Context, config: DesktopShellConfig): void {
         if (rejectDesktopRequest(ctx, req, res)) return
         return handleYootunSupplyWatchRequest(req, res, rendererOrigin, {
           statePath: ctx.get('dshHomePath')?.('storages', 'yootun-supply-watch', 'state.json'),
-          audit: ctx.yootunAudit,
+          audit: ctx.sensteedAudit,
         })
       },
     }),
@@ -443,7 +443,7 @@ export function apply(ctx: Context, config: DesktopShellConfig): void {
           statePath: ctx.get('dshHomePath')?.('storages', 'yootun-content-command', 'state.json'),
           tools: ctx.tools,
           publishWebsite: publishYootunWebsite,
-          audit: ctx.yootunAudit,
+          audit: ctx.sensteedAudit,
           openPlatformWeb: async (platform, url) => {
             if (platform === 'website') return
             await ctx.get('desktopRuntime')?.openContentPlatformWeb(platform, url)
