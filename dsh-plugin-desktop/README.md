@@ -5,13 +5,28 @@ English | [中文](README.zh.md)
 `dsh-plugin-desktop` runs DSH in Electron while remaining part of the ordinary Cordis composition. <!-- brand:plugin-identity:start -->
 The installed application is named **Sensteed-Agent Beta**.<!-- brand:plugin-identity:end --> The package provides the `dsh-plugin-desktop` executable and the `sensteed-agent` alias; the registered npm package name is the reliable `npx` entry.
 
+## Contents
+
+- [Package overview](#package-overview)
+- [DoFe access (Feishu login required)](#dofe-access-feishu-login-required)
+- [Audit and dashboards](#audit-and-dashboards)
+- [Architecture](#architecture)
+- [Mode setting and restart boundary](#mode-setting-and-restart-boundary)
+- [Presentation modes](#presentation-modes)
+- [Development and packaging](#development-and-packaging)
+- [Command-line launch](#command-line-launch)
+- [Desktop actions and notifications](#desktop-actions-and-notifications)
+- [Update channel](#update-channel)
+- [Logs and diagnostics](#logs-and-diagnostics)
+- [Known limitations](#known-limitations)
+
 ## Package overview
 
 | Domain | Content |
 | --- | --- |
 | Desktop shell | Electron host, three presentation modes (compatibility / extended / advanced), system tray, native menus, notifications, chat and dashboard surfaces |
 | DoFe access | Mandatory Feishu SSO login, tenant and entitlement verification, protocol and default model selection, built-in capability switches |
-| Business plugins | Douyin operations, recruiting, sales, supply watch, content command, dashboards, FinOps, audit, and knowledge-capture data sources |
+| Business plugins | Douyin operations, recruiting, sales, supply watch, content command, dashboards, FinOps, audit, and knowledge-capture data sources; the composed set follows brand and entitlement filtering |
 | Operations and recovery | Profile management and switching, three-slot checkpoint rollback, recovery assistant, Safe Mode, logs and diagnostics export |
 | Updates and distribution | stable/beta channel checks, in-app download and upgrade hand-off, NSIS/portable/DMG packaging |
 | Network and security | Loopback binding, connection fence, LAN HTTPS, system proxy inheritance, sandboxed renderer |
@@ -20,17 +35,33 @@ The installed application is named **Sensteed-Agent Beta**.<!-- brand:plugin-ide
 
 First use requires Feishu SSO login: the application root is blocked by an access gate until login binding and enterprise entitlement verification pass. The "User settings" page carries tenant identity, entitled plugin groups, protocol (Chat Completions / Messages) and default model selection; credentials go into the system credential store, and operation events are written to the audit outbox and synced to Models by configuration. Until login completes, the manual credential mode is unavailable, and there is no path around the login.
 
+#### Model access
+
+The profile composition injects the enterprise model route by default: `llm-deepseek` points at the DoFe gateway (`apiKeyEnv=MODELS_API_KEY`, requests carry the `X-Company-Code` tenant header, connection policy `composition`) with default model `deepseek-v4-flash`; the OpenAI Responses protocol rides a dedicated `llm-pi-ai` route.
+
 ### Audit and dashboards
 
-The `yootunAudit` service collects operation-audit events: staged locally, synced to Models per `auditSyncEnabled`, and shared as the single audit outlet for the recruiting, sales, supply-watch, and content-command business routes. The finance dashboard, operations dashboard, and recruiting workbench are built into the desktop as private routes.
+The `sensteedAudit` service collects operation-audit events:
+
+- events are staged locally under `<DSH home>/storages/yootun-audit` and survive network or credential outages;
+- when `auditSyncEnabled` is on and the `MODELS_API_KEY` credential is ready, batches sync to Models, and credential updates take effect immediately;
+- the service is the shared audit outlet for the recruiting / sales / supply-watch / content-command business routes.
+
+The finance dashboard, operations dashboard, and recruiting workbench are built into the desktop as private routes.
 
 ## Architecture
 
+### Host startup and lifecycle
+
 The Electron executable is minimal bootstrap code. It acquires the single-instance lock, resolves the selected DSH profile, provides the native runtime capability, and boots the Host Cordis root in the Electron main process. The `desktop-shell` Host plugin owns the `BrowserWindow`, navigation policy, settings namespace, and close-versus-quit lifecycle through Cordis effects. The native runtime owns the physical tray, while `desktop-shell`, `desktop-profiles`, `desktop-terminal`, and `desktop-updates` contribute effect-scoped commands through its ordered item registry.
+
+### Presentation modes and Web carrier
 
 All three presentation modes reuse the existing Web carrier. The profile mounts the ordinary `dsh-base` and `dsh-web-app` bundles. By default, the Host binds its HTTP and WebSocket surface to `127.0.0.1` on an ephemeral port; an explicitly confirmed LAN setting binds all interfaces, while Electron continues to load the loopback same-origin page in a sandboxed renderer. There is no Electron-owned plugin roster, preload bridge, or raw Electron API in the renderer.
 
 The desktop package has normal Host and Web Client faces. Its Client face validates the Host-supplied mode, platform, and capability-gated material markers in every mode. Compatibility places the unchanged official presentation below an independent Desktop frame. Extended mode replaces the official root layout with its own Desktop-owned layout and sidebar surface while continuing to host the official sidebar, conversation, and details occupants. Enhanced mode retains a separate root registration and the compact internal-caption geometry established by the original enhanced implementation. Third-party Web clients continue to use the ordinary DSH module graph in every mode.
+
+### Profile management and recovery
 
 The tray profile selector lists existing profiles and the lazily available `desktop` and `web` defaults. A selectable profile directly composes `dsh-base` before `dsh-web-app`; headless, malformed, or already desktop-embedded profiles remain visible but disabled. `desktop` is the only launcher-managed profile: its installation-owned prefix is repaired while third-party bundle order is preserved. Every other selected profile keeps its manifest, user patch, and dependencies unchanged. The launcher inserts its own desktop layer after `dsh-web-app` for the active generation and never persists that layer in the selected bundle list.
 
