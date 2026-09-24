@@ -38,13 +38,19 @@ Profile selection is desktop-owned state under Electron user data, not another f
 
 Before Loader entries mount, the launcher registers the generation-scoped `ctx.desktopProfiles` service. Its immutable `current` value contains the active profile's `name` and absolute `dir`; `list()` performs read-only discovery, while `select(name)` serializes persistence-before-restart switching without changing the live generation in place. The service is a Desktop Host capability, not a renderer bridge or an active-profile API supplied by current upstream DSH.
 
+### Module resolution
+
 Bare Cordis plugin imports resolve from the persistent profile. A narrow Node resolve hook applies only to imports issued by `@deepseek-ai/cordis-plugin-loader`, so profile-local third-party packages and the healed launcher fallback use the same resolution path even when packaged Electron does not expose Node's internal ESM loader.
 
 Before profile preparation and Cordis boot, a packaged macOS or Linux launch runs the configured account shell in interactive login mode and recovers its exported `PATH`. This repairs the minimal `PATH` commonly supplied by Finder, LaunchServices, and other graphical launchers. It also fills only missing locale, toolchain, package-manager, and virtual-environment exports from a fixed allowlist; `PATH` alone always uses the shell value. Recovery supports absolute `zsh`, `bash`, and `fish` paths. Bash follows its standard login behavior, so `.bashrc` contributes only when a login profile sources it. Windows and unpackaged or development launches skip recovery. An unavailable or unsupported shell, timeout, capture failure, or missing `PATH` silently retains the inherited process environment.
 
 The capture starts from `@deepseek-ai/dsh-subprocess`'s `scrubbedParentEnv()`, and captured names pass the same `SENSITIVE_ENV_PATTERN` and `DSH_ENV_PREFIX` checks before the fixed allowlist is applied. Credentials, `DSH_*` values, proxy and SSH-agent settings, and process startup hooks learned only from shell rc files are therefore not imported into Electron. This recovery does not erase values already present in Electron's explicit launch environment. Ordinary DSH subprocesses apply the official scrub again; an explicit child environment may still deliberately add a value.
 
+### Launch environment recovery
+
 After login-shell recovery, the launcher creates the layered launch-environment snapshot. It then prepends a private command directory containing only the pinned bundled `pnpm` command to the current Electron main process `PATH`. Host and third-party plugins can therefore discover that package manager from startup, including through ordinary DSH subprocess providers, without requiring a system Node.js installation. This ambient path is a compatibility surface, not the formal plugin-management contract.
+
+### Bundled package management
 
 The `desktop-pnpm` Host row provides one package-manager capability against the immutable active profile: `ctx.desktopPnpm.run(argv, signal?)`. It executes the packaged pnpm entry directly with the active Profile directory as `cwd`. Every Desktop-owned pnpm operation process-locally applies exactly one `--config.minimumReleaseAge=0` at the final package-manager boundary; it never rewrites the user's pnpm configuration. Callers own the remaining command construction, Profile bundle reconciliation, receipts, validation, and user-facing progress. Desktop deliberately adds no plugin-specific retry, snapshot, or rollback to this interface; all recovery is handled by the three healthy-start checkpoints.
 

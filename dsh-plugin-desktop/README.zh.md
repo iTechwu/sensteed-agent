@@ -5,13 +5,28 @@
 `dsh-plugin-desktop` 在 Electron 中运行 DSH，同时仍然参与普通 Cordis 组合。<!-- brand:plugin-identity:start -->
 安装后的应用名称为 **Sensteed-Agent Beta**。<!-- brand:plugin-identity:end -->该包提供 `dsh-plugin-desktop` 可执行命令和 `sensteed-agent` 别名；已注册的 npm 包名是可靠的 `npx` 入口。
 
+## 目录
+
+- [包概览](#包概览)
+- [DoFe 访问（强制飞书登录）](#dofe-访问强制飞书登录)
+- [审计与看板](#审计与看板)
+- [架构](#架构)
+- [模式设置与重启边界](#模式设置与重启边界)
+- [呈现模式](#呈现模式)
+- [开发与打包](#开发与打包)
+- [命令行启动](#命令行启动)
+- [桌面操作与通知](#桌面操作与通知)
+- [更新通道](#更新通道)
+- [日志与诊断](#日志与诊断)
+- [已知限制](#已知限制)
+
 ## 包概览
 
 | 能力域 | 内容 |
 | --- | --- |
 | 桌面壳 | Electron 宿主、三种呈现模式（兼容/扩展/增强）、系统托盘、原生菜单、通知、对话与看板表面 |
 | DoFe 访问 | 强制飞书 SSO 登录、租户与授权校验、接口协议与默认模型、内置能力开关 |
-| 业务插件 | 抖音运营、招聘、销售、供方观察、内容指令、看板、FinOps、审计、知识采集等数据源 |
+| 业务插件 | 抖音运营、招聘、销售、供方观察、内容指令、看板、FinOps、审计、知识采集等数据源，实际组合集合随品牌与授权过滤 |
 | 运维与恢复 | profile 管理与切换、三槽检查点回滚、恢复助手、Safe Mode、日志与诊断导出 |
 | 更新与分发 | stable/beta 通道检查、应用内下载与升级交接、NSIS/便携版/DMG 打包 |
 | 网络与安全 | 回环绑定、连接栅栏、LAN HTTPS、系统代理继承、沙箱 renderer |
@@ -22,15 +37,33 @@
 
 ### 审计与看板
 
-`yootunAudit` 服务收集操作审计事件：本地暂存、按 `auditSyncEnabled` 同步 Models，并为招聘/销售/供方观察/内容指令等业务路由提供统一审计出口。财务看板、运营看板与招聘工作台作为桌面私有路由内置。
+#### 模型接入
+
+profile 组合默认注入企业模型路由：`llm-deepseek` 指向 DoFe 网关（`apiKeyEnv=MODELS_API_KEY`，请求携带 `X-Company-Code` 租户头，连接策略为 composition），默认模型 `deepseek-v4-flash`；OpenAI Responses 协议由专用 `llm-pi-ai` 路由承载。协议与模型可在「用户设置」中按授权调整。
+
+### 审计与看板
+
+`sensteedAudit` 服务收集操作审计事件：
+
+- 事件先本地暂存于 `<DSH home>/storages/yootun-audit`，网络或凭据不可用时不丢失；
+- `auditSyncEnabled` 开启且 `MODELS_API_KEY` 凭据就绪时按批次同步 Models，凭据更新即时生效；
+- 为招聘 / 销售 / 供方观察 / 内容指令等业务路由提供统一审计出口。
+
+财务看板、运营看板与招聘工作台作为桌面私有路由内置。
 
 ## 架构
 
+### 宿主启动与生命周期
+
 Electron 可执行文件只包含最小启动代码。它获取单实例锁、解析当前选中的 DSH profile、提供原生运行时能力，并在 Electron main 进程中启动 Host Cordis 根。`desktop-shell` Host 插件通过 Cordis effect 拥有 `BrowserWindow`、导航策略、settings namespace，以及关闭与退出生命周期。原生 runtime 拥有实体托盘；`desktop-shell`、`desktop-profiles`、`desktop-terminal` 与 `desktop-updates` 则通过有序 item registry 提供 effect-scoped 命令。
+
+### 呈现模式与 Web carrier
 
 三种呈现模式都复用现有 Web carrier。profile 挂载普通 `dsh-base` 与 `dsh-web-app` bundle。Host 默认把 HTTP 与 WebSocket surface 绑定到 `127.0.0.1` 的临时端口；只有明确确认的局域网设置才会绑定所有接口，Electron 则始终从 loopback 地址在沙箱 renderer 中加载同源页面。Electron 不维护自有插件 roster，不使用 preload bridge，renderer 也不会获得原始 Electron API。
 
 desktop package 拥有普通 Host 与 Web Client 两个 face。它的 Client face 会在所有模式下校验 Host 提供的模式、平台和经过能力门槛解析的材质 marker。兼容模式把保持不变的官方呈现放在独立 Desktop frame 下方。扩展窗口会用自己独立注册的 Desktop layout 与 sidebar surface 替换官方 root layout，同时继续承载官方 sidebar、conversation 和 details occupant。增强模式保留独立的 root registration，以及最初增强模式确定的紧凑内部 caption 几何。所有模式下，第三方 Web client 都继续使用普通 DSH 模块图。
+
+### Profile 管理与恢复
 
 托盘中的 profile 选择器会列出现有 profile，以及可延迟创建的 `desktop` 与 `web` 默认项。可选 profile 必须直接按顺序组合 `dsh-base` 与 `dsh-web-app`；headless、损坏或已经内嵌 desktop bundle 的 profile 仍会显示，但不可选择。只有 `desktop` 是 Launcher 管理的 profile：它会修复安装方拥有的前缀，同时保留第三方 bundle 的相对顺序。其他被选 profile 的 manifest、用户 patch 与依赖均保持不变。Launcher 只会为当前 generation 在 `dsh-web-app` 后插入自有 desktop layer，不会把该 layer 持久化到被选 bundle 列表。
 
@@ -38,13 +71,19 @@ Profile 选择保存在 Electron user data 下的 desktop 自有状态中，而�
 
 Launcher 会在 Loader entry 挂载前注册作用于当前 generation 的 `ctx.desktopProfiles` service。其不可变 `current` 值包含激活 profile 的 `name` 与绝对 `dir`；`list()` 只读执行发现，`select(name)` 会串行化“先持久化、再重启”的切换，而不会就地改变当前 generation。该 service 是 Desktop Host capability，不是 renderer bridge，也不是当前上游 DSH 已提供的 active-profile API。
 
+### 模块解析
+
 Cordis 的裸插件导入从持久化 profile 解析。一个范围受限的 Node resolve hook 只处理由 `@deepseek-ai/cordis-plugin-loader` 发起的导入，因此即使打包后的 Electron 不暴露 Node 内部 ESM Loader，profile 本地第三方包与修复后的 launcher fallback 仍使用同一条解析路径。
+
+### 启动环境恢复
 
 在 profile 准备与 Cordis boot 之前，打包后的 macOS 或 Linux 启动会以交互式 login 模式运行用户账户配置的 shell，并恢复其导出的 `PATH`。这样可补全 Finder、LaunchServices 等图形启动方式通常传入的精简 `PATH`。除 `PATH` 外，只会从固定 allowlist 补充当前启动环境尚未定义的 locale、工具链、package manager 与虚拟环境变量；只有 `PATH` 始终采用 shell 值。该流程只支持绝对路径的 `zsh`、`bash` 与 `fish`。Bash 遵循标准 login 行为，只有 login profile 主动 source `.bashrc` 时，该文件才会参与。Windows 以及未打包或开发运行会跳过恢复；shell 不存在或不受支持、捕获超时或失败、没有可用 `PATH` 时，会静默保留原有进程环境。
 
 捕获过程以 `@deepseek-ai/dsh-subprocess` 的 `scrubbedParentEnv()` 作为输入；捕获到的变量名还必须通过同一套 `SENSITIVE_ENV_PATTERN` 与 `DSH_ENV_PREFIX` 检查，之后才进入固定 allowlist。因此，只在 shell rc 中出现的凭据、`DSH_*` 值、代理与 SSH agent 设置，以及进程启动 hook 都不会被导入 Electron。该恢复流程不会删除 Electron 显式启动环境中已经存在的值。普通 DSH subprocess 会再次应用官方 scrub；显式 child environment 仍可有意补回某项值。
 
 Login-shell 恢复完成后，Launcher 才创建 layered launch-environment snapshot。随后，它会把只包含固定版本内置 `pnpm` 命令的私有命令目录前置到当前 Electron main 进程的 `PATH`。因此 Host 与第三方插件从启动开始即可发现该 package manager，也可以通过普通 DSH subprocess provider 使用它，而无需系统安装 Node.js。该 ambient path 是兼容 surface，不是正式的插件管理 contract。
+
+### 内置包管理
 
 `desktop-pnpm` Host row 只提供一个针对不可变激活 Profile 的 package-manager 能力：`ctx.desktopPnpm.run(argv, signal?)`。它以激活 Profile 目录作为 `cwd`，直接执行内置 pnpm entry。所有 Desktop 发起的 pnpm 操作都会在最终执行 package manager 时仅加入一次 `--config.minimumReleaseAge=0`，不会修改用户的 pnpm 配置。其余命令构造、Profile bundle reconcile、receipt、结果验证和用户界面进度都由调用方负责。Desktop 不会在该接口中加入插件专用重试、快照或回滚；恢复统一由三个健康启动 checkpoint 处理。
 

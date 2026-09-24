@@ -9,7 +9,6 @@
 
 import { formatUnexpectedHostExit, startIsolatedDesktopHost } from './host-process.ts'
 import { createDesktopProfileBoot } from './profile-context.ts'
-import type { Context } from '@deepseek-ai/cordis'
 import { logInactiveStartupEntries } from './startup-audit.ts'
 import { app, crashReporter, safeStorage, session, shell } from 'electron'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
@@ -1662,7 +1661,12 @@ async function start(): Promise<void> {
           desktopPnpmBootstrap, logDirectory: join(desktopUserDataDir, 'logs', 'host') },
         runtime, rendererToken: browserAccess.rendererHeader.value,
         prepareCertificate: prepareHostCertificate,
-        bindHost: host => { generation.bindHost(host); profileBoot.prepare(host as unknown as Context) }, requestQuit,
+        // The isolated Host owns the real Cordis context: it provides
+        // profileContext inside the child (host-bootstrap). The main process
+        // only binds the generation's minimal lifetime object here — it is
+        // `{ fiber: { dispose } }`, never a Context, and must not be handed
+        // to `profileBoot.prepare`.
+        bindHost: host => { generation.bindHost(host) }, requestQuit,
         onFailure: (error, exit) => {
           electronLogger.error(formatUnexpectedHostExit(error, exit))
           lifecycleRecorder.recordHostExit({
