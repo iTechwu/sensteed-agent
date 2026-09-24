@@ -79,6 +79,7 @@ it('requires login before showing model setup and commits authorization only aft
     await act(async () => root.render(createElement(DofeAccessGate, props as never)))
     expect(container.querySelector('input[type="password"]')).toBeNull()
     expect(container.querySelector('select')).toBeNull()
+    expect(container.querySelector('#dofe-model-section-title')).toBeNull()
     await act(async () => {
       const login = [...container.querySelectorAll('button')].find(button => button.textContent?.includes('飞书登录'))!
       login.click()
@@ -108,6 +109,10 @@ it('requires login before showing model setup and commits authorization only aft
       createElement(DofeAccessGate, props as never),
       createElement(DofeAccessSection, props as never),
     )))
+    expect(container.querySelector('#dofe-account-section-title')?.textContent).toBe('accountSectionTitle')
+    expect(container.querySelector('#dofe-model-section-title')?.textContent).toBe('modelSectionTitle')
+    expect(container.querySelector('.dshDofeAccessPlugins')).not.toBeNull()
+    expect(container.querySelector('.dshDofeAccessModelRefresh')).toBeNull()
     await act(async () => { (container.querySelector('.dshDofeAccessLogout') as HTMLButtonElement).click() })
     expect(credentials.unset).toHaveBeenCalledWith('MODELS_API_KEY')
     expect(snapshot.value.identity).toBeUndefined()
@@ -149,6 +154,29 @@ it('opens the settings panel with the stored-credential model list already loade
     const [path, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit]
     expect(path).toBe('/api/desktop/dofe/models')
     expect(JSON.parse(String(init.body))).toEqual({ key: '', protocol: 'messages', useStored: true })
+  } finally {
+    await act(async () => root.unmount())
+    container.remove()
+  }
+})
+
+it('keeps the entitled default model selectable when the catalog is temporarily empty', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+  const snapshot = { value: { setupComplete: false, validationVersion: 0, enabledPlugins: ['knowledge'], modelId: '', protocol: 'messages', authMode: 'feishu', identity: { ssoSub: 'user', name: 'User' }, entitlements: { plugins: ['knowledge'], allowedProtocols: ['messages'], defaultModel: 'preferred-model' } } }
+  const settingsScope = { getSnapshot: () => snapshot, subscribe: () => () => {} }
+  const credentials = { describe: vi.fn(async () => ({ ok: true, value: { MODELS_API_KEY: { configured: true } } })) }
+  const fetcher = vi.fn(async () => Response.json({ models: [] }))
+  vi.stubGlobal('fetch', fetcher)
+  const container = document.createElement('div')
+  document.body.append(container)
+  const root = createRoot(container)
+  try {
+    await act(async () => root.render(createElement(DofeAccessSection, { settingsApi: {}, settingsScope, credentials, t: (key: string) => key } as never)))
+    await act(async () => {})
+    const select = container.querySelector('select') as HTMLSelectElement
+    expect(select.value).toBe('preferred-model')
+    expect([...select.options].map(option => option.value)).toEqual(['', 'preferred-model'])
+    expect(select.disabled).toBe(false)
   } finally {
     await act(async () => root.unmount())
     container.remove()

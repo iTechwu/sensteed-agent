@@ -3,7 +3,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import type { ClientRemote } from '@deepseek-ai/dsh-api-remotes/client'
 import type { InjectFace, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { Button, Toast } from '@deepseek-ai/dsh-client-ui-primitives'
-import { ArrowRight, Check, Loader2, RefreshCw } from 'lucide-react'
+import { ArrowRight, Check } from 'lucide-react'
 import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { DofeOnboardingModal } from './DofeOnboardingModal.tsx'
 import { DofeLoginSection } from './DofeLoginSection.tsx'
@@ -30,6 +30,9 @@ const CSS = `
 .dshDofeModalDescription { margin: 7px 0 0; max-width: 540px; color: var(--dsw-alias-label-secondary, #667085); font-size: 14px; line-height: 1.55; }
 .dshDofeModalBody { min-height: 0; overflow: auto; padding: 22px 28px 26px; }
 .dshDofeAccess { display: grid; gap: 20px; max-width: 640px; }
+.dshDofeAccessSection { display: grid; gap: 16px; padding: 16px; background: var(--dsw-alias-bg-layer-1, #fff); border: 1px solid var(--dsw-alias-border-l1, #e2e6ed); border-radius: 8px; }
+.dshDofeAccessSectionHeader { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+.dshDofeAccessSectionHeader h3 { margin: 0; color: var(--dsw-alias-label-primary, #172033); font-size: 16px; line-height: 1.35; }
 .dshDofeAccessIntro { color: var(--dsw-alias-label-secondary, #667085); line-height: 1.5; margin: 0; }
 .dshDofeAccessHelp { display: flex; align-items: center; gap: 8px; color: var(--dsw-alias-label-secondary, #667085); background: var(--dsw-alias-bg-layer-2, #f5f7fa); border-left: 3px solid var(--dsw-alias-brand-primary, #245eea); padding: 10px 12px; margin: 0; font-size: 13px; line-height: 1.45; }
 .dshDofeAccessHelp svg { flex: 0 0 auto; color: var(--dsw-alias-brand-primary, #245eea); }
@@ -92,11 +95,7 @@ const CSS = `
 .dshDofeAccessProtocol:hover:not(:has(input:disabled)) { color: var(--dsw-alias-label-primary, #172033); background: var(--dsw-alias-interactive-bg-hover, #f2f5f9); }
 .dshDofeAccessProtocolSelected, .dshDofeAccessProtocolSelected:hover:not(:has(input:disabled)) { color: var(--dsw-alias-label-primary-foreground, #fff); background: var(--dsw-alias-brand-primary, #245eea); }
 .dshDofeAccessProtocol:has(input:focus-visible) { outline: 2px solid var(--dsw-alias-brand-primary, #245eea); outline-offset: -2px; z-index: 1; }
-.dshDofeAccessModelRow { display: grid; grid-template-columns: minmax(0, 1fr) 42px; gap: 8px; }
-.dshDofeAccessModelRefresh { display: grid; place-items: center; width: 42px; min-height: 42px; padding: 0; color: var(--dsw-alias-label-secondary, #667085); background: var(--dsw-alias-bg-layer-1, #fff); border: 1px solid var(--dsw-alias-border-l2, #c7ced9); border-radius: 6px; cursor: pointer; }
-.dshDofeAccessModelRefresh:hover:not(:disabled) { color: var(--dsw-alias-label-primary, #172033); background: var(--dsw-alias-interactive-bg-hover, #edf1f7); }
-.dshDofeAccessModelRefresh:disabled { opacity: .5; cursor: default; }
-.dshDofeAccessModelRefresh:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary, #245eea); outline-offset: 1px; }
+.dshDofeAccessModelRow { display: grid; }
 .dshDofeAccessSpin { animation: dshDofeSpin 1s linear infinite; }
 @keyframes dshDofeSpin { to { transform: rotate(360deg); } }
 @media (max-width: 720px) {
@@ -104,6 +103,7 @@ const CSS = `
   .dshDofeModal { width: calc(100vw - 32px); max-height: calc(100vh - 32px); }
   .dshDofeModalHeader { padding: 22px 20px 18px; }
   .dshDofeModalBody { padding: 18px 20px 22px; }
+  .dshDofeAccessSection { padding: 14px; }
   .dshDofeAccessFieldHeader { align-items: flex-start; flex-direction: column; gap: 3px; }
   .dshDofeAccessPlugins { grid-template-columns: 1fr; }
   .dshDofeAccessPlugin:nth-child(n) { padding: 11px 4px; border-right: 0; }
@@ -248,6 +248,7 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
   const [success, setSuccess] = useState(false)
   const ssoBound = settings.value?.authMode === 'feishu' && Boolean(settings.value.identity?.ssoSub)
   const showSetup = BRAND_VARIANT !== 'sensteed' || ssoBound
+  const showCapabilities = BRAND_VARIANT === 'sensteed' ? ssoBound : onboarding === true
   const bindFeishuLogin = async (status: DofeAuthSnapshot): Promise<void> => {
     if (!status.user?.ssoSub || !status.entitlements) throw new Error('登录身份不完整')
     const nextProtocol = UI_DOFE_PROTOCOLS.find(candidate => status.entitlements?.allowedProtocols.includes(candidate))
@@ -288,6 +289,7 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
   }, [credentials, t])
   const loadModels = async (overrides: { key?: string; protocol?: DofeProtocol; configured?: boolean; preferredModel?: string } = {}): Promise<void> => {
     const request = dofeModelsRequestBody(overrides.key ?? draft, overrides.configured ?? configured, overrides.protocol ?? protocol)
+    const preferredModel = (overrides.preferredModel ?? settings.value?.entitlements?.defaultModel)?.trim()
     if ((!request.key && !request.useStored) || loadingRef.current || busyRef.current) return
     loadingRef.current = true
     setLoadingModels(true)
@@ -317,6 +319,12 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
         }
       }
       if (!response.ok || found.length === 0) {
+        if (preferredModel) {
+          setModels([{ id: preferredModel, name: preferredModel }])
+          setSelectedModel(preferredModel)
+          setError(undefined)
+          return
+        }
         setModels([])
         setSelectedModel('')
         setError(failureReason === 'tenant_mismatch' ? t('tenantMismatch') : failureReason === 'tenant_unavailable' ? t('tenantUnavailable') : t('modelsError'))
@@ -324,10 +332,16 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
       }
       setModels(found)
       setSelectedModel(current => {
-        const candidate = overrides.preferredModel || current
+        const candidate = preferredModel || current
         return found.some(model => model.id === candidate) ? candidate : found[0]!.id
       })
     } catch {
+      if (preferredModel) {
+        setModels([{ id: preferredModel, name: preferredModel }])
+        setSelectedModel(preferredModel)
+        setError(undefined)
+        return
+      }
       setModels([])
       setSelectedModel('')
       setError(t('modelsError'))
@@ -336,15 +350,16 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
       setLoadingModels(false)
     }
   }
-  // A stored credential should surface its model list as soon as the form
-  // opens; the refresh button stays for manual reloads and typed keys. The
-  // one-shot ref keeps a failed fetch from re-entering an automatic retry loop.
+  // A stored credential should surface its model list as soon as the logged-in
+  // form opens. The one-shot ref keeps a failed fetch from re-entering an
+  // automatic retry loop while protocol changes still trigger a fresh request.
   const autoLoadedRef = useRef(false)
   useEffect(() => {
-    if (configured !== true || autoLoadedRef.current) return
+    if (configured !== true || (BRAND_VARIANT === 'sensteed' && !ssoBound) || autoLoadedRef.current) return
     autoLoadedRef.current = true
-    void loadModels()
-  }, [configured])
+    const preferredModel = settings.value?.entitlements?.defaultModel
+    void loadModels(preferredModel === undefined ? {} : { preferredModel })
+  }, [configured, ssoBound])
   const save = async (): Promise<void> => {
     if (BRAND_VARIANT === 'sensteed' && (!ssoBound || !settings.value?.entitlements?.allowedProtocols.includes(protocol))) return
     const key = draft.trim()
@@ -455,16 +470,20 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
   return <div className={`dshDofeAccess${onboarding ? ' dshDofeAccessOnboarding' : ''}`} aria-busy={interactionBusy}>
     {!onboarding && <h2>{t('title')}</h2>}
     {success && <Toast text={t('loginSuccess')} icon={<Check size={18} />} onDone={() => setSuccess(false)} />}
-    {BRAND_VARIANT === 'sensteed' && <DofeLoginSection disabled={interactionBusy} name={ssoBound ? settings.value?.identity?.name || '用户' : undefined} avatar={ssoBound ? settings.value?.identity?.avatar : undefined} onBound={bindFeishuLogin} onLogout={remove} />}
-    {BRAND_VARIANT === 'sensteed' && !ssoBound && <p className="dshDofeAccessIntro">{t('sensteedLoginIntro')}</p>}
-    {showSetup && <>
-    {BRAND_VARIANT === 'sensteed' && ssoBound && <p className="dshDofeAccessHint">{t('sensteedSetupIntro')}{settings.value?.identity?.groups?.length ? ` · 企业授权：${settings.value.identity.groups.map(group => settings.value?.identity?.groupNames?.[group] ?? group).join('、')}` : ''}</p>}
-    <div className="dshDofeAccessField"><div className="dshDofeAccessFieldHeader"><span className="dshDofeAccessLabel" id="dofe-protocol-label">{t('protocolTitle')}</span></div><div className="dshDofeAccessProtocols" role="radiogroup" aria-labelledby="dofe-protocol-label">{UI_DOFE_PROTOCOLS.map(p => <label key={p} className={`dshDofeAccessProtocol${protocol === p ? ' dshDofeAccessProtocolSelected' : ''}`}><input type="radio" name="dofe-protocol" value={p} checked={protocol === p} disabled={interactionBusy || (BRAND_VARIANT === 'sensteed' && !settings.value?.entitlements?.allowedProtocols.includes(p))} onChange={() => { setProtocol(p); setModels([]); setSelectedModel(''); setError(undefined); void loadModels({ protocol: p }) }} /><span>{p === 'messages' ? t('protocolMessages') : t('protocolChat')}</span></label>)}</div></div>
-    <div className="dshDofeAccessField"><div className="dshDofeAccessFieldHeader"><label className="dshDofeAccessLabel" htmlFor="dofe-model-select">{t('modelsTitle')}</label></div>{configured === true && !draft.trim() && models.length === 0 && !loadingModels && <p className="dshDofeAccessHint" role="status">{t('storedReady')}</p>}<div className="dshDofeAccessModelRow"><select id="dofe-model-select" className="dshDofeAccessModelSelect" value={selectedModel} disabled={interactionBusy || models.length === 0} onChange={event => setSelectedModel(event.currentTarget.value)}><option value="">{models.length === 0 ? t('modelsPlaceholder') : t('modelsEmpty')}</option>{models.map(model => <option key={model.id} value={model.id}>{model.name} ({model.id})</option>)}</select><button type="button" className="dshDofeAccessModelRefresh" title={loadingModels ? t('loadingModels') : t('loadModels')} aria-label={loadingModels ? t('loadingModels') : t('loadModels')} disabled={interactionBusy || (!draft.trim() && configured !== true)} onClick={() => void loadModels()}>{loadingModels ? <Loader2 size={16} className="dshDofeAccessSpin" /> : <RefreshCw size={16} />}</button></div></div>
-    {onboarding && <div className="dshDofeAccessField"><div className="dshDofeAccessFieldHeader"><span className="dshDofeAccessLabel">{t('pluginsTitle')}</span><span className="dshDofeAccessCount">{t('selectedCount').replace('{count}', String(enabledPlugins.length))}</span></div><div className="dshDofeAccessPlugins">{availablePlugins.map(plugin => { const selected = enabledPlugins.includes(plugin.id); return <label className={`dshDofeAccessPlugin${selected ? ' dshDofeAccessPluginSelected' : ''}`} key={plugin.id}><input type="checkbox" checked={selected} disabled={interactionBusy} onChange={event => { const checked = event.currentTarget.checked; setEnabledPlugins(current => checked ? [...new Set([...current, plugin.id])] : current.filter(id => id !== plugin.id)) }} /><span className="dshDofeAccessPluginCheck" aria-hidden="true"><Check size={14} strokeWidth={2.5} /></span><span><span className="dshDofeAccessPluginName">{plugin.name}</span><span className="dshDofeAccessPluginDescription">{plugin.description}</span></span></label> })}</div></div>}
-    {error !== undefined && <p className="dshDofeAccessError" role="alert">{error}</p>}
-    <div className={`dshDofeAccessActions${onboarding ? ' dshDofeAccessActionsOnboarding' : ''}`}><Button className="dshDofeAccessPrimary" variant="primary" disabled={interactionBusy || (!draft.trim() && configured !== true) || models.length === 0 || !selectedModel || (onboarding && enabledPlugins.length === 0)} onClick={() => void save()}>{busy ? t('saving') : t('save')}{!busy && <ArrowRight size={16} aria-hidden="true" />}</Button>{!onboarding && <span className="dshDofeAccessStatus" role="status">{configured === true ? t('configured') : configured === false ? t('missing') : ''}</span>}</div>
-    </>}
+    <section className="dshDofeAccessSection" aria-labelledby="dofe-account-section-title">
+      <div className="dshDofeAccessSectionHeader"><h3 id="dofe-account-section-title">{t('accountSectionTitle')}</h3></div>
+      {BRAND_VARIANT === 'sensteed' && <DofeLoginSection disabled={interactionBusy} name={ssoBound ? settings.value?.identity?.name || '用户' : undefined} avatar={ssoBound ? settings.value?.identity?.avatar : undefined} onBound={bindFeishuLogin} onLogout={remove} />}
+      {BRAND_VARIANT === 'sensteed' && !ssoBound && <p className="dshDofeAccessIntro">{t('sensteedLoginIntro')}</p>}
+      {BRAND_VARIANT === 'sensteed' && ssoBound && <p className="dshDofeAccessHint">{t('sensteedSetupIntro')}{settings.value?.identity?.groups?.length ? ` · 企业授权：${settings.value.identity.groups.map(group => settings.value?.identity?.groupNames?.[group] ?? group).join('、')}` : ''}</p>}
+      {showCapabilities && <div className="dshDofeAccessField"><div className="dshDofeAccessFieldHeader"><span className="dshDofeAccessLabel">{t('pluginsTitle')}</span><span className="dshDofeAccessCount">{t('selectedCount').replace('{count}', String(enabledPlugins.length))}</span></div><div className="dshDofeAccessPlugins">{availablePlugins.map(plugin => { const selected = enabledPlugins.includes(plugin.id); return <label className={`dshDofeAccessPlugin${selected ? ' dshDofeAccessPluginSelected' : ''}`} key={plugin.id}><input type="checkbox" checked={selected} disabled={interactionBusy} onChange={event => { const checked = event.currentTarget.checked; setEnabledPlugins(current => checked ? [...new Set([...current, plugin.id])] : current.filter(id => id !== plugin.id)) }} /><span className="dshDofeAccessPluginCheck" aria-hidden="true"><Check size={14} strokeWidth={2.5} /></span><span><span className="dshDofeAccessPluginName">{plugin.name}</span><span className="dshDofeAccessPluginDescription">{plugin.description}</span></span></label> })}</div></div>}
+    </section>
+    {showSetup && <section className="dshDofeAccessSection" aria-labelledby="dofe-model-section-title">
+      <div className="dshDofeAccessSectionHeader"><h3 id="dofe-model-section-title">{t('modelSectionTitle')}</h3></div>
+      <div className="dshDofeAccessField"><div className="dshDofeAccessFieldHeader"><span className="dshDofeAccessLabel" id="dofe-protocol-label">{t('protocolTitle')}</span></div><div className="dshDofeAccessProtocols" role="radiogroup" aria-labelledby="dofe-protocol-label">{UI_DOFE_PROTOCOLS.map(p => <label key={p} className={`dshDofeAccessProtocol${protocol === p ? ' dshDofeAccessProtocolSelected' : ''}`}><input type="radio" name="dofe-protocol" value={p} checked={protocol === p} disabled={interactionBusy || (BRAND_VARIANT === 'sensteed' && !settings.value?.entitlements?.allowedProtocols.includes(p))} onChange={() => { setProtocol(p); setModels([]); setSelectedModel(''); setError(undefined); void loadModels({ protocol: p }) }} /><span>{p === 'messages' ? t('protocolMessages') : t('protocolChat')}</span></label>)}</div></div>
+      <div className="dshDofeAccessField"><div className="dshDofeAccessFieldHeader"><label className="dshDofeAccessLabel" htmlFor="dofe-model-select">{t('modelsTitle')}</label></div>{loadingModels && <p className="dshDofeAccessHint" role="status">{t('loadingModels')}</p>}{!loadingModels && models.length === 0 && <p className="dshDofeAccessHint" role="status">{t('modelsPlaceholder')}</p>}<div className="dshDofeAccessModelRow"><select id="dofe-model-select" className="dshDofeAccessModelSelect" value={selectedModel} disabled={interactionBusy || models.length === 0} onChange={event => setSelectedModel(event.currentTarget.value)}><option value="">{models.length === 0 ? t('modelsPlaceholder') : t('modelsEmpty')}</option>{models.map(model => <option key={model.id} value={model.id}>{model.name} ({model.id})</option>)}</select></div></div>
+      {error !== undefined && <p className="dshDofeAccessError" role="alert">{error}</p>}
+      <div className={`dshDofeAccessActions${onboarding ? ' dshDofeAccessActionsOnboarding' : ''}`}><Button className="dshDofeAccessPrimary" variant="primary" disabled={interactionBusy || (!draft.trim() && configured !== true) || models.length === 0 || !selectedModel || (onboarding && enabledPlugins.length === 0)} onClick={() => void save()}>{busy ? t('saving') : t('save')}{!busy && <ArrowRight size={16} aria-hidden="true" />}</Button>{!onboarding && <span className="dshDofeAccessStatus" role="status">{configured === true ? t('configured') : configured === false ? t('missing') : ''}</span>}</div>
+    </section>}
   </div>
 }
 
