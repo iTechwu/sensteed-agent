@@ -921,6 +921,9 @@ describe('published package surface', () => {
       'build/tray-iconTemplate.png',
       'build/tray-iconTemplate@2x.png',
       'node_modules/fs-ext/**',
+      'node_modules/node-addon-require-builtin/**',
+      'node_modules/node-addon-require-builtin-darwin-arm64/**',
+      'node_modules/node-addon-require-builtin-darwin-x64/**',
     ])
     expect(builderConfig?.mac?.mergeASARs).toBe(false)
     expect(builderConfig?.mac?.signIgnore).toEqual(['\\.(?:pak|dat|wasm)$'])

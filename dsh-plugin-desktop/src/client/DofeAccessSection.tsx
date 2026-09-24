@@ -7,7 +7,7 @@ import { ArrowRight, Check, Loader2, RefreshCw } from 'lucide-react'
 import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { DofeOnboardingModal } from './DofeOnboardingModal.tsx'
 import { DofeLoginSection } from './DofeLoginSection.tsx'
-import { DOFE_AUTH_LOGOUT_PATH, type DofeAuthSnapshot } from '../dofe-auth-contract.ts'
+import { DOFE_AUTH_LOGOUT_PATH, DOFE_AUTH_STATUS_PATH, type DofeAuthSnapshot } from '../dofe-auth-contract.ts'
 import { heroBrandDataUrl } from './generated-brand-assets.ts'
 import { BRAND_TENANT, BRAND_VARIANT } from '../generated-product-identity.ts'
 import { DOFE_ACCESS_KEY, type DofeAccessLocaleKey } from './dofe-access.ts'
@@ -487,6 +487,36 @@ export function DofeAccessGate({ credentials, settingsApi, settingsScope, t, onA
   const [credentialConfigured, setCredentialConfigured] = useState<boolean>()
   const [credentialReadFailed, setCredentialReadFailed] = useState(false)
   const [success, setSuccess] = useState(false)
+  // The persisted settings can carry a login from a previous installation while
+  // the live SSO session behind it is long dead. The gate must therefore ask the
+  // Host's auth service, not just trust the document: a definitively dead
+  // session (`invalid_grant`, idle, cancelled) revokes the stale authorization;
+  // a transient failure keeps the last good state, mirroring the Host's own
+  // restore semantics.
+  const [sessionDead, setSessionDead] = useState(false)
+  const ssoBoundStatic = settings.value?.authMode === 'feishu' && Boolean(settings.value.identity?.ssoSub)
+  useEffect(() => {
+    if (!ssoBoundStatic) { setSessionDead(false); return }
+    let cancelled = false
+    const check = async (): Promise<void> => {
+      try {
+        const response = await fetch(DOFE_AUTH_STATUS_PATH, {
+          method: 'POST', credentials: 'same-origin', redirect: 'error',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: '{}', signal: AbortSignal.timeout(15_000),
+        })
+        if (!response.ok || cancelled) return
+        const snapshot = await response.json() as DofeAuthSnapshot
+        if (cancelled) return
+        if (snapshot.status === 'bound') setSessionDead(false)
+        else if (snapshot.status === 'error' || snapshot.status === 'idle' || snapshot.status === 'cancelled') setSessionDead(true)
+        // `pending`/`issued` mean a login is in flight; keep the current state.
+      } catch { /* A transient failure is not a session revocation. */ }
+    }
+    void check()
+    const timer = setInterval(() => { void check() }, 60_000)
+    return () => { cancelled = true; clearInterval(timer) }
+  }, [ssoBoundStatic])
   useEffect(() => {
     let cancelled = false
     let retry: ReturnType<typeof setTimeout> | undefined
@@ -511,14 +541,14 @@ export function DofeAccessGate({ credentials, settingsApi, settingsScope, t, onA
   const authorized = credentialConfigured === true
     && settings.value?.setupComplete === true
     && settings.value.validationVersion === DOFE_ACCESS_VALIDATION_VERSION
-    && settings.value.authMode === 'feishu'
-    && Boolean(settings.value.identity?.ssoSub)
+    && ssoBoundStatic
+    && !sessionDead
   useEffect(() => { onAuthorizationChange?.(authorized) }, [authorized, onAuthorizationChange])
   if (authorized) return success ? <Toast text={t('loginSuccess')} icon={<Check size={18} />} onDone={() => setSuccess(false)} /> : null
   // Do not flash onboarding while the persisted account/credential is loading.
   if (settings.value === undefined || credentialConfigured === undefined) return credentialReadFailed
     ? <div className="dshDofeAccessLoading" role="status">{t('loadError')}</div> : null
-  const ssoBound = settings.value?.authMode === 'feishu' && Boolean(settings.value.identity?.ssoSub)
+  const ssoBound = ssoBoundStatic && !sessionDead
   return <DofeOnboardingModal eyebrow={t('onboardingEyebrow')} title={BRAND_VARIANT === 'sensteed' ? ssoBound ? t('sensteedSetupTitle') : t('sensteedLoginTitle') : t('onboardingTitle')} description={BRAND_VARIANT === 'sensteed' ? ssoBound ? t('sensteedSetupIntro') : t('sensteedLoginIntro') : t('onboardingIntro')} brandLogo={heroBrandDataUrl} brandLogoAlt={BRAND_TENANT}><AccessForm credentials={credentials} settingsApi={settingsApi} settingsScope={settingsScope} t={t} onboarding onDone={() => { setCredentialConfigured(true); setSuccess(true) }} /></DofeOnboardingModal>
 }
 

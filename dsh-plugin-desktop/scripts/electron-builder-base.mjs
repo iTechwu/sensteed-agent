@@ -52,6 +52,9 @@ export const ELECTRON_BUILDER_BASE = Object.freeze({
       'build/tray-iconTemplate.png',
       'build/tray-iconTemplate@2x.png',
       'node_modules/fs-ext/**',
+      'node_modules/node-addon-require-builtin/**',
+      'node_modules/node-addon-require-builtin-darwin-arm64/**',
+      'node_modules/node-addon-require-builtin-darwin-x64/**',
     ],
     files: [
       'build/app-icon.png',
@@ -110,6 +113,9 @@ export const ELECTRON_BUILDER_BASE = Object.freeze({
       'build/tray-icon-blue@1.5x.png',
       'build/tray-icon-blue@2x.png',
       'node_modules/@agents-anywhere/dsh-bridge-next/lib/bundled-connector/**',
+      'node_modules/node-addon-require-builtin/**',
+      'node_modules/node-addon-require-builtin-win32-x64/**',
+      'node_modules/node-addon-require-builtin-win32-arm64/**',
     ],
     files: [
       '!node_modules/@img/sharp-darwin*/**',
