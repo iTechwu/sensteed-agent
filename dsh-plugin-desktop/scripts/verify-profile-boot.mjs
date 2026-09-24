@@ -5,7 +5,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, write
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { boot } from '@deepseek-ai/dsh-app-boot'
+import { boot, resolveProfileDir } from '@deepseek-ai/dsh-app-boot'
 import { provideCmdline } from '@deepseek-ai/dsh-cmdline'
 import {
   createLaunchEnvironmentSnapshot,
@@ -57,6 +57,18 @@ try {
     '  mode: advanced',
     'agent-presets:',
     '  default: minimal',
+    '',
+  ].join('\n'))
+  // 0.1.7 reads startup preferences from the composed desktop-shell row, which
+  // lives in the profile's own patch layer once the config editor (or the
+  // one-shot settings import) has written the user's choices there.
+  const profileDir = resolveProfileDir('desktop', home)
+  mkdirSync(profileDir, { recursive: true })
+  writeFileSync(join(profileDir, 'cordis.patch.yml'), [
+    '# User layer: overrides the base-bundle desktop-shell row in place.',
+    '- id: desktop-shell',
+    '  config:',
+    '    mode: advanced',
     '',
   ].join('\n'))
   const aaRequested = process.env.DSH_VERIFY_AA === '1'
@@ -169,6 +181,36 @@ try {
     prepared.rootConfig,
     patches,
     async (host) => {
+      // dsh 0.1.7 gates the base-bundle rows (settings, config-editor, hmr, …)
+      // on `profileContext`, which only a profile launcher provides. The smoke
+      // IS a profile launcher: supply the same launcher facts the production
+      // Desktop boot supplies, or every gated row stays disabled and the
+      // desktop shell never mounts.
+      host.provide('profileContext', {
+        name: prepared.profile.name,
+        dir: prepared.profile.dir,
+        patchPath: prepared.profile.patchPath,
+        installAnchor: fileURLToPath(new URL('../package.json', import.meta.url)),
+        cwd: process.cwd(),
+        home,
+        startedBundles: prepared.profile.layers.map(layer => layer.packageName),
+        overlays: structuredClone(prepared.overlays ?? []),
+        telemetryDisabledEnv: process.env.DSH_TELEMETRY_DISABLED,
+        // The first-boot settings import recomposes the profile through this
+        // seam; without the Desktop-owned preparation the recomposed tree
+        // drops the launcher's rows (webserver replacement, shell pins) and
+        // the running WebServer is disposed under the fetch — the same
+        // rc.1 semantics the isolated Host delegates in host-bootstrap.
+        readPatches: profilePatches => [...prepareDesktopProfile(
+          process.env.DSH_TELEMETRY_DISABLED, home, 'win32', prepared.profile.name,
+          undefined, undefined,
+          {
+            aaEnabled: aaRequested,
+            lanAddresses: prepared.lanAddresses,
+            ...(profilePatches === undefined ? {} : { profilePatches }),
+          },
+        ).patches],
+      })
       // Match the public resolver path used by packaged Electron.
       host.loader.internal = undefined
       host.provide(DSH_LAUNCH_ENVIRONMENT_KEY, createLaunchEnvironmentSnapshot([]))
@@ -234,7 +276,9 @@ try {
       .map(preset => `${preset.id}: ${preset.broken}`)
       .join('; ')}`)
   }
-  if (agentPresets.defaultId !== 'minimal') {
+  // 0.1.7: `default` is the bundle-authored fallback (standard); the user's
+  // own choice moved to `selectedDefault`, which no smoke run has ever set.
+  if (agentPresets.defaultId !== 'standard') {
     throw new Error(`assembled Windows profile selected unexpected default ${agentPresets.defaultId}`)
   }
   const minimalPreset = await agentPresets.resolve('minimal')
@@ -274,9 +318,11 @@ try {
   if (nativeThemeSource !== 'system') {
     throw new Error(`desktop plugin produced an unexpected native theme source: ${nativeThemeSource}`)
   }
-  const desktopSettings = ctx.settings.get(DESKTOP_SETTINGS_NAMESPACE)
+  // 0.1.7 keys live settings by Loader entry id; the legacy 'sensteed-agent'
+  // section name only exists in the harness-home document before the import.
+  const desktopSettings = ctx.settings.get('desktop-shell')
   if (desktopSettings?.mode !== 'advanced') {
-    throw new Error('assembled Host settings are missing the advanced sensteed-agent mode')
+    throw new Error('assembled Host settings are missing the advanced desktop-shell mode')
   }
   if (!trayItems.some(item => item.label() === 'Check for Updates…')) {
     throw new Error('assembled desktop profile is missing the update tray command')
@@ -321,9 +367,10 @@ try {
     redirect: 'manual',
   })
   await exchange.body?.cancel()
-  if (exchange.status !== 303 || exchange.headers.get('location') !== '/') {
+  // rc.1 answers with the relative './'; both spellings address the root.
+  if (exchange.status !== 303 || !['/', './'].includes(exchange.headers.get('location') ?? '')) {
     throw new Error(
-      `browser authentication exchange returned HTTP ${String(exchange.status)} instead of a root redirect`,
+      `browser authentication exchange returned HTTP ${String(exchange.status)} with location ${String(exchange.headers.get('location'))} instead of a root redirect`,
     )
   }
   const setCookie = exchange.headers.get('set-cookie')

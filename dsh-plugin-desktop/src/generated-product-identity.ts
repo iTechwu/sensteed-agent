@@ -22,7 +22,7 @@ export const BRAND_RELEASE_IDENTITIES = Object.freeze({
 export const BRAND_ACTIVE_CHANNEL = "beta" as const
 
 /** Build-time white-label variant, widened so either brand's sources typecheck. */
-export type BrandVariant = 'yootun' | 'sensteed'
+export type BrandVariant = 'sensteed'
 
 /** Build-time white-label variant. */
 export const BRAND_VARIANT: BrandVariant = "sensteed"

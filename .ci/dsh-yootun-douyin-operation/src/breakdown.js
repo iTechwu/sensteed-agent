@@ -13,6 +13,7 @@
 // 表格元素渲染（React 文本子节点自动转义，无 HTML 注入面），不引入 markdown 依赖。
 
 import { formatCount, formatDateTime } from './ui-format.js'
+import { FilterSelect } from './select-ui.js'
 
 // React 由 client.js 内联作用域提供（构建时剥离本模块的 require，与 overview-ui 同法）；
 // hooks 以 React.xxx 形式使用，避免与 client.js 顶部解构重复声明同名绑定。
@@ -80,6 +81,29 @@ export function workflowErrorCopyKey(workflow) {
 
 export function breakdownStatusTone(status) {
   return BREAKDOWN_STATUS_TONE[status] || 'running'
+}
+
+// 拆解记录列表状态筛选（纯前端过滤，不改变加载链路）：tone 归一后分组——
+// 「失败」= error + warn（cancelled/needs_input 同属「未成功」终态），与
+// StatusBadge 的语义色一致；未登记 status 按 running 归「进行中」。
+export const BREAKDOWN_STATUS_FILTERS = Object.freeze([
+  { id: 'all', copyKey: 'bdFilterAll' },
+  { id: 'running', copyKey: 'bdFilterRunning' },
+  { id: 'succeeded', copyKey: 'bdFilterSucceeded' },
+  { id: 'failed', copyKey: 'bdFilterFailed' },
+])
+
+export function filterBreakdownHistory(history, filter) {
+  const rows = Array.isArray(history) ? history : []
+  if (filter === 'succeeded') return rows.filter(item => breakdownStatusTone(item?.status) === 'ok')
+  if (filter === 'failed') {
+    return rows.filter(item => {
+      const tone = breakdownStatusTone(item?.status)
+      return tone === 'error' || tone === 'warn'
+    })
+  }
+  if (filter === 'running') return rows.filter(item => breakdownStatusTone(item?.status) === 'running')
+  return rows
 }
 
 /**
@@ -340,7 +364,9 @@ export function BreakdownRulePicker({ rules, value, onChange, disabled, t }) {
         disabled,
         onClick: () => onChange(value === rule.rewriteRuleId ? null : rule.rewriteRuleId),
       },
-      h('span', { className: 'ydo-bd-radio-name' }, rule.name),
+      h('span', { className: 'ydo-bd-radio-name' },
+        h('span', { className: 'ydo-bd-radio-box', 'aria-hidden': true }),
+        rule.name),
       rule.description ? h('span', { className: 'ydo-bd-radio-desc' }, rule.description) : null))
       : h('span', { className: 'ydo-hint' }, t('bdRulesEmpty')))
 }
@@ -359,7 +385,7 @@ export function BreakdownNewPage({ rules, rulesError, onRetryRules, submitting, 
     setShareUrl('')
     setRuleId(null)
   }
-  return h('section', { className: 'ydo-ov-panel' },
+  return h('section', { className: 'ydo-ov-panel ydo-bd-panel' },
     h('h3', null, t('bdNewTitle')),
     h('div', { className: 'ydo-bd-new' },
       h('input', {
@@ -401,10 +427,15 @@ export function BreakdownNewPage({ rules, rulesError, onRetryRules, submitting, 
       : null)
 }
 
-export function BreakdownHistoryList({ history, rules, loading, errorReason, hasMore, loadingMore, onLoadMore, onOpen, t }) {
+export function BreakdownHistoryList({
+  history, rules, loading, errorReason, hasMore, loadingMore, onLoadMore, onOpen,
+  statusFilter = 'all', onStatusFilterChange, t,
+}) {
   // 行数据 = workflow 投影：标题/作者/播放量/规则 id（服务端投影直出，防 N+1）。
   // 表格结构（预览稿 tbl）：视频 | 状态 | 仿写规则 | 当前步骤 | 时间。
-  const rows = history.map((item, index) => {
+  // 状态筛选是纯前端过滤：只影响展示，不改变加载与分页链路。
+  const filtered = filterBreakdownHistory(history, statusFilter)
+  const rows = filtered.map((item, index) => {
     const tone = breakdownStatusTone(item.status)
     const failed = tone === 'error'
     const running = tone === 'running' && item.currentStepLabel
@@ -434,14 +465,27 @@ export function BreakdownHistoryList({ history, rules, loading, errorReason, has
   })
   // 预览稿 panel 口径：可见标题「拆解记录（团队共享，按时间倒序）」，记录区与
   // 发起区同为 ydo-ov-panel；空态/错误态同样带标题，保持结构对称。
-  return h('section', { className: 'ydo-ov-panel ydo-bd-history', role: 'group', 'aria-label': t('bdHistoryLabel') },
-    h('h3', null, t('bdHistoryLabel'),
-      h('span', { className: 'ydo-bd-history-sub' }, t('bdHistorySub'))),
+  // 状态筛选复用总览/分析页的「toolbar 标题行 + FilterSelect 下拉」范式，
+  // 与既有筛选交互（账号/时间范围/趋势指标）保持一致，不另造控件。
+  return h('section', { className: 'ydo-ov-panel ydo-bd-panel ydo-bd-history', role: 'group', 'aria-label': t('bdHistoryLabel') },
+    h('div', { className: 'ydo-ov-toolbar' },
+      h('h3', null, t('bdHistoryLabel'),
+        h('span', { className: 'ydo-bd-history-sub' }, t('bdHistorySub'))),
+      h('div', { className: 'ydo-ov-filter' },
+        h('span', null, t('bdFilterLabel')),
+        h(FilterSelect, {
+          label: t('bdFilterLabel'),
+          value: statusFilter,
+          onChange: value => onStatusFilterChange && onStatusFilterChange(value),
+          options: BREAKDOWN_STATUS_FILTERS.map(item => ({ value: item.id, label: t(item.copyKey) })),
+        }))),
     errorReason
       ? h('p', { className: 'ydo-error', role: 'alert' }, t(errorReason))
       : !history.length
         ? h('p', { className: 'ydo-hint', role: 'status' }, loading ? t('loading') : t('bdHistoryEmpty'))
-        : [
+        : !filtered.length
+          ? h('p', { className: 'ydo-hint', role: 'status' }, t('bdHistoryEmptyFiltered'))
+          : [
           h('table', { key: 'table', className: 'ydo-bd-table' },
             h('thead', null, h('tr', null,
               h('th', null, t('bdColVideo')),
@@ -495,10 +539,11 @@ export function BreakdownDetailPage({ workflow, detail, candidate, rules, loadin
   // 走「暂无拆解内容」引导，避免误导。
   const pending = Boolean(workflow) && !failed && breakdownStatusTone(workflow.status) === 'running'
   return h('div', { className: 'ydo-bd-page' },
+    // 预览稿 detail-top：返回靠左、「重新改写」靠右（弹性撑开）。
     h('div', { className: 'ydo-an-toolbar' },
       h('button', { type: 'button', className: 'ydo-secondary', onClick: onBack }, t('bdBackToList')),
       h('button', {
-        type: 'button', className: 'ydo-secondary',
+        type: 'button', className: 'ydo-secondary ydo-bd-toolbar-rewrite',
         disabled: pending || loading,
         onClick: onRequestRewrite,
       }, t('bdRewriteButton'))),
@@ -602,8 +647,10 @@ function FoldCard({ tone, title, defaultOpen = false, digest = null, children })
 export function BreakdownRewriteModal({ open, rules, submitting, onConfirm, onClose, t }) {
   const [ruleId, setRuleId] = React.useState(null)
   if (!open) return null
-  return h('div', { className: 'ydo-ai-modal-overlay', role: 'dialog', 'aria-modal': true, 'aria-label': t('bdRewriteTitle') },
-    h('div', { className: 'ydo-ai-modal' },
+  // 预览稿 dialog 口径：560px 居中、radius 10、深遮罩；特化类只覆盖宽度/
+  // 遮罩/字号/底部按钮行，交互复用 ydo-ai-modal 既有结构（含右上 × 关闭）。
+  return h('div', { className: 'ydo-ai-modal-overlay ydo-bd-modal-overlay', role: 'dialog', 'aria-modal': true, 'aria-label': t('bdRewriteTitle') },
+    h('div', { className: 'ydo-ai-modal ydo-bd-modal' },
       h('button', { type: 'button', className: 'ydo-ai-modal-close', 'aria-label': t('close'), onClick: onClose },
         h(IconCloseOutline16, { size: 16 })),
       h('div', { className: 'ydo-ai-modal-body' },
