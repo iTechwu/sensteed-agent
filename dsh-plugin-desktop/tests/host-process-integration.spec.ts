@@ -22,6 +22,7 @@ it.each(['disabled', 'missing', 'installed'] as const)('boots a separate Web Hos
   let releaseNative: (() => Promise<void>) | undefined
   let pnpm: ReturnType<typeof installDesktopPnpmRuntime> | undefined
   let stderr = ''
+  let stdoutLog = ''
   try {
     writeFileSync(join(home, 'settings.yaml'), 'sensteed-agent:\n  mode: advanced\nagent-presets:\n  default: minimal\n')
     const initial = prepareDesktopProfile('1', home, 'win32')
@@ -58,6 +59,7 @@ it.each(['disabled', 'missing', 'installed'] as const)('boots a separate Web Hos
     child = fork(fileURLToPath(new URL('./fixtures/isolated-host/child.mjs', import.meta.url)), [], {
       execArgv: [], stdio: ['ignore', 'pipe', 'pipe', 'ipc'], serialization: 'advanced',
     })
+    child.stdout?.on('data', data => { stdoutLog += String(data) })
     child.stderr?.on('data', data => { stderr += String(data) })
     const [ready] = await once(child, 'message')
     expect(ready).toEqual({ ready: true })
@@ -125,7 +127,8 @@ it.each(['disabled', 'missing', 'installed'] as const)('boots a separate Web Hos
     await rpc.call('stop')
     await expect(fetch(spec.url, { headers })).rejects.toThrow()
   } catch (error) {
-    throw new Error(`${error instanceof Error ? error.stack : String(error)}\n${stderr}`)
+    const cause = (error as { cause?: unknown }).cause
+    throw new Error(`${error instanceof Error ? error.stack : String(error)}\ncause=${String(cause)}\nexit=${String(child.exitCode ?? child.signalCode)}\nstdout:\n${stdoutLog}\nstderr:\n${stderr}`)
   } finally {
     await releaseNative?.()
     rpc?.close()
