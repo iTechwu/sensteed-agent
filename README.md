@@ -87,6 +87,106 @@ Sensteed Agent 将 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-ha
 | 了解桌面应用如何工作 | [架构说明](docs/architecture.md) |
 | 查阅包级构建与发布细节 | [`dsh-plugin-desktop/README.md`](dsh-plugin-desktop/README.md) |
 
+## 项目全景
+
+本节面向第一次接触本仓库的人，用一页说清 Sensteed Agent 是什么、由哪些部分组成、如何构建与验证。
+
+### 产品定位
+
+| 视角 | 说明 |
+| --- | --- |
+| 面向用户 | Sensteed Agent（山子 Agent）是把 DeepSeek Harness 完整装进原生窗口的桌面客户端：托盘、通知、终端、更新、工作配置开箱即用，无需安装 Node.js 或敲命令。 |
+| 面向企业 | 山子高科内部 AI 工作台。登录强制走飞书 SSO，模型与内置能力按企业授权（entitlements）下发，操作经审计服务留痕并同步 Models。 |
+| 面向开发者 | 一个 fork 型桌面发行版：固定版本的上游内核原样运行，桌面壳与全部业务能力都按「一切皆插件」的方式组合，可插拔、可演进。 |
+
+### 核心能力
+
+| 能力 | 说明 |
+| --- | --- |
+| 原生桌面壳 | compatibility / extended / advanced 三种窗口模式，系统托盘、原生菜单、通知、macOS 材质与 Mica 窗口效果。 |
+| DoFe 访问（强制飞书登录） | 首次使用必须完成飞书 SSO 绑定；租户校验、企业授权组、协议与默认模型选择、内置能力开关都在「用户设置」中完成。手动 Key 模式不可绕过登录。 |
+| 业务插件套件 | 抖音运营、招聘、销售、供方观察、内容指令、看板、FinOps、审计、知识采集等 DoFe 数据源即插即用，由 `dofe-managed` 统一管理凭据与 MCP 传输。 |
+| 审计与运维 | 操作审计事件本地暂存（outbox）并按配置同步 Models；财务与运营看板内置于桌面。 |
+| 插件市场 | DSH Community Market 内置：插件发现、详情、安装与管理，支持开放数据源接入。 |
+| 恢复与安全模式 | 启动检查点、一键回滚、失败自动进入恢复助手；Safe Mode 以出厂默认配置启动用于排障。 |
+| 浏览器与局域网访问 | 回环默认；可选交给系统浏览器打开或开放局域网（带连接栅栏与 LAN HTTPS）。 |
+| 系统代理继承 | Node 侧出站统一继承系统代理，启动即安装出站策略，启动报告写明实际路由。 |
+| 手机远程 | 通过 Agents Anywhere 从手机连接桌面 Agent，发起任务并跟进进度。 |
+| 更新通道 | stable / beta 双通道，固定版本检查与安装包下载分离，请求头携带版本与通道元数据。 |
+
+### 仓库结构
+
+```text
+├── dsh-plugin-desktop/      桌面主包：Electron 宿主 + 客户端 + 打包脚本（sensteed 品牌）
+├── dsh-desktop-next/        下一代壳实验场（不在 workspace 与门禁内，源码级对齐）
+├── dsh-community-market/    社区市场：产品与安全设计（私有文档脚手架，不声明可加载入口）
+├── dsh-community-fabric/    插件互操作 RFC 与调研
+├── .ci/dsh-*                DoFe 业务插件源码、品牌资源与 CI 资源
+├── brand/                   品牌单一来源：brand.config.json → 全部生成产物
+├── docs/                    用户与开发者文档（中英双语）
+├── scripts/                 品牌渲染、门禁校验、快照同步脚本
+├── assets/                  界面截图、社区与赞助素材
+└── deepseek-harness → ../deepseek-harness   内核 fork（symlink 直连 sibling checkout）
+```
+
+### 内核与同步模型
+
+- 运行内核是自己的 DeepSeek Harness fork（`iTechwu/deepseek-harness`，dev 分支），通过 `upstream.json` 固定 `sourceVersion`（当前 **0.1.7-rc.1**），以 symlink 方式整体并入根 pnpm workspace，238 个 `@deepseek-ai/*` 包全部 `workspace:*` 跟随 sibling。
+- 桌面特有的内核扩展（旧版设置门面、settings-file 兼容层、预设数据包等）以 fork 原生提交落地，不使用补丁文件。
+- 同步节奏：`git fetch` 上游 → merge 进 dev → `main ← dev` 快进；每轮同步按「架构文件保 ours、产品内容取 theirs、品牌重放」的既定约定逐类解冲突。
+- 依赖闭包由 `verify:closure` 强制：319 个一等节点形成闭合可达运行时图，缺一个 peer 都会红。
+
+### 品牌体系
+
+- `brand/brand.config.json` 是唯一品牌来源（sensteed 单品牌），`generate:brand` 据此生成 `generated-product-identity.ts`、`electron-builder.json`、应用图标、托盘图标、锁标与 README 品牌围栏。
+- 已退役的旧品牌名由 `brand/legacy-tokens-allowlist.json` 按文件配额管控，只减不增；产品文案已全量切换 sensteed（显示名「山子 Agent」）。
+- README 中的 `<!-- brand:* -->` 围栏由 `pnpm brand:docs` 渲染，`pnpm brand:check` 强制校验。
+
+### 构建与门禁
+
+根 `check` 固定 `BRAND=sensteed`，串联以下阶段（任一失败即红）：
+
+| 阶段 | 内容 |
+| --- | --- |
+| `verify:brand` | 品牌文档围栏 + 双语哈希记录 + 旧品牌 token 配额 |
+| `build` | market 构建后再构建桌面主包（tsdown + vite + tsc 三个 tsconfig） |
+| `typecheck` | 主包与 market 的 TS 全量类型检查 |
+| `test` | 约 2000 项 vitest（含真实 Host 启动的集成用例） |
+| `verify:closure` | 319 节点一等运行时闭包校验 |
+| `verify:cli` | 打包后 CLI 引导运行时冒烟 |
+| `verify:loader` | Loader 装配冒烟（dofe-managed 装配与托盘桩） |
+| `verify:yootun-clients` | DoFe 客户端运行时校验 |
+| `verify:profile` | 完整 profile 组合 + 渲染器清单冒烟 |
+| `verify:licenses` | 生产依赖许可证再分发白名单 |
+| `verify:operations` | 运维脚本单测 |
+
+market 包另有独立 `check`（文档 → 构建 → 导出校验 → loader → 类型 → 274 项测试）。
+
+### 常用命令
+
+```sh
+corepack pnpm install --frozen-lockfile   # 安装（内核包全部 workspace 链接）
+corepack pnpm dev                          # 本地开发启动
+corepack pnpm check                        # 全量门禁（BRAND=sensteed）
+corepack pnpm build                        # 构建 market + 桌面主包
+corepack pnpm upstream:install             # 内核 fork 依赖安装
+corepack pnpm upstream:build               # 内核 fork 全量构建（clean + build）
+corepack pnpm --filter dsh-plugin-desktop run package:dir      # 目录打包
+corepack pnpm --filter dsh-plugin-desktop run dist:mac-smoke   # macOS 无签名 DMG 冒烟
+corepack pnpm --filter dsh-plugin-desktop run verify:profile   # profile 组合冒烟
+node scripts/sync-dofe-plugin-snapshot.mjs --write <插件名>     # 重同步 DoFe 插件快照
+corepack pnpm brand:docs && corepack pnpm brand:check          # 品牌文档再生成与校验
+```
+
+### 打包产物
+
+| 平台 | 产物 | 说明 |
+| --- | --- | --- |
+| macOS | Universal DMG（另支持 arm64/x64 单架构冒烟） | 未签名冒烟 + 签名发布两条路径 |
+| Windows | NSIS 安装程序 + 便携版 zip | 辅助安装消息、升级冒烟、运行中检测脚本齐备 |
+| Linux | AppImage / deb | x64，产物名与可执行名走品牌渲染 |
+
+
 ## 主要功能
 
 <table>

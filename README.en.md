@@ -87,6 +87,106 @@ Ordinary users can start with the [user guide](docs/user-guide.en.md); the devel
 | Understand how the desktop works | [Architecture](docs/architecture.en.md) |
 | Read package-level build and release details | [`dsh-plugin-desktop/README.md`](dsh-plugin-desktop/README.md) |
 
+## Project Panorama
+
+This section gives a first-time visitor the whole picture: what Sensteed Agent is, what it is made of, and how it is built and verified.
+
+### Product positioning
+
+| Perspective | Description |
+| --- | --- |
+| For users | Sensteed Agent puts a complete DeepSeek Harness inside a native window: tray, notifications, terminal, updates, and workspace configuration out of the box — no Node.js or command line required. |
+| For the enterprise | The internal AI workbench of Shandzi High-Tech. Login requires Feishu SSO; models and built-in capabilities are provisioned by enterprise entitlements, and operations are recorded by the audit service and synced to Models. |
+| For developers | A fork-based desktop distribution: the pinned upstream kernel runs unmodified, while the desktop shell and every business capability compose as plugins — pluggable and evolvable. |
+
+### Core capabilities
+
+| Capability | Description |
+| --- | --- |
+| Native desktop shell | compatibility / extended / advanced window modes, system tray, native menus, notifications, macOS materials and Mica effects. |
+| DoFe access (Feishu login required) | First use requires Feishu SSO binding; tenant verification, entitlement groups, protocol and default model selection, and built-in capability switches all live in "User settings". The manual key mode cannot bypass login. |
+| Business plugin suite | Douyin operations, recruiting, sales, supply watch, content command, dashboards, FinOps, audit, and knowledge capture DoFe data sources, managed end-to-end by `dofe-managed` (credentials + MCP transport). |
+| Audit and operations | Operation-audit events are staged locally (outbox) and synced to Models by configuration; finance and operations dashboards are built into the desktop. |
+| Plugin market | DSH Community Market built in: plugin discovery, details, install, and management with open data-source onboarding. |
+| Recovery and safe mode | Startup checkpoints, one-click rollback, automatic recovery assistant on failure; Safe Mode boots with shipped defaults for troubleshooting. |
+| Browser and LAN access | Loopback by default; optionally hand off to the system browser or open the LAN (with a connection fence and LAN HTTPS). |
+| System proxy inheritance | Node-side egress inherits the system proxy; the outbound policy installs at boot and the startup report states the resolved route. |
+| Phone remote | Connect to the desktop Agent from a phone via Agents Anywhere to start tasks and follow progress. |
+| Update channels | stable / beta channels; pinned-version checks and artifact downloads are separate requests with version and channel metadata headers. |
+
+### Repository layout
+
+```text
+├── dsh-plugin-desktop/      Main desktop package: Electron host + client + packaging scripts (sensteed brand)
+├── dsh-desktop-next/        Next-shell experiment (outside the workspace and gates, source-level alignment)
+├── dsh-community-market/    Community market: product and safety design (private docs scaffold, no loadable entries)
+├── dsh-community-fabric/    Plugin interop RFC and research
+├── .ci/dsh-*                DoFe business plugin sources, brand assets, and CI resources
+├── brand/                   Single brand source: brand.config.json → all generated artifacts
+├── docs/                    User and developer documentation (bilingual)
+├── scripts/                 Brand rendering, gate verification, and snapshot-sync scripts
+├── assets/                  Screenshots, community and sponsor material
+└── deepseek-harness -> ../deepseek-harness   Kernel fork (symlink into the sibling checkout)
+```
+
+### Kernel and sync model
+
+- The runtime kernel is our own DeepSeek Harness fork (`iTechwu/deepseek-harness`, dev branch) pinned by `upstream.json` to `sourceVersion` (currently **0.1.7-rc.1**), linked whole into the root pnpm workspace via symlink; all 238 `@deepseek-ai/*` packages follow the sibling as `workspace:*`.
+- Desktop-specific kernel extensions (the legacy settings facade, the settings-file compat layer, the preset data package) land as native fork commits — no patch files.
+- Sync cadence: `git fetch` upstream → merge into dev → `main ← dev` fast-forward; each round resolves conflicts per the established convention (architecture files keep ours, product content takes theirs, brand replayed).
+- The dependency closure is enforced by `verify:closure`: 319 first-party nodes must form a closed reachable runtime graph — one missing peer turns it red.
+
+### Brand system
+
+- `brand/brand.config.json` is the single brand source (sensteed only); `generate:brand` renders `generated-product-identity.ts`, `electron-builder.json`, app icons, tray icons, the lockup, and the README brand fences.
+- Retired brand names are governed per-file by `brand/legacy-tokens-allowlist.json` and may only shrink; product copy is fully sensteed (display name 山子 Agent).
+- The `<!-- brand:* -->` fences in this README are rendered by `pnpm brand:docs` and enforced by `pnpm brand:check`.
+
+### Build and gates
+
+The root `check` pins `BRAND=sensteed` and chains the following stages (any failure turns red):
+
+| Stage | Content |
+| --- | --- |
+| `verify:brand` | Brand doc fences + bilingual hash records + legacy token quotas |
+| `build` | Market build, then the desktop package (tsdown + vite + three tsconfigs) |
+| `typecheck` | Full TS type checking for the main package and market |
+| `test` | ~2000 vitest cases (including integration cases that boot a real Host) |
+| `verify:closure` | 319-node first-party runtime closure check |
+| `verify:cli` | Packaged CLI bootstrap runtime smoke |
+| `verify:loader` | Loader assembly smoke (dofe-managed wiring and tray stubs) |
+| `verify:yootun-clients` | DoFe client runtime verification |
+| `verify:profile` | Full profile composition + renderer manifest smoke |
+| `verify:licenses` | Redistribution allowlist for production dependency licenses |
+| `verify:operations` | Unit tests for operations scripts |
+
+The market package runs its own `check` (docs → build → export verification → loader → types → 274 tests).
+
+### Common commands
+
+```sh
+corepack pnpm install --frozen-lockfile   # install (kernel packages all workspace-linked)
+corepack pnpm dev                          # local development
+corepack pnpm check                        # full gates (BRAND=sensteed)
+corepack pnpm build                        # build market + desktop package
+corepack pnpm upstream:install             # kernel fork dependency install
+corepack pnpm upstream:build               # kernel fork full build (clean + build)
+corepack pnpm --filter dsh-plugin-desktop run package:dir      # directory packaging
+corepack pnpm --filter dsh-plugin-desktop run dist:mac-smoke   # unsigned macOS DMG smoke
+corepack pnpm --filter dsh-plugin-desktop run verify:profile   # profile composition smoke
+node scripts/sync-dofe-plugin-snapshot.mjs --write <plugin>    # re-sync a DoFe plugin snapshot
+corepack pnpm brand:docs && corepack pnpm brand:check          # brand doc regeneration and verification
+```
+
+### Packaging artifacts
+
+| Platform | Artifact | Notes |
+| --- | --- | --- |
+| macOS | Universal DMG (plus arm64/x64 single-arch smokes) | unsigned smoke and signed release paths |
+| Windows | NSIS installer + portable zip | assisted installer messages, upgrade smoke, and running-check scripts included |
+| Linux | AppImage / deb | x64; artifact and executable names follow the brand rendering |
+
+
 ## Features
 
 <table>
