@@ -7,20 +7,9 @@
 
 Sensteed Agent 是一个本地优先的开源桌面应用。本政策说明 Sensteed Agent 官方版本及官方在线服务会处理哪些信息、为什么处理、信息会发送给谁，以及您可以如何作出选择。
 
-本政策中的“我们”指在 GitHub 组织 [`anywhere-labs`](https://github.com/anywhere-labs) 下维护和发布 Sensteed Agent 官方版本、并运营 `dshdesktop.cn` 官方服务的 <!-- brand:privacy-maintainer:start -->
-**Sensteed 团队（山子高科）**<!-- brand:privacy-maintainer:end -->。项目是独立的社区开源项目，与 DeepSeek 不存在隶属、合作、授权或背书关系。
-
-隐私问题或权利请求请发送至 [t4wefan@qq.com](mailto:t4wefan@qq.com)。请不要在公开 GitHub Issue 中提交安装标识、日志、凭据或其他私密信息。
-
 ## 1. 适用范围
 
-本政策适用于：
-
-- 我们通过 [官方 GitHub 仓库](https://github.com/anywhere-labs/sensteed-agent)及官方发布渠道提供的 Sensteed Agent；
-- `https://www.dshdesktop.cn/` 下的官方网页、版本检查和下载跳转服务；
-- 您主动发送给项目维护团队的隐私请求、支持邮件或问题报告。
-
-第三方 Fork、自行修改的构建、第三方分发渠道、模型服务商、插件、插件市场来源及软件包服务各自的处理行为不由本政策控制。如果第三方构建仍访问硬编码的 `dshdesktop.cn` 官方端点，本政策仍适用于该官方端点实际收到的信息，但不适用于第三方构建或分发者的其他处理行为。
+**Sensteed 团队（山子高科）**<!-- brand:privacy-maintainer:end -->。项目是独立的社区开源项目，与 DeepSeek 不存在隶属、合作、授权或背书关系。
 
 ## 2. 摘要
 

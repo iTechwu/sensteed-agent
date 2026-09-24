@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="assets/desktop-hero-zh.png" alt="Sensteed Agent：基于 DeepSeek Harness 构建的企业级 AI 桌面工作台" width="100%">
-</p>
-
 <!-- brand:brand-title:start -->
 Sensteed Agent<!-- brand:brand-title:end -->
 
@@ -16,9 +12,6 @@ Sensteed Agent<!-- brand:brand-title:end -->
   万物皆「插件」，桌面本身也是「插件」。
 </p>
 
-<p align="center">
-  <img src="assets/desktop-chat-zh.png" alt="Sensteed Agent 中文对话界面" width="100%">
-</p>
 
 ## 项目定位
 
