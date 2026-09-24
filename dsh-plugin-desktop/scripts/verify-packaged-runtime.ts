@@ -111,19 +111,26 @@ export const ALLOWED_SMART_UNPACK_PACKAGE_ROOTS = [
 
 /** Platform package families selected by native dependencies at package time. */
 export const ALLOWED_SMART_UNPACK_PACKAGE_PREFIXES = [
+  'node_modules/@anthropic-ai/claude-agent-sdk-',
   'node_modules/@dataiku/uv-',
   'node_modules/@deepseek-ai/libreoffice-kit-',
   'node_modules/@deepseek-ai/node-addon-system-',
   'node_modules/@img/sharp-',
   'node_modules/@koromix/koffi-',
+  'node_modules/@openai/codex-',
+  'node_modules/@trycua/cua-driver-',
+  'node_modules/@ubjs/node-',
   'node_modules/@vscode/ripgrep-',
   'node_modules/lightningcss-',
   'node_modules/node-addon-require-builtin-',
+  'node_modules/sherpa-onnx-',
 ] as const
 
 /** Large platform runtime families intentionally kept outside the generic unpacked payload budget. */
 export const EXEMPT_UNPACKED_RUNTIME_PACKAGE_PREFIXES = [
+  'node_modules/@anthropic-ai/claude-agent-sdk-',
   'node_modules/@deepseek-ai/libreoffice-kit-',
+  'node_modules/@openai/codex-',
 ] as const
 
 /** Every generated JavaScript file shipped by the installed DSH CLI package. */
