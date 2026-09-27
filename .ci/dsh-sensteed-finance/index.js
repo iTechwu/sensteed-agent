@@ -379,10 +379,18 @@ async function mcpCall(fetchImpl, config, toolName, args, observedAt, logger) {
     if (!response.ok) return { ok: false, error: `upstream_http_${response.status}` }
     const payload = await response.json()
     if (payload?.error) return { ok: false, error: payload.error?.message || 'mcp_error' }
-    const raw = payload?.result?.content?.find(item => item.type === 'text')?.text
-    if (raw === undefined) return { ok: false, error: payload?.result?.isError ? 'tool_error' : 'empty_result' }
-    const data = JSON.parse(raw)
-    if (payload?.result?.isError || data?.error) return { ok: false, error: data?.hint || data?.error || '财务操作失败' }
+    const result = payload?.result
+    const structured = result?.structuredContent && typeof result.structuredContent === 'object' ? result.structuredContent : null
+    const raw = result?.content?.find(item => item.type === 'text')?.text
+    // structuredContent 优先；无结构化结果时回退 content 文本 JSON（datasource 域当前形态）。
+    let data
+    if (structured) {
+      data = structured
+    } else {
+      if (raw === undefined) return { ok: false, error: result?.isError ? 'tool_error' : 'empty_result' }
+      data = JSON.parse(raw)
+    }
+    if (result?.isError || data?.error) return { ok: false, error: data?.hint || data?.error || '财务操作失败' }
     return { ok: true, data, meta: { asOf: observedAt.toISOString() } }
   } catch (error) {
     logger?.warn?.('sensteed finance: mcp call %s failed', toolName)

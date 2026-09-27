@@ -15,13 +15,15 @@ function Dashboard({ t }) {
   const [brief, setBrief] = useState(null) // 总览/经营共用的全景快照
   const [briefState, setBriefState] = useState('loading')
   const shellRef = useRef(null)
+  // 同步请求锁：brief 取数在途时丢弃重复刷新，避免 revision 连击叠加请求
+  const loadingRef = useRef(false)
 
   useEffect(() => {
     if (!opened) return undefined
     let cancelled = false
     void api('/context').then(value => { if (!cancelled) setContext(value) }).catch(() => {})
     // 登录身份（sensteed 品牌宿主提供；路由不存在/未登录时静默隐藏）
-    void fetch('/api/desktop/auth/feishu/status', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: '{}' })
+    void fetch('/api/desktop/auth/feishu/status', { method: 'POST', credentials: 'same-origin', redirect: 'error', headers: { 'content-type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
       .then(response => response.json().catch(() => null))
       .then(snapshot => { if (!cancelled && snapshot?.status === 'bound' && snapshot.user?.name) setOperator(snapshot.user.name) })
       .catch(() => {})
@@ -33,15 +35,17 @@ function Dashboard({ t }) {
     if (!opened) return undefined
     if (tab !== 'overview' && tab !== 'operations') return undefined
     let cancelled = false
+    loadingRef.current = true
     setBrief(null)
     setBriefState('loading')
     api(`/brief?year=${year}${orgId ? `&orgId=${orgId}` : ''}`)
       .then(value => { if (!cancelled) { setBrief(value); setBriefState('ok') } })
       .catch(() => { if (!cancelled) setBriefState('error') })
-    return () => { cancelled = true }
+      .finally(() => { loadingRef.current = false })
+    return () => { cancelled = true; loadingRef.current = false }
   }, [opened, tab, year, orgId, revision])
 
-  const refresh = () => setRevision(value => value + 1)
+  const refresh = () => { if (loadingRef.current) return; setRevision(value => value + 1) }
   useEffect(() => {
     if (!opened) return undefined
     window.addEventListener('sf:refresh', refresh)
@@ -80,8 +84,8 @@ function Dashboard({ t }) {
       h('header', { className: 'sf-header' },
         h('div', null, h('h1', { id: 'sf-title' }, t('title')), h('p', null, operator ? `${t('operatorAs')} ${operator} · ${t('subtitle')}` : t('subtitle'))),
         h('div', { className: 'sf-header-buttons' },
-          h(Tooltip, { label: t('refresh') }, h('button', { type: 'button', className: 'sf-icon-btn', 'aria-label': t('refresh'), onClick: refresh }, h(IconRefreshOutline16, { size: 16 }))),
-          h(Tooltip, { label: t('close') }, h('button', { type: 'button', className: 'sf-icon-btn', 'aria-label': t('close'), onClick: closeOverlay }, h(IconCloseOutline16, { size: 16 }))))),
+          h(Tooltip, { label: t('refresh') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('refresh'), onClick: refresh }, h(IconRefreshOutline16, { size: 16 }))),
+          h(Tooltip, { label: t('close') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('close'), onClick: closeOverlay }, h(IconCloseOutline16, { size: 16 }))))),
       h('div', { className: 'sf-toolbar' },
         h(FormRow, { label: t('year') }, h(Select, { value: year, onChange: value => { setYear(value); setDrillParams(null) }, options: yearOptions() })),
         h(FormRow, { label: t('org') }, h(Select, { value: orgId, onChange: value => { setOrgId(value); setDrillParams(null) }, options: orgs.map(org => [org.id, org.name]), placeholder: t('allOrgs') }))),

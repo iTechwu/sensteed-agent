@@ -420,7 +420,7 @@ window.__ModuleLoader__.load({
       return h('div', { className: 'sf-dialog-mask', onMouseDown: event => { if (event.target === event.currentTarget) onClose?.() } },
         h('div', { className: `sf-dialog sf-dialog-${width}`, role: 'dialog', 'aria-modal': true, 'aria-label': title, ref: panelRef, tabIndex: -1 },
           h('header', { className: 'sf-dialog-head' }, h('h3', null, title),
-            h('button', { type: 'button', className: 'sf-icon-btn', 'aria-label': 'close', onClick: onClose }, h(Glyph, { name: 'close', size: 14 }))),
+            h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': 'close', onClick: onClose }, h(Glyph, { name: 'close', size: 14 }))),
           h('div', { className: 'sf-dialog-body' }, children),
           footer ? h('footer', { className: 'sf-dialog-foot' }, footer) : null))
     }
@@ -551,8 +551,8 @@ window.__ModuleLoader__.load({
     .sf-root{--sf-rose:var(--dsw-alias-state-error-primary);--sf-amber:var(--dsw-alias-state-warn-primary);--sf-green:var(--dsw-alias-state-success-primary);--sf-blue:var(--dsw-alias-state-business-primary);--sf-sky:var(--dsw-alias-state-business-primary);--sf-line:var(--dsw-alias-border-l1);--sf-line2:var(--dsw-alias-border-l2);--sf-bg:var(--dsw-alias-bg-base);--sf-card:var(--dsw-alias-bg-layer-1);--sf-hover:var(--dsw-alias-bg-layer-2);--sf-ink:var(--dsw-alias-label-primary);--sf-ink2:var(--dsw-alias-label-secondary);--sf-ink3:var(--dsw-alias-label-tertiary);--sf-brand:var(--dsw-alias-brand-primary);--sf-on-brand:var(--dsw-alias-label-primary-foreground)}
     .sf-button{display:flex;width:36px;height:36px;align-items:center;justify-content:center;gap:8px;border:0;border-radius:6px;background:transparent;color:var(--sf-ink2);cursor:pointer}.sf-button:hover{background:var(--sf-hover);color:var(--sf-ink)}.sf-wide{width:100%;height:34px;justify-content:flex-start;padding:0 10px}.sf-wide span{font-size:13px}
     .sf-overlay{position:fixed;inset:0;z-index:510;background:var(--sf-bg);color:var(--sf-ink);font-size:13px}.sf-shell{display:grid;grid-template-rows:auto auto auto 1fr;width:100%;height:100%;overflow:hidden}
-    .sf-header{display:flex;min-height:64px;align-items:center;justify-content:space-between;gap:18px;padding:14px 24px;border-bottom:1px solid var(--sf-line)}.sf-header h1{margin:0;font-size:18px;line-height:1.3}.sf-header p{margin:4px 0 0;color:var(--sf-ink2);font-size:12px}.sf-header-buttons{display:flex;gap:6px}
-    .sf-icon-btn{display:grid;width:32px;height:32px;place-items:center;border:1px solid var(--sf-line);border-radius:6px;background:var(--sf-card);color:inherit;cursor:pointer}.sf-icon-btn:hover{background:var(--sf-hover)}
+    .sf-header{display:flex;min-height:72px;align-items:center;justify-content:space-between;gap:18px;padding:14px 24px;border-bottom:1px solid var(--sf-line)}.sf-header h1{margin:0;font-size:18px;line-height:1.3}.sf-header p{margin:4px 0 0;color:var(--sf-ink2);font-size:12px}.sf-header-buttons{display:flex;gap:6px}
+    .sf-icon-button{display:grid;width:36px;height:36px;place-items:center;border:1px solid var(--sf-line);border-radius:6px;background:var(--sf-card);color:inherit;cursor:pointer}.sf-icon-button:hover{background:var(--sf-hover)}
     .sf-toolbar{display:flex;align-items:center;gap:14px;padding:10px 28px;border-bottom:1px solid var(--sf-line);flex-wrap:wrap}.sf-toolbar .sf-form-row{margin:0}
     .sf-tabs{display:flex;gap:2px;padding:0 28px;border-bottom:1px solid var(--sf-line);overflow-x:auto}.sf-tabs button{height:40px;padding:0 14px;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--sf-ink2);font:inherit;font-size:13px;white-space:nowrap;cursor:pointer}.sf-tabs button[aria-current]{border-bottom-color:var(--sf-brand);color:var(--sf-ink);font-weight:650}
     .sf-content{overflow:auto;padding:18px 28px 44px}.sf-content.sf-refreshing{opacity:.62;transition:opacity .2s}
@@ -2324,13 +2324,15 @@ window.__ModuleLoader__.load({
       const [brief, setBrief] = useState(null) // 总览/经营共用的全景快照
       const [briefState, setBriefState] = useState('loading')
       const shellRef = useRef(null)
+      // 同步请求锁：brief 取数在途时丢弃重复刷新，避免 revision 连击叠加请求
+      const loadingRef = useRef(false)
 
       useEffect(() => {
         if (!opened) return undefined
         let cancelled = false
         void api('/context').then(value => { if (!cancelled) setContext(value) }).catch(() => {})
         // 登录身份（sensteed 品牌宿主提供；路由不存在/未登录时静默隐藏）
-        void fetch('/api/desktop/auth/feishu/status', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: '{}' })
+        void fetch('/api/desktop/auth/feishu/status', { method: 'POST', credentials: 'same-origin', redirect: 'error', headers: { 'content-type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
           .then(response => response.json().catch(() => null))
           .then(snapshot => { if (!cancelled && snapshot?.status === 'bound' && snapshot.user?.name) setOperator(snapshot.user.name) })
           .catch(() => {})
@@ -2342,15 +2344,17 @@ window.__ModuleLoader__.load({
         if (!opened) return undefined
         if (tab !== 'overview' && tab !== 'operations') return undefined
         let cancelled = false
+        loadingRef.current = true
         setBrief(null)
         setBriefState('loading')
         api(`/brief?year=${year}${orgId ? `&orgId=${orgId}` : ''}`)
           .then(value => { if (!cancelled) { setBrief(value); setBriefState('ok') } })
           .catch(() => { if (!cancelled) setBriefState('error') })
-        return () => { cancelled = true }
+          .finally(() => { loadingRef.current = false })
+        return () => { cancelled = true; loadingRef.current = false }
       }, [opened, tab, year, orgId, revision])
 
-      const refresh = () => setRevision(value => value + 1)
+      const refresh = () => { if (loadingRef.current) return; setRevision(value => value + 1) }
       useEffect(() => {
         if (!opened) return undefined
         window.addEventListener('sf:refresh', refresh)
@@ -2389,8 +2393,8 @@ window.__ModuleLoader__.load({
           h('header', { className: 'sf-header' },
             h('div', null, h('h1', { id: 'sf-title' }, t('title')), h('p', null, operator ? `${t('operatorAs')} ${operator} · ${t('subtitle')}` : t('subtitle'))),
             h('div', { className: 'sf-header-buttons' },
-              h(Tooltip, { label: t('refresh') }, h('button', { type: 'button', className: 'sf-icon-btn', 'aria-label': t('refresh'), onClick: refresh }, h(IconRefreshOutline16, { size: 16 }))),
-              h(Tooltip, { label: t('close') }, h('button', { type: 'button', className: 'sf-icon-btn', 'aria-label': t('close'), onClick: closeOverlay }, h(IconCloseOutline16, { size: 16 }))))),
+              h(Tooltip, { label: t('refresh') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('refresh'), onClick: refresh }, h(IconRefreshOutline16, { size: 16 }))),
+              h(Tooltip, { label: t('close') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('close'), onClick: closeOverlay }, h(IconCloseOutline16, { size: 16 }))))),
           h('div', { className: 'sf-toolbar' },
             h(FormRow, { label: t('year') }, h(Select, { value: year, onChange: value => { setYear(value); setDrillParams(null) }, options: yearOptions() })),
             h(FormRow, { label: t('org') }, h(Select, { value: orgId, onChange: value => { setOrgId(value); setDrillParams(null) }, options: orgs.map(org => [org.id, org.name]), placeholder: t('allOrgs') }))),

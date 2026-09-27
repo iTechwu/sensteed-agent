@@ -529,7 +529,7 @@ export function DofeAccessGate({ credentials, settingsApi, settingsScope, t, onA
         const response = await fetch(DOFE_AUTH_STATUS_PATH, {
           method: 'POST', credentials: 'same-origin', redirect: 'error',
           headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: '{}', signal: AbortSignal.timeout(15_000),
+          body: '{}', signal: AbortSignal.timeout(ACCESS_REQUEST_TIMEOUT_MS),
         })
         if (!response.ok || cancelled) return
         const snapshot = await response.json() as DofeAuthSnapshot

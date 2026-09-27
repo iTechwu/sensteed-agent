@@ -19,12 +19,26 @@ async function readSourceTree(root, extensions) {
 }
 
 const clientPlugins = []
+const clientArtifacts = new Map()
 for (const name of entries) {
   try {
     await stat(new URL(`../.ci/${name}/src/client.js`, import.meta.url))
     clientPlugins.push(name)
+    clientArtifacts.set(name, `../.ci/${name}/src/client.js`)
   } catch (error) {
     if (error?.code !== 'ENOENT') throw error
+    // Concatenated builds (build.mjs FILES list) ship no src/client.js entry;
+    // their lib/client.js artifact is the audited source.
+    try {
+      const manifest = JSON.parse(await readFile(new URL(`../.ci/${name}/package.json`, import.meta.url), 'utf8'))
+      if (manifest.dsh?.client === undefined) continue
+      await stat(new URL(`../.ci/${name}/lib/client.js`, import.meta.url))
+    } catch (manifestError) {
+      if (manifestError?.code !== 'ENOENT') throw manifestError
+      continue
+    }
+    clientPlugins.push(name)
+    clientArtifacts.set(name, `../.ci/${name}/lib/client.js`)
   }
 }
 
@@ -124,6 +138,7 @@ const actionLifecyclePlugins = new Set([
 ])
 
 const pluginClassPrefixes = {
+  'dsh-sensteed-finance': 'sf-',
   'dsh-yootun-audit': 'ya-',
   'dsh-yootun-content-command': 'ycc-',
   'dsh-yootun-daily-report': 'ydr-',
@@ -377,7 +392,8 @@ for (const name of ciEntries) {
 }
 
 for (const name of clientPlugins) {
-  const source = await readFile(new URL(`../.ci/${name}/src/client.js`, import.meta.url), 'utf8')
+  const clientPath = clientArtifacts.get(name)
+  const source = await readFile(new URL(clientPath, import.meta.url), 'utf8')
   const localApiPaths = new Set(source.match(/\/(?:api\/desktop|_dsh)\/[a-z0-9/_-]+/giu) || [])
   const sidebarOrder = source.match(/name:\s*['"]sidebar\.footer\.action['"][\s\S]{0,180}?order:\s*(\d+)/u)?.[1]
   const overlayOrder = source.match(/name:\s*['"]shell\.overlay['"][\s\S]{0,180}?order:\s*(\d+)/u)?.[1]

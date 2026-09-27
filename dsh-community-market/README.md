@@ -2,7 +2,7 @@
 
 [中文说明](README.zh.md)
 
-DSH Community Market is the open plugin market built into [Sensteed Agent](../README.en.md). It discovers plugins from user-selected catalog sources and performs simple npm package operations against the active Desktop Profile.
+DSH Community Market is the open plugin market built into [Sensteed Agent](../README.md). It discovers plugins from user-selected catalog sources and performs simple npm package operations against the active Desktop Profile.
 
 > A catalog listing or an installable result is not a security review, compatibility guarantee, or endorsement. Installed plugins run locally with the user's permissions.
 

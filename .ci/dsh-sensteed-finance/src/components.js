@@ -135,7 +135,7 @@ function Dialog({ title, width = 'md', onClose, children, footer }) {
   return h('div', { className: 'sf-dialog-mask', onMouseDown: event => { if (event.target === event.currentTarget) onClose?.() } },
     h('div', { className: `sf-dialog sf-dialog-${width}`, role: 'dialog', 'aria-modal': true, 'aria-label': title, ref: panelRef, tabIndex: -1 },
       h('header', { className: 'sf-dialog-head' }, h('h3', null, title),
-        h('button', { type: 'button', className: 'sf-icon-btn', 'aria-label': 'close', onClick: onClose }, h(Glyph, { name: 'close', size: 14 }))),
+        h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': 'close', onClick: onClose }, h(Glyph, { name: 'close', size: 14 }))),
       h('div', { className: 'sf-dialog-body' }, children),
       footer ? h('footer', { className: 'sf-dialog-foot' }, footer) : null))
 }

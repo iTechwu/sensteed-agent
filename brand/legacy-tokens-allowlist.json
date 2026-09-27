@@ -14,6 +14,8 @@
     ".ci/dsh-georank-mcp/cordis.patch.yml": 1,
     ".ci/dsh-opencli/index.js": 1,
     ".ci/dsh-opencli/index.test.mjs": 6,
+    ".ci/dsh-sensteed-supplier-intelligence/cordis.patch.yml": 1,
+    ".ci/dsh-sensteed-supplier-intelligence/test/plugin.test.mjs": 1,
     ".ci/dsh-tools-mcp/cordis.patch.yml": 9,
     ".ci/dsh-yootun-audit/package.json": 1,
     ".ci/dsh-yootun-audit/test/plugin.test.mjs": 1,
