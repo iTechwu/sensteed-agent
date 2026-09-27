@@ -16,6 +16,7 @@ import {
 import { BRAND_TENANT, BRAND_VARIANT } from './generated-product-identity.ts'
 import { KNOWLEDGE_ROUTING_PROMPT } from './knowledge-routing.ts'
 import { DofeAuthService } from './dofe-auth-service.ts'
+import { localFinanceMcpConfig } from './finance-mcp.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context { dofeAuth: DofeAuthService }
@@ -80,6 +81,7 @@ export async function apply(ctx: Context): Promise<void> {
       },
     },
   )
+  let financeAuth: DofeAuthService | undefined
   if (BRAND_VARIANT === 'sensteed') {
     const auth = new DofeAuthService(ctx.desktopRuntime, ctx.credentials, globalThis.fetch, async snapshot => {
       const current = access.get()
@@ -104,6 +106,7 @@ export async function apply(ctx: Context): Promise<void> {
           && Boolean(current.modelId) && entitlements.allowedProtocols.includes(current.protocol ?? 'chat-completions'),
       })
     }, ctx.logger)
+    financeAuth = auth
     ctx.provide('dofeAuth', auth)
     const restore = async () => {
       const snapshot = await auth.restore()
@@ -170,6 +173,10 @@ export async function apply(ctx: Context): Promise<void> {
         }
         created.push(await ctx.plugin(McpClient, config))
       }
+      const financeSession = financeAuth?.getDatasourceSession()
+      if (BRAND_VARIANT === 'sensteed' && financeSession) {
+        created.push(await ctx.plugin(McpClient, localFinanceMcpConfig(financeSession.accessToken)))
+      }
       clients = created
     } catch (error) {
       await Promise.all(created.map(client => client.dispose()))
@@ -184,6 +191,9 @@ export async function apply(ctx: Context): Promise<void> {
     reload = reload.then(reconcile, reconcile)
   }
 
+  let observingFinance = false
+  if (financeAuth) ctx.effect(() => financeAuth.watchBinding(() => { if (observingFinance) schedule() }), 'dofe-managed: finance SSO renewal')
+  observingFinance = true
   schedule()
   tray = ctx.desktopRuntime.registerTrayItem({
     group: 'tools',

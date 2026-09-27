@@ -1406,7 +1406,7 @@ export function prepareDesktopProfile(
   }
   // Sensteed 登录统一走 DoFe 飞书模式:禁用 web-app bundle 层的 DeepSeek 原生
   // 账号 UI 与其后端控制器。llm-deepseek 对 deepseekAccount 是软依赖
-  // (`ctx.get(...)?... ?? fallback`,且桌面行已覆写为 ixicai 网关),禁用不影响
+  // (`ctx.get(...)?... ?? fallback`,且桌面行已覆写为托管网关),禁用不影响
   // 模型行;launcher 层 compose 在 bundle 层之后,按 id 覆盖即生效。
   patches.push(
     { id: 'ui-settings-account', disabled: true },

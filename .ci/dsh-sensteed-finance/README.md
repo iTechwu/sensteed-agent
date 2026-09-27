@@ -1,48 +1,33 @@
-# dsh-sensteed-finance
+# Sensteed 财务管理
 
-Sensteed（山子Agent）财务专业看板插件：把 datasource.dofe.ai 财务数据中心的数据接口以 MCP 暴露给 Agent，并在插件内提供统计看板、数据录入与一键深度分析入口。
+Sensteed Agent 侧边栏「财务管理」提供与 datasource 网页工作台对应的八个模块：经营总览、预算、经营分析、资金、预警、数据中心、填报录入、深度分析。
 
-## 组成
+## 登录与数据连接
 
-| 部分 | 说明 |
+本地打包按用户明确选择连接 `https://datasource.local.dofe.ai/api/mcp`。这是此本地财务集成的明确例外；其他 MCP 仍遵守仓库的公共网关规则。
+
+使用桌面端飞书登录即可。宿主内存保存短期 SSO access token，登录/续期后由 `dofe-managed` 创建 `mcp__finance__*` 客户端。财务界面每次请求读取当前会话；服务端验证 token 并固定租户和操作者。不再要求用户配置 `DATASOURCE_INTERNAL_API_SECRET`、租户或操作者环境变量。token 不进入渲染进程、状态 API、构建产物或日志。
+
+本机 datasource 必须已启动，并支持 SSO Bearer 鉴权。宿主将用户本机 mkcert 根证书追加至 Node TLS 信任集，保留证书校验。未登录/过期时显示飞书登录提示；没有财务角色时保留服务端拒绝信息。
+
+## 交互覆盖
+
+| 模块 | 交互 |
 | --- | --- |
-| `cordis.patch.yml` | 注册 `@deepseek-ai/dsh-mcp-client`（serverName `finance`，指向 datasource `/api/mcp`）+ 本插件 guidance |
-| `index.js`（宿主端） | ① `mcp__finance__*` 工具的 Agent 使用 guidance（财务口径 + 分析工作流 + 财务口吻输出规范）；② `sensteed_finance_bootstrap` 工具（租户/主体上下文）；③ 同源前缀路由 `/api/desktop/sensteed/finance*`，代理统计读取与录入/回填写入 |
-| `src/client.js`（浏览器端） | 八页看板：总览 / 预算 / 台账与计划（含回填）/ 资金 / 预警（可触发引擎）/ 数据治理 / 数据录入 / 深度分析入口（7 个预制分析场景，发送给当前会话由 Agent 调 MCP 完成分析） |
+| 总览/经营 | 年度、主体筛选；预算/PR/付款指标、趋势；下钻到预算子视图与月份 |
+| 预算 | 汇总矩阵、月度、明细、PR 台账、差异、调整审批、分配记录、版本与结转规则、保存视图 |
+| 资金 | 汇总、排款、实际回填、调增审批、收入计划 |
+| 预警 | 严重度/状态筛选、分页、详情与来源下钻、规则确认、触发引擎 |
+| 数据中心 | 数据质量、导入批次、数据源与运行记录 |
+| 录入 | 填报任务、部门填报、通讯录、人员归属、成员角色、预算及收支录入 |
+| 深度分析 | 风险、成本、预算执行、收入、质量、预测、版本和规则分析，投递到当前会话；无会话时创建会话 |
 
-## 配置（桌面端 DSH 环境）
+财务界面仅访问同源 `/api/desktop/sensteed/finance`；Agent 和界面共用 datasource MCP。所有写入自动带幂等键，进行中的重复点击合并。业务错误不会作为成功返回，客户端无法覆盖操作者/租户。
 
-三个引用均从**凭据服务**解析（层级：进程环境 > `~/.dsh/.credentials.yaml` > `~/.dsh/.env`），插件内再兜底 `process.env`。最简方式是写入家目录 `.env`：
+## 构建与验证
 
-```bash
-# ~/.dsh/.env（权限 600；值与 datasource API 的 INTERNAL_API_SECRET 一致）
-DATASOURCE_TENANT_ID=<SSO 租户 ID>
-DATASOURCE_INTERNAL_API_SECRET=<datasource 的 INTERNAL_API_SECRET 值>
+```sh
+BRAND=sensteed npm run check
 ```
 
-| 引用 | 必填 | 说明 |
-| --- | --- | --- |
-| `DATASOURCE_TENANT_ID` | 是 | 默认租户（SSO tenantId），注入所有 MCP 工具入参与宿主代理路由 |
-| `DATASOURCE_INTERNAL_API_SECRET` | 是 | datasource API 的 `INTERNAL_API_SECRET` 同值密钥（无此名时回退解析 `INTERNAL_API_SECRET`） |
-| `DATASOURCE_BASE_URL` | 否 | datasource API 源，默认 `https://datasource.local.dofe.ai/api`（自动拼 `/mcp`；统一走本地 nginx 入口，不直连回环地址。mkcert 证书由插件自动引导 Node 信任，也可用 `NODE_EXTRA_CA_CERTS` 显式指定） |
-| `DATASOURCE_MCP_URL` | 否 | MCP 完整 URL 覆盖（默认 `https://datasource.local.dofe.ai/api/mcp`），特殊部署使用 |
-
-MCP 客户端条目使用 `authorizationCredential: DATASOURCE_INTERNAL_API_SECRET`，由 dsh-mcp-client 自动附加 `Authorization: Bearer`；packaged 桌面端从 shell rc 注入的普通变量会被白名单/敏感名过滤剥除，因此不要走 shell export 通道。
-
-## 数据面
-
-- **Agent**：`mcp__finance__*`（streamable-http，无状态 JSON-RPC，Bearer secret）。读：orgs/overview/budget/pr/plans/revenue/cash/alerts/quality/batches/analysis_brief；写：create payment-plan / revenue-plan / budget-line、patch 实际值、run alert engine。
-- **看板**：浏览器只访问同源 `/api/desktop/sensteed/finance*`，宿主端用同一 secret 以 `tools/call` 转发——与 Agent 完全同一数据面，口径一致。
-
-## 开发
-
-```bash
-pnpm install
-npm run check   # build + node --check + node --test
-```
-
-## 验证
-
-1. 启动 datasource API 与本地 nginx（入口 `https://datasource.local.dofe.ai`，需设置 `INTERNAL_API_SECRET`；mkcert 根证书保持默认位置即可被插件自动识别）。
-2. 桌面端环境注入上表三个变量，安装插件后侧栏底部出现「财务看板」入口。
-3. 会话内输入「分析本年预算执行风险」，Agent 应先调 `sensteed_finance_bootstrap`、`mcp__finance__finance_analysis_brief`，再输出财务口吻的风险预判。
+桌面构建会先重新生成本插件浏览器模块并刷新已安装的 file 依赖。桌面仓库的 `tests/browser/finance.browser.mjs` 使用受控数据覆盖八页、分析指令、下钻和失败重试；真实财务写入仍应使用测试租户验收。

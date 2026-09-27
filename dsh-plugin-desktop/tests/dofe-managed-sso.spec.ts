@@ -69,7 +69,11 @@ describe('Sensteed startup authorization', () => {
     await apply(h.ctx as never)
     expect(h.getSettings().setupComplete).toBe(true)
     expect(h.getSettings().enabledPlugins).toEqual(['media'])
-    expect(h.ctx.plugin).toHaveBeenCalledOnce()
+    expect(h.ctx.plugin).toHaveBeenCalledTimes(2)
+    expect(h.ctx.plugin).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({
+      serverName: 'finance', url: 'https://datasource.local.dofe.ai/api/mcp',
+      headers: { Authorization: 'Bearer access-new' },
+    }))
     expect(h.tray.enabled()).toBe(false)
     expect(h.ctx.desktopRuntime.openExternal).not.toHaveBeenCalled()
     await h.dispose()

@@ -54,10 +54,13 @@ describe('DofeAuthService', () => {
     const service = new DofeAuthService({ openExternal } as never, credentials as never, fetcher, onBound)
     const snapshot = await service.restore()
     expect(snapshot.status).toBe('bound')
+    expect(service.getDatasourceSession()).toEqual({ accessToken: 'access-new', tenantId: 'tenant-1', operator: 'sub-1' })
+    expect(JSON.stringify(snapshot)).not.toContain('access-new')
     expect(snapshot.user?.avatar).toBe(userinfo.picture)
     expect(onBound).toHaveBeenCalledOnce()
     expect(openExternal).not.toHaveBeenCalled()
     await service.dispose()
+    expect(service.getDatasourceSession()).toBeUndefined()
   })
 
   it('keeps first launch offline and requires an explicit login for an expired grant', async () => {

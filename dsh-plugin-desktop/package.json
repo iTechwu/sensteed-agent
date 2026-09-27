@@ -137,7 +137,7 @@
     }
   },
   "scripts": {
-    "build": "corepack pnpm run generate:brand && node scripts/clean.mjs && tsdown && vite build --config vite.native-ui.config.ts && tsc -p tsconfig.json --emitDeclarationOnly && tsc -p tsconfig.client.json --emitDeclarationOnly",
+    "build": "corepack pnpm run generate:brand && node ../scripts/build-finance-ui.mjs && node scripts/clean.mjs && tsdown && vite build --config vite.native-ui.config.ts && tsc -p tsconfig.json --emitDeclarationOnly && tsc -p tsconfig.client.json --emitDeclarationOnly",
     "generate:brand": "node scripts/generate-brand-assets.mjs && node scripts/generate-lockup.ts && node scripts/generate-client-brand-module.mjs && node scripts/generate-product-identity.mjs && node scripts/generate-mac-app-icon.mjs && node scripts/generate-tray-icons.mjs && node scripts/generate-windows-app-icon.mjs",
     "verify:brand": "node scripts/verify-brand-sync.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit && tsc -p tsconfig.native-ui.json --noEmit && tsc -p tsconfig.tests.json --noEmit && tsc -p tsconfig.tests.client.json --noEmit",

@@ -4,11 +4,6 @@ import test from 'node:test'
 
 const root = new URL('../', import.meta.url)
 
-// apply() 在装载时读取环境变量，先于任何用例固定好桩值
-process.env.DATASOURCE_TENANT_ID ||= 'tenant-1'
-process.env.DATASOURCE_INTERNAL_API_SECRET ||= 'sec'
-process.env.DATASOURCE_BASE_URL ||= 'https://ds.local'
-
 // 前缀路由注册名：子路径用例统一从 BASE 拼接，避免散落完整字面量
 const BASE = '/api/desktop/sensteed/finance'
 
@@ -27,35 +22,62 @@ async function loadHost(overrides = {}) {
   const tools = new Map()
   const sections = []
   const { apply } = await import('../index.js')
-  // 凭据桩：默认仅这两个引用有存储值；overrides.credentialRefs 提供时整体替换（模拟引用缺省场景）
+  // 凭据桩：默认仅这三个引用有存储值；overrides.credentialRefs 提供时整体替换（模拟引用缺省场景）
   const credentialRefs = new Map(Object.entries(overrides.credentialRefs ?? {
     DATASOURCE_INTERNAL_API_SECRET: 'cred-secret',
     DATASOURCE_TENANT_ID: 'tenant-1',
+    DATASOURCE_OPERATOR_ID: 'op-1',
   }))
   apply({
     credentials: { async resolve(name) { return credentialRefs.has(name) ? { value: credentialRefs.get(name), source: 'file' } : undefined } },
     effect(factory) { return factory() },
     logger: { warn() {} },
-    webServer: { register(value) { routes.set(value.path, value); return () => {} } },
+    webServer: { port: 1, register(value) { routes.set(value.path, value); return () => {} } },
     tools: { register(value) { tools.set(value.name, value); return () => {} } },
     systemPrompt: { section(value) { sections.push(value); return () => {} } },
+    settings: overrides.settings,
+    dofeAuth: overrides.dofeAuth ?? { getDatasourceSession: () => ({ accessToken: 'feishu-test-token', tenantId: 'tenant-1', operator: 'op-1' }) },
   }, overrides)
   return { routes, tools, sections }
 }
 
-async function invokeRoute(route, method, url, body) {
+async function invokeRoute(route, method, url, body, headers = {}) {
   let status = 0
   let raw = ''
-  const req = { method, url: url || route.path, headers: {}, async *[Symbol.asyncIterator]() { if (body) yield Buffer.from(JSON.stringify(body)) } }
+  const merged = {
+    // 渲染进程同源请求的浏览器默认头（宿主 sameOrigin 校验依赖）
+    origin: 'http://127.0.0.1:1',
+    'sec-fetch-site': 'same-origin',
+    ...(method === 'POST' ? { 'content-type': 'application/json' } : {}),
+    ...headers,
+  }
+  const req = {
+    method,
+    url: url || route.path,
+    headers: merged,
+    socket: { remoteAddress: '127.0.0.1' },
+    async *[Symbol.asyncIterator]() { if (body) yield Buffer.from(JSON.stringify(body)) },
+  }
   const res = {
     writeHead(value) { status = value; return this },
     end(value = '') { raw += value },
   }
   await route.handler(req, res)
-  return { status, body: raw ? JSON.parse(raw) : undefined }
+  return { status, body: raw ? JSON.parse(raw) : undefined, headers: merged }
 }
 
-const ENV = { DATASOURCE_TENANT_ID: 'tenant-1', DATASOURCE_INTERNAL_API_SECRET: 'sec', DATASOURCE_BASE_URL: 'https://ds.local' }
+// 客户端片段清单（与 scripts/build.mjs 的 FILES 保持一致；顺序即依赖顺序）
+const CLIENT_FILES = [
+  'src/head.js', 'src/format.js', 'src/components.js', 'src/styles.js',
+  'src/views/overview.js', 'src/views/budget.js', 'src/views/operations.js', 'src/views/cash.js',
+  'src/views/alerts.js', 'src/views/datacenter.js', 'src/views/entry.js', 'src/views/analyze.js',
+  'src/shell.js',
+]
+async function readClientSource() {
+  const chunks = []
+  for (const file of CLIENT_FILES) chunks.push(await readFile(new URL(file, root), 'utf8'))
+  return chunks.join('\n')
+}
 
 test('manifest wires the MCP client and the web client', async () => {
   const manifest = JSON.parse(await readFile(new URL('package.json', root), 'utf8'))
@@ -88,8 +110,8 @@ test('GET routes proxy finance reads through the stateless MCP endpoint', async 
   assert.equal(brief.body.ok, true)
   assert.equal(brief.body.data.year, 2026)
   const briefCall = calls.find(item => item.init.body.includes('finance_analysis_brief'))
-  assert.match(briefCall.url, /^https:\/\/ds\.local\/mcp$/u, 'MCP endpoint = DATASOURCE_BASE_URL 源 + /mcp')
-  assert.equal(briefCall.init.headers.authorization, 'Bearer cred-secret', 'credential-store value must win over process.env')
+  assert.match(briefCall.url,  /^https:\/\/datasource\.local\.dofe\.ai\/api\/mcp$/u, 'local Datasource endpoint')
+  assert.equal(briefCall.init.headers.authorization, 'Bearer feishu-test-token', 'MCP uses the live Feishu session')
   assert.ok(JSON.parse(briefCall.init.body).params.arguments.tenantId, 'tenant must be injected')
 
   const quality = await invokeRoute(route, 'GET', BASE + '/quality')
@@ -109,6 +131,7 @@ test('write routes map to MCP write tools with path ids', async () => {
   assert.equal(created.status, 200)
   assert.equal(calls[0].body.params.name, 'finance_create_payment_plan')
   assert.equal(calls[0].body.params.arguments.tenantId, 'tenant-1')
+  assert.equal(calls[0].body.params.arguments.operator, 'op-1', 'operator 缺省注入凭据 DATASOURCE_OPERATOR_ID')
 
   const patched = await invokeRoute(route, 'POST', BASE + '/revenue-plans/row-9/actuals', { actualAmount: 50 })
   assert.equal(patched.status, 200)
@@ -123,6 +146,139 @@ test('write routes map to MCP write tools with path ids', async () => {
   assert.equal(bad.status, 404)
 })
 
+test('requires Feishu login and ignores client-supplied tenant and operator', async () => {
+  const calls = []
+  let session
+  const { routes } = await loadHost({
+    dofeAuth: { getDatasourceSession: () => session },
+    fetch: async (_url, init) => { calls.push(JSON.parse(init.body).params.arguments); return mcpJson({ ok: true }) },
+  })
+  const route = routes.get(BASE)
+  assert.equal((await invokeRoute(route, 'POST', BASE + '/payment-plans', { operator: 'spoof' })).status, 401)
+  assert.equal(calls.length, 0)
+  session = { accessToken: 'feishu-test-token', tenantId: 'tenant-1', operator: 'sso-1' }
+  await invokeRoute(route, 'POST', BASE + '/payment-plans', { tenantId: 'other', operator: 'spoof' })
+  assert.equal(calls[0].operator, 'sso-1')
+  assert.equal(calls[0].tenantId, 'tenant-1')
+  assert.match(calls[0].idempotencyKey, /^[0-9a-f-]{36}$/)
+  session = undefined
+  assert.equal((await invokeRoute(route, 'GET', BASE + '/quality')).status, 401)
+})
+
+test('same-origin guard rejects foreign-origin and non-loopback requests', async () => {
+  const calls = []
+  const { routes } = await loadHost({ fetch: async (url, init) => { calls.push({}); return mcpJson({ ok: true }) } })
+  const route = routes.get(BASE)
+  // 跨源 POST（网页 CSRF 形态）：403 且不落上游
+  const csrf = await invokeRoute(route, 'POST', BASE + '/payment-plans', { orgId: 'org-1' }, { origin: 'https://evil.example' })
+  assert.equal(csrf.status, 403)
+  // 非本机回环来源：403
+  let status = 0
+  const req = { method: 'GET', url: BASE + '/brief', headers: { origin: 'http://127.0.0.1:1' }, socket: { remoteAddress: '10.0.0.9' }, async *[Symbol.asyncIterator]() {} }
+  const res = { writeHead(value) { status = value; return this }, end() {} }
+  await route.handler(req, res)
+  assert.equal(status, 403)
+  assert.equal(calls.length, 0, 'rejected requests must not reach the MCP upstream')
+})
+
+test('read and write operator come from the live Feishu session', async () => {
+  const calls = []
+  const { routes } = await loadHost({
+    dofeAuth: { getDatasourceSession: () => ({ accessToken: 'token', tenantId: 'tenant-1', operator: 'sso-2' }) },
+    fetch: async (url, init) => { calls.push({ body: JSON.parse(init.body) }); return mcpJson({ ok: true }) },
+  })
+  const route = routes.get(BASE)
+  await invokeRoute(route, 'POST', BASE + '/payment-plans', { orgId: 'org-1', plannedAmount: 1 })
+  assert.equal(calls.at(-1).body.params.arguments.operator, 'sso-2')
+  // GET 侧 operatorArg 同样吃到 SSO 身份
+  await invokeRoute(route, 'GET', BASE + '/saved-views')
+  assert.equal(calls.at(-1).body.params.arguments.operator, 'sso-2')
+})
+
+test('new read routes map to the v0.4 MCP tools', async () => {
+  const calls = []
+  const { routes } = await loadHost({ fetch: async (url, init) => { calls.push({ body: JSON.parse(init.body) }); return mcpJson({ list: [] }) } })
+  const route = routes.get(BASE)
+  const cases = [
+    ['/departments?x=1', 'finance_get_departments'],
+    ['/alerts-summary?year=2026', 'finance_get_alert_summary'],
+    ['/alert-rules', 'finance_get_alert_rules'],
+    ['/budget-versions?year=2026', 'finance_get_budget_versions'],
+    ['/budget-version-diff?year=2026&baseVersionId=b1&targetVersionId=t1', 'finance_get_budget_version_diff'],
+    ['/carryover-rules', 'finance_get_carryover_rules'],
+    ['/saved-views', 'finance_get_saved_views'],
+    ['/members', 'finance_get_members'],
+    ['/employment-records', 'finance_get_employment_records'],
+    ['/contacts?onlyUnmapped=1', 'finance_directory_contacts_query'],
+    ['/data-source-configs', 'finance_get_data_source_configs'],
+    ['/data-source-runs?status=FAILED', 'finance_get_data_source_runs'],
+    ['/budget-adjustments?status=SUBMITTED', 'finance_budget_adjustment_list'],
+    ['/plan-adjustments', 'finance_plan_adjustment_list'],
+    ['/allocations?page=1', 'finance_allocation_list'],
+    ['/allocations-pool?year=2026', 'finance_allocation_pool_query'],
+    ['/availability?year=2026', 'finance_budget_availability_query'],
+    ['/filing-tasks?status=OPEN', 'finance_filing_task_list'],
+    ['/filing-assignments?year=2026', 'finance_filing_assignments_query'],
+  ]
+  for (const [path, tool] of cases) {
+    const response = await invokeRoute(route, 'GET', BASE + path)
+    assert.equal(response.status, 200, path)
+    const call = calls.at(-1)
+    assert.equal(call.body.params.name, tool, path)
+  }
+  // operator 解析：query 优先，缺省用凭据
+  await invokeRoute(route, 'GET', BASE + '/saved-views?operator=op-query')
+  assert.equal(calls.at(-1).body.params.arguments.operator, 'op-1')
+  await invokeRoute(route, 'GET', BASE + '/saved-views')
+  assert.equal(calls.at(-1).body.params.arguments.operator, 'op-1')
+})
+
+test('new write routes merge path captures and body into MCP args', async () => {
+  const calls = []
+  const { routes } = await loadHost({ fetch: async (url, init) => { calls.push({ body: JSON.parse(init.body) }); return mcpJson({ ok: true }) } })
+  const route = routes.get(BASE)
+
+  // 版本生命周期：路径 id 注入
+  await invokeRoute(route, 'POST', BASE + '/budget-versions/ver-1/action', { action: 'activate' })
+  assert.equal(calls.at(-1).body.params.name, 'finance_budget_version_action')
+  assert.equal(calls.at(-1).body.params.arguments.id, 'ver-1')
+  assert.equal(calls.at(-1).body.params.arguments.action, 'activate')
+
+  // 填报重开：路径捕获注入 id + action
+  await invokeRoute(route, 'POST', BASE + '/filing-assignments/as-1/reopen', { reason: '数据填错' })
+  assert.equal(calls.at(-1).body.params.name, 'finance_filing_assignment_action')
+  assert.equal(calls.at(-1).body.params.arguments.id, 'as-1')
+  assert.equal(calls.at(-1).body.params.arguments.action, 'reopen')
+
+  // 填报行暂存：路径捕获映射为 assignmentId
+  await invokeRoute(route, 'POST', BASE + '/filing-assignments/as-1/rows', { rows: [{ plannedAmount: 10 }] })
+  assert.equal(calls.at(-1).body.params.name, 'finance_filing_rows_upsert')
+  assert.equal(calls.at(-1).body.params.arguments.assignmentId, 'as-1')
+
+  // 预算调整审批：approve/reject 合一到 review 工具
+  await invokeRoute(route, 'POST', BASE + '/budget-adjustments/adj-1/reject', { note: '预算依据不足' })
+  assert.equal(calls.at(-1).body.params.name, 'finance_budget_adjustment_review')
+  assert.equal(calls.at(-1).body.params.arguments.id, 'adj-1')
+  assert.equal(calls.at(-1).body.params.arguments.action, 'reject')
+
+  // 提交走独立工具，路径捕获映射为 adjustmentId
+  await invokeRoute(route, 'POST', BASE + '/budget-adjustments/adj-1/submit', {})
+  assert.equal(calls.at(-1).body.params.name, 'finance_budget_adjustment_submit')
+  assert.equal(calls.at(-1).body.params.arguments.adjustmentId, 'adj-1')
+
+  // 排款调增审批 / 过账 / 数据源启停（无 operator 工具）
+  await invokeRoute(route, 'POST', BASE + '/plan-adjustments/pa-1/approve', { note: '同意' })
+  assert.equal(calls.at(-1).body.params.name, 'finance_plan_adjustment_review')
+  assert.equal(calls.at(-1).body.params.arguments.action, 'approve')
+  await invokeRoute(route, 'POST', BASE + '/allocations/al-1/remove', {})
+  assert.equal(calls.at(-1).body.params.name, 'finance_allocation_remove')
+  await invokeRoute(route, 'POST', BASE + '/data-source-configs/ds-1/active', { active: false })
+  assert.equal(calls.at(-1).body.params.name, 'finance_toggle_data_source_config')
+  assert.equal(calls.at(-1).body.params.arguments.id, 'ds-1')
+  assert.equal(calls.at(-1).body.params.arguments.active, false)
+  assert.equal(calls.at(-1).body.params.arguments.operator, 'op-1')
+})
+
 test('bootstrap tool reports tenant and orgs', async () => {
   const { tools } = await loadHost({ fetch: async () => mcpJson({ orgs: [{ id: 'org-1', name: '主体A' }] }) })
   const result = await tools.get('sensteed_finance_bootstrap').execute({})
@@ -131,23 +287,38 @@ test('bootstrap tool reports tenant and orgs', async () => {
   assert.equal(result.result.orgs[0].name, '主体A')
 })
 
-test('rejects tenant-dependent reads without a configured tenant while /quality stays available', async () => {
-  const previous = process.env.DATASOURCE_TENANT_ID
-  delete process.env.DATASOURCE_TENANT_ID
-  try {
-    const { routes } = await loadHost({
-      credentialRefs: {},
-      fetch: async () => mcpJson({ issues: [], list: [] }),
-    })
-    const route = routes.get(BASE)
-    const brief = await invokeRoute(route, 'GET', BASE + '/brief')
-    assert.equal(brief.status, 400)
-    assert.match(brief.body.error, /DATASOURCE_TENANT_ID/u)
-    const quality = await invokeRoute(route, 'GET', BASE + '/quality')
-    assert.equal(quality.status, 200, 'quality reads need no tenant')
-  } finally {
-    if (previous !== undefined) process.env.DATASOURCE_TENANT_ID = previous
+test('context normalizes organizations and departments for the selectors', async () => {
+  const { routes } = await loadHost({ fetch: async (_url, init) => {
+    const name = JSON.parse(init.body).params.name
+    return mcpJson(name === 'finance_get_orgs' ? { orgs: [{ id: 'org-1', name: '主体' }] } : { list: [{ id: 'dept-1', name: '部门' }] })
+  } })
+  const result = await invokeRoute(routes.get(BASE), 'GET', BASE + '/context')
+  assert.equal(result.body.data.orgs[0].id, 'org-1')
+  assert.equal(result.body.data.departments[0].id, 'dept-1')
+})
+
+test('MCP business errors are failures, not successful writes', async () => {
+  for (const data of [{ error: 'forbidden', hint: '没有操作权限' }, { error: 'budget_exceeded' }]) {
+    const { routes } = await loadHost({ fetch: async () => jsonResponse({ result: { isError: true, content: [{ type: 'text', text: JSON.stringify(data) }] } }) })
+    const result = await invokeRoute(routes.get(BASE), 'POST', BASE + '/allocations', {})
+    assert.equal(result.status, 502)
+    assert.equal(result.body.ok, false)
+    assert.equal(result.body.error, data.hint || data.error)
   }
+})
+
+test('scope changes replace group totals with the selected organization', async () => {
+  const calls = []
+  const { routes } = await loadHost({ fetch: async (_url, init) => {
+    const { name, arguments: args } = JSON.parse(init.body).params
+    calls.push({ name, args })
+    return mcpJson(name === 'finance_analysis_brief' ? { year: 2026, overview: { group: true } } : { selectedOrg: args.orgId })
+  } })
+  const result = await invokeRoute(routes.get(BASE), 'GET', BASE + '/brief?year=2026&orgId=org-1')
+  assert.equal(result.body.data.overview.selectedOrg, 'org-1')
+  assert.equal(result.body.data.budget.selectedOrg, 'org-1')
+  assert.equal(result.body.data.cash.selectedOrg, 'org-1')
+  assert.equal(calls.length, 4)
 })
 
 test('keeps the secret out of URLs and never fabricates upstream data', async () => {
@@ -156,31 +327,19 @@ test('keeps the secret out of URLs and never fabricates upstream data', async ()
   const response = await invokeRoute(route, 'GET', BASE + '/brief')
   assert.equal(response.status, 502)
   assert.equal(response.body.ok, false)
-  assert.equal(response.body.error, 'auth_unavailable')
+  assert.match(response.body.error, /飞书登录/)
   const source = await readFile(new URL('index.js', root), 'utf8')
   assert.doesNotMatch(source, /api_key|MODELS_API_KEY/u)
 })
 
-test('falls back to the legacy INTERNAL_API_SECRET ref when the named one is absent', async () => {
-  const calls = []
-  const { routes } = await loadHost({
-    credentialRefs: { INTERNAL_API_SECRET: 'legacy-secret' },
-    fetch: async (url, init) => { calls.push({ init }); return mcpJson({ list: [] }) },
-  })
-  const route = routes.get(BASE)
-  await invokeRoute(route, 'GET', BASE + '/brief')
-  assert.equal(calls[0].init.headers.authorization, 'Bearer legacy-secret')
-})
-
-test('patches the cordis entry to authorizationCredential for the packaged desktop', async () => {
+test('MCP registration is owned by the desktop login lifecycle without machine secrets', async () => {
   const patch = await readFile(new URL('cordis.patch.yml', root), 'utf8')
-  assert.match(patch, /authorizationCredential: DATASOURCE_INTERNAL_API_SECRET/u)
-  assert.doesNotMatch(patch, /!!js/u)
+  assert.doesNotMatch(patch, /authorizationCredential|INTERNAL_API_SECRET|mcp-finance/u)
 })
 
-test('client source wires sidebar entry, overlay, and analysis entries', async () => {
-  const source = await readFile(new URL('src/client.js', root), 'utf8')
-  for (const token of ['sidebar.footer.action', 'shell.overlay', 'sf-overlay', 'ANALYSIS_ENTRIES', 'finance_analysis_brief', 'backfillActual', 'runDone', 'analysis_forecast']) {
+test('client source wires sidebar entry, overlay, tabs, and analysis entries', async () => {
+  const source = await readClientSource()
+  for (const token of ['sidebar.footer.action', 'shell.overlay', 'sf-overlay', 'ANALYSIS_ENTRIES', '/brief', 'backfillActual', 'runDone', 'analysis_forecast', 'PillTabs', 'BudgetView', 'sf-pilltabs']) {
     assert.match(source, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'u'))
   }
   assert.doesNotMatch(source, /fetch\(`https?:\/\//u, 'client must only call same-origin routes')
@@ -194,7 +353,7 @@ test('clicking the sidebar button renders the dashboard without render-time refe
   globalThis.CustomEvent = class { constructor(type, init) { this.type = type; this.detail = init?.detail } }
   globalThis.document = { activeElement: null, createElement: () => ({ dataset: {}, remove() {} }), head: { appendChild() {} } }
   globalThis.requestAnimationFrame = () => 0
-  const source = await readFile(new URL('src/client.js', root), 'utf8')
+  const source = await readClientSource()
   const module = { exports: {} }
   let renderDepth = 0
   const createElement = (type, props, ...children) => {
@@ -258,16 +417,24 @@ test('clicking the sidebar button renders the dashboard without render-time refe
 
   // 打开状态的首渲染：曾因 focusReady 未定义在这里抛 ReferenceError
   const opened = Overlay({ t: key => key })
-  assert.equal(opened?.props?.className, 'sf-overlay', 'opened overlay must render the dashboard shell')
+  assert.match(String(opened?.props?.className), /\bsf-overlay\b/, 'opened overlay must render the dashboard shell')
+  assert.match(String(opened?.props?.className), /\bsf-root\b/, 'overlay must carry the sf-root token scope')
 })
 
 test('client field names match the finance contract schemas', async () => {
-  const source = await readFile(new URL('src/client.js', root), 'utf8')
+  const source = await readClientSource()
   // 契约字段回归：FinanceMetric/trend 扁平 *Amount、BudgetSummary {list,totals}、PaymentPlan remainingAmount
   for (const token of ['budgetAmount', 'prSubmittedAmount', 'paidAmount', 'summary?.list', 'summary?.totals', 'remainingAmount', 'data?.list']) {
     assert.match(source, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'u'), token)
   }
-  for (const stale of ['taxFreeAmount', "metric.key === 'budgetTotal'", '.rows ||']) {
+  // `.rows ||` 已不再陈旧：版本 diff 契约（BudgetVersionDiffResponse.rows）合法使用该字段
+  for (const stale of ['taxFreeAmount', "metric.key === 'budgetTotal'"]) {
     assert.doesNotMatch(source, new RegExp(stale.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'u'), stale)
   }
+})
+
+test('client build concatenates every registered fragment', async () => {
+  // 防回归：新增 src 片段必须登记进 build.mjs 的 FILES（列表与测试 CLIENT_FILES 同步）
+  const build = await readFile(new URL('scripts/build.mjs', root), 'utf8')
+  for (const file of CLIENT_FILES) assert.match(build, new RegExp(file.replace(/\//g, '\\/'), 'u'), file)
 })

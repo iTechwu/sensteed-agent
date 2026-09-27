@@ -54,6 +54,7 @@ class DofeAuthTokenError extends Error {
 
 export class DofeAuthService {
   private snapshot: DofeAuthSnapshot = { status: 'idle' }
+  private accessToken: string | undefined
   private server: ReturnType<typeof createServer> | undefined
   private timer: ReturnType<typeof setTimeout> | undefined
   private operation: Promise<void> | undefined
@@ -71,6 +72,12 @@ export class DofeAuthService {
   ) {}
 
   getStatus(): DofeAuthSnapshot { return structuredClone(this.snapshot) }
+
+  /** Host-only bearer; never included in the renderer status or persisted settings. */
+  getDatasourceSession(): { accessToken: string; tenantId: string; operator: string } | undefined {
+    if (this.snapshot.status !== 'bound' || !this.accessToken || !this.snapshot.tenant || !this.snapshot.user) return undefined
+    return { accessToken: this.accessToken, tenantId: this.snapshot.tenant.tenantId, operator: this.snapshot.user.ssoSub }
+  }
 
   watchBinding(listener: (snapshot: DofeAuthSnapshot) => void): () => void {
     this.bindingListeners.add(listener)
@@ -106,6 +113,7 @@ export class DofeAuthService {
 
   async cancel(): Promise<DofeAuthSnapshot> {
     this.cancelled = true
+    this.accessToken = undefined
     this.abort.abort()
     this.cancelPending?.()
     this.cancelPending = undefined
@@ -293,6 +301,7 @@ export class DofeAuthService {
     }
     await this.onBound?.(snapshot)
     this.abort.signal.throwIfAborted()
+    this.accessToken = accessToken
     this.snapshot = snapshot
     for (const listener of this.bindingListeners) {
       try { listener(this.getStatus()) } catch { /* Observers must not change authentication results. */ }
@@ -331,6 +340,7 @@ export class DofeAuthService {
 
   private fail(message: string, code?: 'invalid_grant'): void {
     this.closeLoopback()
+    this.accessToken = undefined
     this.snapshot = { status: 'error', error: message.slice(0, 240), ...(code === undefined ? {} : { code }) }
   }
 }

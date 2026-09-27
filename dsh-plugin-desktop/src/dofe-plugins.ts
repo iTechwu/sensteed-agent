@@ -74,7 +74,7 @@ export const DOFE_PLUGIN_CATALOG = [
   },
   {
     id: 'finance',
-    name: '财务数据中心',
+    name: '财务管理',
     description: '预算/台账/资金/预警/数据治理看板与财务 MCP 数据面',
     variants: ['sensteed'],
     servers: ['finance'],
