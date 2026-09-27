@@ -1181,8 +1181,38 @@ export function prepareDesktopProfile(
       }
     }
   }
+  // Model settings belong to the editable profile. Seed the managed defaults
+  // before that layer, including during config-editor validation and HMR. A
+  // trailing providers: {} would erase every route and reject onboarding saves.
+  const modelDefaults: PatchOptions[] = [
+    {
+      id: 'llm-deepseek',
+      disabled: false,
+      config: {
+        apiKeyEnv: DOFE_MODEL_API_KEY_ENV,
+        baseURL: DOFE_MODEL_BASE_URL,
+        headers: { 'X-Company-Code': BRAND_TENANT },
+        // 0.1.7's adapter derives the protocol from a Messages-compatible
+        // baseURL; OpenAI Responses rides the dedicated llm-pi-ai route below.
+        connectionPolicy: 'composition',
+        models: [{
+          id: 'deepseek-v4-flash',
+          name: 'DeepSeek V4 Flash',
+          description: 'DoFe managed DeepSeek model',
+          contextWindow: 1_000_000,
+          inputModalities: ['text', 'image'],
+        }],
+      },
+    },
+    { id: 'llm-pi-ai', disabled: false, config: { providers: {} } },
+    {
+      id: 'agent-default-model',
+      config: { provider: DOFE_MODEL_PROVIDER, model: 'deepseek-v4-flash' },
+    },
+  ]
   const ordinary = filterMarketProviderPatches([
     ...filteredBundles.patches,
+    ...modelDefaults,
     ...providerPatches,
     ...filteredProfile.patches,
     ...filteredHome.patches,
@@ -1232,32 +1262,6 @@ export function prepareDesktopProfile(
   // under the entry ids it keys by.
   migrateDesktopSettingsDocumentSections(settingsSpec)
   hooks.onSettingsDocumentResolved?.(settingsDocument)
-  patches.push(
-    {
-      id: 'llm-deepseek',
-      disabled: false,
-      config: {
-        apiKeyEnv: DOFE_MODEL_API_KEY_ENV,
-        baseURL: DOFE_MODEL_BASE_URL,
-        headers: { 'X-Company-Code': BRAND_TENANT },
-        // 0.1.7's adapter derives the protocol from a Messages-compatible
-        // baseURL; OpenAI Responses rides the dedicated llm-pi-ai route below.
-        connectionPolicy: 'composition',
-        models: [{
-          id: 'deepseek-v4-flash',
-          name: 'DeepSeek V4 Flash',
-          description: 'DoFe managed DeepSeek model',
-          contextWindow: 1_000_000,
-          inputModalities: ['text', 'image'],
-        }],
-      },
-    },
-    { id: 'llm-pi-ai', disabled: false, config: { providers: {} } },
-    {
-      id: 'agent-default-model',
-      config: { provider: DOFE_MODEL_PROVIDER, model: 'deepseek-v4-flash' },
-    },
-  )
   const desktopShell = rows.get('desktop-shell')
   if (desktopShell === undefined) {
     throw new Error(`${BIN_NAME}: desktop profile has no desktop-shell row`)

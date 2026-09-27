@@ -1,11 +1,12 @@
 /** Headless smoke for the complete published DSH Web profile and renderer manifest. */
 
+import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { boot, resolveProfileDir } from '@deepseek-ai/dsh-app-boot'
+import { boot, composeEntries, resolveProfileDir } from '@deepseek-ai/dsh-app-boot'
 import { provideCmdline } from '@deepseek-ai/dsh-cmdline'
 import {
   createLaunchEnvironmentSnapshot,
@@ -434,6 +435,39 @@ try {
   ]) {
     if (ids.has(id)) throw new Error(`assembled advanced Web graph unexpectedly includes ${id}`)
   }
+  // Exercise onboarding through the real Settings -> ConfigEditor -> Desktop
+  // composition path. UI mocks cannot detect launcher overlays erasing a save.
+  for (const [route, api, protocol] of [
+    ['dofe-messages', 'anthropic-messages', 'messages'],
+    ['dofe-chat', 'openai-completions', 'chat-completions'],
+    ['dofe-responses', 'openai-responses', 'responses'],
+  ]) {
+    const descriptors = ctx.settings.describe()
+    const routeConfig = {
+      api, apiKeyEnv: 'MODELS_API_KEY', baseURL: 'https://gateway.example/v1',
+      models: [{ id: 'glm-5.3-flash', name: 'GLM test model' }],
+    }
+    await ctx.settings.mutate('llm-pi-ai', [
+      ...['dofe-chat', 'dofe-messages', 'dofe-responses'].map(id => ({ op: 'unset', path: ['providers', id] })),
+      { op: 'set', path: ['providers', route], value: routeConfig },
+    ], descriptors.find(item => item.ns === 'llm-pi-ai').revision)
+    await ctx.settings.mutate('agent-default-model', [
+      { op: 'set', path: ['provider'], value: route },
+      { op: 'set', path: ['model'], value: 'glm-5.3-flash' },
+    ], descriptors.find(item => item.ns === 'agent-default-model').revision)
+    await ctx.settings.update('dofe-access', { setupComplete: true,
+      enabledPlugins: [], modelId: 'glm-5.3-flash', protocol, authMode: 'feishu' })
+    assert.equal(ctx.settings.get('dofe-access').setupComplete, true)
+    assert.equal(ctx.settings.get('agent-default-model').provider, route)
+    assert.ok(ctx.llm.listProviders().some(provider => provider.id === route))
+    // A fresh preparation reads the actual saved file, just like a restart.
+    const restarted = prepareDesktopProfile('1', home, 'win32')
+    const rows = composeEntries([restarted.patches])
+    assert.deepEqual(rows.find(row => row.id === 'llm-pi-ai').config.providers, { [route]: routeConfig })
+    assert.deepEqual(rows.find(row => row.id === 'agent-default-model').config,
+      { provider: route, model: 'glm-5.3-flash' })
+  }
+  console.log('Real onboarding settings writes, protocol switching, and restart composition passed')
 } finally {
   await ctx?.fiber.dispose()
   releasePackageResolver?.()

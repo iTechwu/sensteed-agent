@@ -793,6 +793,52 @@ virtualStoreDirMaxLength: 60
     expect(prepared).toMatchObject({ mode: 'advanced', port: 43_189, networkExposure: 'loopback' })
   })
 
+  it.each(['openai-completions', 'anthropic-messages', 'openai-responses'])(
+    'preserves %s onboarding edits during validation, reload, and restart', (api) => {
+      const home = temporaryHome()
+      const initial = prepareDesktopProfile(undefined, home, 'darwin')
+      const route = api === 'anthropic-messages' ? 'dofe-messages'
+        : api === 'openai-responses' ? 'dofe-responses' : 'dofe-chat'
+      const edits = [
+        { id: 'llm-pi-ai', config: { providers: {
+          [route]: { api, apiKeyEnv: 'MODELS_API_KEY', baseURL: 'https://gateway.example/v1',
+            models: [{ id: 'glm-5.3-flash' }] },
+          custom: { api: 'openai-completions', baseURL: 'https://custom.example/v1' },
+        } } },
+        { id: 'agent-default-model', config: { provider: route, model: 'glm-5.3-flash' } },
+        { id: 'llm-deepseek', config: { apiKeyEnv: 'MODELS_API_KEY',
+          baseURL: 'https://gateway.example/v1', models: [{ id: 'selected-model' }] } },
+      ]
+      const pending = prepareDesktopProfile(undefined, home, 'darwin', undefined, undefined, undefined, {
+        profilePatches: edits,
+      })
+      for (const edit of edits) {
+        expect(composeEntries([pending.patches]).find(row => row.id === edit.id)?.config).toEqual(edit.config)
+      }
+      // Validation must not persist a draft. Restart must recover the saved choices.
+      expect(readFileSync(initial.profile.patchPath, 'utf8')).not.toContain('glm-5.3-flash')
+      writeFileSync(initial.profile.patchPath, JSON.stringify(edits))
+      const restarted = prepareDesktopProfile(undefined, home, 'darwin')
+      for (const edit of edits) {
+        expect(composeEntries([restarted.patches]).find(row => row.id === edit.id)?.config).toEqual(edit.config)
+      }
+    },
+  )
+
+  it('keeps machine-level model policy above editable profile settings', () => {
+    const home = temporaryHome()
+    const managed = { providers: { managed: { api: 'openai-completions', baseURL: 'https://policy.example/v1' } } }
+    writeFileSync(join(home, 'cordis.patch.yml'), JSON.stringify([
+      { id: 'llm-pi-ai', config: managed },
+    ]))
+    const prepared = prepareDesktopProfile(undefined, home, 'darwin', undefined, undefined, undefined, {
+      profilePatches: [{ id: 'llm-pi-ai', config: { providers: {} } }],
+    })
+    // A genuine administrator override must still trigger the editor's conflict
+    // protection; moving application defaults is not a bypass of that protection.
+    expect(composeEntries([prepared.patches]).find(row => row.id === 'llm-pi-ai')?.config).toEqual(managed)
+  })
+
   it('composes a pending patch document in place of the one on disk', () => {
     const home = temporaryHome()
     writeDesktopShellPreferences(home, ['mode: compatibility'])
