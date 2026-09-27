@@ -40,6 +40,7 @@ export const TOOL_NAMES = [
   'viral_video_storyboards_list',
   'viral_video_analysis_status_get',
   'viral_video_rewrite_rules_list',
+  'viral_video_candidates_list',
 ]
 
 const ALLOWED_ERROR_CODES = new Set([
@@ -223,23 +224,19 @@ function errorEnvelopeCode(payload) {
  */
 export function parseToolResult(result) {
   if (!result || typeof result !== 'object') return {}
-  if (result.isError === true) {
-    const text = Array.isArray(result.content)
-      ? result.content.filter(item => item?.type === 'text').map(item => String(item.text || '')).join('')
-      : ''
-    // 宿主对 isError 文本统一加 `Error: ` 前缀（dsh-tools toolErrorResult），
-    // 必须经 extractJsonEnvelope 才能还原服务端业务 envelope。
-    const code = errorEnvelopeCode(extractJsonEnvelope(text))
-    throw new ToolsCallError('unknown', code ? safeErrorCode(code) : 'douyin_operation_request_failed')
-  }
-  const structured = result.structuredContent && typeof result.structuredContent === 'object' && !Array.isArray(result.structuredContent)
-    ? result.structuredContent
+  if (result.isError === true) throwForErrorContent(result.content)
+  // 当前 ToolRuntime 信封把 MCP 结果包在 result.value 下
+  // （{ isError, value: { structuredContent, content } }）；旧扁平形态回退为 result 本身。
+  const value = result.value && typeof result.value === 'object' && !Array.isArray(result.value) ? result.value : result
+  if (value.isError === true) throwForErrorContent(value.content)
+  const structured = value.structuredContent && typeof value.structuredContent === 'object' && !Array.isArray(value.structuredContent)
+    ? value.structuredContent
     : null
   const code = errorEnvelopeCode(structured)
   if (code) throw new ToolsCallError('unknown', safeErrorCode(code))
   if (structured) return structured
-  if (Array.isArray(result.content)) {
-    const text = result.content.filter(item => item?.type === 'text').map(item => String(item.text || '')).join('')
+  if (Array.isArray(value.content)) {
+    const text = value.content.filter(item => item?.type === 'text').map(item => String(item.text || '')).join('')
     if (!text) return {}
     const parsed = tryParseJson(text)
     if (parsed === null) return {}
@@ -247,7 +244,17 @@ export function parseToolResult(result) {
     if (errorCode) throw new ToolsCallError('unknown', safeErrorCode(errorCode))
     return parsed
   }
-  return result
+  return value
+}
+
+function throwForErrorContent(content) {
+  const text = Array.isArray(content)
+    ? content.filter(item => item?.type === 'text').map(item => String(item.text || '')).join('')
+    : ''
+  // 宿主对 isError 文本统一加 `Error: ` 前缀（dsh-tools toolErrorResult），
+  // 必须经 extractJsonEnvelope 才能还原服务端业务 envelope。
+  const code = errorEnvelopeCode(extractJsonEnvelope(text))
+  throw new ToolsCallError('unknown', code ? safeErrorCode(code) : 'douyin_operation_request_failed')
 }
 
 function tryParseJson(text) {

@@ -25,7 +25,7 @@ test('package registers the supply-chain MCP patch', async () => {
   assert.equal(manifest.name, '@dofe/dsh-sensteed-supplier-intelligence')
   assert.equal(manifest.dsh.bundle.patch, './cordis.patch.yml')
   assert.match(patch, /serverName: supply-chain/u)
-  assert.match(patch, /https:\/\/api\.tools\.dofe\.ai\/mcp\/supply-chain/u)
+  assert.match(patch, /https:\/\/ixicai\.cn\/mcp\/tools\/supply-chain/u)
   assert.doesNotMatch(patch, /authorizationCredential|api[_-]?key|token/u)
 })
 

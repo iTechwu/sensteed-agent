@@ -2642,7 +2642,7 @@ window.__ModuleLoader__.load({
 
     const React = require('react')
     const { createElement: h, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } = React
-    const { IconCloseOutline16, IconDownloadOutline16, IconPlayOutline16, Tooltip } = require('@deepseek-ai/dsh-client-ui-primitives')
+    const { IconCloseOutlineRegular, IconDownloadOutlineRegular, IconPlayOutlineRegular, Tooltip } = require('@deepseek-ai/dsh-client-ui-primitives')
 
     const NS = 'dofe.yootun-douyin-operation'
     const PATH = '/api/desktop/yootun/douyin-operation'
@@ -3111,7 +3111,7 @@ window.__ModuleLoader__.load({
     function Button({ wide, t }) {
       return h(Tooltip, { label: t('open'), disabled: wide },
         h('button', { type: 'button', className: `ydo-button${wide ? ' ydo-wide' : ''}`, 'aria-label': t('open'), onClick: openOverlay },
-          h(IconPlayOutline16, { size: wide ? 14 : 18 }), wide ? h('span', null, t('open')) : null))
+          h(IconPlayOutlineRegular, { size: wide ? 14 : 18 }), wide ? h('span', null, t('open')) : null))
     }
 
     function openOverlay(event) {
@@ -3239,7 +3239,7 @@ window.__ModuleLoader__.load({
                 work && work.visibility === 'not_in_list' ? ` · ${t('privateBadge')}` : null),
               h('p', { className: 'ydo-modal-meta' }, `${t('latestCollected')} ${latestText === EMPTY ? t('noRecord') : latestText}`)),
             h(Tooltip, { label: t('close') },
-              h('button', { type: 'button', 'aria-label': t('close'), onClick: onClose }, h(IconCloseOutline16, { size: 16 })))),
+              h('button', { type: 'button', 'aria-label': t('close'), onClick: onClose }, h(IconCloseOutlineRegular, { size: 16 })))),
           loading
             ? h('div', { className: 'ydo-state', role: 'status' }, h('span', { className: 'ydo-spinner' }), h('p', null, t('collecting')))
             : h('div', { className: 'ydo-modal-body' },
@@ -4287,7 +4287,7 @@ window.__ModuleLoader__.load({
             h('div', null, h('h1', { id: 'ydo-title' }, t('title')), h('p', null, t('subtitle'))),
             h('div', { className: 'ydo-header-buttons' },
               h(Tooltip, { label: t('close') },
-                h('button', { type: 'button', 'aria-label': t('close'), onClick: closeOverlay }, h(IconCloseOutline16, { size: 16 }))))),
+                h('button', { type: 'button', 'aria-label': t('close'), onClick: closeOverlay }, h(IconCloseOutlineRegular, { size: 16 }))))),
           h('nav', { className: 'ydo-tabs', 'aria-label': t('data') },
             h('button', { type: 'button', 'aria-current': tab === 'overview' || undefined, onClick: () => setTab('overview') }, t('tabOverview')),
             h('button', {
@@ -4456,7 +4456,7 @@ window.__ModuleLoader__.load({
                   title: !selected || !works.length ? t('exportNoData') : undefined,
                   onClick: () => exportExcel(selected),
                 },
-                h(IconDownloadOutline16, { size: 14 }),
+                h(IconDownloadOutlineRegular, { size: 14 }),
                 h('span', null, exporting ? t('exporting') : t('exportExcel'))),
                 // 账号顶部「上次采集」= 账号最近一次采集运行完成时间（远端 account.lastCollectedAt），
                 // 与作品发布时间/作品级采集时间含义不同；格式统一走 formatDateTime（二次优化 §5.6）。

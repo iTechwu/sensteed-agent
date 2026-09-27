@@ -58,7 +58,7 @@ async function evalUiModule(url, sandbox, reactStub) {
     ...uiFormatModule,
     require: name => {
       if (name === 'react') return reactStub || { createElement: () => null }
-      if (name === '@deepseek-ai/dsh-client-ui-primitives') return { IconDownloadOutline16: () => null }
+      if (name === '@deepseek-ai/dsh-client-ui-primitives') return { IconDownloadOutlineRegular: () => null }
       throw new Error(`unexpected require: ${name}`)
     },
     Date,
@@ -357,9 +357,9 @@ test('构建产物 lib/client.js 可加载，且内联了展示逻辑', async ()
       useSyncExternalStore: () => false,
     },
     '@deepseek-ai/dsh-client-ui-primitives': {
-      IconCloseOutline16: () => null,
-      IconDownloadOutline16: () => null,
-      IconPlayOutline16: () => null,
+      IconCloseOutlineRegular: () => null,
+      IconDownloadOutlineRegular: () => null,
+      IconPlayOutlineRegular: () => null,
       Tooltip: () => null,
     },
   }
@@ -721,9 +721,9 @@ async function loadBundle() {
       useSyncExternalStore: () => false,
     },
     '@deepseek-ai/dsh-client-ui-primitives': {
-      IconCloseOutline16: props => ({ type: 'icon-close', props: props || {}, children: null }),
-      IconDownloadOutline16: props => ({ type: 'icon-download', props: props || {}, children: null }),
-      IconPlayOutline16: props => ({ type: 'icon-play', props: props || {}, children: null }),
+      IconCloseOutlineRegular: props => ({ type: 'icon-close', props: props || {}, children: null }),
+      IconDownloadOutlineRegular: props => ({ type: 'icon-download', props: props || {}, children: null }),
+      IconPlayOutlineRegular: props => ({ type: 'icon-play', props: props || {}, children: null }),
       Tooltip: props => ({ type: 'tooltip', props: props || {}, children: props && props.children }),
     },
   }
@@ -777,7 +777,7 @@ test('构建产物导出下载：base64→Uint8Array→Blob→锚点触发下载
   vm.runInContext(source, sandbox)
   const stubs = {
     react: { createElement: () => null, useCallback: fn => fn, useEffect: () => {}, useMemo: fn => fn(), useRef: value => ({ current: value }), useState: value => [value, () => {}], useSyncExternalStore: () => false },
-    '@deepseek-ai/dsh-client-ui-primitives': { IconCloseOutline16: () => null, IconDownloadOutline16: () => null, IconPlayOutline16: () => null, Tooltip: () => null },
+    '@deepseek-ai/dsh-client-ui-primitives': { IconCloseOutlineRegular: () => null, IconDownloadOutlineRegular: () => null, IconPlayOutlineRegular: () => null, Tooltip: () => null },
   }
   const moduleExports = loaded[0].factory(name => {
     if (!(name in stubs)) throw new Error(`unexpected require: ${name}`)
@@ -816,7 +816,7 @@ test('构建产物注册导出文案：导出 Excel/导出中/失败/超限/无�
   vm.runInContext(source, sandbox)
   const stubs = {
     react: { createElement: () => null, useCallback: fn => fn, useEffect: () => {}, useMemo: fn => fn(), useRef: value => ({ current: value }), useState: value => [value, () => {}], useSyncExternalStore: () => false },
-    '@deepseek-ai/dsh-client-ui-primitives': { IconCloseOutline16: () => null, IconDownloadOutline16: () => null, IconPlayOutline16: () => null, Tooltip: () => null },
+    '@deepseek-ai/dsh-client-ui-primitives': { IconCloseOutlineRegular: () => null, IconDownloadOutlineRegular: () => null, IconPlayOutlineRegular: () => null, Tooltip: () => null },
   }
   const moduleExports = loaded[0].factory(name => {
     if (!(name in stubs)) throw new Error(`unexpected require: ${name}`)
@@ -866,7 +866,7 @@ test('构建产物注册侧边栏入口与整页 overlay', async () => {
       useState: value => [value, () => {}],
       useSyncExternalStore: () => false,
     },
-    '@deepseek-ai/dsh-client-ui-primitives': { IconCloseOutline16: () => null, IconPlayOutline16: () => null, Tooltip: () => null },
+    '@deepseek-ai/dsh-client-ui-primitives': { IconCloseOutlineRegular: () => null, IconPlayOutlineRegular: () => null, Tooltip: () => null },
   }
   const moduleExports = loaded[0].factory(name => stubs[name])
   const registered = []

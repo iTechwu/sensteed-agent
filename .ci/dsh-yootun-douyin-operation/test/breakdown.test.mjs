@@ -31,7 +31,7 @@ async function evalBdModule(reactStub) {
     FilterSelect: props => ({ type: 'filter-select', props: props || {}, children: null }),
     require: name => {
       if (name === 'react') return reactStub
-      if (name === '@deepseek-ai/dsh-client-ui-primitives') return { IconCloseOutline16: props => ({ type: 'icon-close', props: props || {}, children: null }) }
+      if (name === '@deepseek-ai/dsh-client-ui-primitives') return { IconCloseOutlineRegular: props => ({ type: 'icon-close', props: props || {}, children: null }) }
       throw new Error(`unexpected require: ${name}`)
     },
     Date,

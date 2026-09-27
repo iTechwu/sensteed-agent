@@ -5,7 +5,7 @@
       config:
         transport: streamable-http
         serverName: supply-chain
-        url: 'https://api.tools.dofe.ai/mcp/supply-chain'
+        url: 'https://ixicai.cn/mcp/tools/supply-chain'
         toolCallTimeoutMs: 120000
         failOnStartupError: false
         reconnect:

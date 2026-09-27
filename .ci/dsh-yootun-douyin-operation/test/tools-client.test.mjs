@@ -67,6 +67,24 @@ test('成功结果：structuredContent 原样返回；回退 content 文本 JSON
   assert.deepEqual(parseToolResult({ content: [{ type: 'text', text: 'not-json' }] }), {})
 })
 
+test('当前 ToolRuntime 信封：结果包在 value 下时正确解包（成功与失败两态）', () => {
+  // 成功：{ isError:false, value:{ structuredContent, content } }
+  assert.deepEqual(
+    parseToolResult({ isError: false, value: { structuredContent: { run: { run_id: 'r-env' } }, content: [] }, content: [] }),
+    { run: { run_id: 'r-env' } },
+  )
+  // 成功：value 只有 content 文本 JSON。
+  assert.deepEqual(
+    parseToolResult({ isError: false, value: { structuredContent: null, content: [{ type: 'text', text: '{"total":3}' }] }, content: [] }),
+    { total: 3 },
+  )
+  // 失败：isError 藏在 value 下，业务 envelope 在 value.content 文本里。
+  assert.throws(
+    () => parseToolResult({ isError: false, value: { isError: true, content: [{ type: 'text', text: JSON.stringify(envelope('ACCOUNT_NOT_FOUND')) }] }, content: [] }),
+    error => error instanceof ToolsCallError && error.code === 'ACCOUNT_NOT_FOUND',
+  )
+})
+
 test('safeErrorCode 接受宿主抛出的 JSON 文本错误（dsh-mcp-client 形态）', () => {
   const thrown = new Error(JSON.stringify(envelope('ACCOUNT_NOT_FOUND')))
   assert.equal(safeErrorCode(thrown), 'ACCOUNT_NOT_FOUND')
