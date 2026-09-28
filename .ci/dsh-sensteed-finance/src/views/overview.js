@@ -27,10 +27,10 @@ function OverviewView({ brief, t, onDrill, orgId }) {
       h('span', null, `${orgId ? t('scopeOrg') : t('scopeAll')} · ${data.year ?? ''} ${t('scopeYear')} · ${t('unitNote')}`),
       h('span', null, `${t('kpiExecRate')} =（${t('kpiPrSubmitted')}+${t('kpiPrEstimated')}）/${t('kpiBudget')}`)),
     h('div', { className: 'sf-kpis' },
-      h(KpiCard, { icon: 'data', label: t('kpiBudget'), value: wan(m.budgetAmount), onClick: () => onDrill('budget') }),
-      h(KpiCard, { icon: 'plan', label: t('kpiPrSubmitted'), value: wan(m.prSubmittedAmount), hint: `${t('kpiExecRate')} ${ratio(exec, 1) ?? '—'}`, onClick: () => onDrill('budget', { view: 'ledger' }) }),
-      h(KpiCard, { icon: 'clock', label: t('kpiPrEstimated'), value: wan(m.prEstimatedAmount), onClick: () => onDrill('budget', { view: 'ledger' }) }),
-      h(KpiCard, { icon: 'goal', label: t('kpiPaid'), value: wan(m.paidAmount), hint: `${t('kpiPaid')}/${t('kpiBudget')} ${ratio(m.paidAmount, m.budgetAmount) ?? '—'}`, onClick: () => onDrill('cash') }),
+      h(KpiCard, { icon: 'data', label: t('kpiBudget'), value: yuan(m.budgetAmount), onClick: () => onDrill('budget') }),
+      h(KpiCard, { icon: 'plan', label: t('kpiPrSubmitted'), value: yuan(m.prSubmittedAmount), hint: `${t('kpiExecRate')} ${ratio(exec, 1) ?? '—'}`, onClick: () => onDrill('budget', { view: 'ledger' }) }),
+      h(KpiCard, { icon: 'clock', label: t('kpiPrEstimated'), value: yuan(m.prEstimatedAmount), onClick: () => onDrill('budget', { view: 'ledger' }) }),
+      h(KpiCard, { icon: 'goal', label: t('kpiPaid'), value: yuan(m.paidAmount), hint: `${t('kpiPaid')}/${t('kpiBudget')} ${ratio(m.paidAmount, m.budgetAmount) ?? '—'}`, onClick: () => onDrill('cash') }),
       h(KpiCard, {
         icon: 'warning', label: t('kpiAlerts'), value: alertsSummary.total ?? 0,
         hint: `${t('sevCritical')} ${alertsSummary.critical ?? 0} · ${t('sevWarn')} ${alertsSummary.warn ?? 0}`,
@@ -76,8 +76,8 @@ function OverviewView({ brief, t, onDrill, orgId }) {
       h('div', { className: 'sf-two-col' },
         h(Card, { title: t('incomeAch'), unit: t('unitNote') },
           h('div', { className: 'sf-stack' },
-            h('div', null, h('div', { className: 'sf-row-between' }, h('span', { className: 'sf-note' }, t('plannedIncome')), h('span', { className: 'sf-note' }, `${wan(cashTotals.actualIncome) ?? '—'} / ${wan(cashTotals.plannedIncome) ?? '—'}`)), h(Progress, { value: cashTotals.plannedIncome ? cashTotals.actualIncome / cashTotals.plannedIncome : null, tone: 'green' })),
-            h('div', null, h('div', { className: 'sf-row-between' }, h('span', { className: 'sf-note' }, t('plannedExpense')), h('span', { className: 'sf-note' }, `${wan(cashTotals.actualExpense) ?? '—'} / ${wan(cashTotals.plannedExpense) ?? '—'}`)), h(Progress, { value: cashTotals.plannedExpense ? cashTotals.actualExpense / cashTotals.plannedExpense : null, tone: 'amber' })))),
+            h('div', null, h('div', { className: 'sf-row-between' }, h('span', { className: 'sf-kpi-value' }, yuan(cashTotals.actualIncome) ?? '—'), h('span', { className: 'sf-note' }, `${t('planCol')} ${yuan(cashTotals.plannedIncome) ?? '—'} · ${t('achieve')} ${ratio(cashTotals.plannedIncome ? cashTotals.actualIncome / cashTotals.plannedIncome : null, 1) ?? '—'}`)), h(Progress, { value: cashTotals.plannedIncome ? cashTotals.actualIncome / cashTotals.plannedIncome : null, tone: 'green' })),
+            h('div', null, h('div', { className: 'sf-row-between' }, h('span', { className: 'sf-kpi-value' }, yuan(cashTotals.actualExpense) ?? '—'), h('span', { className: 'sf-note' }, `${t('planCol')} ${yuan(cashTotals.plannedExpense) ?? '—'} · ${t('achieve')} ${ratio(cashTotals.plannedExpense ? cashTotals.actualExpense / cashTotals.plannedExpense : null, 1) ?? '—'}`)), h(Progress, { value: cashTotals.plannedExpense ? cashTotals.actualExpense / cashTotals.plannedExpense : null, tone: 'amber' })))),
         h(Card, { title: t('alertSummary'), actions: [h(LinkButton, { key: 'more', onClick: () => onDrill('alerts') }, t('drill'))] }, h(Table, {
           columns: [
             { label: t('severity'), render: row => h(SeverityBadge, { severity: row.severity, t }) },

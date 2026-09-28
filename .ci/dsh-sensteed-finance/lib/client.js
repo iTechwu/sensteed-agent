@@ -78,7 +78,7 @@ window.__ModuleLoader__.load({
       zh: {
         copyFailed: '无法复制分析指令，请重试。',
         open: '财务管理', title: '财务管理', eyebrow: '财务数据中心',
-        descOverview: '集团核心财务指标、预算进度与异常事项', scopeAll: '集团合并口径', scopeOrg: '当前主体口径', scopeYear: '年', descBudget: '查看已发布预算、实际付款与责任中心差异', descOperations: '预算执行、费用构成与计划实际收支对比', descCash: '资金余额、收支计划与流动性风险', descAlerts: '集中处理预算、资金与数据质量异常', descDatacenter: '财务数据源、质量规则与主数据覆盖', descEntry: '财务数据录入、回填与复核', descAnalyze: '基于财务数据中心 MCP 的可信深度分析', close: '关闭财务管理', refresh: '刷新数据', operatorAs: '当前操作者',
+        descOverview: '集团核心财务指标、预算进度与异常事项', scopeAll: '集团合并口径', scopeOrg: '当前主体口径', scopeYear: '年', planCol: '计划', achieve: '达成', descBudget: '查看已发布预算、实际付款与责任中心差异', descOperations: '预算执行、费用构成与计划实际收支对比', descCash: '资金余额、收支计划与流动性风险', descAlerts: '集中处理预算、资金与数据质量异常', descDatacenter: '财务数据源、质量规则与主数据覆盖', descEntry: '财务数据录入、回填与复核', descAnalyze: '基于财务数据中心 MCP 的可信深度分析', close: '关闭财务管理', refresh: '刷新数据', operatorAs: '当前操作者',
         tabOverview: '经营总览', tabBudget: '预算执行', tabOperations: '经营分析', tabCash: '资金分析', tabAlerts: '预警中心', tabDatacenter: '数据中心', tabEntry: '录入', tabAnalyze: '深度分析',
         year: '年度', org: '主体', allOrgs: '全部主体（集团）', loading: '正在加载财务数据...', retry: '重新加载', loadError: '数据加载失败', refreshedAt: '更新于', unitWan: '万元', unitYuan: '元', unitNote: '单位：万元', total: '合计',
         kpiBudget: '年度预算', kpiPrSubmitted: '已打 PR', kpiPrEstimated: '预计 PR', kpiPaid: '实际付款', kpiAlerts: '未处理预警', kpiExecRate: '预算执行率', kpiPayRate: 'PR 付款率', kpiNetInflow: '实际净流入', kpiRevenueAch: '收入达成', kpiSpendExec: '支出执行', kpiHealth: '预算健康度',
@@ -132,7 +132,7 @@ window.__ModuleLoader__.load({
       en: {
         copyFailed: 'Could not copy the analysis prompt. Please retry.',
         open: 'Finance', title: 'Finance Workspace', eyebrow: 'Finance data center',
-        descOverview: 'Group-level financial metrics, budget progress and exceptions', scopeAll: 'Group consolidated', scopeOrg: 'Current org', scopeYear: '', descBudget: 'Published budgets, actual payments and responsibility-center variance', descOperations: 'Budget execution, cost mix and plan-vs-actual comparison', descCash: 'Cash balance, payment plans and liquidity risk', descAlerts: 'Central handling of budget, cash and data-quality anomalies', descDatacenter: 'Finance data sources, quality rules and master-data coverage', descEntry: 'Finance data entry, backfill and review', descAnalyze: 'Trusted deep analysis on the finance data center MCP', close: 'Close finance workspace', refresh: 'Refresh', operatorAs: 'Operating as',
+        descOverview: 'Group-level financial metrics, budget progress and exceptions', scopeAll: 'Group consolidated', scopeOrg: 'Current org', scopeYear: '', planCol: 'Plan', achieve: 'attained', descBudget: 'Published budgets, actual payments and responsibility-center variance', descOperations: 'Budget execution, cost mix and plan-vs-actual comparison', descCash: 'Cash balance, payment plans and liquidity risk', descAlerts: 'Central handling of budget, cash and data-quality anomalies', descDatacenter: 'Finance data sources, quality rules and master-data coverage', descEntry: 'Finance data entry, backfill and review', descAnalyze: 'Trusted deep analysis on the finance data center MCP', close: 'Close finance workspace', refresh: 'Refresh', operatorAs: 'Operating as',
         tabOverview: 'Overview', tabBudget: 'Budget execution', tabOperations: 'Operations analysis', tabCash: 'Cash analysis', tabAlerts: 'Alert center', tabDatacenter: 'Data center', tabEntry: 'Entry', tabAnalyze: 'Deep analysis',
         year: 'Year', org: 'Org', allOrgs: 'All orgs (group)', loading: 'Loading finance data...', retry: 'Retry', loadError: 'Failed to load', refreshedAt: 'Updated', unitWan: '10k CNY', unitYuan: 'CNY', unitNote: 'Unit: 10k CNY', total: 'Total',
         kpiBudget: 'Annual budget', kpiPrSubmitted: 'PR submitted', kpiPrEstimated: 'PR estimated', kpiPaid: 'Paid', kpiAlerts: 'Open alerts', kpiExecRate: 'Execution rate', kpiPayRate: 'PR payment rate', kpiNetInflow: 'Net inflow', kpiRevenueAch: 'Revenue attainment', kpiSpendExec: 'Spend execution', kpiHealth: 'Budget health',
@@ -223,6 +223,16 @@ window.__ModuleLoader__.load({
       if (Math.abs(parsed) >= 100000000) return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(parsed / 100000000)} 亿`
       if (Math.abs(parsed) >= 10000) return `${new Intl.NumberFormat(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(parsed / 10000)} 万`
       return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(parsed)
+    }
+
+    /** 网页端 metric-card 口径：¥ 前缀 + 亿/万 自动量级（KPI 与收支达成用） */
+    function yuan(value) {
+      const parsed = finite(value)
+      if (parsed === null) return null
+      if (parsed === 0) return '¥0.00'
+      if (Math.abs(parsed) >= 100000000) return `¥${new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(parsed / 100000000)} 亿`
+      if (Math.abs(parsed) >= 10000) return `¥${new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(parsed / 10000)} 万`
+      return `¥${new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(parsed)}`
     }
 
     /** 执行率等比值 → 百分数字符串 */
@@ -639,10 +649,10 @@ window.__ModuleLoader__.load({
           h('span', null, `${orgId ? t('scopeOrg') : t('scopeAll')} · ${data.year ?? ''} ${t('scopeYear')} · ${t('unitNote')}`),
           h('span', null, `${t('kpiExecRate')} =（${t('kpiPrSubmitted')}+${t('kpiPrEstimated')}）/${t('kpiBudget')}`)),
         h('div', { className: 'sf-kpis' },
-          h(KpiCard, { icon: 'data', label: t('kpiBudget'), value: wan(m.budgetAmount), onClick: () => onDrill('budget') }),
-          h(KpiCard, { icon: 'plan', label: t('kpiPrSubmitted'), value: wan(m.prSubmittedAmount), hint: `${t('kpiExecRate')} ${ratio(exec, 1) ?? '—'}`, onClick: () => onDrill('budget', { view: 'ledger' }) }),
-          h(KpiCard, { icon: 'clock', label: t('kpiPrEstimated'), value: wan(m.prEstimatedAmount), onClick: () => onDrill('budget', { view: 'ledger' }) }),
-          h(KpiCard, { icon: 'goal', label: t('kpiPaid'), value: wan(m.paidAmount), hint: `${t('kpiPaid')}/${t('kpiBudget')} ${ratio(m.paidAmount, m.budgetAmount) ?? '—'}`, onClick: () => onDrill('cash') }),
+          h(KpiCard, { icon: 'data', label: t('kpiBudget'), value: yuan(m.budgetAmount), onClick: () => onDrill('budget') }),
+          h(KpiCard, { icon: 'plan', label: t('kpiPrSubmitted'), value: yuan(m.prSubmittedAmount), hint: `${t('kpiExecRate')} ${ratio(exec, 1) ?? '—'}`, onClick: () => onDrill('budget', { view: 'ledger' }) }),
+          h(KpiCard, { icon: 'clock', label: t('kpiPrEstimated'), value: yuan(m.prEstimatedAmount), onClick: () => onDrill('budget', { view: 'ledger' }) }),
+          h(KpiCard, { icon: 'goal', label: t('kpiPaid'), value: yuan(m.paidAmount), hint: `${t('kpiPaid')}/${t('kpiBudget')} ${ratio(m.paidAmount, m.budgetAmount) ?? '—'}`, onClick: () => onDrill('cash') }),
           h(KpiCard, {
             icon: 'warning', label: t('kpiAlerts'), value: alertsSummary.total ?? 0,
             hint: `${t('sevCritical')} ${alertsSummary.critical ?? 0} · ${t('sevWarn')} ${alertsSummary.warn ?? 0}`,
@@ -688,8 +698,8 @@ window.__ModuleLoader__.load({
           h('div', { className: 'sf-two-col' },
             h(Card, { title: t('incomeAch'), unit: t('unitNote') },
               h('div', { className: 'sf-stack' },
-                h('div', null, h('div', { className: 'sf-row-between' }, h('span', { className: 'sf-note' }, t('plannedIncome')), h('span', { className: 'sf-note' }, `${wan(cashTotals.actualIncome) ?? '—'} / ${wan(cashTotals.plannedIncome) ?? '—'}`)), h(Progress, { value: cashTotals.plannedIncome ? cashTotals.actualIncome / cashTotals.plannedIncome : null, tone: 'green' })),
-                h('div', null, h('div', { className: 'sf-row-between' }, h('span', { className: 'sf-note' }, t('plannedExpense')), h('span', { className: 'sf-note' }, `${wan(cashTotals.actualExpense) ?? '—'} / ${wan(cashTotals.plannedExpense) ?? '—'}`)), h(Progress, { value: cashTotals.plannedExpense ? cashTotals.actualExpense / cashTotals.plannedExpense : null, tone: 'amber' })))),
+                h('div', null, h('div', { className: 'sf-row-between' }, h('span', { className: 'sf-kpi-value' }, yuan(cashTotals.actualIncome) ?? '—'), h('span', { className: 'sf-note' }, `${t('planCol')} ${yuan(cashTotals.plannedIncome) ?? '—'} · ${t('achieve')} ${ratio(cashTotals.plannedIncome ? cashTotals.actualIncome / cashTotals.plannedIncome : null, 1) ?? '—'}`)), h(Progress, { value: cashTotals.plannedIncome ? cashTotals.actualIncome / cashTotals.plannedIncome : null, tone: 'green' })),
+                h('div', null, h('div', { className: 'sf-row-between' }, h('span', { className: 'sf-kpi-value' }, yuan(cashTotals.actualExpense) ?? '—'), h('span', { className: 'sf-note' }, `${t('planCol')} ${yuan(cashTotals.plannedExpense) ?? '—'} · ${t('achieve')} ${ratio(cashTotals.plannedExpense ? cashTotals.actualExpense / cashTotals.plannedExpense : null, 1) ?? '—'}`)), h(Progress, { value: cashTotals.plannedExpense ? cashTotals.actualExpense / cashTotals.plannedExpense : null, tone: 'amber' })))),
             h(Card, { title: t('alertSummary'), actions: [h(LinkButton, { key: 'more', onClick: () => onDrill('alerts') }, t('drill'))] }, h(Table, {
               columns: [
                 { label: t('severity'), render: row => h(SeverityBadge, { severity: row.severity, t }) },

@@ -19,6 +19,16 @@ function wan(value) {
   return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(parsed)
 }
 
+/** 网页端 metric-card 口径：¥ 前缀 + 亿/万 自动量级（KPI 与收支达成用） */
+function yuan(value) {
+  const parsed = finite(value)
+  if (parsed === null) return null
+  if (parsed === 0) return '¥0.00'
+  if (Math.abs(parsed) >= 100000000) return `¥${new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(parsed / 100000000)} 亿`
+  if (Math.abs(parsed) >= 10000) return `¥${new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(parsed / 10000)} 万`
+  return `¥${new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(parsed)}`
+}
+
 /** 执行率等比值 → 百分数字符串 */
 function ratio(part, total) {
   const p = finite(part), t = finite(total)
