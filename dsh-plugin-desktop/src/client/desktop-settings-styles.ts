@@ -300,6 +300,12 @@ const CSS = `
 .sensteedAgentSettingsNotice { background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-secondary); }
 .sensteedAgentSettingsError { color: var(--dsw-alias-state-error-primary); background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 10%, transparent); }
 .sensteedAgentSettingsSuccess { color: var(--dsw-alias-state-success-primary); background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 10%, transparent); }
+.sensteedAgentSettingsRestartStatus {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  box-shadow: 0 6px 18px color-mix(in srgb, #000 14%, transparent);
+}
 .sensteedAgentSettingsToggle {
   flex: 0 0 auto;
   position: relative;

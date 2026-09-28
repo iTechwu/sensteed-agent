@@ -576,7 +576,7 @@ export function DesktopSettingsSection({
       {introNotice}
       {operationFailed && aaStatus !== 'failed' && <p className="sensteedAgentSettingsError" role="alert">{t('operationFailed')}</p>}
       {restart !== 'none' && (
-        <p className="sensteedAgentSettingsSuccess" role="status">
+        <p className="sensteedAgentSettingsSuccess sensteedAgentSettingsRestartStatus" role="status">
           {t(restart === 'restarting' ? 'restarting' : 'restartRequired')}
         </p>
       )}
@@ -771,7 +771,9 @@ export function DesktopSettingsSection({
           <label className="sensteedAgentSettingsMaterialField">
             <span className="sensteedAgentSettingsMaterialCopy">
               <span className="sensteedAgentSettingsChoiceTitle">{t('windowMaterial')}</span>
-              <span className="sensteedAgentSettingsChoiceBody">{t('windowMaterialBody')}</span>
+              <span className="sensteedAgentSettingsChoiceBody">
+                {t(capabilities?.materialRequiresRestart === false ? 'windowMaterialBodyHot' : 'windowMaterialBody')}
+              </span>
             </span>
             <select
               className="sensteedAgentSettingsSelect"
@@ -797,6 +799,46 @@ export function DesktopSettingsSection({
         )}
       </section>
 
+      <section className="sensteedAgentSettingsGroup" aria-labelledby="dsh-desktop-notifications-title">
+        <div>
+          <h3 id="dsh-desktop-notifications-title">{t('notificationsTitle')}</h3>
+          <p className="sensteedAgentSettingsGroupIntro">{t('notificationsIntro')}</p>
+        </div>
+        {notifications.status === 'unavailable' && <p className="sensteedAgentSettingsNotice">{t('readOnly')}</p>}
+        <DesktopSettingsToggleRow
+          label={t('notificationsEnabled')}
+          checked={notificationValue.enabled}
+          disabled={!notificationsWritable || busy !== undefined}
+          onChange={checked => { setNotification('enabled', checked) }}
+        />
+        <div className="sensteedAgentSettingsDetails">
+          <DesktopSettingsToggleRow
+            label={t('turnCompletion')}
+            checked={notificationValue.notifyOnTurnCompletion}
+            disabled={!notificationValue.enabled || !notificationsWritable || busy !== undefined}
+            onChange={checked => { setNotification('notifyOnTurnCompletion', checked) }}
+          />
+          <DesktopSettingsToggleRow
+            label={t('turnFailure')}
+            checked={notificationValue.notifyOnTurnFailure}
+            disabled={!notificationValue.enabled || !notificationsWritable || busy !== undefined}
+            onChange={checked => { setNotification('notifyOnTurnFailure', checked) }}
+          />
+          {capabilities?.jobNotifications !== false && <><DesktopSettingsToggleRow
+            label={t('jobCompletion')}
+            checked={notificationValue.notifyOnJobCompletion}
+            disabled={!notificationValue.enabled || !notificationsWritable || busy !== undefined}
+            onChange={checked => { setNotification('notifyOnJobCompletion', checked) }}
+          />
+          <DesktopSettingsToggleRow
+            label={t('jobFailure')}
+            checked={notificationValue.notifyOnJobFailure}
+            disabled={!notificationValue.enabled || !notificationsWritable || busy !== undefined}
+            onChange={checked => { setNotification('notifyOnJobFailure', checked) }}
+          /></>}
+        </div>
+      </section>
+
       <section className="sensteedAgentSettingsGroup" aria-labelledby="dsh-desktop-web-title">
         <div>
           <h3 id="dsh-desktop-web-title">{t('webTitle')}</h3>
@@ -808,7 +850,9 @@ export function DesktopSettingsSection({
           disabled={!desktopBrowserAccessAvailable(mode) || !settingsWritable || busy !== undefined}
           onChange={setBrowserAccess}
         />
-        <p className="sensteedAgentSettingsNotice">{t('browserCompatibilityNotice')}</p>
+        {!desktopBrowserAccessAvailable(mode) && (
+          <p className="sensteedAgentSettingsNotice">{t('browserCompatibilityNotice')}</p>
+        )}
         <DesktopSettingsToggleRow
           label={t('lanAccess')}
           badge={t('beta')}
@@ -861,46 +905,6 @@ export function DesktopSettingsSection({
         )}
       </section>
 
-      <section className="sensteedAgentSettingsGroup" aria-labelledby="dsh-desktop-notifications-title">
-        <div>
-          <h3 id="dsh-desktop-notifications-title">{t('notificationsTitle')}</h3>
-          <p className="sensteedAgentSettingsGroupIntro">{t('notificationsIntro')}</p>
-        </div>
-        {notifications.status === 'unavailable' && <p className="sensteedAgentSettingsNotice">{t('readOnly')}</p>}
-        <DesktopSettingsToggleRow
-          label={t('notificationsEnabled')}
-          checked={notificationValue.enabled}
-          disabled={!notificationsWritable || busy !== undefined}
-          onChange={checked => { setNotification('enabled', checked) }}
-        />
-        <div className="sensteedAgentSettingsDetails">
-          <DesktopSettingsToggleRow
-            label={t('turnCompletion')}
-            checked={notificationValue.notifyOnTurnCompletion}
-            disabled={!notificationValue.enabled || !notificationsWritable || busy !== undefined}
-            onChange={checked => { setNotification('notifyOnTurnCompletion', checked) }}
-          />
-          <DesktopSettingsToggleRow
-            label={t('turnFailure')}
-            checked={notificationValue.notifyOnTurnFailure}
-            disabled={!notificationValue.enabled || !notificationsWritable || busy !== undefined}
-            onChange={checked => { setNotification('notifyOnTurnFailure', checked) }}
-          />
-          {capabilities?.jobNotifications !== false && <><DesktopSettingsToggleRow
-            label={t('jobCompletion')}
-            checked={notificationValue.notifyOnJobCompletion}
-            disabled={!notificationValue.enabled || !notificationsWritable || busy !== undefined}
-            onChange={checked => { setNotification('notifyOnJobCompletion', checked) }}
-          />
-          <DesktopSettingsToggleRow
-            label={t('jobFailure')}
-            checked={notificationValue.notifyOnJobFailure}
-            disabled={!notificationValue.enabled || !notificationsWritable || busy !== undefined}
-            onChange={checked => { setNotification('notifyOnJobFailure', checked) }}
-          /></>}
-        </div>
-      </section>
-
       {capabilities?.updates !== false && (
         <section className="sensteedAgentSettingsGroup" aria-labelledby="dsh-desktop-updates-title">
           <div>
@@ -929,14 +933,33 @@ export function DesktopSettingsSection({
 
       {extraSections}
       {confirmLan && (
-        <div className="sensteedAgentSettingsDialogBackdrop" role="presentation">
-          <div className="sensteedAgentSettingsDialog" role="alertdialog" aria-modal="true" aria-labelledby="dsh-desktop-lan-warning-title" aria-describedby="dsh-desktop-lan-warning-body">
+        <div
+          className="sensteedAgentSettingsDialogBackdrop"
+          role="presentation"
+          onClick={() => {
+            resolveDesktopLanConfirmation(false, () => { setConfirmLan(false) }, () => { setNetworkExposure('lan') })
+          }}
+          onKeyDown={event => {
+            if (event.key !== 'Escape') return
+            event.stopPropagation()
+            resolveDesktopLanConfirmation(false, () => { setConfirmLan(false) }, () => { setNetworkExposure('lan') })
+          }}
+        >
+          <div
+            className="sensteedAgentSettingsDialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="dsh-desktop-lan-warning-title"
+            aria-describedby="dsh-desktop-lan-warning-body"
+            onClick={event => { event.stopPropagation() }}
+          >
             <h3 id="dsh-desktop-lan-warning-title">{t('lanWarningTitle')}</h3>
             <p id="dsh-desktop-lan-warning-body">{t('lanWarningBody')}</p>
             <div className="sensteedAgentSettingsDialogActions">
               <button
                 type="button"
                 className="sensteedAgentSettingsButton sensteedAgentSettingsButtonSecondary"
+                autoFocus
                 onClick={() => {
                   resolveDesktopLanConfirmation(false, () => { setConfirmLan(false) }, () => { setNetworkExposure('lan') })
                 }}
