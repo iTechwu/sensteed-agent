@@ -70,6 +70,7 @@
 | --- | --- | --- | --- |
 | `geoflow` | `/mcp/geoflow` | 60s | geoflow |
 | `georank` | `/mcp/georank` | 120s | georank |
+| `knowledge` | `/mcp/knowledge` | 60s | knowledge |
 | `openmontage` | `/mcp/montage` | 600s | openmontage |
 | `media` | `/mcp/media` | 60s | media |
 | `tools-platform` | `/mcp/tools/platform` | 60s | tools |

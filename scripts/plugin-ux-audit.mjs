@@ -128,31 +128,13 @@ function declaredToolNames(source) {
   return [...block.matchAll(/['"]([a-z][a-z0-9_-]+)['"]/giu)].map(match => match[1])
 }
 
+// Plugin names whose cards must carry an action lifecycle; empty after the
+// dsh-yootun-* snapshot cleanup in 288809e279.
 const actionLifecyclePlugins = new Set([
-  'dsh-yootun-content-command',
-  'dsh-yootun-recruiter',
-  'dsh-yootun-sales',
-  'dsh-yootun-supply-watch',
-  'dsh-yootun-xhs-operation',
-  'dsh-yootun-douyin-operation',
 ])
 
 const pluginClassPrefixes = {
   'dsh-sensteed-finance': 'sf-',
-  'dsh-yootun-audit': 'ya-',
-  'dsh-yootun-content-command': 'ycc-',
-  'dsh-yootun-daily-report': 'ydr-',
-  'dsh-yootun-dashboard': 'yd-',
-  'dsh-yootun-douyin-operation': 'ydo-',
-  'dsh-yootun-finops': 'yf-',
-  'dsh-yootun-knowledge': 'yk-',
-  'dsh-yootun-lead-discovery': 'yl-',
-  'dsh-yootun-recruiter': 'yr-',
-  'dsh-yootun-retrofit': 'yro-',
-  'dsh-yootun-sales': 'ys-',
-  'dsh-yootun-supply-watch': 'ysw-',
-  'dsh-yootun-ui': 'yu-',
-  'dsh-yootun-xhs-operation': 'yxh-',
 }
 
 if (!desktopStyles.includes('[aria-modal="true"] :is(')) failures.push('dsh-plugin-desktop: modal focus indicator is missing')
