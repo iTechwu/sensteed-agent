@@ -9,6 +9,7 @@
  */
 
 import { CODE_LANG_BY_EXT } from './file-icons.js'
+import { REQUEST_TIMEOUT_MS } from './rpc.js'
 import { ICON_REFRESH, FILE_ICON_EDIT, FILE_ICON_PREVIEW } from './styles.js'
 
 /** 取路径小写扩展名。 */
@@ -492,7 +493,7 @@ export function createPreviewRenderers(ctx) {
     React.useEffect(function () {
       var cancelled = false
       var made = null
-      fetch('data:application/pdf;base64,' + props.data)
+      fetch('data:application/pdf;base64,' + props.data, { credentials: 'same-origin', redirect: 'error', signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
         .then(function (r) { return r.blob() })
         .then(function (blob) {
           if (cancelled) { URL.revokeObjectURL(made); return }

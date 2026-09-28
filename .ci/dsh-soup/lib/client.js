@@ -30715,6 +30715,7 @@
   }
 
   // lib/client/rpc.js
+  var REQUEST_TIMEOUT_MS = 3e4;
   function hostBase({ location = globalThis.location } = {}) {
     const origin = location && location.origin;
     return origin !== void 0 && origin !== "null" && origin !== "" ? origin : "http://dsh.internal";
@@ -31989,7 +31990,7 @@
       React.useEffect(function() {
         var cancelled = false;
         var made = null;
-        fetch("data:application/pdf;base64," + props.data).then(function(r) {
+        fetch("data:application/pdf;base64," + props.data, { credentials: "same-origin", redirect: "error", signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) }).then(function(r) {
           return r.blob();
         }).then(function(blob) {
           if (cancelled) {
@@ -33180,9 +33181,21 @@
     function PreviewOverlay() {
       var s = useStore();
       var files = s.files;
-      if (!files.overlay || !files.active) return null;
-      var active = findFileEntry(files.active);
-      if (!active) return null;
+      var active = files.overlay && files.active ? findFileEntry(files.active) : null;
+      var overlayActive = Boolean(active);
+      React.useEffect(function() {
+        if (!overlayActive || typeof document === "undefined") return;
+        var lastTrigger = document.activeElement;
+        function onKey(event) {
+          if (event.key === "Escape") setFiles({ overlay: false, overlayMax: false, overlayReturn: null });
+        }
+        document.addEventListener("keydown", onKey);
+        return function() {
+          document.removeEventListener("keydown", onKey);
+          requestAnimationFrame(() => lastTrigger?.focus());
+        };
+      }, [overlayActive]);
+      if (!overlayActive) return null;
       var close = function() {
         setFiles({ overlay: false, overlayMax: false, overlayReturn: null });
       };
@@ -33853,7 +33866,7 @@
       }
       updateUpload(name2, 0, size, 0, 1, true);
       try {
-        var r = await fetch(res.url);
+        var r = await fetch(res.url, { credentials: "same-origin", redirect: "error", signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
         if (!r.ok) throw new Error("HTTP " + r.status);
         var total = Number(r.headers.get("content-length")) || size;
         var reader = r.body.getReader();

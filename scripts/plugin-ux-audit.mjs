@@ -9,7 +9,7 @@ const ciEntries = (await readdir(ciRoot, { withFileTypes: true }))
   .map(entry => entry.name)
   .sort()
 // Client-plugin discovery spans every white-label brand family under .ci/.
-const entries = ciEntries.filter(name => /^dsh-(?:yootun|sensteed)-/.test(name))
+const entries = ciEntries.filter(name => /^dsh-(?:yootun|sensteed)-|^dsh-soup$/.test(name))
 
 async function readSourceTree(root, extensions) {
   const paths = await readdir(root, { recursive: true })
@@ -404,11 +404,16 @@ for (const name of clientPlugins) {
   const fetchCount = (source.match(/\bfetch\s*\(/g) || []).length
   const sameOriginCount = (source.match(/credentials:\s*['"]same-origin['"]/g) || []).length
   const rejectRedirectCount = (source.match(/redirect:\s*['"]error['"]/g) || []).length
-  const boundedFetchCount = (source.match(/\bsignal:\s*/g) || []).length
+  // Count the shared bounded-timeout wiring itself: a bare `signal:` also
+  // appears on host RPC options, which are not fetches.
+  const boundedFetchCount = (source.match(/signal:\s*AbortSignal\.timeout\(REQUEST_TIMEOUT_MS\)/g) || []).length
   const hasDynamicStatus = /aria-live/.test(source) || /role:\s*[^}\n]*['"](?:status|alert)['"]/.test(source)
   const hasAsyncUiState = /set(?:Loading|Busy)\(/.test(source)
   const exposesAsyncUiState = /aria-busy/.test(source)
-  const hasCanonicalShell = name === 'dsh-yootun-ui' || (hasCanonicalHeader(source) && hasCanonicalIconButton(source))
+  // dsh-soup contributes in-session docks and overlay previews only; it never
+  // mounts shell chrome, so the header baseline names it exempt explicitly.
+  const hasCanonicalShell = name === 'dsh-yootun-ui' || name === 'dsh-soup'
+    || (hasCanonicalHeader(source) && hasCanonicalIconButton(source))
   const hasActionLifecycle = /awaiting_confirmation|confirmed_pending_adapter|adapter_pending/.test(source)
     || (name === 'dsh-yootun-xhs-operation' && /cancelConfirm|confirmYes|confirmNo/.test(source))
   const usesRevisionReload = /\bsetRevision\s*\(/.test(source)
@@ -425,7 +430,7 @@ for (const name of clientPlugins) {
   if (!hasThemeAliases) failures.push(`${name}: client styles do not use desktop theme aliases`)
   if (sameOriginCount !== fetchCount) failures.push(`${name}: every fetch must use same-origin credentials`)
   if (rejectRedirectCount !== fetchCount) failures.push(`${name}: every fetch must reject redirects`)
-  if (!source.includes('const REQUEST_TIMEOUT_MS = 30000') || boundedFetchCount !== fetchCount) {
+  if (!/(?:const|let|var)\s+REQUEST_TIMEOUT_MS\s*=\s*(?:30000|3e4)\b/.test(source) || boundedFetchCount !== fetchCount) {
     failures.push(`${name}: every fetch must have the shared bounded timeout policy`)
   }
   if (!hasDynamicStatus) failures.push(`${name}: client has no announced loading, empty, or error state`)
