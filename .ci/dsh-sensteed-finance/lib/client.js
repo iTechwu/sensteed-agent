@@ -10,28 +10,28 @@ window.__ModuleLoader__.load({
     const REQUEST_TIMEOUT_MS = 30000
     const { createElement: h, useEffect, useState, useRef, useCallback, useMemo, useSyncExternalStore } = React
     const {
-      IconAlarmClockOutline16,
-      IconCheckOutline16,
-      IconChevronDownOutline14,
-      IconChevronLeftOutline14,
-      IconChevronRightOutline14,
-      IconChevronUpOutline14,
-      IconCloseOutline16,
-      IconDataOutline16,
-      IconDatabaseOutline16,
-      IconGoalOutline16,
-      IconLoadingOutline16,
-      IconPlanOutline14,
-      IconPlusOutline16,
-      IconRefreshOutline16,
-      IconRightUpOutline14,
-      IconSearchOutline16,
-      IconSendOutline14,
-      IconShieldOutline16,
-      IconSparkle16,
-      IconTrashOutline16,
-      IconUserOutline16,
-      IconWarningOutline16,
+      IconAlarmClockOutlineRegular,
+      IconCheckOutlineRegular,
+      IconChevronDownOutlineRegular,
+      IconChevronLeftOutlineRegular,
+      IconChevronRightOutlineRegular,
+      IconChevronUpOutlineRegular,
+      IconCloseOutlineRegular,
+      IconDataOutlineRegular,
+      IconDatabaseOutlineRegular,
+      IconGoalOutlineRegular,
+      IconLoadingOutlineRegular,
+      IconPlanOutlineRegular,
+      IconPlusOutlineRegular,
+      IconRefreshOutlineRegular,
+      IconRightUpOutlineRegular,
+      IconSearchOutlineRegular,
+      IconSendOutlineRegular,
+      IconShieldOutlineRegular,
+      IconSparkleRegular,
+      IconTrashOutlineRegular,
+      IconUserOutlineRegular,
+      IconWarningOutlineRegular,
       Tooltip,
     } = require('@deepseek-ai/dsh-client-ui-primitives')
 
@@ -288,13 +288,13 @@ window.__ModuleLoader__.load({
 
     function Glyph({ name, size = 16, className }) {
       const icons = {
-        check: IconCheckOutline16, warning: IconWarningOutline16, close: IconCloseOutline16,
-        refresh: IconRefreshOutline16, data: IconDataOutline16, sparkle: IconSparkle16,
-        goal: IconGoalOutline16, clock: IconAlarmClockOutline16, database: IconDatabaseOutline16,
-        loading: IconLoadingOutline16, plan: IconPlanOutline14, up: IconChevronUpOutline14,
-        down: IconChevronDownOutline14, left: IconChevronLeftOutline14, right: IconChevronRightOutline14,
-        plus: IconPlusOutline16, trendUp: IconRightUpOutline14, search: IconSearchOutline16,
-        send: IconSendOutline14, shield: IconShieldOutline16, trash: IconTrashOutline16, user: IconUserOutline16,
+        check: IconCheckOutlineRegular, warning: IconWarningOutlineRegular, close: IconCloseOutlineRegular,
+        refresh: IconRefreshOutlineRegular, data: IconDataOutlineRegular, sparkle: IconSparkleRegular,
+        goal: IconGoalOutlineRegular, clock: IconAlarmClockOutlineRegular, database: IconDatabaseOutlineRegular,
+        loading: IconLoadingOutlineRegular, plan: IconPlanOutlineRegular, up: IconChevronUpOutlineRegular,
+        down: IconChevronDownOutlineRegular, left: IconChevronLeftOutlineRegular, right: IconChevronRightOutlineRegular,
+        plus: IconPlusOutlineRegular, trendUp: IconRightUpOutlineRegular, search: IconSearchOutlineRegular,
+        send: IconSendOutlineRegular, shield: IconShieldOutlineRegular, trash: IconTrashOutlineRegular, user: IconUserOutlineRegular,
       }
       const Icon = icons[name]
       return Icon ? h(Icon, { size, className }) : null
@@ -2393,8 +2393,8 @@ window.__ModuleLoader__.load({
           h('header', { className: 'sf-header' },
             h('div', null, h('h1', { id: 'sf-title' }, t('title')), h('p', null, operator ? `${t('operatorAs')} ${operator} · ${t('subtitle')}` : t('subtitle'))),
             h('div', { className: 'sf-header-buttons' },
-              h(Tooltip, { label: t('refresh') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('refresh'), onClick: refresh }, h(IconRefreshOutline16, { size: 16 }))),
-              h(Tooltip, { label: t('close') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('close'), onClick: closeOverlay }, h(IconCloseOutline16, { size: 16 }))))),
+              h(Tooltip, { label: t('refresh') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('refresh'), onClick: refresh }, h(IconRefreshOutlineRegular, { size: 16 }))),
+              h(Tooltip, { label: t('close') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('close'), onClick: closeOverlay }, h(IconCloseOutlineRegular, { size: 16 }))))),
           h('div', { className: 'sf-toolbar' },
             h(FormRow, { label: t('year') }, h(Select, { value: year, onChange: value => { setYear(value); setDrillParams(null) }, options: yearOptions() })),
             h(FormRow, { label: t('org') }, h(Select, { value: orgId, onChange: value => { setOrgId(value); setDrillParams(null) }, options: orgs.map(org => [org.id, org.name]), placeholder: t('allOrgs') }))),
@@ -2404,7 +2404,7 @@ window.__ModuleLoader__.load({
     }
 
     function Button({ wide, t }) {
-      return h(Tooltip, { label: t('open'), disabled: wide }, h('button', { type: 'button', className: `sf-button${wide ? ' sf-wide' : ''}`, 'aria-label': t('open'), onClick: openOverlay }, h(IconDataOutline16, { size: wide ? 14 : 18 }), wide ? h('span', null, t('open')) : null))
+      return h(Tooltip, { label: t('open'), disabled: wide }, h('button', { type: 'button', className: `sf-button${wide ? ' sf-wide' : ''}`, 'aria-label': t('open'), onClick: openOverlay }, h(IconDataOutlineRegular, { size: wide ? 14 : 18 }), wide ? h('span', null, t('open')) : null))
     }
 
     function apply(ctx) {

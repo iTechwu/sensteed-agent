@@ -3,13 +3,13 @@
 
 function Glyph({ name, size = 16, className }) {
   const icons = {
-    check: IconCheckOutline16, warning: IconWarningOutline16, close: IconCloseOutline16,
-    refresh: IconRefreshOutline16, data: IconDataOutline16, sparkle: IconSparkle16,
-    goal: IconGoalOutline16, clock: IconAlarmClockOutline16, database: IconDatabaseOutline16,
-    loading: IconLoadingOutline16, plan: IconPlanOutline14, up: IconChevronUpOutline14,
-    down: IconChevronDownOutline14, left: IconChevronLeftOutline14, right: IconChevronRightOutline14,
-    plus: IconPlusOutline16, trendUp: IconRightUpOutline14, search: IconSearchOutline16,
-    send: IconSendOutline14, shield: IconShieldOutline16, trash: IconTrashOutline16, user: IconUserOutline16,
+    check: IconCheckOutlineRegular, warning: IconWarningOutlineRegular, close: IconCloseOutlineRegular,
+    refresh: IconRefreshOutlineRegular, data: IconDataOutlineRegular, sparkle: IconSparkleRegular,
+    goal: IconGoalOutlineRegular, clock: IconAlarmClockOutlineRegular, database: IconDatabaseOutlineRegular,
+    loading: IconLoadingOutlineRegular, plan: IconPlanOutlineRegular, up: IconChevronUpOutlineRegular,
+    down: IconChevronDownOutlineRegular, left: IconChevronLeftOutlineRegular, right: IconChevronRightOutlineRegular,
+    plus: IconPlusOutlineRegular, trendUp: IconRightUpOutlineRegular, search: IconSearchOutlineRegular,
+    send: IconSendOutlineRegular, shield: IconShieldOutlineRegular, trash: IconTrashOutlineRegular, user: IconUserOutlineRegular,
   }
   const Icon = icons[name]
   return Icon ? h(Icon, { size, className }) : null

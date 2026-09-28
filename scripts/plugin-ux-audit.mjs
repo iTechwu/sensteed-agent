@@ -375,6 +375,16 @@ for (const name of ciEntries) {
       for (const color of findLegacySemanticColors(clientArtifact)) {
         failures.push(`${name}/${relativePath}: ${color} bypasses the shared semantic theme aliases`)
       }
+      // The retired size-suffixed icon names (Outline16/Outline14/Sparkle16) no
+      // longer exist in @deepseek-ai/dsh-client-ui-primitives; rendering one is
+      // an invalid React element, so the whole client surface disappears. Scoped
+      // to sensteed-shipped surfaces: the yootun-only clients await the same
+      // migration in their owning docker-helm checkout.
+      if (!name.startsWith('dsh-yootun-')) {
+        for (const icon of clientArtifact.match(/\bIcon[A-Za-z0-9]*(?:Outline1[46]|Sparkle16)\b/gu) ?? []) {
+          failures.push(`${name}/${relativePath}: ${icon} is a retired primitives icon name; use the OutlineRegular/SparkleRegular family`)
+        }
+      }
       if (name === 'dsh-yootun-knowledge') {
         for (const color of findHardcodedStateColors(clientArtifact)) {
           failures.push(`${name}/${relativePath}: ${color} hardcodes a knowledge state supplement color`)
