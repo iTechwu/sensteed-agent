@@ -20,7 +20,7 @@ import { FilterSelect } from './select-ui.js'
 const React = require('react')
 const { createElement: h } = React
 // 关闭图标与作品详情/AI 弹框同款（client.js 顶部解构统一提供，构建时剥离此处 require）。
-const { IconCloseOutline16 } = require('@deepseek-ai/dsh-client-ui-primitives')
+const { IconCloseOutlineRegular } = require('@deepseek-ai/dsh-client-ui-primitives')
 
 // 稳定 reason → 已登记文案键（与 overview-ui 同一策略；未登记码由调用方兜底）。
 // 仅收 isError 形态 envelope 的白名单码；workflow_start 失败 payload 内的小写
@@ -652,7 +652,7 @@ export function BreakdownRewriteModal({ open, rules, submitting, onConfirm, onCl
   return h('div', { className: 'ydo-ai-modal-overlay ydo-bd-modal-overlay', role: 'dialog', 'aria-modal': true, 'aria-label': t('bdRewriteTitle') },
     h('div', { className: 'ydo-ai-modal ydo-bd-modal' },
       h('button', { type: 'button', className: 'ydo-ai-modal-close', 'aria-label': t('close'), onClick: onClose },
-        h(IconCloseOutline16, { size: 16 })),
+        h(IconCloseOutlineRegular, { size: 16 })),
       h('div', { className: 'ydo-ai-modal-body' },
         h('h3', null, t('bdRewriteTitle')),
         h('p', { className: 'ydo-hint' }, t('bdRewriteHint')),

@@ -837,7 +837,7 @@ window.__ModuleLoader__.load({
               'aria-busy': exporting,
               onClick: onExport,
             },
-            h(IconDownloadOutline16, { size: 14 }),
+            h(IconDownloadOutlineRegular, { size: 14 }),
             h('span', null, exporting ? t('exporting') : t('exportOverview'))),
             collecting ? h('span', { className: 'ydo-ov-collecting', role: 'status' }, t('collecting')) : null)),
 
@@ -1864,7 +1864,7 @@ window.__ModuleLoader__.load({
             type: 'button', className: 'ydo-secondary ydo-export',
             disabled: exporting, 'aria-busy': exporting, onClick: onExport,
           },
-          h2(IconDownloadOutline16, { size: 14 }),
+          h2(IconDownloadOutlineRegular, { size: 14 }),
           h2('span', null, exporting ? t('exporting') : t('exportAnalysis')))),
 
         account ? h2('header', { className: 'ydo-an-head' },
@@ -2618,7 +2618,7 @@ window.__ModuleLoader__.load({
       return h('div', { className: 'ydo-ai-modal-overlay ydo-bd-modal-overlay', role: 'dialog', 'aria-modal': true, 'aria-label': t('bdRewriteTitle') },
         h('div', { className: 'ydo-ai-modal ydo-bd-modal' },
           h('button', { type: 'button', className: 'ydo-ai-modal-close', 'aria-label': t('close'), onClick: onClose },
-            h(IconCloseOutline16, { size: 16 })),
+            h(IconCloseOutlineRegular, { size: 16 })),
           h('div', { className: 'ydo-ai-modal-body' },
             h('h3', null, t('bdRewriteTitle')),
             h('p', { className: 'ydo-hint' }, t('bdRewriteHint')),
