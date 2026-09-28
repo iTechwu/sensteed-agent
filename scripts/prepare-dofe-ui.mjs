@@ -5,28 +5,11 @@ import { dirname, resolve } from 'node:path'
 
 const root = resolve(import.meta.dirname, '..')
 const preinstalledPlugins = [
-  'dsh-geoflow-mcp',
-  'dsh-georank-mcp',
   'dsh-opencli',
   'dsh-plugin-console',
   'dsh-sensteed-finance',
   'dsh-sensteed-supplier-intelligence',
   'dsh-tools-mcp',
-  'dsh-yootun-ui',
-  'dsh-yootun-dashboard',
-  'dsh-yootun-douyin-operation',
-  'dsh-yootun-recruiter',
-  'dsh-yootun-sales',
-  'dsh-yootun-supply-watch',
-  'dsh-yootun-content-command',
-  'dsh-yootun-knowledge',
-  'dsh-yootun-audit',
-  'dsh-yootun-finops',
-  'dsh-yootun-retrofit',
-  'dsh-yootun-daily-report',
-  'dsh-yootun-lead-discovery',
-  'dsh-yootun-tos-upload',
-  'dsh-yootun-xhs-operation',
 ]
 
 const snapshots = [

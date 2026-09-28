@@ -47,10 +47,6 @@ import {
 } from '../src/dofe-access-route.ts'
 import { DOFE_AUTH_PATHS } from '../src/dofe-auth-route.ts'
 import { YOOTUN_AUDIT_PATH } from '../src/yootun-audit-route.ts'
-import { YOOTUN_RECRUITER_PATH } from '../src/yootun-recruiter-route.ts'
-import { YOOTUN_SALES_PATH } from '../src/yootun-sales-route.ts'
-import { YOOTUN_SUPPLY_WATCH_PATH } from '../src/yootun-supply-watch-route.ts'
-import { YOOTUN_CONTENT_COMMAND_PATH } from '../src/yootun-content-command-route.ts'
 import { RENDERER_BOOT_REPORT_PATH, type RendererBootReport } from '../src/renderer-boot-contract.ts'
 
 /** Loader entry id dsh 0.1.7-alpha.1 keys the Desktop shell's settings by. */
@@ -591,10 +587,6 @@ describe('desktop Host plugin', () => {
       DOFE_ACCESS_MODELS_PATH,
       DOFE_ACCESS_VALIDATE_PATH,
       YOOTUN_AUDIT_PATH,
-      YOOTUN_RECRUITER_PATH,
-      YOOTUN_SALES_PATH,
-      YOOTUN_SUPPLY_WATCH_PATH,
-      YOOTUN_CONTENT_COMMAND_PATH,
     ].sort()
     const routes = harness.routes().filter(route => route.path !== DESKTOP_LAN_HTTPS_CA_PATH)
     expect(routes.map(route => route.path).sort()).toEqual(expectedPaths)

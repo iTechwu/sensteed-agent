@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { dofePluginsForBrand, normalizeDofePluginIds } from '../src/dofe-plugins.ts'
 
 describe('DoFe brand capability policy', () => {
-  it('keeps GEO capabilities exclusive to their owning brand', () => {
-    expect(dofePluginsForBrand('yootun').map(plugin => plugin.id)).toContain('geoflow')
-    expect(dofePluginsForBrand('yootun').map(plugin => plugin.id)).toContain('georank')
-    expect(dofePluginsForBrand('sensteed').map(plugin => plugin.id)).not.toContain('geoflow')
-    expect(dofePluginsForBrand('sensteed').map(plugin => plugin.id)).not.toContain('georank')
+  it('keeps retired GEO capabilities out of the desktop catalog', () => {
+    for (const variant of ['yootun', 'sensteed'] as const) {
+      expect(dofePluginsForBrand(variant).map(plugin => plugin.id)).not.toContain('geoflow')
+      expect(dofePluginsForBrand(variant).map(plugin => plugin.id)).not.toContain('georank')
+    }
   })
 
   it('keeps the sensteed datasource bundles exclusive to sensteed and marks them built-in', () => {

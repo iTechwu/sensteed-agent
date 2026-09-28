@@ -4,7 +4,7 @@
       config:
         transport: streamable-http
         serverName: tools-platform
-        url: 'https://ixicai.cn/mcp/tools/platform'
+        url: 'https://ai.hozonauto.com/mcp/tools/platform'
         headers:
           Authorization: !!js ('Bearer ' + (process.env.MODELS_API_KEY || ''))
         toolCallTimeoutMs: 60000
@@ -17,7 +17,7 @@
       config:
         transport: streamable-http
         serverName: tools-supply-chain
-        url: 'https://ixicai.cn/mcp/tools/supply-chain'
+        url: 'https://ai.hozonauto.com/mcp/tools/supply-chain'
         headers:
           Authorization: !!js ('Bearer ' + (process.env.MODELS_API_KEY || ''))
         toolCallTimeoutMs: 60000
@@ -30,7 +30,7 @@
       config:
         transport: streamable-http
         serverName: tools-talent-discovery
-        url: 'https://ixicai.cn/mcp/tools/talent-discovery'
+        url: 'https://ai.hozonauto.com/mcp/tools/talent-discovery'
         headers:
           Authorization: !!js ('Bearer ' + (process.env.MODELS_API_KEY || ''))
         toolCallTimeoutMs: 60000
@@ -43,7 +43,7 @@
       config:
         transport: streamable-http
         serverName: tools-lead-discovery
-        url: 'https://ixicai.cn/mcp/tools/lead-discovery'
+        url: 'https://ai.hozonauto.com/mcp/tools/lead-discovery'
         headers:
           Authorization: !!js ('Bearer ' + (process.env.MODELS_API_KEY || ''))
         toolCallTimeoutMs: 60000
@@ -56,7 +56,7 @@
       config:
         transport: streamable-http
         serverName: tools-lead-monitor
-        url: 'https://ixicai.cn/mcp/tools/lead-monitor'
+        url: 'https://ai.hozonauto.com/mcp/tools/lead-monitor'
         headers:
           Authorization: !!js ('Bearer ' + (process.env.MODELS_API_KEY || ''))
         toolCallTimeoutMs: 60000
@@ -69,7 +69,7 @@
       config:
         transport: streamable-http
         serverName: tools-hotspot-discovery
-        url: 'https://ixicai.cn/mcp/tools/hotspot-discovery'
+        url: 'https://ai.hozonauto.com/mcp/tools/hotspot-discovery'
         headers:
           Authorization: !!js ('Bearer ' + (process.env.MODELS_API_KEY || ''))
         toolCallTimeoutMs: 60000
@@ -82,7 +82,7 @@
       config:
         transport: streamable-http
         serverName: tools-custom-car-monitoring
-        url: 'https://ixicai.cn/mcp/tools/custom-car-monitoring'
+        url: 'https://ai.hozonauto.com/mcp/tools/custom-car-monitoring'
         headers:
           Authorization: !!js ('Bearer ' + (process.env.MODELS_API_KEY || ''))
         toolCallTimeoutMs: 60000
@@ -95,7 +95,7 @@
       config:
         transport: streamable-http
         serverName: tools-viral-video
-        url: 'https://ixicai.cn/mcp/tools/viral-video'
+        url: 'https://ai.hozonauto.com/mcp/tools/viral-video'
         headers:
           Authorization: !!js ('Bearer ' + (process.env.MODELS_API_KEY || ''))
         toolCallTimeoutMs: 60000
@@ -108,7 +108,7 @@
       config:
         transport: streamable-http
         serverName: tools-browser-intelligence
-        url: 'https://ixicai.cn/mcp/tools/browser-intelligence'
+        url: 'https://ai.hozonauto.com/mcp/tools/browser-intelligence'
         headers:
           Authorization: !!js ('Bearer ' + (process.env.MODELS_API_KEY || ''))
         toolCallTimeoutMs: 60000

@@ -5,64 +5,7 @@
       name: dsh-plugin-desktop
       config:
         mode: compatibility
-    - id: dofe-yootun-ui
-      name: '@dofe/dsh-yootun-ui'
-    - id: dofe-yootun-dashboard
-      name: '@dofe/dsh-yootun-dashboard'
-      config:
-        registerHostRoute: false
-    - id: dofe-yootun-recruiter
-      name: '@dofe/dsh-yootun-recruiter'
-      config:
-        registerHostRoute: false
-    - id: dofe-yootun-sales
-      name: '@dofe/dsh-yootun-sales'
-      config:
-        registerHostRoute: false
-    - id: dofe-yootun-supply-watch
-      name: '@dofe/dsh-yootun-supply-watch'
-      config:
-        registerHostRoute: false
-    - id: dofe-yootun-content-command
-      name: '@dofe/dsh-yootun-content-command'
-      config:
-        registerHostRoute: false
-    - id: dofe-yootun-knowledge
-      name: '@dofe/dsh-yootun-knowledge'
-    - id: dofe-yootun-audit
-      name: '@dofe/dsh-yootun-audit'
-    - id: yootun-agent-knowledge-capture
-      name: '@dofe/dsh-knowledge-capture'
-    - id: dofe-yootun-finops
-      name: '@dofe/dsh-yootun-finops'
-    - id: dofe-yootun-retrofit
-      name: '@dofe/dsh-yootun-retrofit'
-    - id: dofe-yootun-daily-report
-      name: '@dofe/dsh-yootun-daily-report'
-    - id: dofe-yootun-lead-discovery
-      name: '@dofe/dsh-yootun-lead-discovery'
-    - id: dofe-yootun-xhs-operation
-      name: '@dofe/dsh-yootun-xhs-operation'
-    # 抖音运营：设备端系统 Chrome 采集 + 本地同源路由；采集与入库业务逻辑归
-    # docker-helm 插件与 tools.dofe.ai 域所有，Desktop 侧只做登记与发行打包。
-    - id: dofe-yootun-douyin-operation
-      name: '@dofe/dsh-yootun-douyin-operation'
-    # Yootun 通用媒体上传能力（纯宿主插件，无客户端半）。凭证与 TOS 拓扑不写进
-    # 本文件：上传授权由 dofe-managed 注册的 tools-tos-upload MCP 工具下发，
-    # 凭证走 credential store 的 MODELS_API_KEY，装完即用。
-    # entry id 与插件自带 dsh.bundle.patch 一致，避免合并出重复加载项。
-    - id: dofe-yootun-tos-upload
-      name: '@dofe/dsh-yootun-tos-upload'
-      config:
-        limits:
-          # 单文件大小上限（字节），默认 500MB。
-          maxBytes: 524288000
-        tool:
-          # agent 工具单次上传超时（大视频走整段 await）。
-          timeoutMs: 1800000
-    # Sensteed 专属数据源插件：财务数据中心（datasource MCP + 看板）与供应商
-    # 情报（supply-chain MCP + 舆情技能）。yootun 构建由 profile.ts 的品牌
-    # 过滤剔除；bundle 自带 MCP 与 guidance，桌面侧只做登记。
+    # Sensteed 数据源插件；bundle 自带 MCP 与 guidance。
     - id: dofe-sensteed-finance
       name: '@dofe/dsh-sensteed-finance'
     - id: dofe-sensteed-supplier-intelligence
@@ -82,12 +25,10 @@
       name: dsh-plugin-desktop/updates
     - id: desktop-browser-tools
       name: dsh-plugin-desktop/browser-tools
-    # 0.1.7 ships the ci tools natively (@deepseek-ai/dsh-tool-ci); the
-    # desktop duplicate register would collide on `ci_run`.
-    - id: desktop-yootun-recruiter-tools
-      name: dsh-plugin-desktop/yootun-recruiter-tools
     - id: dofe-managed
       name: dsh-plugin-desktop/dofe-managed
+    - id: personal-knowledge-files
+      name: dsh-plugin-desktop/personal-knowledge-files
     # dofe-managed owns the OpenMontage MCP transport. This shared Host module
     # adds workflow guidance, Agent-scoped projection, and stalled-call blocking.
     - id: openmontage-guidance
@@ -102,7 +43,7 @@
 - id: llm-deepseek
   config:
     apiKeyEnv: MODELS_API_KEY
-    baseURL: https://ixicai.cn/api/v1
+    baseURL: https://ai.hozonauto.com/api/v1
     connectionPolicy: composition
     retryPolicy:
       mode: normal

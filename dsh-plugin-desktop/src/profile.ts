@@ -136,7 +136,7 @@ const MARKET_PACKAGE_NAMES: ReadonlySet<string> = new Set([
 
 const DOFE_MODEL_PROVIDER = 'deepseek-official'
 const DOFE_MODEL_API_KEY_ENV = 'MODELS_API_KEY'
-const DOFE_MODEL_BASE_URL = 'https://ixicai.cn/api/v1'
+const DOFE_MODEL_BASE_URL = 'https://ai.hozonauto.com/api/v1'
 
 const YOOTUN_PRIVATE_PLUGIN_ROW_IDS = new Set([
   'dofe-yootun-dashboard',
@@ -787,6 +787,7 @@ function loadRecoveryFilteredProfile(
       layers,
       patchPath,
       patches: existsSync(patchPath) ? loadOverlayPatches(BIN_NAME, patchPath) : [],
+      skippedBundles: [],
     },
     ...(dshMarketFailure === undefined ? {} : { dshMarketFailure }),
     ...(aaFailure === undefined ? {} : { aaFailure }),

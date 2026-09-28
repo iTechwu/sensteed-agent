@@ -7,9 +7,8 @@ import { randomUUID } from 'node:crypto'
 
 const ROUTE_PREFIX = '/api/desktop/sensteed/finance'
 // 财务页面是直连服务型插件：Datasource REST API 负责 SSO、租户和操作者校验。
-// MCP 仅能经 ixicai.cn/mcp 公共网关访问；当前 Datasource 尚未纳入该网关，
-// 因此这里不再保留任何本地/私有 MCP 端点。
-const DATASOURCE_API_BASE_URL = process.env.DATASOURCE_API_BASE_URL || 'https://ds.hozonauto.com/api'
+// MCP 仅能经 ai.hozonauto.com/mcp 公共网关访问；财务页面的 REST 请求使用 Datasource 公共 API。
+const DEFAULT_DATASOURCE_API_BASE_URL = 'https://ds.hozonauto.com/api'
 const REQUEST_TIMEOUT_MS = 30000
 const MAX_BODY_BYTES = 32 * 1024
 
@@ -258,7 +257,7 @@ async function dispatchGet(fetchImpl, config, sub, url, res, logger) {
   return await runGet(calls, res, logger, config, fetchImpl, sub === '/' || sub === '/context')
 }
 
-/** 执行一组 MCP 调用并按块降级拼装响应（部分失败保留成功块） */
+/** 执行一组 REST 调用并按块降级拼装响应（部分失败保留成功块） */
 async function runGet(calls, res, logger, config, fetchImpl, context = false) {
   const results = await Promise.all(calls.map(([name, args]) => financeApiCall(fetchImpl, config, name, args, new Date(), logger)))
   const okAll = results.every(result => result.ok)
@@ -368,7 +367,7 @@ async function financeApiCall(fetchImpl, config, toolName, args, observedAt, log
   if (!config.token) return { ok: false, error: '请先使用飞书登录，再打开财务管理。' }
   try {
     if (toolName === 'finance_analysis_brief') {
-      const year = args.year
+      const year = args.year === undefined ? undefined : Number(args.year)
       const calls = [
         ['finance_get_overview', { year }],
         ['finance_get_budget_summary', { year }],
@@ -417,7 +416,7 @@ async function financeApiCall(fetchImpl, config, toolName, args, observedAt, log
 
     const route = resolveFinanceRoute(toolName, args)
     if (!route) return { ok: false, error: 'finance_tool_unavailable' }
-    const query = route.method === 'GET' ? stripControlFields(args) : undefined
+    const query = route.method === 'GET' ? stripPathFields(stripControlFields(args)) : undefined
     const body = route.method === 'GET' || route.method === 'DELETE' ? undefined : stripPathFields(stripControlFields(route.body ?? args))
     const url = buildFinanceUrl(route.path, query)
     const response = await timedFetch(fetchImpl, url, {
@@ -425,6 +424,7 @@ async function financeApiCall(fetchImpl, config, toolName, args, observedAt, log
       headers: {
         'content-type': 'application/json',
         accept: 'application/json',
+        'x-api-version': '1',
         authorization: `Bearer ${config.token}`,
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
@@ -457,12 +457,25 @@ function stripPathFields(value = {}) {
 }
 
 function buildFinanceUrl(path, query) {
-  const url = new URL(`${DATASOURCE_API_BASE_URL.replace(/\/$/u, '')}${path}`)
+  const base = resolveDatasourceApiBaseUrl()
+  const url = new URL(`${base.replace(/\/$/u, '')}${path}`)
   for (const [key, value] of Object.entries(query || {})) {
     if (value === undefined || value === null || value === '') continue
     url.searchParams.set(key, String(value))
   }
   return url.toString()
+}
+
+function resolveDatasourceApiBaseUrl() {
+  const configured = process.env.DATASOURCE_API_BASE_URL
+  if (!configured) return DEFAULT_DATASOURCE_API_BASE_URL
+  try {
+    const url = new URL(configured)
+    if (url.protocol === 'https:' && url.hostname === 'ds.hozonauto.com' && (url.pathname === '/api' || url.pathname === '/api/')) {
+      return url.toString().replace(/\/$/u, '')
+    }
+  } catch { /* invalid override falls back to the allowlisted public origin */ }
+  return DEFAULT_DATASOURCE_API_BASE_URL
 }
 
 function buildBudgetAvailability(data = {}) {

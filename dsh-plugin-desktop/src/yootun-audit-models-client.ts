@@ -4,7 +4,7 @@ import {
   type YootunAuditRecordInput,
 } from './yootun-audit-contract.ts'
 
-export const YOOTUN_AUDIT_MODELS_BASE_URL = 'https://ixicai.cn/api/v1/yootun/audit-events'
+export const YOOTUN_AUDIT_MODELS_BASE_URL = 'https://ai.hozonauto.com/api/v1/yootun/audit-events'
 const DEFAULT_TIMEOUT_MS = 10_000
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 const MAX_RETRY_AFTER_MS = 5 * 60 * 1_000

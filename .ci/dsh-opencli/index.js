@@ -5,7 +5,7 @@ export const inject = ['tools', 'systemPrompt', 'credentials']
 
 const TIMEOUT_MS = 90000
 const MAX_OUTPUT_BYTES = 2 * 1024 * 1024
-const EXA_MCP_URL = 'https://ixicai.cn/mcp/exa'
+const EXA_MCP_URL = 'https://ai.hozonauto.com/mcp/exa'
 const READ_ONLY_COMMANDS = new Map([
   ['autohome', new Set(['brand', 'score'])],
   ['bilibili', new Set(['comments', 'hot', 'ranking', 'search', 'subtitle', 'summary', 'user-videos', 'video'])],

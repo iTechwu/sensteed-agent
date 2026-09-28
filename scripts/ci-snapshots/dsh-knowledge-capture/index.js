@@ -5,7 +5,7 @@
 export const name = 'yootun-agent-knowledge-capture'
 export const inject = ['credentials', 'systemPrompt']
 
-export const KNOWLEDGE_MCP_URL = 'https://ixicai.cn/mcp/knowledge'
+export const KNOWLEDGE_MCP_URL = 'https://ai.hozonauto.com/mcp/knowledge'
 const MCP_TIMEOUT_MS = 2500
 const SHUTDOWN_DEADLINE_MS = 1500
 const MAX_PENDING_EVENTS = 200

@@ -1,4 +1,0 @@
-# Register the host endpoint plugin into the DSH bundle.
-- insert:
-    - id: yootun-recruiter
-      name: '@dofe/yootun-recruiter'

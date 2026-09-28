@@ -5,7 +5,7 @@ import { credentialRef, type CredentialProvider } from '@deepseek-ai/dsh-credent
 import { yesterdayPeriod, type DashboardPeriod } from './yootun-dashboard-activity.ts'
 
 export const YOOTUN_FINOPS_PATH = '/api/desktop/yootun/finops'
-export const YOOTUN_FINOPS_USAGE_URL = 'https://ixicai.cn/api/v1/yootun/usage'
+export const YOOTUN_FINOPS_USAGE_URL = 'https://ai.hozonauto.com/api/v1/yootun/usage'
 
 const MODELS_API_KEY_REF = credentialRef('MODELS_API_KEY')
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024

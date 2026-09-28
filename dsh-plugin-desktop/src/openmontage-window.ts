@@ -3,8 +3,8 @@
 import { BrowserWindow, session } from 'electron'
 import { revealApplication } from './electron-reveal.ts'
 
-export const OPENMONTAGE_URL = 'https://ixicai.cn/montage/'
-const AUTH_URL = 'https://ixicai.cn/montage/auth/session'
+export const OPENMONTAGE_URL = 'https://montage.hozonauto.com/'
+const AUTH_URL = 'https://montage.hozonauto.com/auth/session'
 const COOKIE_NAME = 'openmontage_backlot_session'
 
 export function parseOpenMontageSessionCookie(value: string | null): string | undefined {
@@ -38,7 +38,7 @@ async function establishSession(apiKey: string): Promise<void> {
     url: OPENMONTAGE_URL,
     name: COOKIE_NAME,
     value,
-    path: '/montage',
+    path: '/',
     secure: true,
     httpOnly: true,
     sameSite: 'no_restriction',

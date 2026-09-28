@@ -40,11 +40,11 @@ export async function generateLockups(environment = process.env): Promise<void> 
   if (markSquare < lockupHeight) {
     throw new Error(`brand sidebar mark is smaller than the lockup height: ${markSquare} < ${lockupHeight}`)
   }
-  await mark
+  const markBuffer = await mark
     .extract({ left: 0, top: 0, width: markSquare, height: markSquare })
     .resize(lockupHeight, lockupHeight, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
     .png()
-    .toFile(output('sidebar-brand.png'))
+    .toBuffer()
 
   const wordmarkWidth = lockupWidth - lockupHeight
   const stagedPath = output('.brand-wordmark-staged.png')
@@ -59,7 +59,7 @@ export async function generateLockups(environment = process.env): Promise<void> 
       create: { width: lockupWidth, height: lockupHeight, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
     })
       .composite([
-        { input: output('sidebar-brand.png'), left: 0, top: 0 },
+        { input: markBuffer, left: 0, top: 0 },
         { input: stagedPath, left: lockupHeight, top: 0 },
       ])
       .png()

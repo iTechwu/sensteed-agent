@@ -58,11 +58,10 @@ describe('OpenMontage managed session', () => {
   })
 
   it('keeps main-frame navigation inside the fixed montage path', () => {
-    expect(isOpenMontageNavigationAllowed('https://ixicai.cn/montage')).toBe(true)
-    expect(isOpenMontageNavigationAllowed('https://ixicai.cn/montage/')).toBe(true)
-    expect(isOpenMontageNavigationAllowed('https://ixicai.cn/montage/projects/example')).toBe(true)
-    expect(isOpenMontageNavigationAllowed('https://ixicai.cn/ai/v1/models')).toBe(false)
-    expect(isOpenMontageNavigationAllowed('https://example.com/montage/')).toBe(false)
+    expect(isOpenMontageNavigationAllowed('https://montage.hozonauto.com/')).toBe(true)
+    expect(isOpenMontageNavigationAllowed('https://montage.hozonauto.com/p/example')).toBe(true)
+    expect(isOpenMontageNavigationAllowed('https://ai.hozonauto.com/api/v1/models')).toBe(false)
+    expect(isOpenMontageNavigationAllowed('https://example.com/')).toBe(false)
     expect(isOpenMontageNavigationAllowed('not-a-url')).toBe(false)
   })
 
@@ -81,12 +80,12 @@ describe('OpenMontage managed session', () => {
     }))
     expect(window?.accessibleTitle).toBe('OpenMontage')
     expect(electron.sessionFetch).toHaveBeenCalledWith(
-      'https://ixicai.cn/montage/auth/session',
+      'https://montage.hozonauto.com/auth/session',
       expect.objectContaining({ method: 'POST' }),
     )
     expect(electron.cookiesSet).toHaveBeenCalledWith(expect.objectContaining({
       name: 'openmontage_backlot_session',
-      path: '/montage',
+      path: '/',
       httpOnly: true,
     }))
   })

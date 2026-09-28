@@ -3,17 +3,17 @@ import type { CredentialRecord } from '@deepseek-ai/dsh-credentials'
 import { DofeAuthService, DOFE_AUTH_GRANT_KEY } from '../src/dofe-auth-service.ts'
 
 const discovery = {
-  issuer: 'https://sso.ixicai.cn/api',
-  authorization_endpoint: 'https://sso.ixicai.cn/api/oauth/authorize',
-  token_endpoint: 'https://sso.ixicai.cn/api/oauth/token',
-  userinfo_endpoint: 'https://sso.ixicai.cn/api/oauth/userinfo',
+  issuer: 'https://user.hozonauto.com/api',
+  authorization_endpoint: 'https://user.hozonauto.com/api/oauth/authorize',
+  token_endpoint: 'https://user.hozonauto.com/api/oauth/token',
+  userinfo_endpoint: 'https://user.hozonauto.com/api/oauth/userinfo',
 }
 const provisioned = {
   key: 'sk-secret', user: { ssoSub: 'sub-1', name: 'Alice' },
   tenant: { tenantId: 'tenant-1', ssoTeamId: 'team-1', tenantSlug: 'sensteed' },
   entitlements: { plugins: ['knowledge'], defaultModel: 'model-a', allowedProtocols: ['messages'] },
 }
-const userinfo = { sub: 'sub-1', name: 'Alice', picture: 'https://sso.ixicai.cn/avatar/sub-1.png' }
+const userinfo = { sub: 'sub-1', name: 'Alice', picture: 'https://user.hozonauto.com/avatar/sub-1.png' }
 function response(value: unknown, status = 200): Response {
   return new Response(JSON.stringify(value), { status })
 }

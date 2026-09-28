@@ -3,7 +3,7 @@ import { DOFE_ANTHROPIC_BASE_URL, dofeModelCatalogUrl, normalizeDofeUiProtocol, 
 
 describe('DoFe model catalog parsing', () => {
   it('keeps the native Anthropic endpoint under the models API prefix', () => {
-    expect(DOFE_ANTHROPIC_BASE_URL).toBe('https://ixicai.cn/api/anthropic')
+    expect(DOFE_ANTHROPIC_BASE_URL).toBe('https://ai.hozonauto.com/api/anthropic')
   })
 
   it('surfaces only the activation UI protocols and falls back from responses', () => {
@@ -88,8 +88,8 @@ describe('DoFe model catalog parsing', () => {
   })
 
   it('maps UI protocols to the gateway catalog query', () => {
-    expect(dofeModelCatalogUrl('chat-completions')).toBe('https://ixicai.cn/api/v1/models?protocol=openai')
-    expect(dofeModelCatalogUrl('messages')).toBe('https://ixicai.cn/api/v1/models?protocol=anthropic')
-    expect(dofeModelCatalogUrl('responses')).toBe('https://ixicai.cn/api/v1/models?protocol=openai_response')
+    expect(dofeModelCatalogUrl('chat-completions')).toBe('https://ai.hozonauto.com/api/v1/models?protocol=openai')
+    expect(dofeModelCatalogUrl('messages')).toBe('https://ai.hozonauto.com/api/v1/models?protocol=anthropic')
+    expect(dofeModelCatalogUrl('responses')).toBe('https://ai.hozonauto.com/api/v1/models?protocol=openai_response')
   })
 })

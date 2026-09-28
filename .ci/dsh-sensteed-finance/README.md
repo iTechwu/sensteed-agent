@@ -4,11 +4,11 @@ Sensteed Agent 侧边栏「财务管理」提供与 datasource 网页工作台�
 
 ## 登录与数据连接
 
-本地打包按用户明确选择连接 `https://datasource.local.dofe.ai/api/mcp`。这是此本地财务集成的明确例外；其他 MCP 仍遵守仓库的公共网关规则。
+财务看板通过 `https://ds.hozonauto.com/api/finance` 的公开 REST 合约读取和写入数据。页面请求只携带当前飞书 SSO Bearer 会话，Datasource 服务端负责租户、角色和操作者校验；插件不再直连任何 MCP 端点。
 
-使用桌面端飞书登录即可。宿主内存保存短期 SSO access token，登录/续期后由 `dofe-managed` 创建 `mcp__finance__*` 客户端。财务界面每次请求读取当前会话；服务端验证 token 并固定租户和操作者。不再要求用户配置 `DATASOURCE_INTERNAL_API_SECRET`、租户或操作者环境变量。token 不进入渲染进程、状态 API、构建产物或日志。
+使用桌面端飞书登录即可。宿主内存保存短期 SSO access token，财务界面每次请求读取当前会话；服务端验证 token 并固定租户和操作者。不再要求用户配置 `DATASOURCE_INTERNAL_API_SECRET`、租户或操作者环境变量。token 不进入渲染进程、状态 API、构建产物或日志。
 
-本机 datasource 必须已启动，并支持 SSO Bearer 鉴权。宿主将用户本机 mkcert 根证书追加至 Node TLS 信任集，保留证书校验。未登录/过期时显示飞书登录提示；没有财务角色时保留服务端拒绝信息。
+Datasource 公共服务必须支持 SSO Bearer 鉴权。未登录/过期时显示飞书登录提示；没有财务角色时保留服务端拒绝信息。`DATASOURCE_API_BASE_URL` 仅接受同一公开 Datasource origin 的 `/api` 地址，非法或私有地址会回退到默认地址。
 
 ## 交互覆盖
 
@@ -22,7 +22,7 @@ Sensteed Agent 侧边栏「财务管理」提供与 datasource 网页工作台�
 | 录入 | 填报任务、部门填报、通讯录、人员归属、成员角色、预算及收支录入 |
 | 深度分析 | 风险、成本、预算执行、收入、质量、预测、版本和规则分析，投递到当前会话；无会话时创建会话 |
 
-财务界面仅访问同源 `/api/desktop/sensteed/finance`；Agent 和界面共用 datasource MCP。所有写入自动带幂等键，进行中的重复点击合并。业务错误不会作为成功返回，客户端无法覆盖操作者/租户。
+财务界面仅访问同源 `/api/desktop/sensteed/finance`，宿主再调用 Datasource REST API。所有写入由服务端会话绑定操作者和租户，并保留幂等语义；业务错误不会作为成功返回，客户端无法覆盖操作者/租户。
 
 ## 构建与验证
 

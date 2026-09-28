@@ -1,7 +1,7 @@
 # @dofe/dsh-knowledge-capture
 
 Yootun-Agent 的 Runtime Knowledge bridge。它监听 DSH 的真实 Session 事件，
-通过 `https://ixicai.cn/mcp/knowledge` 提交 `knowledge.session_checkpoint`，
+通过 `https://ai.hozonauto.com/mcp/knowledge` 提交 `knowledge.session_checkpoint`，
 并在每次模型请求前获取 `knowledge.context_pack`。
 
 私有插件，不发布到 npmjs。身份只由公共 MCP 网关根据

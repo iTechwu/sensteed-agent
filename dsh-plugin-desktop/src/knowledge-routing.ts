@@ -32,11 +32,11 @@ export function classifyKnowledgeRoute(query: string): KnowledgeRoute {
 
 export const KNOWLEDGE_ROUTING_PROMPT = [
   '数据源路由规则（必须遵守）：',
-  '1. 企业内部事实优先使用 knowledge_search；已确认经验、会话记忆或用户偏好使用 knowledge_recall。',
+  '1. 企业内部事实优先使用已加载的 mcp__knowledge__ 检索工具；已确认经验、会话记忆或用户偏好使用其 recall 工具。',
   '2. 企业内部事实包括当前租户及其园区、公司、客户、会员、员工、招聘、销售、供应链、库存、财务、项目、制度、流程、服务标准、合同和历史复盘。',
   '3. 公开实时信息（新闻、今天/最新/当前、价格行情、天气、赛事、股票、汇率、官方网页）才使用 web_search/web_fetch。',
   '4. 混合问题必须先调用 Knowledge 获取企业事实，再按需调用 Web 获取外部实时信息；网页结果不能替代企业事实。',
-  '5. 只要问题可能涉及企业事实，就先调用 knowledge_search 或 knowledge_recall，不要直接凭模型记忆作答。Knowledge 不可用时明确说明企业知识不可用；只有问题本身是公开信息时才降级到 Web。',
-  '6. Knowledge 统一使用本地封装工具 knowledge_search、knowledge_recall、knowledge_loadout、knowledge_context_pack 等；不要调用任何 mcp__knowledge__* 直连工具，也不要给封装工具套用直连 MCP 的参数格式。',
+  '5. 只要问题可能涉及企业事实，就先调用 Knowledge，不要直接凭模型记忆作答。Knowledge 不可用时明确说明企业知识不可用；只有问题本身是公开信息时才降级到 Web。',
+  '6. Knowledge 统一使用已加载的 mcp__knowledge__* 工具及其实际参数；个人知识空间使用 user.personal，身份和空间由服务端解析，不要要求用户填写 UUID。',
   '7. Knowledge 结果必须保留文档、版本、Memory 或 Session 引用；没有引用不得把推断写成企业事实。',
 ].join('\n')

@@ -1,4 +1,3 @@
-import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { extname, join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -23,9 +22,9 @@ describe('Yootun audit release closure', () => {
     }
     const patch = readFileSync(join(packageRoot, 'cordis.patch.yml'), 'utf8')
 
-    expect(manifest.dependencies).toHaveProperty('@dofe/dsh-yootun-audit')
+    expect(manifest.dependencies).not.toHaveProperty('@dofe/dsh-yootun-audit')
     expect(manifest.dependencies).not.toHaveProperty('@dofe/dsh-yootun-approvals')
-    expect(patch).toContain("name: '@dofe/dsh-yootun-audit'")
+    expect(patch).not.toContain("name: '@dofe/dsh-yootun-audit'")
     expect(patch).not.toContain('dsh-yootun-approvals')
     expect(existsSync(join(packageRoot, 'src/yootun-approvals-route.ts'))).toBe(false)
   })
@@ -42,20 +41,4 @@ describe('Yootun audit release closure', () => {
     expect(allOwnedHostSource).not.toMatch(/\/api\/desktop\/yootun\/approvals|awaiting_confirmation.*统一审批/u)
   })
 
-  it('executes the packaged collector audit behavior suites', () => {
-    const tests = [
-      '.ci/dsh-yootun-knowledge/test/plugin.test.mjs',
-      '.ci/dsh-yootun-lead-discovery/test/plugin.test.mjs',
-      '.ci/dsh-yootun-retrofit/test/plugin.test.mjs',
-      '.ci/dsh-yootun-xhs-operation/test/route.test.mjs',
-      '.ci/dsh-yootun-tos-upload/test/plugin.test.mjs',
-    ]
-    const result = spawnSync(process.execPath, [
-      '--test',
-      '--test-name-pattern=audits|marks an MCP|marks a resolved|records task creation|upload route authorizes then streams|apply registers both routes',
-      ...tests,
-    ], { cwd: workspaceRoot, encoding: 'utf8' })
-
-    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0)
-  })
 })

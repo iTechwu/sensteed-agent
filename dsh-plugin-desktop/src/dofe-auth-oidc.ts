@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto'
 
-export const SENSTEED_SSO_DISCOVERY_URL = 'https://sso.ixicai.cn/api/.well-known/openid-configuration'
+export const SENSTEED_SSO_DISCOVERY_URL = 'https://user.hozonauto.com/api/.well-known/openid-configuration'
 export const SENSTEED_SSO_CLIENT_ID = 'sensteed-desktop'
 export const SENSTEED_SSO_SCOPES = ['openid', 'profile', 'email', 'tenant', 'offline_access'] as const
 
@@ -81,4 +81,3 @@ export function parseOidcCallback(url: string | URL, expectedState: string): Oid
   if (code === null || code.length === 0) return { ok: false, reason: 'missing_code' }
   return { ok: true, code, state }
 }
-

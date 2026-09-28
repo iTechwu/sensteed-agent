@@ -23,7 +23,7 @@ describe('dofe-managed media route', () => {
   })
 
   it('keeps the managed base URL on the public gateway and credential-only auth', () => {
-    expect(DOFE_MCP_BASE_URL).toBe('https://ixicai.cn/mcp')
+    expect(DOFE_MCP_BASE_URL).toBe('https://ai.hozonauto.com/mcp')
     expect(MODELS_API_KEY).toBe('MODELS_API_KEY')
     // 客户端固定公共地址：不允许出现 CI 地址、容器名或自定义端点覆盖。
     expect(managedSource).not.toMatch(/172\.30\.30\.11|127\.0\.0\.1|localhost|mcp\.exa\.ai/)

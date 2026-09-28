@@ -44,10 +44,10 @@ function harness(overrides = {}) {
 }
 
 const discovery = {
-  issuer: 'https://sso.ixicai.cn/api',
-  authorization_endpoint: 'https://sso.ixicai.cn/api/oauth/authorize',
-  token_endpoint: 'https://sso.ixicai.cn/api/oauth/token',
-  userinfo_endpoint: 'https://sso.ixicai.cn/api/oauth/userinfo',
+  issuer: 'https://user.hozonauto.com/api',
+  authorization_endpoint: 'https://user.hozonauto.com/api/oauth/authorize',
+  token_endpoint: 'https://user.hozonauto.com/api/oauth/token',
+  userinfo_endpoint: 'https://user.hozonauto.com/api/oauth/userinfo',
 }
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status })
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers() })
@@ -65,14 +65,14 @@ describe('Sensteed startup authorization', () => {
         key: 'model-key', user: { ssoSub: 'user-1', name: 'User' },
         tenant: { tenantId: 'tenant', ssoTeamId: 'team', tenantSlug: 'sensteed' },
         entitlements: { plugins: ['media'], allowedProtocols: ['messages'] },
-      })).mockResolvedValueOnce(json({ sub: 'user-1', name: 'User', picture: 'https://sso.ixicai.cn/avatar/user-1.png' })))
+      })).mockResolvedValueOnce(json({ sub: 'user-1', name: 'User', picture: 'https://user.hozonauto.com/avatar/user-1.png' })))
     await apply(h.ctx as never)
     expect(h.getSettings().setupComplete).toBe(true)
     expect(h.getSettings().enabledPlugins).toEqual(['media'])
     expect(h.ctx.plugin).toHaveBeenCalledTimes(2)
     expect(h.ctx.plugin).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({
-      serverName: 'finance', url: 'https://datasource.local.dofe.ai/api/mcp',
-      headers: { Authorization: 'Bearer access-new' },
+      serverName: 'finance', url: 'https://ai.hozonauto.com/mcp/finance',
+      headers: { Authorization: 'Bearer model-key', 'X-Sensteed-SSO-Authorization': 'Bearer access-new' },
     }))
     expect(h.tray.enabled()).toBe(false)
     expect(h.ctx.desktopRuntime.openExternal).not.toHaveBeenCalled()

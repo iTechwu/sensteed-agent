@@ -56,7 +56,7 @@
     }
   },
   "updates": {
-    "endpoint": "https://ixicai.cn/api/desktop/version",
+    "endpoint": "https://ai.hozonauto.com/api/desktop/version",
     "versionHeader": "X-Sensteed-Agent-Version",
     "channelHeader": "X-Sensteed-Agent-Channel"
   },

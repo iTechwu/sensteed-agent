@@ -62,7 +62,7 @@ describe('DoFe model_api_key validation route', () => {
       }),
     )
     expect(fetcher).toHaveBeenCalledWith(
-      'https://ixicai.cn/api/v1/models?protocol=openai',
+      'https://ai.hozonauto.com/api/v1/models?protocol=openai',
       expect.objectContaining({
         headers: expect.objectContaining({ Authorization: 'Bearer entered-secret', 'X-Company-Code': BRAND_TENANT }),
         redirect: 'error',
@@ -157,7 +157,7 @@ describe('DoFe model_api_key validation route', () => {
     await handleDofeModelCatalogRequest(request({ key: 'entered-secret' }), res, ORIGIN, fetcher)
 
     expect(fetcher).toHaveBeenCalledWith(
-      'https://ixicai.cn/api/v1/models?protocol=openai',
+      'https://ai.hozonauto.com/api/v1/models?protocol=openai',
       expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer entered-secret', Accept: 'application/json', 'X-Company-Code': BRAND_TENANT }) }),
     )
     expect(JSON.parse(res.body)).toEqual({ models: [{ id: 'remote-a', name: 'Remote A' }] })
@@ -173,7 +173,7 @@ describe('DoFe model_api_key validation route', () => {
 
     await handleDofeAccessValidationRequest(request({ key: 'entered-secret', protocol: 'messages' }), res, ORIGIN, fetcher)
     expect(fetcher).toHaveBeenLastCalledWith(
-      'https://ixicai.cn/api/v1/models?protocol=anthropic',
+      'https://ai.hozonauto.com/api/v1/models?protocol=anthropic',
       expect.anything(),
     )
 
@@ -183,7 +183,7 @@ describe('DoFe model_api_key validation route', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ id: 'o3', protocol: 'openai_responses' }] }), { status: 200 }))
     await handleDofeModelCatalogRequest(request({ key: 'entered-secret', protocol: 'responses' }), catalogRes, ORIGIN, catalogFetcher)
     expect(catalogFetcher).toHaveBeenLastCalledWith(
-      'https://ixicai.cn/api/v1/models?protocol=openai_response',
+      'https://ai.hozonauto.com/api/v1/models?protocol=openai_response',
       expect.anything(),
     )
     expect(JSON.parse(catalogRes.body)).toEqual({ models: [{ id: 'o3', name: 'o3' }] })
@@ -214,7 +214,7 @@ describe('DoFe model_api_key validation route', () => {
     )
 
     expect(fetcher).toHaveBeenCalledWith(
-      'https://ixicai.cn/api/v1/models?protocol=anthropic',
+      'https://ai.hozonauto.com/api/v1/models?protocol=anthropic',
       expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer stored-secret', 'X-Company-Code': BRAND_TENANT }) }),
     )
     expect(JSON.parse(res.body)).toEqual({ models: [{ id: 'remote-a', name: 'Remote A' }] })

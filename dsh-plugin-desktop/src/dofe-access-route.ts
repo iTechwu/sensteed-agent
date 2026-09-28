@@ -5,7 +5,7 @@ import { BRAND_TENANT, BRAND_TENANT_ID } from './generated-product-identity.ts'
 
 export const DOFE_ACCESS_VALIDATE_PATH = '/api/desktop/dofe/validate'
 export const DOFE_ACCESS_MODELS_PATH = '/api/desktop/dofe/models'
-export const DOFE_AUTH_CONTEXT_URL = 'https://ixicai.cn/api/internal/auth/context'
+export const DOFE_AUTH_CONTEXT_URL = 'https://ai.hozonauto.com/api/internal/auth/context'
 const MAX_BODY_BYTES = 16 * 1024
 const MODEL_GATEWAY_HEADERS = Object.freeze({ 'X-Company-Code': BRAND_TENANT })
 

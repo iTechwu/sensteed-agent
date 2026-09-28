@@ -25,26 +25,6 @@ import { DOFE_AUTH_PATHS, handleDofeAuthRequest } from './dofe-auth-route.ts'
 import type {} from './dofe-managed.ts'
 import { watchDofeAuthAudit } from './dofe-auth-audit.ts'
 import { BRAND_VARIANT } from './generated-product-identity.ts'
-import {
-  handleYootunRecruiterRequest,
-  YOOTUN_RECRUITER_PATH,
-} from './yootun-recruiter-route.ts'
-import {
-  createRecruiterKnowledgePublisher,
-} from './yootun-recruiter-integrations.ts'
-import {
-  handleYootunSalesRequest,
-  YOOTUN_SALES_PATH,
-} from './yootun-sales-route.ts'
-import {
-  handleYootunSupplyWatchRequest,
-  YOOTUN_SUPPLY_WATCH_PATH,
-} from './yootun-supply-watch-route.ts'
-import {
-  handleYootunContentCommandRequest,
-  YOOTUN_CONTENT_COMMAND_PATH,
-} from './yootun-content-command-route.ts'
-import { createYootunWebsitePublisher } from './yootun-website-publisher.ts'
 import { YootunAuditModelsClient } from './yootun-audit-models-client.ts'
 import { handleYootunAuditRequest, YOOTUN_AUDIT_PATH } from './yootun-audit-route.ts'
 import { YootunAuditService } from './yootun-audit-service.ts'
@@ -243,7 +223,6 @@ export function apply(ctx: Context, config: DesktopShellConfig): void {
       )
     }
   }
-  const publishYootunWebsite = createYootunWebsitePublisher()
   const dshHomePath = ctx.get('dshHomePath')
   if (dshHomePath === undefined) {
     throw new Error('dsh-plugin-desktop: dshHomePath is required for the audit outbox')
@@ -387,72 +366,6 @@ export function apply(ctx: Context, config: DesktopShellConfig): void {
       `dsh-plugin-desktop: private DoFe access route ${path}`,
     )
   }
-  ctx.effect(
-    () => ctx.webServer.register({
-      kind: 'exact',
-      path: YOOTUN_RECRUITER_PATH,
-      handler: async (req, res) => {
-        if (rejectDesktopRequest(ctx, req, res)) return
-        return handleYootunRecruiterRequest(req, res, rendererOrigin, {
-          statePath: ctx.get('dshHomePath')?.('storages', 'yootun-recruiter', 'state.json'),
-          credentials: ctx.credentials,
-          knowledgePublisher: createRecruiterKnowledgePublisher(ctx.tools),
-          openBossWeb: async url => { await ctx.get('desktopRuntime')?.openBossWeb(url) },
-          audit: ctx.sensteedAudit,
-        })
-      },
-    }),
-    `dsh-plugin-desktop: private Yootun recruiter route ${YOOTUN_RECRUITER_PATH}`,
-  )
-  ctx.effect(
-    () => ctx.webServer.register({
-      kind: 'exact',
-      path: YOOTUN_SALES_PATH,
-      handler: (req, res) => {
-        if (rejectDesktopRequest(ctx, req, res)) return
-        return handleYootunSalesRequest(req, res, rendererOrigin, {
-          statePath: ctx.get('dshHomePath')?.('storages', 'yootun-sales', 'state.json'),
-          tools: ctx.tools,
-          audit: ctx.sensteedAudit,
-        })
-      },
-    }),
-    `dsh-plugin-desktop: private Yootun sales route ${YOOTUN_SALES_PATH}`,
-  )
-  ctx.effect(
-    () => ctx.webServer.register({
-      kind: 'exact',
-      path: YOOTUN_SUPPLY_WATCH_PATH,
-      handler: (req, res) => {
-        if (rejectDesktopRequest(ctx, req, res)) return
-        return handleYootunSupplyWatchRequest(req, res, rendererOrigin, {
-          statePath: ctx.get('dshHomePath')?.('storages', 'yootun-supply-watch', 'state.json'),
-          audit: ctx.sensteedAudit,
-        })
-      },
-    }),
-    `dsh-plugin-desktop: private Yootun supply watch route ${YOOTUN_SUPPLY_WATCH_PATH}`,
-  )
-  ctx.effect(
-    () => ctx.webServer.register({
-      kind: 'exact',
-      path: YOOTUN_CONTENT_COMMAND_PATH,
-      handler: (req, res) => {
-        if (rejectDesktopRequest(ctx, req, res)) return
-        return handleYootunContentCommandRequest(req, res, rendererOrigin, {
-          statePath: ctx.get('dshHomePath')?.('storages', 'yootun-content-command', 'state.json'),
-          tools: ctx.tools,
-          publishWebsite: publishYootunWebsite,
-          audit: ctx.sensteedAudit,
-          openPlatformWeb: async (platform, url) => {
-            if (platform === 'website') return
-            await ctx.get('desktopRuntime')?.openContentPlatformWeb(platform, url)
-          },
-        })
-      },
-    }),
-    `dsh-plugin-desktop: private Yootun content command route ${YOOTUN_CONTENT_COMMAND_PATH}`,
-  )
   if (runtime.platform === 'win32') {
     ctx.effect(
       () => ctx.webServer.register({

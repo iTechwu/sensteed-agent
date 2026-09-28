@@ -234,50 +234,41 @@ test('new read routes map to public REST resources', async () => {
   assert.match(calls.at(-1).url, /\/saved-views/u)
 })
 
-test('new write routes merge path captures and body into MCP args', async () => {
+test('new write routes merge path captures into REST resources', async () => {
   const calls = []
-  const { routes } = await loadHost({ fetch: async (url, init) => { calls.push({ body: JSON.parse(init.body) }); return mcpJson({ ok: true }) } })
+  const { routes } = await loadHost({ fetch: async (url, init) => { calls.push({ url: String(url), init, body: init.body ? JSON.parse(init.body) : {} }); return mcpJson({ ok: true }) } })
   const route = routes.get(BASE)
 
   // 版本生命周期：路径 id 注入
   await invokeRoute(route, 'POST', BASE + '/budget-versions/ver-1/action', { action: 'activate' })
-  assert.equal(calls.at(-1).body.params.name, 'finance_budget_version_action')
-  assert.equal(calls.at(-1).body.params.arguments.id, 'ver-1')
-  assert.equal(calls.at(-1).body.params.arguments.action, 'activate')
+  assert.match(calls.at(-1).url, /\/api\/finance\/budget\/versions\/ver-1\/activate/u)
 
   // 填报重开：路径捕获注入 id + action
   await invokeRoute(route, 'POST', BASE + '/filing-assignments/as-1/reopen', { reason: '数据填错' })
-  assert.equal(calls.at(-1).body.params.name, 'finance_filing_assignment_action')
-  assert.equal(calls.at(-1).body.params.arguments.id, 'as-1')
-  assert.equal(calls.at(-1).body.params.arguments.action, 'reopen')
+  assert.match(calls.at(-1).url, /\/api\/finance\/filing\/assignments\/as-1\/reopen/u)
 
   // 填报行暂存：路径捕获映射为 assignmentId
   await invokeRoute(route, 'POST', BASE + '/filing-assignments/as-1/rows', { rows: [{ plannedAmount: 10 }] })
-  assert.equal(calls.at(-1).body.params.name, 'finance_filing_rows_upsert')
-  assert.equal(calls.at(-1).body.params.arguments.assignmentId, 'as-1')
+  assert.match(calls.at(-1).url, /\/api\/finance\/filing\/assignments\/as-1\/rows/u)
+  assert.equal(calls.at(-1).init.method, 'PUT')
 
   // 预算调整审批：approve/reject 合一到 review 工具
   await invokeRoute(route, 'POST', BASE + '/budget-adjustments/adj-1/reject', { note: '预算依据不足' })
-  assert.equal(calls.at(-1).body.params.name, 'finance_budget_adjustment_review')
-  assert.equal(calls.at(-1).body.params.arguments.id, 'adj-1')
-  assert.equal(calls.at(-1).body.params.arguments.action, 'reject')
+  assert.match(calls.at(-1).url, /\/api\/finance\/budget\/adjustments\/adj-1\/reject/u)
 
   // 提交走独立工具，路径捕获映射为 adjustmentId
   await invokeRoute(route, 'POST', BASE + '/budget-adjustments/adj-1/submit', {})
-  assert.equal(calls.at(-1).body.params.name, 'finance_budget_adjustment_submit')
-  assert.equal(calls.at(-1).body.params.arguments.adjustmentId, 'adj-1')
+  assert.match(calls.at(-1).url, /\/api\/finance\/budget\/adjustments\/adj-1\/submit/u)
 
   // 排款调增审批 / 过账 / 数据源启停（无 operator 工具）
   await invokeRoute(route, 'POST', BASE + '/plan-adjustments/pa-1/approve', { note: '同意' })
-  assert.equal(calls.at(-1).body.params.name, 'finance_plan_adjustment_review')
-  assert.equal(calls.at(-1).body.params.arguments.action, 'approve')
+  assert.match(calls.at(-1).url, /\/api\/finance\/payment-plan-adjustments\/pa-1\/approve/u)
   await invokeRoute(route, 'POST', BASE + '/allocations/al-1/remove', {})
-  assert.equal(calls.at(-1).body.params.name, 'finance_allocation_remove')
+  assert.match(calls.at(-1).url, /\/api\/finance\/allocations\/al-1\/remove/u)
   await invokeRoute(route, 'POST', BASE + '/data-source-configs/ds-1/active', { active: false })
-  assert.equal(calls.at(-1).body.params.name, 'finance_toggle_data_source_config')
-  assert.equal(calls.at(-1).body.params.arguments.id, 'ds-1')
-  assert.equal(calls.at(-1).body.params.arguments.active, false)
-  assert.equal(calls.at(-1).body.params.arguments.operator, 'op-1')
+  assert.match(calls.at(-1).url, /\/api\/data-source\/configs\/ds-1\/active/u)
+  assert.equal(calls.at(-1).body.active, false)
+  assert.equal(calls.at(-1).body.operator, undefined)
 })
 
 test('bootstrap tool reports tenant and orgs', async () => {
@@ -289,18 +280,18 @@ test('bootstrap tool reports tenant and orgs', async () => {
 })
 
 test('context normalizes organizations and departments for the selectors', async () => {
-  const { routes } = await loadHost({ fetch: async (_url, init) => {
-    const name = JSON.parse(init.body).params.name
-    return mcpJson(name === 'finance_get_orgs' ? { orgs: [{ id: 'org-1', name: '主体' }] } : { list: [{ id: 'dept-1', name: '部门' }] })
+  const { routes } = await loadHost({ fetch: async (url) => {
+    const path = new URL(url).pathname
+    return mcpJson(path.endsWith('/orgs') ? { orgs: [{ id: 'org-1', name: '主体' }] } : { list: [{ id: 'dept-1', name: '部门' }] })
   } })
   const result = await invokeRoute(routes.get(BASE), 'GET', BASE + '/context')
   assert.equal(result.body.data.orgs[0].id, 'org-1')
   assert.equal(result.body.data.departments[0].id, 'dept-1')
 })
 
-test('MCP business errors are failures, not successful writes', async () => {
+test('REST business errors are failures, not successful writes', async () => {
   for (const data of [{ error: 'forbidden', hint: '没有操作权限' }, { error: 'budget_exceeded' }]) {
-    const { routes } = await loadHost({ fetch: async () => jsonResponse({ result: { isError: true, content: [{ type: 'text', text: JSON.stringify(data) }] } }) })
+    const { routes } = await loadHost({ fetch: async () => jsonResponse({ code: 1, msg: data.hint || data.error }, 200) })
     const result = await invokeRoute(routes.get(BASE), 'POST', BASE + '/allocations', {})
     assert.equal(result.status, 502)
     assert.equal(result.body.ok, false)
@@ -310,16 +301,17 @@ test('MCP business errors are failures, not successful writes', async () => {
 
 test('scope changes replace group totals with the selected organization', async () => {
   const calls = []
-  const { routes } = await loadHost({ fetch: async (_url, init) => {
-    const { name, arguments: args } = JSON.parse(init.body).params
-    calls.push({ name, args })
-    return mcpJson(name === 'finance_analysis_brief' ? { year: 2026, overview: { group: true } } : { selectedOrg: args.orgId })
+  const { routes } = await loadHost({ fetch: async (url) => {
+    const parsed = new URL(url)
+    const selectedOrg = parsed.searchParams.get('orgId')
+    calls.push(parsed.pathname)
+    return mcpJson(parsed.pathname.endsWith('/overview') && !selectedOrg ? { group: true } : { selectedOrg })
   } })
   const result = await invokeRoute(routes.get(BASE), 'GET', BASE + '/brief?year=2026&orgId=org-1')
   assert.equal(result.body.data.overview.selectedOrg, 'org-1')
   assert.equal(result.body.data.budget.selectedOrg, 'org-1')
   assert.equal(result.body.data.cash.selectedOrg, 'org-1')
-  assert.equal(calls.length, 4)
+  assert.equal(calls.length, 10)
 })
 
 test('keeps the secret out of URLs and never fabricates upstream data', async () => {

@@ -3,11 +3,8 @@ import { apply, DOFE_MCP_BASE_URL } from '../src/dofe-managed.ts'
 import { DOFE_ACCESS_VALIDATION_VERSION, DEFAULT_DOFE_PLUGIN_IDS, normalizeDofePluginIds, type DofeAccessSettings } from '../src/dofe-plugins.ts'
 import { BRAND_VARIANT } from '../src/generated-product-identity.ts'
 
-// The first three created clients before the simulated 4th route failure;
-// yootun leads with its exclusive GEO plugins, sensteed with shared routes.
-const BRAND_LEADING_SERVER_NAMES = BRAND_VARIANT === 'sensteed'
-  ? ['openmontage', 'media', 'tools-platform']
-  : ['geoflow', 'georank', 'openmontage']
+// The first three clients created before the simulated fourth route failure.
+const BRAND_LEADING_SERVER_NAMES = ['knowledge', 'openmontage', 'media']
 
 function createHarness(settings: DofeAccessSettings, failAt = Number.POSITIVE_INFINITY) {
   const clients: Array<{ config: Record<string, unknown>; dispose: ReturnType<typeof vi.fn> }> = []
@@ -89,8 +86,7 @@ describe('dofe-managed MCP runtime', () => {
     await apply(harness.ctx as never)
 
     expect(harness.clients).toHaveLength(3)
-    // Route order is brand-specific: yootun leads with the GEO plugins,
-    // sensteed with the shared video/media/tooling routes.
+    // A failure on the fourth route must release all three earlier clients.
     expect(harness.clients.map(client => client.config.serverName)).toEqual(BRAND_LEADING_SERVER_NAMES)
     expect(harness.errors).toEqual([['dofe-managed: failed to activate one or more MCP clients']])
     for (const client of harness.clients) expect(client.dispose).toHaveBeenCalledOnce()

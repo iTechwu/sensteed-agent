@@ -80,7 +80,7 @@ async function diffSnapshot(name) {
 
 // The snapshot set is the authoritative registry of preinstalled plugins.
 const snapshotPlugins = (await readdir(resolve(root, '.ci'), { withFileTypes: true }))
-  .filter(entry => entry.isDirectory())
+  .filter(entry => entry.isDirectory() && existsSync(join(root, '.ci', entry.name, 'package.json')))
   .map(entry => entry.name)
   .concat([...specialSnapshots.keys()])
 // Optional positional filter: sync/verify only the named plugins.

@@ -12,22 +12,6 @@ export type DofeBrandVariant = 'yootun' | 'sensteed'
 
 export const DOFE_PLUGIN_CATALOG = [
   {
-    id: 'geoflow',
-    name: 'GeoFlow',
-    description: 'GEO 工作流与草稿自动化',
-    variants: ['yootun'],
-    servers: ['geoflow'],
-    builtIn: false,
-  },
-  {
-    id: 'georank',
-    name: 'GEORank',
-    description: 'GEO 诊断、拓词与内容生成',
-    variants: ['yootun'],
-    servers: ['georank'],
-    builtIn: false,
-  },
-  {
     id: 'tools',
     name: 'DoFe Tools',
     description: '商业调研与热点工具集',

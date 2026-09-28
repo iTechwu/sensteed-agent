@@ -16,9 +16,9 @@ describe('Knowledge routing contract', () => {
     expect(classifyKnowledgeRoute('优惠豚库存和今天特斯拉 Model Y 价格')).toBe('mixed')
   })
 
-  it('states the single wrapper surface and fallback policy', () => {
-    expect(KNOWLEDGE_ROUTING_PROMPT).toContain('就先调用 knowledge_search 或 knowledge_recall')
-    expect(KNOWLEDGE_ROUTING_PROMPT).toContain('不要调用任何 mcp__knowledge__* 直连工具')
+  it('states the managed Knowledge tool surface and fallback policy', () => {
+    expect(KNOWLEDGE_ROUTING_PROMPT).toContain('已加载的 mcp__knowledge__ 检索工具')
+    expect(KNOWLEDGE_ROUTING_PROMPT).toContain('个人知识空间使用 user.personal')
     expect(KNOWLEDGE_ROUTING_PROMPT).toContain('Knowledge 不可用时明确说明企业知识不可用')
   })
 })

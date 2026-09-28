@@ -398,7 +398,7 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
       const route = protocol === 'messages' ? 'dofe-messages' : protocol === 'responses' ? 'dofe-responses' : 'dofe-chat'
       const api = protocol === 'messages' ? 'anthropic-messages' : protocol === 'responses' ? 'openai-responses' : 'openai-completions'
       const displayName = protocol === 'messages' ? 'DoFe Anthropic Messages' : protocol === 'responses' ? 'DoFe OpenAI Responses' : 'DoFe OpenAI Chat'
-      const baseURL = protocol === 'messages' ? DOFE_ANTHROPIC_BASE_URL : 'https://ixicai.cn/api/v1'
+      const baseURL = protocol === 'messages' ? DOFE_ANTHROPIC_BASE_URL : 'https://ai.hozonauto.com/api/v1'
       const result = await settingsApi.mutate('llm-pi-ai', [
         { op: 'unset', path: ['providers', 'dofe-chat'] },
         { op: 'unset', path: ['providers', 'dofe-messages'] },

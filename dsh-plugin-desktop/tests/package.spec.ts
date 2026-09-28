@@ -133,26 +133,11 @@ describe('published package surface', () => {
 
   it('preinstalls every DoFe plugin from the plugin workspace', () => {
     const plugins = [
-      ['@dofe/dsh-geoflow-mcp', 'dsh-geoflow-mcp'],
-      ['@dofe/dsh-georank-mcp', 'dsh-georank-mcp'],
       ['@dofe/dsh-opencli', 'dsh-opencli'],
       ['@noob-stupid/dsh-plugin-console', 'dsh-plugin-console'],
       ['@dofe/dsh-tools-mcp', 'dsh-tools-mcp'],
-      ['@dofe/dsh-yootun-audit', 'dsh-yootun-audit'],
-      ['@dofe/dsh-yootun-content-command', 'dsh-yootun-content-command'],
-      ['@dofe/dsh-yootun-daily-report', 'dsh-yootun-daily-report'],
-      ['@dofe/dsh-yootun-dashboard', 'dsh-yootun-dashboard'],
-      ['@dofe/dsh-yootun-douyin-operation', 'dsh-yootun-douyin-operation'],
-      ['@dofe/dsh-yootun-finops', 'dsh-yootun-finops'],
-      ['@dofe/dsh-yootun-knowledge', 'dsh-yootun-knowledge'],
-      ['@dofe/dsh-yootun-lead-discovery', 'dsh-yootun-lead-discovery'],
-      ['@dofe/dsh-yootun-recruiter', 'dsh-yootun-recruiter'],
-      ['@dofe/dsh-yootun-retrofit', 'dsh-yootun-retrofit'],
-      ['@dofe/dsh-yootun-sales', 'dsh-yootun-sales'],
-      ['@dofe/dsh-yootun-supply-watch', 'dsh-yootun-supply-watch'],
-      ['@dofe/dsh-yootun-tos-upload', 'dsh-yootun-tos-upload'],
-      ['@dofe/dsh-yootun-ui', 'dsh-yootun-ui'],
-      ['@dofe/dsh-yootun-xhs-operation', 'dsh-yootun-xhs-operation'],
+      ['@dofe/dsh-sensteed-finance', 'dsh-sensteed-finance'],
+      ['@dofe/dsh-sensteed-supplier-intelligence', 'dsh-sensteed-supplier-intelligence'],
     ] as const
     for (const [name, directory] of plugins) {
       expect(manifest.dependencies?.[name])
@@ -160,74 +145,31 @@ describe('published package surface', () => {
     }
     expect(workspaceManifest.scripts?.['dofe-ui:build'])
       .toBe('node scripts/build-dofe-ui.mjs')
-    expect(dofeUiBuild).toContain("'dsh-yootun-audit'")
+    expect(dofeUiBuild).not.toContain("'dsh-yootun-audit'")
     expect(manifest.scripts?.['test:audit-ui']).toBe('node tests/browser/yootun-audit.visual.mjs')
     expect(ciWorkflow.match(/node scripts\/prepare-dofe-ui\.mjs/g)).toHaveLength(4)
   })
 
   it('keeps CI fallback snapshots for every preinstalled plugin', () => {
     const pluginMains = new Map([
-      ['dsh-geoflow-mcp', 'index.js'], ['dsh-georank-mcp', 'index.js'], ['dsh-opencli', 'index.js'],
+      ['dsh-opencli', 'index.js'],
       ['dsh-plugin-console', 'lib/index.js'], ['dsh-tools-mcp', 'index.js'],
-      ['dsh-yootun-audit', 'index.js'], ['dsh-yootun-content-command', 'index.js'],
-      ['dsh-yootun-daily-report', 'index.js'], ['dsh-yootun-dashboard', 'index.js'],
-      ['dsh-yootun-douyin-operation', 'index.js'],
-      ['dsh-yootun-finops', 'index.js'], ['dsh-yootun-knowledge', 'index.js'],
-      ['dsh-yootun-lead-discovery', 'index.js'], ['dsh-yootun-recruiter', 'index.js'],
-      ['dsh-yootun-retrofit', 'index.js'], ['dsh-yootun-sales', 'index.js'],
-      ['dsh-yootun-supply-watch', 'index.js'], ['dsh-yootun-tos-upload', 'index.js'], ['dsh-yootun-ui', 'index.js'],
-      ['dsh-yootun-xhs-operation', 'index.js'],
+      ['dsh-sensteed-finance', 'index.js'],
+      ['dsh-sensteed-supplier-intelligence', 'index.js'],
     ])
     for (const [name, main] of pluginMains) {
       expect(existsSync(new URL(`../.ci/${name}/package.json`, packageRoot))).toBe(true)
       expect(existsSync(new URL(`../.ci/${name}/${main}`, packageRoot))).toBe(true)
     }
-    const recruiterSource = readFileSync(new URL('../.ci/dsh-yootun-recruiter/src/client.js', packageRoot), 'utf8')
-    expect(recruiterSource).toContain("succeeded: '适配器已完成'")
-    expect(recruiterSource).toContain("requiresLogin: '需要重新登录'")
   })
 
-  it('ships the Douyin operation plugin snapshot and bundle wiring', () => {
-    // 快照必须与 sibling 源同一版本，且四个入口都来自同一次快照。
-    const snapshotRoot = new URL('../.ci/dsh-yootun-douyin-operation/', packageRoot)
-    const snapshotManifest = JSON.parse(readFileSync(new URL('package.json', snapshotRoot), 'utf8')) as {
-      name?: unknown
-      main?: unknown
-      exports?: Record<string, unknown>
-      dsh?: { bundle?: { patch?: unknown }; client?: { platform?: unknown } }
-      dependencies?: Record<string, unknown>
+  it('excludes retired plugin snapshots and packaged legacy endpoints', () => {
+    for (const name of ['dsh-yootun-ui', 'dsh-yootun-douyin-operation', 'dsh-geoflow-mcp', 'dsh-georank-mcp']) {
+      expect(existsSync(new URL(`../.ci/${name}/package.json`, packageRoot))).toBe(false)
     }
-    expect(snapshotManifest.name).toBe('@dofe/dsh-yootun-douyin-operation')
-    expect(snapshotManifest.main).toBe('./index.js')
-    expect(snapshotManifest.exports?.['./client']).toBe('./lib/client.js')
-    expect(snapshotManifest.dsh?.bundle?.patch).toBe('./cordis.patch.yml')
-    expect(snapshotManifest.dsh?.client?.platform).toBe('web')
-    // 运行依赖必须由 desktop 的解析链管理，不能只靠开发机 node_modules。
-    expect(snapshotManifest.dependencies?.['playwright-core']).toBeDefined()
-    for (const file of ['package.json', 'index.js', 'cordis.patch.yml', 'src/client.js', 'lib/client.js']) {
-      expect(existsSync(new URL(file, snapshotRoot)), file).toBe(true)
+    for (const file of ['lib/index.js', 'lib/dofe-managed.js', 'lib/client.js']) {
+      expect(readFileSync(new URL(file, packageRoot), 'utf8')).not.toContain('ixicai.cn')
     }
-    expect(existsSync(new URL('node_modules', snapshotRoot))).toBe(false)
-
-    // Host 路由与 cordis bundle entry 与插件自身声明一致。
-    const patch = readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')
-    expect(patch).toContain("id: dofe-yootun-douyin-operation")
-    expect(patch).toContain("name: '@dofe/dsh-yootun-douyin-operation'")
-    const hostSource = readFileSync(new URL('index.js', snapshotRoot), 'utf8')
-    expect(hostSource).toContain("export const PATH = '/api/desktop/yootun/douyin-operation'")
-    expect(hostSource).toContain("export const inject = ['webServer', 'tools']")
-
-    // 客户端只使用独占的 ydo- 命名空间，且本地请求带同源凭证、拒绝重定向和超时。
-    const clientSource = readFileSync(new URL('src/client.js', snapshotRoot), 'utf8')
-    expect(clientSource).toContain('.ydo-overlay')
-    expect(clientSource).not.toMatch(/\.yd-/u)
-    expect(clientSource).toContain("const REQUEST_TIMEOUT_MS = 30000")
-    expect(clientSource).toContain("credentials: 'same-origin'")
-    expect(clientSource).toContain("redirect: 'error'")
-    expect(clientSource).toContain('AbortSignal.timeout(REQUEST_TIMEOUT_MS)')
-    expect(clientSource).not.toContain('MODELS_API_KEY')
-    // 凭证只允许出现在注释里说明边界，不能出现在可执行代码中。
-    expect(clientSource).not.toMatch(/storage_state\s*[:=]/u)
   })
 
   it('keeps the capture SDK fallback loadable as Node ESM', () => {
@@ -347,27 +289,10 @@ describe('published package surface', () => {
     expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop/notifications')
     expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop/updates')
     expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop/dofe-managed')
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop/yootun-recruiter-tools')
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain("name: '@dofe/dsh-yootun-ui'")
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain("name: '@dofe/dsh-yootun-dashboard'")
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain("name: '@dofe/dsh-yootun-recruiter'")
+    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).not.toContain('name: dsh-plugin-desktop/yootun-recruiter-tools')
     const patchSource = readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')
-    for (const plugin of ['recruiter', 'sales', 'supply-watch', 'content-command']) {
-      expect(patchSource).toMatch(
-        new RegExp(`name: '@dofe/dsh-yootun-${plugin}'\\n\\s+config:\\n\\s+registerHostRoute: false`, 'u'),
-      )
-    }
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain("name: '@dofe/dsh-yootun-sales'")
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain("name: '@dofe/dsh-yootun-supply-watch'")
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain("name: '@dofe/dsh-yootun-content-command'")
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain("name: '@dofe/dsh-yootun-knowledge'")
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain("name: '@dofe/dsh-yootun-audit'")
-    expect(patchSource).not.toContain('dsh-yootun-approvals')
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain("name: '@dofe/dsh-yootun-finops'")
-    expect(patchSource).not.toMatch(/name: '@dofe\/dsh-yootun-finops'\n\s+config:\n\s+registerHostRoute: false/u)
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain("name: '@dofe/dsh-yootun-retrofit'")
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain("name: '@dofe/dsh-yootun-daily-report'")
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('baseURL: https://ixicai.cn/api/v1')
+    expect(patchSource).not.toContain("name: '@dofe/dsh-yootun-")
+    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('baseURL: https://ai.hozonauto.com/api/v1')
     expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('apiKeyEnv: MODELS_API_KEY')
     expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('id: ui-settings-models')
     expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('disabled: true')
@@ -485,7 +410,7 @@ describe('published package surface', () => {
     expect(config).toContain("'update-download': 'src/update-download.ts'")
     expect(config).toContain("updates: 'src/updates.ts'")
     expect(readFileSync(new URL('src/openmontage-window.ts', packageRoot), 'utf8'))
-      .toContain("export const OPENMONTAGE_URL = 'https://ixicai.cn/montage/'")
+      .toContain("export const OPENMONTAGE_URL = 'https://montage.hozonauto.com/'")
   })
 
   it('builds the browser client without Node process globals', () => {

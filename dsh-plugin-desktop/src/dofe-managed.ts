@@ -16,7 +16,7 @@ import {
 import { BRAND_TENANT, BRAND_VARIANT } from './generated-product-identity.ts'
 import { KNOWLEDGE_ROUTING_PROMPT } from './knowledge-routing.ts'
 import { DofeAuthService } from './dofe-auth-service.ts'
-import { localFinanceMcpConfig } from './finance-mcp.ts'
+import { financeMcpConfig } from './finance-mcp.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context { dofeAuth: DofeAuthService }
@@ -28,7 +28,7 @@ export const inject = ['credentials', 'tools', 'systemPrompt', 'desktopRuntime',
 export const MODELS_API_KEY = 'MODELS_API_KEY'
 const MODELS_API_KEY_REF = credentialRef(MODELS_API_KEY)
 const McpClient = { name: mcpClientName, inject: mcpClientInject, apply: applyMcpClient }
-export const DOFE_MCP_BASE_URL = 'https://ixicai.cn/mcp'
+export const DOFE_MCP_BASE_URL = 'https://ai.hozonauto.com/mcp'
 
 type ManagedMcpRoute = {
   /** Omitted for required platform capabilities that were already always-on. */
@@ -39,8 +39,7 @@ type ManagedMcpRoute = {
 }
 
 const ROUTES: readonly ManagedMcpRoute[] = [
-  { plugin: 'geoflow', serverName: 'geoflow', path: 'geoflow', timeoutMs: 60_000 },
-  { plugin: 'georank', serverName: 'georank', path: 'georank', timeoutMs: 120_000 },
+  { plugin: 'knowledge', serverName: 'knowledge', path: 'knowledge', timeoutMs: 60_000 },
   { plugin: 'openmontage', serverName: 'openmontage', path: 'montage', timeoutMs: 600_000 },
   // Models 媒体直连生成：create 是普通 API 调用（60s），轮询由 Agent 显式调用
   // get_generation_task，不持有长连接等待生成完成。
@@ -58,7 +57,7 @@ const ROUTES: readonly ManagedMcpRoute[] = [
  * is the narrowest way to keep its transport aligned with the credential seam.
  */
 export async function apply(ctx: Context): Promise<void> {
-  const access = ctx.settings.register<'dofe-access', DofeAccessSettings>(
+  const access = ctx.settings.register<DofeAccessSettings>(
     DOFE_ACCESS_SETTINGS_NAMESPACE,
     z.object({
       setupComplete: z.boolean().default(false),
@@ -128,7 +127,7 @@ export async function apply(ctx: Context): Promise<void> {
   ctx.systemPrompt.section({
     name: 'dofe:managed-access',
     order: 4,
-    text: `DoFe 托管能力：模型请求统一使用 Models API；${KNOWLEDGE_ROUTING_PROMPT} 空间由服务端根据 tenant/team/user 权限解析；GEO、商业工具、单张图片、5–10 秒单镜头短视频或复杂视频使用已加载的 mcp__geoflow__、mcp__georank__、mcp__tools-*、mcp__media__ 与 mcp__openmontage__ 工具（脚本/多镜头/复刻/字幕/配音用 mcp__openmontage__，单镜头直连用 mcp__media__）。启动引导只收集一次 model_api_key，之后不要要求用户再次提供。`,
+    text: `DoFe 托管能力：模型请求统一使用 Models API；${KNOWLEDGE_ROUTING_PROMPT} 空间由服务端根据 tenant/team/user 权限解析；商业工具、单张图片、5–10 秒单镜头短视频或复杂视频使用已加载的 mcp__tools-*、mcp__media__ 与 mcp__openmontage__ 工具（脚本/多镜头/复刻/字幕/配音用 mcp__openmontage__，单镜头直连用 mcp__media__）。启动引导只收集一次 model_api_key，之后不要要求用户再次提供。`,
   })
   let clients: { dispose(): void | Promise<void> }[] = []
   let activeKey: string | undefined
@@ -175,7 +174,7 @@ export async function apply(ctx: Context): Promise<void> {
       }
       const financeSession = financeAuth?.getDatasourceSession()
       if (BRAND_VARIANT === 'sensteed' && financeSession) {
-        created.push(await ctx.plugin(McpClient, localFinanceMcpConfig(financeSession.accessToken)))
+        created.push(await ctx.plugin(McpClient, financeMcpConfig(next, financeSession.accessToken)))
       }
       clients = created
     } catch (error) {

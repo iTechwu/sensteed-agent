@@ -16,7 +16,7 @@ import {
 
 export const DOFE_AUTH_GRANT_KEY = credentialKey('dsh-plugin-desktop', 'sensteed-auth')
 const MODELS_API_KEY_REF = credentialRef('MODELS_API_KEY')
-const MODELS_PROVISION_URL = 'https://ixicai.cn/api/auth/desktop/provision-key'
+const MODELS_PROVISION_URL = 'https://ai.hozonauto.com/api/auth/desktop/provision-key'
 const SESSION_TIMEOUT_MS = 5 * 60_000
 
 interface TokenResponse { access_token?: unknown; refresh_token?: unknown; error?: unknown }
