@@ -1255,8 +1255,8 @@ importers:
         specifier: 1.38.1
         version: 1.38.1(@deepseek-ai/cordis@deepseek-harness+vendor+cordis)(@deepseek-ai/dsh-settings@deepseek-harness+packages+settings+settings)(@deepseek-ai/schemastery@deepseek-harness+vendor+schemastery)
       pnpm:
-        specifier: 11.8.0
-        version: 11.8.0
+        specifier: 11.7.0
+        version: 11.7.0
       react:
         specifier: 18.3.1
         version: 18.3.1
@@ -7216,11 +7216,6 @@ packages:
 
   pnpm@11.7.0:
     resolution: {integrity: sha512-GcyFLBIMcSV2DyRD7mvgyltA+fUFmN4aCaHxd1A+AQ5Xwjx3ZG4B52HeWb+HT7IqM5jDOrlpH8E+uUa28PTWIA==}
-    engines: {node: '>=22.13'}
-    hasBin: true
-
-  pnpm@11.8.0:
-    resolution: {integrity: sha512-wfXnxMskHI8XS3Q4UdgvQrgCMkr8iw8Ra5atsVqgZmSUjd42lgo7oQebpbSyndAUATW5S1tfUmNZIknWjlVfJg==}
     engines: {node: '>=22.13'}
     hasBin: true
 
@@ -13243,8 +13238,6 @@ snapshots:
   pngjs@5.0.0: {}
 
   pnpm@11.7.0: {}
-
-  pnpm@11.8.0: {}
 
   points-on-curve@0.2.0: {}
 

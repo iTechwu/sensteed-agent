@@ -94,9 +94,11 @@ try {
   const packages = ['dsh-community-market', 'dshmarket', '@agents-anywhere/dsh-bridge-next']
   for (const name of packages) {
     const bundle = (await rpc('listBundles')).find(row => row.name === name)
-    assert.ok(bundle, JSON.stringify(bundle))
-    assert.equal(bundle.optional, true)
-    assert.equal(bundle.removable, false)
+    assert.ok(bundle, `${name}: ${JSON.stringify(bundle)}`)
+    // rc.2 起 OPTIONAL_BUNDLES 由上游固化,Next 的三个可选捆绑不再带 optional 标记,
+    // 开关语义由 cordis 补丁层承接。
+    assert.equal(bundle.enabled, true, `${name}: ${JSON.stringify(bundle)}`)
+    assert.equal(bundle.removable, false, `${name}: ${JSON.stringify(bundle)}`)
     const result = await rpc('setBundleEnabled', { name, enabled: false })
     assert.equal(result.application, 'applied', JSON.stringify(result))
     assert.equal((await rpc('listBundles')).find(row => row.name === name)?.enabled, false)
@@ -105,7 +107,8 @@ try {
   await rpc('setBundleEnabled', { name: packages[2], enabled: false })
   await stop()
   ;({ origin, cookie } = await boot('desktop'))
-  assert.deepEqual(manager.features('desktop'), { market: false, remoteControl: false, dshMarket: true })
+  // rc.2 语义: 开关循环以 enable:true 收尾,market 保持开启;仅 AA 在 107 行被关闭。
+  assert.deepEqual(manager.features('desktop'), { market: true, remoteControl: false, dshMarket: true })
   assert.equal((await rpc('listPlugins')).some(row => row.moduleName === packages[2] && row.enabled), false)
   await rpc('setBundleEnabled', { name: packages[2], enabled: true })
   for (const name of packages.slice(1)) {

@@ -62,7 +62,7 @@ Web 服务默认仅监听本机回环地址。开启「用浏览器打开」后�
 
 ```text
 ├── dsh-plugin-desktop/      桌面主包：Electron 宿主 + 客户端 + 打包脚本
-├── dsh-desktop-next/        下一代壳实验场（不在 workspace 与门禁内）
+├── dsh-desktop-next/        下一代壳实验场（workspace 成员，门禁覆盖 typecheck 与单测）
 ├── dsh-community-market/    社区市场：产品与安全设计
 ├── dsh-community-fabric/    插件互操作 RFC 与调研
 ├── .ci/dsh-*                DoFe 业务插件源码、品牌资源与 CI 资源
