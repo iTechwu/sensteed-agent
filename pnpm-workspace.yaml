@@ -10,6 +10,7 @@ packages:
   - deepseek-harness/vendor/**
 
 allowBuilds:
+  '@dataiku/uv': false
   '@deepseek-ai/dsh-subprocess-local': true
   '@google/genai': false
   cloudflared: true
@@ -45,3 +46,4 @@ patchedDependencies:
 
 minimumReleaseAgeExclude:
   - dshmarket@1.39.0
+  - '@agents-anywhere/dsh-bridge-next@2.0.1'

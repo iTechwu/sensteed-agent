@@ -15,7 +15,6 @@ import { installWindowStyles } from './styles.ts'
 import { registerPluginControls } from './plugin-controls.tsx'
 import { installPluginControlsStyles } from './plugin-controls-styles.ts'
 import { SettingsRequests } from './settings-requests.tsx'
-import { registerNativeSidebarBrowser } from './sidebar-browser.tsx'
 import type { DesktopSettingsLocaleKey } from '../../../dsh-plugin-desktop/src/client/desktop-settings-locales.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
