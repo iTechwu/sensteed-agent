@@ -1,6 +1,6 @@
 // 片段 5/7 视图：总览（对齐前端 overview-section：5 KPI + 月度趋势 + 主体执行 + 收支达成 + 预警 TOP5）
 
-function OverviewView({ brief, t, onDrill }) {
+function OverviewView({ brief, t, onDrill, orgId }) {
   if (!brief) return h(EmptyState, null, t('empty'))
   const data = brief.data || brief
   const overview = data.overview || {}
@@ -23,7 +23,9 @@ function OverviewView({ brief, t, onDrill }) {
   }))
   const openAlerts = (data.openAlerts || alertsSummary.top || []).slice(0, 5)
   return h('div', { className: 'sf-view' },
-    h('p', { className: 'sf-note' }, `${t('year')} ${data.year ?? ''} · ${t('unitNote')} · ${t('kpiExecRate')} =（${t('kpiPrSubmitted')}+${t('kpiPrEstimated')}）/${t('kpiBudget')}`),
+    h('div', { className: 'sf-scopebar' },
+      h('span', null, `${orgId ? t('scopeOrg') : t('scopeAll')} · ${data.year ?? ''} ${t('scopeYear')} · ${t('unitNote')}`),
+      h('span', null, `${t('kpiExecRate')} =（${t('kpiPrSubmitted')}+${t('kpiPrEstimated')}）/${t('kpiBudget')}`)),
     h('div', { className: 'sf-kpis' },
       h(KpiCard, { icon: 'data', label: t('kpiBudget'), value: wan(m.budgetAmount), onClick: () => onDrill('budget') }),
       h(KpiCard, { icon: 'plan', label: t('kpiPrSubmitted'), value: wan(m.prSubmittedAmount), hint: `${t('kpiExecRate')} ${ratio(exec, 1) ?? '—'}`, onClick: () => onDrill('budget', { view: 'ledger' }) }),
@@ -35,16 +37,16 @@ function OverviewView({ brief, t, onDrill }) {
         hintTone: alertsSummary.critical > 0 ? 'down' : alertsSummary.warn > 0 ? 'warn' : 'up',
         negative: alertsSummary.critical > 0, onClick: () => onDrill('alerts'),
       })),
-    h(Card, { title: t('trendTitle'), unit: t('unitNote') },
-      h(GroupedBars, {
-        data: trendData,
-        series: [
-          { key: 'prSubmitted', label: t('kpiPrSubmitted'), tone: 'a' },
-          { key: 'paid', label: t('kpiPaid'), tone: 'b' },
-        ],
-        onBarClick: point => onDrill('budget', { view: 'month', month: Number(point.label) }),
-      })),
-    h('div', { className: 'sf-two-col' },
+    h('div', { className: 'sf-overview-grid' },
+      h(Card, { title: t('trendTitle'), unit: t('unitNote') },
+        h(GroupedBars, {
+          data: trendData,
+          series: [
+            { key: 'prSubmitted', label: t('kpiPrSubmitted'), tone: 'a' },
+            { key: 'paid', label: t('kpiPaid'), tone: 'b' },
+          ],
+          onBarClick: point => onDrill('budget', { view: 'month', month: Number(point.label) }),
+        })),
       h(Card, { title: t('orgSummary') }, h(Table, {
         columns: [
           { label: t('org'), key: 'orgName', stickyLeft: true },
@@ -71,7 +73,7 @@ function OverviewView({ brief, t, onDrill }) {
         ],
         rows: overview.byOrg || [], empty: t('empty'),
       })),
-      h('div', { className: 'sf-stack' },
+      h('div', { className: 'sf-two-col' },
         h(Card, { title: t('incomeAch'), unit: t('unitNote') },
           h('div', { className: 'sf-stack' },
             h('div', null, h('div', { className: 'sf-row-between' }, h('span', { className: 'sf-note' }, t('plannedIncome')), h('span', { className: 'sf-note' }, `${wan(cashTotals.actualIncome) ?? '—'} / ${wan(cashTotals.plannedIncome) ?? '—'}`)), h(Progress, { value: cashTotals.plannedIncome ? cashTotals.actualIncome / cashTotals.plannedIncome : null, tone: 'green' })),

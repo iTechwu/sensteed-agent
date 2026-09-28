@@ -72,9 +72,7 @@ function Dashboard({ t }) {
   const departments = context?.data?.departments || []
   const ctx = { year, orgId, orgs, departments, revision, drillParams }
   const onDrill = (target, params) => { setDrillParams(params ?? null); if (params?.orgId) setOrgId(params.orgId); setTab(target) }
-  const briefProps = tab === 'overview'
-    ? { brief, t, onDrill }
-    : { brief, t, onDrill }
+  const briefProps = { brief, t, onDrill, orgId }
 
   // 各 tab 的错误/空态由视图内部处理；这里只处理 brief 类视图的加载与失败
   const body = (tab === 'overview' || tab === 'operations') && briefState === 'loading' && !brief
