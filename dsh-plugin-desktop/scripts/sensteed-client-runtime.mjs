@@ -4,7 +4,7 @@ import { dirname, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import vm from 'node:vm'
 
-const PLUGIN_PREFIX = '@dofe/dsh-yootun-'
+const PLUGIN_PREFIX = '@dofe/dsh-sensteed-'
 
 function createElement(tagName, elementsById) {
   const element = {
@@ -45,6 +45,8 @@ function createBrowserHarness(pluginId) {
     activeElement: null,
     body,
     head,
+    // CodeMirror's browser probe touches documentElement.style at module load.
+    documentElement: { style: {} },
     createElement: tagName => createElement(tagName, elementsById),
     getElementById: id => elementsById.get(id) ?? null,
     querySelector: () => null,
@@ -162,19 +164,21 @@ function createBrowserHarness(pluginId) {
   return { context, ctx, effects, registrations, require, slots, styles }
 }
 
-export async function smokeYootunClientBundle({ pluginId, clientPath, source }) {
+export async function smokeSensteedClientBundle({ pluginId, clientPath, source }) {
   const harness = createBrowserHarness(pluginId)
   const clientSource = source ?? await readFile(clientPath, 'utf8')
   let plugin
 
   if (clientSource.includes('window.__ModuleLoader__.load')) {
     vm.runInContext(clientSource, harness.context, { filename: clientPath, timeout: 5_000 })
-    if (harness.registrations.length !== 1) {
-      throw new Error(`${pluginId}: expected one client module registration, received ${harness.registrations.length}`)
+    // 拼接构建(如 dsh-soup)会随包注册多个 cordis 客户端模块;逐个应用,
+    // 只要求其中包含插件本体的注册。
+    if (harness.registrations.length === 0) {
+      throw new Error(`${pluginId}: client bundle registered no client module`)
     }
-    const [registration] = harness.registrations
-    if (registration.id !== pluginId) {
-      throw new Error(`${pluginId}: client bundle registered unexpected id ${String(registration.id)}`)
+    const registration = harness.registrations.find(entry => entry.id === pluginId)
+    if (registration === undefined) {
+      throw new Error(`${pluginId}: client bundle registered unexpected id ${String(harness.registrations[0]?.id)}`)
     }
     plugin = registration.factory(harness.require)
   } else {
@@ -199,12 +203,14 @@ export async function smokeYootunClientBundle({ pluginId, clientPath, source }) 
   }
 }
 
-export async function smokeInstalledYootunClients(manifestPath) {
+export async function smokeInstalledSensteedClients(manifestPath) {
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+  // 旧品牌内置插件清理后,预装面由 docker-helm 的
+  // @lyhue1991/dsh-* 快照与现役的 @dofe/dsh-sensteed-* 共同组成。
   const pluginIds = Object.keys(manifest.dependencies ?? {})
-    .filter(name => name.startsWith(PLUGIN_PREFIX))
+    .filter(name => name.startsWith(PLUGIN_PREFIX) || name.startsWith('@lyhue1991/dsh-'))
     .sort()
-  if (pluginIds.length === 0) throw new Error('desktop manifest does not declare any built-in Yootun plugins')
+  if (pluginIds.length === 0) throw new Error('desktop manifest does not declare any built-in Sensteed plugins')
 
   const require = createRequire(manifestPath)
   const results = []
@@ -213,9 +219,10 @@ export async function smokeInstalledYootunClients(manifestPath) {
     const pluginManifest = JSON.parse(await readFile(packagePath, 'utf8'))
     const clientExport = pluginManifest.exports?.['./client']
     const relativeClientPath = typeof clientExport === 'string' ? clientExport : clientExport?.default
-    if (!relativeClientPath) throw new Error(`${pluginId}: package does not export ./client`)
+    // sensteed 前缀插件里允许混有纯 host 侧包；冒烟只覆盖带浏览器面的客户端。
+    if (!relativeClientPath) continue
     const clientPath = resolve(dirname(packagePath), relativeClientPath)
-    results.push({ pluginId, clientPath, ...(await smokeYootunClientBundle({ pluginId, clientPath })) })
+    results.push({ pluginId, clientPath, ...(await smokeSensteedClientBundle({ pluginId, clientPath })) })
   }
   return results
 }

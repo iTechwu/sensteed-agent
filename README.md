@@ -96,7 +96,7 @@ corepack pnpm build                       # 构建 market + 桌面主包
 | `verify:closure` | 一等运行时闭包校验（rc.1 为 319 节点） |
 | `verify:cli` | 打包后 CLI 引导运行时冒烟 |
 | `verify:loader` | Loader 装配冒烟（dofe-managed 装配与托盘桩） |
-| `verify:yootun-clients` | DoFe 客户端运行时校验 |
+| `verify:sensteed-clients` | DoFe 客户端运行时校验 |
 | `verify:profile` | 完整 profile 组合 + 渲染器清单冒烟 |
 | `verify:licenses` | 生产依赖许可证再分发白名单 |
 | `verify:operations` | 运维脚本单测 |

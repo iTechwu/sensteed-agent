@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { smokeYootunClientBundle } from './yootun-client-runtime.mjs'
+import { smokeSensteedClientBundle } from './sensteed-client-runtime.mjs'
 
 function bundle(id, applyBody) {
   return `window.__ModuleLoader__.load({
@@ -14,10 +14,10 @@ function bundle(id, applyBody) {
 }
 
 test('executes client effects and slot registrations', async () => {
-  const pluginId = '@dofe/dsh-yootun-fixture'
-  const result = await smokeYootunClientBundle({
+  const pluginId = '@dofe/dsh-sensteed-fixture'
+  const result = await smokeSensteedClientBundle({
     pluginId,
-    clientPath: '/virtual/yootun-fixture/client.js',
+    clientPath: '/virtual/sensteed-fixture/client.js',
     source: bundle(pluginId, `
       ctx.effect(() => {
         const style = document.createElement('style')
@@ -35,11 +35,11 @@ test('executes client effects and slot registrations', async () => {
 })
 
 test('reports an undefined value inside an apply effect with plugin context', async () => {
-  const pluginId = '@dofe/dsh-yootun-broken'
+  const pluginId = '@dofe/dsh-sensteed-broken'
   await assert.rejects(
-    smokeYootunClientBundle({
+    smokeSensteedClientBundle({
       pluginId,
-      clientPath: '/virtual/yootun-broken/client.js',
+      clientPath: '/virtual/sensteed-broken/client.js',
       source: bundle(pluginId, `
         ctx.effect(() => {
           const style = document.createElement('style')
@@ -54,11 +54,11 @@ test('reports an undefined value inside an apply effect with plugin context', as
 
 test('rejects a bundle that registers a different plugin id', async () => {
   await assert.rejects(
-    smokeYootunClientBundle({
-      pluginId: '@dofe/dsh-yootun-expected',
-      clientPath: '/virtual/yootun-wrong/client.js',
-      source: bundle('@dofe/dsh-yootun-wrong', ''),
+    smokeSensteedClientBundle({
+      pluginId: '@dofe/dsh-sensteed-expected',
+      clientPath: '/virtual/sensteed-wrong/client.js',
+      source: bundle('@dofe/dsh-sensteed-wrong', ''),
     }),
-    /registered unexpected id @dofe\/dsh-yootun-wrong/,
+    /registered unexpected id @dofe\/dsh-sensteed-wrong/,
   )
 })
