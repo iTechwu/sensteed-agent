@@ -9,6 +9,7 @@ const preinstalledPlugins = [
   'dsh-plugin-console',
   'dsh-sensteed-finance',
   'dsh-sensteed-supplier-intelligence',
+  'dsh-soup',
   'dsh-tools-mcp',
 ]
 

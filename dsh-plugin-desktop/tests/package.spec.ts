@@ -138,6 +138,7 @@ describe('published package surface', () => {
       ['@dofe/dsh-tools-mcp', 'dsh-tools-mcp'],
       ['@dofe/dsh-sensteed-finance', 'dsh-sensteed-finance'],
       ['@dofe/dsh-sensteed-supplier-intelligence', 'dsh-sensteed-supplier-intelligence'],
+      ['@lyhue1991/dsh-soup', 'dsh-soup'],
     ] as const
     for (const [name, directory] of plugins) {
       expect(manifest.dependencies?.[name])
@@ -156,6 +157,7 @@ describe('published package surface', () => {
       ['dsh-plugin-console', 'lib/index.js'], ['dsh-tools-mcp', 'index.js'],
       ['dsh-sensteed-finance', 'index.js'],
       ['dsh-sensteed-supplier-intelligence', 'index.js'],
+      ['dsh-soup', 'lib/index.js'],
     ])
     for (const [name, main] of pluginMains) {
       expect(existsSync(new URL(`../.ci/${name}/package.json`, packageRoot))).toBe(true)
