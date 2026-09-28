@@ -78,7 +78,7 @@ window.__ModuleLoader__.load({
       zh: {
         copyFailed: '无法复制分析指令，请重试。',
         open: '财务管理', title: '财务管理', eyebrow: '财务数据中心',
-        descOverview: '集团核心财务指标、预算进度与异常事项', scopeAll: '集团合并口径', scopeOrg: '当前主体口径', scopeYear: '年', planCol: '计划', achieve: '达成', descBudget: '查看已发布预算、实际付款与责任中心差异', descOperations: '预算执行、费用构成与计划实际收支对比', descCash: '资金余额、收支计划与流动性风险', descAlerts: '集中处理预算、资金与数据质量异常', descDatacenter: '财务数据源、质量规则与主数据覆盖', descEntry: '财务数据录入、回填与复核', descAnalyze: '基于财务数据中心 MCP 的可信深度分析', close: '关闭财务管理', refresh: '刷新数据', operatorAs: '当前操作者',
+        descOverview: '集团核心财务指标、预算进度与异常事项', scopeAll: '集团合并口径', scopeOrg: '当前主体口径', scopeYear: '年', planCol: '计划', achieve: '达成', severity: '级别', typeOverrun: '预算超支', typeSlow: '执行偏慢', typeCashGap: '资金缺口', typeQuality: '数据质量', descBudget: '查看已发布预算、实际付款与责任中心差异', descOperations: '预算执行、费用构成与计划实际收支对比', descCash: '资金余额、收支计划与流动性风险', descAlerts: '集中处理预算、资金与数据质量异常', descDatacenter: '财务数据源、质量规则与主数据覆盖', descEntry: '财务数据录入、回填与复核', descAnalyze: '基于财务数据中心 MCP 的可信深度分析', close: '关闭财务管理', refresh: '刷新数据', operatorAs: '当前操作者',
         tabOverview: '经营总览', tabBudget: '预算执行', tabOperations: '经营分析', tabCash: '资金分析', tabAlerts: '预警中心', tabDatacenter: '数据中心', tabEntry: '录入', tabAnalyze: '深度分析',
         year: '年度', org: '主体', allOrgs: '全部主体（集团）', loading: '正在加载财务数据...', retry: '重新加载', loadError: '数据加载失败', refreshedAt: '更新于', unitWan: '万元', unitYuan: '元', unitNote: '单位：万元', total: '合计',
         kpiBudget: '年度预算', kpiPrSubmitted: '已打 PR', kpiPrEstimated: '预计 PR', kpiPaid: '实际付款', kpiAlerts: '未处理预警', kpiExecRate: '预算执行率', kpiPayRate: 'PR 付款率', kpiNetInflow: '实际净流入', kpiRevenueAch: '收入达成', kpiSpendExec: '支出执行', kpiHealth: '预算健康度',
@@ -132,7 +132,7 @@ window.__ModuleLoader__.load({
       en: {
         copyFailed: 'Could not copy the analysis prompt. Please retry.',
         open: 'Finance', title: 'Finance Workspace', eyebrow: 'Finance data center',
-        descOverview: 'Group-level financial metrics, budget progress and exceptions', scopeAll: 'Group consolidated', scopeOrg: 'Current org', scopeYear: '', planCol: 'Plan', achieve: 'attained', descBudget: 'Published budgets, actual payments and responsibility-center variance', descOperations: 'Budget execution, cost mix and plan-vs-actual comparison', descCash: 'Cash balance, payment plans and liquidity risk', descAlerts: 'Central handling of budget, cash and data-quality anomalies', descDatacenter: 'Finance data sources, quality rules and master-data coverage', descEntry: 'Finance data entry, backfill and review', descAnalyze: 'Trusted deep analysis on the finance data center MCP', close: 'Close finance workspace', refresh: 'Refresh', operatorAs: 'Operating as',
+        descOverview: 'Group-level financial metrics, budget progress and exceptions', scopeAll: 'Group consolidated', scopeOrg: 'Current org', scopeYear: '', planCol: 'Plan', achieve: 'attained', severity: 'Severity', typeOverrun: 'Budget overrun', typeSlow: 'Slow execution', typeCashGap: 'Cash gap', typeQuality: 'Data quality', descBudget: 'Published budgets, actual payments and responsibility-center variance', descOperations: 'Budget execution, cost mix and plan-vs-actual comparison', descCash: 'Cash balance, payment plans and liquidity risk', descAlerts: 'Central handling of budget, cash and data-quality anomalies', descDatacenter: 'Finance data sources, quality rules and master-data coverage', descEntry: 'Finance data entry, backfill and review', descAnalyze: 'Trusted deep analysis on the finance data center MCP', close: 'Close finance workspace', refresh: 'Refresh', operatorAs: 'Operating as',
         tabOverview: 'Overview', tabBudget: 'Budget execution', tabOperations: 'Operations analysis', tabCash: 'Cash analysis', tabAlerts: 'Alert center', tabDatacenter: 'Data center', tabEntry: 'Entry', tabAnalyze: 'Deep analysis',
         year: 'Year', org: 'Org', allOrgs: 'All orgs (group)', loading: 'Loading finance data...', retry: 'Retry', loadError: 'Failed to load', refreshedAt: 'Updated', unitWan: '10k CNY', unitYuan: 'CNY', unitNote: 'Unit: 10k CNY', total: 'Total',
         kpiBudget: 'Annual budget', kpiPrSubmitted: 'PR submitted', kpiPrEstimated: 'PR estimated', kpiPaid: 'Paid', kpiAlerts: 'Open alerts', kpiExecRate: 'Execution rate', kpiPayRate: 'PR payment rate', kpiNetInflow: 'Net inflow', kpiRevenueAch: 'Revenue attainment', kpiSpendExec: 'Spend execution', kpiHealth: 'Budget health',
@@ -966,7 +966,7 @@ window.__ModuleLoader__.load({
           { label: t('department'), key: 'departmentName' },
           { label: t('monthCol'), render: row => mm(row.month), num: true },
           { label: t('amount'), render: row => wan(row.budgetAmount) ?? '—', num: true },
-          { label: t('statusCol'), key: 'status' },
+          { label: t('statusCol'), render: row => row.status ? h(Pill, { tone: /完成|已批|通过/.test(row.status) ? 'green' : /审批|待|处理/.test(row.status) ? 'blue' : 'muted' }, row.status) : '—' },
         ],
         rows, empty: t('empty'),
       }), h(Pager, { page, total: pr?.data?.total ?? pr?.total, limit: PAGE_SIZE, onPage }))
@@ -1769,9 +1769,11 @@ window.__ModuleLoader__.load({
 
     // 片段 5/7 视图：预警（4 统计卡 + 规则集确认横幅 + 明细筛选分页 + 证据快照 Dialog + 按类型下钻）
 
+    // 服务端 alertType 枚举 → 中文文案键（与预警引擎产出枚举一致）
     const ALERT_TYPES = [
-      ['BUDGET_OVERRUN', 'typeNew'], ['SLOW_EXECUTION', 'viewLedger'], ['CASH_GAP', 'cashSummaryV'], ['DATA_QUALITY', 'qualityTitle'],
+      ['BUDGET_OVERRUN', 'typeOverrun'], ['EXECUTION_SLOW', 'typeSlow'], ['CASH_GAP', 'typeCashGap'], ['DATA_QUALITY', 'typeQuality'],
     ]
+    const alertTypeLabel = (value, t) => t((ALERT_TYPES.find(([id]) => id === value) ?? [])[1] ?? value)
     const ALERT_STATUS_OPTIONS = [['OPEN', 'stPending'], ['CONFIRMED', 'stConfirmed'], ['RESOLVED', 'stResolved'], ['IGNORED', 'stIgnored'], ['', 'stAll']]
 
     function AlertsView({ ctx, t, onDrill }) {
@@ -1848,12 +1850,12 @@ window.__ModuleLoader__.load({
             : t('rulesUnconfirmed'),
           !activeRuleSet ? h(PrimaryButton, { onClick: () => post('/alert-rules/confirm', {}).then(() => api('/alert-rules').then(value => setRules(value.data ?? { list: [], activeVersion: null })).catch(() => {})).catch(error => setNotice(`${t('opFailed')}: ${error.message}`)) }, t('confirmDefaultRules')) : null) : null,
         h('div', { className: 'sf-filters' },
-          h(Select, { value: filters.severity, onChange: value => { setPage(1); setFilters(f => ({ ...f, severity: value })) }, options: [['CRITICAL', 'sevCritical'], ['WARN', 'sevWarn'], ['INFO', 'sevInfo']], placeholder: t('severity') }),
+          h(Select, { value: filters.severity, onChange: value => { setPage(1); setFilters(f => ({ ...f, severity: value })) }, options: [['CRITICAL', t('sevCritical')], ['WARN', t('sevWarn')], ['INFO', t('sevInfo')]], placeholder: t('severity') }),
           h(Select, { value: filters.status, onChange: value => { setPage(1); setFilters(f => ({ ...f, status: value })) }, options: ALERT_STATUS_OPTIONS.map(([id, key]) => [id, t(key)]), placeholder: t('stAll') })),
         h(Card, { title: t('alertsTitle') }, h(Table, {
           columns: [
             { label: t('severity'), render: row => h(SeverityBadge, { severity: row.severity, t }) },
-            { label: t('alertType'), key: 'alertType' },
+            { label: t('alertType'), render: row => alertTypeLabel(row.alertType, t) },
             { label: t('alertTitleCol'), key: 'title', stickyLeft: false },
             { label: t('detail'), render: row => h('span', { style: { whiteSpace: 'normal', wordBreak: 'break-all', display: 'block', maxWidth: 420, textAlign: 'left' } }, row.detail ?? '—') },
             { label: t('org'), key: 'orgName' },
@@ -1864,7 +1866,7 @@ window.__ModuleLoader__.load({
         }), h(Pager, { page, total: rows?.data?.total ?? rows?.total, limit: PAGE_SIZE, onPage: setPage })),
         detail ? h(Dialog, { title: t('alertDetail'), onClose: () => setDetail(null) },
           h('div', { className: 'sf-stack' },
-            h('div', { className: 'sf-row' }, h(SeverityBadge, { severity: detail.severity, t }), h(Pill, { tone: 'muted' }, detail.alertType ?? '—'), h('span', { className: 'sf-note' }, `${shortDate(detail.firstSeenAt) ?? '—'} → ${shortDate(detail.lastSeenAt) ?? '—'}`)),
+            h('div', { className: 'sf-row' }, h(SeverityBadge, { severity: detail.severity, t }), h(Pill, { tone: 'muted' }, alertTypeLabel(detail.alertType, t) ?? '—'), h('span', { className: 'sf-note' }, `${shortDate(detail.firstSeenAt) ?? '—'} → ${shortDate(detail.lastSeenAt) ?? '—'}`)),
             h('p', { className: 'sf-note' }, detail.detail ?? detail.title ?? ''),
             detail.evidence && Object.keys(detail.evidence).length ? h('div', null, h('strong', null, t('evidence')), h('div', { className: 'sf-evidence' }, ...Object.entries(detail.evidence).map(([key, value]) =>
               h('div', { key, className: 'sf-evidence-item' }, h('small', null, key), h('strong', null, typeof value === 'object' ? JSON.stringify(value) : String(value ?? '—')))))) : null,
@@ -2473,5 +2475,5 @@ window.__ModuleLoader__.load({
       return visible ? h(Dashboard, { t }) : null
     }
 
-    exports.apply = apply; exports.inject = ['slots', 'locale']; return module.exports; },
+    exports.apply = apply; exports.inject = ['slots', 'locale', 'sessions', 'uiWorkspace']; return module.exports; },
 });

@@ -1,8 +1,10 @@
 // 片段 5/7 视图：预警（4 统计卡 + 规则集确认横幅 + 明细筛选分页 + 证据快照 Dialog + 按类型下钻）
 
+// 服务端 alertType 枚举 → 中文文案键（与预警引擎产出枚举一致）
 const ALERT_TYPES = [
-  ['BUDGET_OVERRUN', 'typeNew'], ['SLOW_EXECUTION', 'viewLedger'], ['CASH_GAP', 'cashSummaryV'], ['DATA_QUALITY', 'qualityTitle'],
+  ['BUDGET_OVERRUN', 'typeOverrun'], ['EXECUTION_SLOW', 'typeSlow'], ['CASH_GAP', 'typeCashGap'], ['DATA_QUALITY', 'typeQuality'],
 ]
+const alertTypeLabel = (value, t) => t((ALERT_TYPES.find(([id]) => id === value) ?? [])[1] ?? value)
 const ALERT_STATUS_OPTIONS = [['OPEN', 'stPending'], ['CONFIRMED', 'stConfirmed'], ['RESOLVED', 'stResolved'], ['IGNORED', 'stIgnored'], ['', 'stAll']]
 
 function AlertsView({ ctx, t, onDrill }) {
@@ -79,12 +81,12 @@ function AlertsView({ ctx, t, onDrill }) {
         : t('rulesUnconfirmed'),
       !activeRuleSet ? h(PrimaryButton, { onClick: () => post('/alert-rules/confirm', {}).then(() => api('/alert-rules').then(value => setRules(value.data ?? { list: [], activeVersion: null })).catch(() => {})).catch(error => setNotice(`${t('opFailed')}: ${error.message}`)) }, t('confirmDefaultRules')) : null) : null,
     h('div', { className: 'sf-filters' },
-      h(Select, { value: filters.severity, onChange: value => { setPage(1); setFilters(f => ({ ...f, severity: value })) }, options: [['CRITICAL', 'sevCritical'], ['WARN', 'sevWarn'], ['INFO', 'sevInfo']], placeholder: t('severity') }),
+      h(Select, { value: filters.severity, onChange: value => { setPage(1); setFilters(f => ({ ...f, severity: value })) }, options: [['CRITICAL', t('sevCritical')], ['WARN', t('sevWarn')], ['INFO', t('sevInfo')]], placeholder: t('severity') }),
       h(Select, { value: filters.status, onChange: value => { setPage(1); setFilters(f => ({ ...f, status: value })) }, options: ALERT_STATUS_OPTIONS.map(([id, key]) => [id, t(key)]), placeholder: t('stAll') })),
     h(Card, { title: t('alertsTitle') }, h(Table, {
       columns: [
         { label: t('severity'), render: row => h(SeverityBadge, { severity: row.severity, t }) },
-        { label: t('alertType'), key: 'alertType' },
+        { label: t('alertType'), render: row => alertTypeLabel(row.alertType, t) },
         { label: t('alertTitleCol'), key: 'title', stickyLeft: false },
         { label: t('detail'), render: row => h('span', { style: { whiteSpace: 'normal', wordBreak: 'break-all', display: 'block', maxWidth: 420, textAlign: 'left' } }, row.detail ?? '—') },
         { label: t('org'), key: 'orgName' },
@@ -95,7 +97,7 @@ function AlertsView({ ctx, t, onDrill }) {
     }), h(Pager, { page, total: rows?.data?.total ?? rows?.total, limit: PAGE_SIZE, onPage: setPage })),
     detail ? h(Dialog, { title: t('alertDetail'), onClose: () => setDetail(null) },
       h('div', { className: 'sf-stack' },
-        h('div', { className: 'sf-row' }, h(SeverityBadge, { severity: detail.severity, t }), h(Pill, { tone: 'muted' }, detail.alertType ?? '—'), h('span', { className: 'sf-note' }, `${shortDate(detail.firstSeenAt) ?? '—'} → ${shortDate(detail.lastSeenAt) ?? '—'}`)),
+        h('div', { className: 'sf-row' }, h(SeverityBadge, { severity: detail.severity, t }), h(Pill, { tone: 'muted' }, alertTypeLabel(detail.alertType, t) ?? '—'), h('span', { className: 'sf-note' }, `${shortDate(detail.firstSeenAt) ?? '—'} → ${shortDate(detail.lastSeenAt) ?? '—'}`)),
         h('p', { className: 'sf-note' }, detail.detail ?? detail.title ?? ''),
         detail.evidence && Object.keys(detail.evidence).length ? h('div', null, h('strong', null, t('evidence')), h('div', { className: 'sf-evidence' }, ...Object.entries(detail.evidence).map(([key, value]) =>
           h('div', { key, className: 'sf-evidence-item' }, h('small', null, key), h('strong', null, typeof value === 'object' ? JSON.stringify(value) : String(value ?? '—')))))) : null,

@@ -254,7 +254,7 @@ function LedgerView({ pr, page, onPage, t }) {
       { label: t('department'), key: 'departmentName' },
       { label: t('monthCol'), render: row => mm(row.month), num: true },
       { label: t('amount'), render: row => wan(row.budgetAmount) ?? '—', num: true },
-      { label: t('statusCol'), key: 'status' },
+      { label: t('statusCol'), render: row => row.status ? h(Pill, { tone: /完成|已批|通过/.test(row.status) ? 'green' : /审批|待|处理/.test(row.status) ? 'blue' : 'muted' }, row.status) : '—' },
     ],
     rows, empty: t('empty'),
   }), h(Pager, { page, total: pr?.data?.total ?? pr?.total, limit: PAGE_SIZE, onPage }))

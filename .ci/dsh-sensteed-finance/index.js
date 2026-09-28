@@ -6,7 +6,10 @@
 import { randomUUID } from 'node:crypto'
 
 const ROUTE_PREFIX = '/api/desktop/sensteed/finance'
-const MCP_URL = 'https://datasource.local.dofe.ai/api/mcp'
+// 财务页面是直连服务型插件：Datasource REST API 负责 SSO、租户和操作者校验。
+// MCP 仅能经 ixicai.cn/mcp 公共网关访问；当前 Datasource 尚未纳入该网关，
+// 因此这里不再保留任何本地/私有 MCP 端点。
+const DATASOURCE_API_BASE_URL = process.env.DATASOURCE_API_BASE_URL || 'https://ds.hozonauto.com/api'
 const REQUEST_TIMEOUT_MS = 30000
 const MAX_BODY_BYTES = 32 * 1024
 
@@ -42,7 +45,7 @@ export function apply(ctx, overrides = {}) {
         if (!config.tenantId) {
           return { ok: false, error: '请先使用飞书登录，再打开财务管理。' }
         }
-        const orgs = await mcpCall(fetchImpl, config, 'finance_get_orgs', {}, now(), ctx.logger)
+        const orgs = await financeApiCall(fetchImpl, config, 'finance_get_orgs', {}, now(), ctx.logger)
         if (!orgs.ok) return orgs
         return {
           ok: true,
@@ -146,11 +149,11 @@ async function dispatchGet(fetchImpl, config, sub, url, res, logger) {
       if (config.tenantId) calls.push(['finance_get_departments', { tenantId: config.tenantId }])
       break
     case '/brief': {
-      const baseline = await mcpCall(fetchImpl, config, 'finance_analysis_brief', { ...tenant(), year: query.year }, new Date(), logger)
+      const baseline = await financeApiCall(fetchImpl, config, 'finance_analysis_brief', { ...tenant(), year: query.year }, new Date(), logger)
       if (!baseline.ok) return sendJson(res, 502, baseline)
       if (query.orgId) {
         for (const [key, name] of [['overview', 'finance_get_overview'], ['budget', 'finance_get_budget_summary'], ['cash', 'finance_get_cash_summary']]) {
-          const scoped = await mcpCall(fetchImpl, config, name, { ...tenant(), year: query.year, orgId: query.orgId }, new Date(), logger)
+          const scoped = await financeApiCall(fetchImpl, config, name, { ...tenant(), year: query.year, orgId: query.orgId }, new Date(), logger)
           if (!scoped.ok) return sendJson(res, 502, scoped)
           baseline.data[key] = scoped.data
         }
@@ -257,7 +260,7 @@ async function dispatchGet(fetchImpl, config, sub, url, res, logger) {
 
 /** 执行一组 MCP 调用并按块降级拼装响应（部分失败保留成功块） */
 async function runGet(calls, res, logger, config, fetchImpl, context = false) {
-  const results = await Promise.all(calls.map(([name, args]) => mcpCall(fetchImpl, config, name, args, new Date(), logger)))
+  const results = await Promise.all(calls.map(([name, args]) => financeApiCall(fetchImpl, config, name, args, new Date(), logger)))
   const okAll = results.every(result => result.ok)
   // 部分失败时保留成功部分：看板按 {ok, data|各命名块} 逐块降级渲染。
   const payload = { ok: okAll }
@@ -351,51 +354,223 @@ async function dispatchPost(fetchImpl, config, sub, req, res, logger) {
     operator: config.operatorId,
     idempotencyKey: body.json.idempotencyKey || randomUUID(),
   }
-  const result = await mcpCall(fetchImpl, config, match.tool, args, new Date(), logger)
+  const result = await financeApiCall(fetchImpl, config, match.tool, args, new Date(), logger)
   return sendJson(res, result.ok ? 200 : 502, result)
 }
 
 // ---------------------------------------------------------------------------
-// 极简 MCP 客户端：datasource 的 MCP 端点为无状态 Streamable HTTP，
-// 单个 tools/call POST 即可（会话校验在无会话模式下整体跳过）。
-// 本地 datasource 入口由用户明确选择，与桌面 MCP 客户端一致。
+// Datasource REST 适配层：页面调用公开业务 API，身份由 Bearer SSO 会话解析。
+// tenantId/operator/idempotencyKey 是旧 MCP 工具的控制字段，REST 端由会话和
+// 服务端审计上下文负责，不能从浏览器或插件参数覆盖。
 // ---------------------------------------------------------------------------
 
-let rpcSeq = 0
-
-async function mcpCall(fetchImpl, config, toolName, args, observedAt, logger) {
+async function financeApiCall(fetchImpl, config, toolName, args, observedAt, logger) {
   if (!config.token) return { ok: false, error: '请先使用飞书登录，再打开财务管理。' }
   try {
-    const response = await timedFetch(fetchImpl, MCP_URL, {
-      method: 'POST',
+    if (toolName === 'finance_analysis_brief') {
+      const year = args.year
+      const calls = [
+        ['finance_get_overview', { year }],
+        ['finance_get_budget_summary', { year }],
+        ['finance_get_cash_summary', { year }],
+        ['finance_get_alert_summary', { year }],
+        ['finance_get_alerts', { year, status: 'OPEN', limit: 10 }],
+        ['finance_get_data_quality', {}],
+        ['finance_get_import_batches', { page: 1, limit: 5 }],
+      ]
+      const results = await Promise.all(calls.map(([name, callArgs]) => financeApiCall(fetchImpl, config, name, callArgs, observedAt, logger)))
+      const failed = results.find(result => !result.ok)
+      if (failed) return failed
+      return {
+        ok: true,
+        data: {
+          year,
+          overview: results[0].data,
+          budget: results[1].data,
+          cash: results[2].data,
+          alertsSummary: results[3].data,
+          openAlerts: results[4].data?.list || [],
+          dataQuality: results[5].data,
+          recentImportBatches: results[6].data?.list || [],
+        },
+        meta: { asOf: observedAt.toISOString() },
+      }
+    }
+
+    if (toolName === 'finance_budget_availability_query') {
+      const lines = await financeApiCall(fetchImpl, config, 'finance_get_budget_lines', { year: args.year, orgId: args.orgId, limit: 500 }, observedAt, logger)
+      if (!lines.ok) return lines
+      return { ok: true, data: buildBudgetAvailability(lines.data), meta: { asOf: observedAt.toISOString() } }
+    }
+
+    if (toolName === 'finance_payment_plan_increase_request') {
+      const create = await financeApiCall(fetchImpl, config, '__create_payment_plan_adjustment', {
+        planId: args.planId,
+        newAmount: args.newAmount,
+        reason: args.reason,
+      }, observedAt, logger)
+      if (!create.ok) return create
+      const adjustmentId = create.data?.id || create.data?.adjustment?.id
+      if (!adjustmentId) return { ok: false, error: 'invalid_adjustment_response' }
+      return financeApiCall(fetchImpl, config, '__submit_payment_plan_adjustment', { adjustmentId }, observedAt, logger)
+    }
+
+    const route = resolveFinanceRoute(toolName, args)
+    if (!route) return { ok: false, error: 'finance_tool_unavailable' }
+    const query = route.method === 'GET' ? stripControlFields(args) : undefined
+    const body = route.method === 'GET' || route.method === 'DELETE' ? undefined : stripPathFields(stripControlFields(route.body ?? args))
+    const url = buildFinanceUrl(route.path, query)
+    const response = await timedFetch(fetchImpl, url, {
+      method: route.method,
       headers: {
         'content-type': 'application/json',
-        accept: 'application/json, text/event-stream',
+        accept: 'application/json',
         authorization: `Bearer ${config.token}`,
       },
-      body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcSeq, method: 'tools/call', params: { name: toolName, arguments: args } }),
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     })
     if (response.status === 401 || response.status === 403) return { ok: false, error: '飞书登录已失效或没有财务访问权限，请重新登录后重试。' }
     if (!response.ok) return { ok: false, error: `upstream_http_${response.status}` }
     const payload = await response.json()
-    if (payload?.error) return { ok: false, error: payload.error?.message || 'mcp_error' }
-    const result = payload?.result
-    const structured = result?.structuredContent && typeof result.structuredContent === 'object' ? result.structuredContent : null
-    const raw = result?.content?.find(item => item.type === 'text')?.text
-    // structuredContent 优先；无结构化结果时回退 content 文本 JSON（datasource 域当前形态）。
-    let data
-    if (structured) {
-      data = structured
-    } else {
-      if (raw === undefined) return { ok: false, error: result?.isError ? 'tool_error' : 'empty_result' }
-      data = JSON.parse(raw)
-    }
-    if (result?.isError || data?.error) return { ok: false, error: data?.hint || data?.error || '财务操作失败' }
+    if (payload?.code !== undefined && payload.code !== 0) return { ok: false, error: payload.msg || '财务操作失败' }
+    const data = payload?.data
+    if (data === undefined) return { ok: false, error: 'empty_result' }
     return { ok: true, data, meta: { asOf: observedAt.toISOString() } }
   } catch (error) {
-    logger?.warn?.('sensteed finance: mcp call %s failed', toolName)
+    logger?.warn?.('sensteed finance: REST call %s failed', toolName)
     return { ok: false, error: error?.name === 'TimeoutError' ? 'upstream_timeout' : 'upstream_unreachable' }
   }
+}
+
+function stripControlFields(value = {}) {
+  const result = { ...value }
+  delete result.tenantId
+  delete result.operator
+  delete result.idempotencyKey
+  return Object.fromEntries(Object.entries(result).filter(([, item]) => item !== undefined))
+}
+
+function stripPathFields(value = {}) {
+  const result = { ...value }
+  for (const key of ['id', 'adjustmentId', 'assignmentId', 'planId', 'contactId', 'action']) delete result[key]
+  return result
+}
+
+function buildFinanceUrl(path, query) {
+  const url = new URL(`${DATASOURCE_API_BASE_URL.replace(/\/$/u, '')}${path}`)
+  for (const [key, value] of Object.entries(query || {})) {
+    if (value === undefined || value === null || value === '') continue
+    url.searchParams.set(key, String(value))
+  }
+  return url.toString()
+}
+
+function buildBudgetAvailability(data = {}) {
+  const lines = (data.list || []).map(line => {
+    const budget = Number(line.budgetAmount ?? 0)
+    const occupied = Number(line.prSubmittedAmount ?? 0) + Number(line.paidAmount ?? 0) + Number(line.allocatedAmount ?? 0)
+    return {
+      budgetLineId: line.id,
+      orgName: line.orgName,
+      departmentName: line.departmentName,
+      costItemName: line.costItemName,
+      month: line.month,
+      budget,
+      occupied,
+      available: budget - occupied,
+    }
+  })
+  const sorted = [...lines].sort((a, b) => a.available - b.available)
+  return {
+    total: {
+      budget: lines.reduce((sum, line) => sum + line.budget, 0),
+      occupied: lines.reduce((sum, line) => sum + line.occupied, 0),
+      available: lines.reduce((sum, line) => sum + line.available, 0),
+    },
+    tightestLines: sorted.filter(line => line.available < 0).slice(0, 10),
+    sample: sorted.slice(0, 20),
+    lineCount: lines.length,
+  }
+}
+
+function resolveFinanceRoute(toolName, args = {}) {
+  const routes = {
+    finance_get_orgs: ['GET', '/finance/orgs'],
+    finance_get_departments: ['GET', '/finance/departments'],
+    finance_get_members: ['GET', '/finance/members'],
+    finance_upsert_member: ['POST', '/finance/members'],
+    finance_remove_member: ['POST', `/finance/members/${args.id}/remove`],
+    finance_get_overview: ['GET', '/finance/overview'],
+    finance_get_budget_summary: ['GET', '/finance/budget/summary'],
+    finance_get_budget_lines: ['GET', '/finance/budget/lines'],
+    finance_get_payment_requests: ['GET', '/finance/payment-requests'],
+    finance_get_payment_plans: ['GET', '/finance/payment-plans'],
+    finance_get_revenue_plans: ['GET', '/finance/revenue-plans'],
+    finance_get_cash_summary: ['GET', '/finance/cash-summary'],
+    finance_get_alerts: ['GET', '/finance/alerts'],
+    finance_get_data_quality: ['GET', '/finance/data-quality'],
+    finance_get_import_batches: ['GET', '/finance/import-batches'],
+    finance_create_payment_plan: ['POST', '/finance/payment-plans'],
+    finance_create_revenue_plan: ['POST', '/finance/revenue-plans'],
+    finance_create_budget_line: ['POST', '/finance/budget/lines'],
+    finance_patch_payment_plan_actuals: ['PATCH', `/finance/payment-plans/${args.id}/actuals`],
+    finance_patch_revenue_plan_actuals: ['PATCH', `/finance/revenue-plans/${args.id}/actuals`],
+    finance_run_alert_engine: ['POST', '/finance/alerts/run'],
+    finance_budget_adjustment_create: ['POST', '/finance/budget/adjustments'],
+    finance_budget_adjustment_submit: ['POST', `/finance/budget/adjustments/${args.adjustmentId}/submit`],
+    finance_budget_adjustment_status_query: ['GET', `/finance/budget/adjustments/${args.adjustmentId}`],
+    finance_budget_adjustment_list: ['GET', '/finance/budget/adjustments'],
+    finance_budget_adjustment_review: ['POST', `/finance/budget/adjustments/${args.id}/${args.action}`],
+    finance_budget_adjustment_post: ['POST', `/finance/budget/adjustments/${args.id}/post`],
+    finance_budget_adjustment_cancel: ['POST', `/finance/budget/adjustments/${args.id}/cancel`],
+    finance_filing_assignments_query: ['GET', '/finance/filing/assignments'],
+    finance_filing_rows_upsert: ['PUT', `/finance/filing/assignments/${args.assignmentId}/rows`],
+    finance_filing_task_list: ['GET', '/finance/filing/tasks'],
+    finance_filing_task_create: ['POST', '/finance/filing/tasks'],
+    finance_filing_task_close: ['POST', `/finance/filing/tasks/${args.id}/close`],
+    finance_filing_assignment_action: ['POST', `/finance/filing/assignments/${args.id}/${args.action}`],
+    finance_plan_adjustment_list: ['GET', '/finance/payment-plan-adjustments'],
+    finance_plan_adjustment_status_query: ['GET', `/finance/payment-plan-adjustments/${args.adjustmentId}`],
+    finance_plan_adjustment_review: ['POST', `/finance/payment-plan-adjustments/${args.id}/${args.action}`],
+    finance_plan_adjustment_post: ['POST', `/finance/payment-plan-adjustments/${args.id}/post`],
+    finance_plan_adjustment_cancel: ['POST', `/finance/payment-plan-adjustments/${args.id}/cancel`],
+    finance_allocation_pool_query: ['GET', '/finance/allocations/pool'],
+    finance_allocation_confirm: ['POST', '/finance/allocations/confirm'],
+    finance_allocation_remove: ['POST', `/finance/allocations/${args.id}/remove`],
+    finance_allocation_list: ['GET', '/finance/allocations'],
+    finance_directory_sync: ['POST', '/finance/feishu/directory/sync'],
+    finance_employment_resolve: ['GET', '/finance/employment/resolve'],
+    finance_directory_contacts_query: ['GET', '/finance/feishu/contacts'],
+    finance_directory_map_user: ['POST', `/finance/feishu/contacts/${args.contactId}/map-user`],
+    finance_get_employment_records: ['GET', '/finance/employment/records'],
+    finance_create_employment_record: ['POST', '/finance/employment/records'],
+    finance_get_budget_versions: ['GET', '/finance/budget/versions'],
+    finance_get_budget_version_diff: ['GET', '/finance/budget/versions/diff'],
+    finance_get_carryover_rules: ['GET', '/finance/carryover-rules'],
+    finance_get_alert_rules: ['GET', '/finance/alert-rules'],
+    finance_confirm_alert_rules: ['POST', '/finance/alert-rules/confirm'],
+    finance_get_saved_views: ['GET', '/finance/saved-views'],
+    finance_save_view: ['POST', '/finance/saved-views'],
+    finance_delete_saved_view: ['POST', '/finance/saved-views/delete'],
+    finance_get_alert_summary: ['GET', '/finance/alerts/summary'],
+    finance_get_data_source_configs: ['GET', '/data-source/configs'],
+    finance_get_data_source_runs: ['GET', '/data-source/runs'],
+    finance_toggle_data_source_config: ['PATCH', `/data-source/configs/${args.id}/active`],
+  }
+  if (toolName === 'finance_patch_payment_plan_schedule') return { method: 'PATCH', path: `/finance/payment-plans/${args.id}/schedule`, body: args }
+  if (toolName === 'finance_budget_version_action') {
+    const path = args.action === 'clone' ? `/finance/budget/versions/${args.id}/clone` : `/finance/budget/versions/${args.id}/${args.action}`
+    return { method: 'POST', path, body: args.action === 'clone' ? { newName: args.newName } : {} }
+  }
+  if (toolName === 'finance_carryover_rule_action') {
+    if (args.action === 'create') return { method: 'POST', path: '/finance/carryover-rules', body: args }
+    return { method: 'POST', path: `/finance/carryover-rules/${args.id}/${args.action === 'toggle' ? 'toggle' : 'remove'}`, body: {} }
+  }
+  if (toolName === '__create_payment_plan_adjustment') return { method: 'POST', path: `/finance/payment-plans/${args.planId}/adjustments`, body: args }
+  if (toolName === '__submit_payment_plan_adjustment') return { method: 'POST', path: `/finance/payment-plan-adjustments/${args.adjustmentId}/submit`, body: {} }
+  const entry = routes[toolName]
+  if (!entry) return null
+  return { method: entry[0], path: entry[1] }
 }
 
 // ---------------------------------------------------------------------------

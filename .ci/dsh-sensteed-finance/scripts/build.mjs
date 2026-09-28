@@ -28,4 +28,4 @@ for (const file of FILES) chunks.push(await readFile(resolve(root, file), 'utf8'
 const source = brandClientSource(chunks.join('\n'))
 await mkdir(resolve(root, 'lib'), { recursive: true })
 const indented = source.split('\n').map(line => line ? `    ${line}` : '').join('\n')
-await writeFile(resolve(root, 'lib/client.js'), `window.__ModuleLoader__.load({\n  id: "@dofe/dsh-sensteed-finance",\n  factory: (require) => { var module = { exports: {} }; var exports = module.exports;\n${indented}\n    exports.apply = apply; exports.inject = ['slots', 'locale']; return module.exports; },\n});\n`)
+await writeFile(resolve(root, 'lib/client.js'), `window.__ModuleLoader__.load({\n  id: "@dofe/dsh-sensteed-finance",\n  factory: (require) => { var module = { exports: {} }; var exports = module.exports;\n${indented}\n    exports.apply = apply; exports.inject = ['slots', 'locale', 'sessions', 'uiWorkspace']; return module.exports; },\n});\n`)

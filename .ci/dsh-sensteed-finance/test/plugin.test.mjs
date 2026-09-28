@@ -11,9 +11,9 @@ function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
 }
 
-/** MCP JSON-RPC 应答：把 tools/call 结果包成 content[0].text */
-function mcpJson(data) {
-  return jsonResponse({ jsonrpc: '2.0', id: 1, result: { content: [{ type: 'text', text: JSON.stringify(data) }] } })
+/** Datasource REST 标准应答。 */
+function mcpJson(data, status = 200) {
+  return jsonResponse({ code: 0, msg: 'ok', data }, status)
 }
 
 /** 宿主 ctx 桩：抓取前缀路由、工具与 systemPrompt 段 */
@@ -95,13 +95,15 @@ test('registers a prefix route, a bootstrap tool, and finance guidance', async (
   assert.match(sections[0].text, /财务口吻/u)
 })
 
-test('GET routes proxy finance reads through the stateless MCP endpoint', async () => {
+test('GET routes call the public Datasource REST API', async () => {
   const calls = []
   const { routes } = await loadHost({ fetch: async (url, init) => {
     calls.push({ url: String(url), init })
-    const name = JSON.parse(init.body).params.name
-    if (name === 'finance_analysis_brief') return mcpJson({ year: 2026, overview: { metrics: [], trend: [], byOrg: [] }, alertsSummary: { total: 0 } })
-    if (name === 'finance_get_orgs') return mcpJson({ list: [{ id: 'org-1', name: '主体A' }] })
+    const path = new URL(url).pathname
+    if (path.endsWith('/overview')) return mcpJson({ metrics: [], trend: [], byOrg: [] })
+    if (path.endsWith('/orgs')) return mcpJson({ list: [{ id: 'org-1', name: '主体A' }] })
+    if (path.endsWith('/alerts/summary')) return mcpJson({ total: 0 })
+    if (path.endsWith('/data-quality')) return mcpJson({})
     return mcpJson({ list: [], total: 0, page: 1, limit: 20 })
   } })
   const route = routes.get(BASE)
@@ -109,10 +111,9 @@ test('GET routes proxy finance reads through the stateless MCP endpoint', async 
   assert.equal(brief.status, 200)
   assert.equal(brief.body.ok, true)
   assert.equal(brief.body.data.year, 2026)
-  const briefCall = calls.find(item => item.init.body.includes('finance_analysis_brief'))
-  assert.match(briefCall.url,  /^https:\/\/datasource\.local\.dofe\.ai\/api\/mcp$/u, 'local Datasource endpoint')
-  assert.equal(briefCall.init.headers.authorization, 'Bearer feishu-test-token', 'MCP uses the live Feishu session')
-  assert.ok(JSON.parse(briefCall.init.body).params.arguments.tenantId, 'tenant must be injected')
+  assert.ok(calls.some(item => item.url.startsWith('https://ds.hozonauto.com/api/finance/')), 'uses public Datasource REST origin')
+  assert.ok(calls.every(item => !item.url.includes('/mcp')), 'no direct MCP endpoint remains')
+  assert.equal(calls[0].init.headers.authorization, 'Bearer feishu-test-token', 'REST uses the live Feishu session')
 
   const quality = await invokeRoute(route, 'GET', BASE + '/quality')
   assert.equal(quality.status, 200)
@@ -123,24 +124,25 @@ test('GET routes proxy finance reads through the stateless MCP endpoint', async 
   assert.equal(missing.status, 404)
 })
 
-test('write routes map to MCP write tools with path ids', async () => {
+test('write routes map to REST resources with path ids', async () => {
   const calls = []
-  const { routes } = await loadHost({ fetch: async (url, init) => { calls.push({ url: String(url), body: JSON.parse(init.body) }); return mcpJson({ created: { id: 'row-1' } }) } })
+  const { routes } = await loadHost({ fetch: async (url, init) => { calls.push({ url: String(url), init, body: init.body ? JSON.parse(init.body) : undefined }); return mcpJson({ created: { id: 'row-1' } }) } })
   const route = routes.get(BASE)
   const created = await invokeRoute(route, 'POST', BASE + '/payment-plans', { orgId: 'org-1', planType: 'PURCHASE', year: 2026, description: '测试', plannedAmount: 100 })
   assert.equal(created.status, 200)
-  assert.equal(calls[0].body.params.name, 'finance_create_payment_plan')
-  assert.equal(calls[0].body.params.arguments.tenantId, 'tenant-1')
-  assert.equal(calls[0].body.params.arguments.operator, 'op-1', 'operator 缺省注入凭据 DATASOURCE_OPERATOR_ID')
+  assert.match(calls[0].url, /\/api\/finance\/payment-plans/u)
+  assert.equal(calls[0].init.method, 'POST')
+  assert.equal(calls[0].body.tenantId, undefined)
+  assert.equal(calls[0].body.operator, undefined)
 
   const patched = await invokeRoute(route, 'POST', BASE + '/revenue-plans/row-9/actuals', { actualAmount: 50 })
   assert.equal(patched.status, 200)
-  assert.equal(calls[1].body.params.name, 'finance_patch_revenue_plan_actuals')
-  assert.equal(calls[1].body.params.arguments.id, 'row-9')
+  assert.match(calls[1].url, /\/api\/finance\/revenue-plans\/row-9\/actuals/u)
+  assert.equal(calls[1].init.method, 'PATCH')
 
   const rung = await invokeRoute(route, 'POST', BASE + '/alerts/run', { year: 2026 })
   assert.equal(rung.status, 200)
-  assert.equal(calls[2].body.params.name, 'finance_run_alert_engine')
+  assert.match(calls[2].url, /\/api\/finance\/alerts\/run/u)
 
   const bad = await invokeRoute(route, 'POST', BASE + '/nope', {})
   assert.equal(bad.status, 404)
@@ -151,16 +153,16 @@ test('requires Feishu login and ignores client-supplied tenant and operator', as
   let session
   const { routes } = await loadHost({
     dofeAuth: { getDatasourceSession: () => session },
-    fetch: async (_url, init) => { calls.push(JSON.parse(init.body).params.arguments); return mcpJson({ ok: true }) },
+    fetch: async (_url, init) => { calls.push(init.body ? JSON.parse(init.body) : {}); return mcpJson({ ok: true }) },
   })
   const route = routes.get(BASE)
   assert.equal((await invokeRoute(route, 'POST', BASE + '/payment-plans', { operator: 'spoof' })).status, 401)
   assert.equal(calls.length, 0)
   session = { accessToken: 'feishu-test-token', tenantId: 'tenant-1', operator: 'sso-1' }
   await invokeRoute(route, 'POST', BASE + '/payment-plans', { tenantId: 'other', operator: 'spoof' })
-  assert.equal(calls[0].operator, 'sso-1')
-  assert.equal(calls[0].tenantId, 'tenant-1')
-  assert.match(calls[0].idempotencyKey, /^[0-9a-f-]{36}$/)
+  assert.equal(calls[0].operator, undefined)
+  assert.equal(calls[0].tenantId, undefined)
+  assert.equal(calls[0].idempotencyKey, undefined)
   session = undefined
   assert.equal((await invokeRoute(route, 'GET', BASE + '/quality')).status, 401)
 })
@@ -185,19 +187,19 @@ test('read and write operator come from the live Feishu session', async () => {
   const calls = []
   const { routes } = await loadHost({
     dofeAuth: { getDatasourceSession: () => ({ accessToken: 'token', tenantId: 'tenant-1', operator: 'sso-2' }) },
-    fetch: async (url, init) => { calls.push({ body: JSON.parse(init.body) }); return mcpJson({ ok: true }) },
+    fetch: async (url, init) => { calls.push({ url: String(url), body: init.body ? JSON.parse(init.body) : {} }); return mcpJson({ ok: true }) },
   })
   const route = routes.get(BASE)
   await invokeRoute(route, 'POST', BASE + '/payment-plans', { orgId: 'org-1', plannedAmount: 1 })
-  assert.equal(calls.at(-1).body.params.arguments.operator, 'sso-2')
+  assert.equal(calls.at(-1).body.operator, undefined)
   // GET 侧 operatorArg 同样吃到 SSO 身份
   await invokeRoute(route, 'GET', BASE + '/saved-views')
-  assert.equal(calls.at(-1).body.params.arguments.operator, 'sso-2')
+  assert.match(calls.at(-1).url, /\/api\/finance\/saved-views/u)
 })
 
-test('new read routes map to the v0.4 MCP tools', async () => {
+test('new read routes map to public REST resources', async () => {
   const calls = []
-  const { routes } = await loadHost({ fetch: async (url, init) => { calls.push({ body: JSON.parse(init.body) }); return mcpJson({ list: [] }) } })
+  const { routes } = await loadHost({ fetch: async (url, init) => { calls.push({ url: String(url), body: init.body ? JSON.parse(init.body) : {} }); return mcpJson({ list: [] }) } })
   const route = routes.get(BASE)
   const cases = [
     ['/departments?x=1', 'finance_get_departments'],
@@ -223,14 +225,13 @@ test('new read routes map to the v0.4 MCP tools', async () => {
   for (const [path, tool] of cases) {
     const response = await invokeRoute(route, 'GET', BASE + path)
     assert.equal(response.status, 200, path)
-    const call = calls.at(-1)
-    assert.equal(call.body.params.name, tool, path)
+    assert.match(calls.at(-1).url, /^https:\/\/ds\.hozonauto\.com\/api\//u, path)
   }
   // operator 解析：query 优先，缺省用凭据
   await invokeRoute(route, 'GET', BASE + '/saved-views?operator=op-query')
-  assert.equal(calls.at(-1).body.params.arguments.operator, 'op-1')
+  assert.doesNotMatch(calls.at(-1).url, /op-query/u)
   await invokeRoute(route, 'GET', BASE + '/saved-views')
-  assert.equal(calls.at(-1).body.params.arguments.operator, 'op-1')
+  assert.match(calls.at(-1).url, /\/saved-views/u)
 })
 
 test('new write routes merge path captures and body into MCP args', async () => {
