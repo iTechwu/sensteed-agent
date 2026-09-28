@@ -15,7 +15,7 @@ import { z } from 'zod';
 export const SexTypeSchema = z.enum(['UNKNOWN', 'MALE', 'FEMALE']);
 export type SexType = z.infer<typeof SexTypeSchema>;
 
-/** File metadata itself remains owned by sso.ixicai.cn and is not stored here. */
+/** File metadata itself remains owned by SSO and is not stored here. */
 export const FileBucketVendorSchema = z.enum(['oss', 'us3', 'qiniu', 's3', 'gcs', 'tos', 'tencent', 'ksyun']);
 export type FileBucketVendor = z.infer<typeof FileBucketVendorSchema>;
 
