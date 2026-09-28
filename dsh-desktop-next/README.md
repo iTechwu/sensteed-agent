@@ -2,46 +2,46 @@
 
 English | [中文](README.zh.md)
 
-A separate experimental package based on DeepSeek Harness **0.1.6-alpha.2**. The main window loads the official published `@deepseek-ai/dsh-web-frontend`, sharing the official Web application, plugin manager, and basic Desktop presentation. Next adds the system tray, desktop preferences and tools, Profiles, recovery, Agents Anywhere remote control, Community Market, and dshmarket.
+A separate experimental package based on DeepSeek Harness **0.1.7-rc.2**. The main window loads the official published `@deepseek-ai/dsh-web-frontend`, sharing the official Web application, plugin manager, and basic Desktop presentation. Next adds the system tray, desktop preferences and tools, Profiles, recovery, Agents Anywhere remote control, Community Market, and dshmarket.
 
 ## Development and verification
 
-Run from the outer repository root with Node.js `^22.19.0` or `>=24.0.0` and Corepack's Yarn 4.18.0:
+Run from the outer repository root with Node.js `^22.19.0` or `>=24.0.0` and the root pnpm release through Corepack. `dsh-desktop-next` is a root pnpm workspace member; its `@deepseek-ai/dsh-*` dependencies resolve to the sibling fork sources through `linkWorkspacePackages`:
 
 ```sh
-git submodule update --init --recursive
-corepack yarn install --immutable
-corepack yarn check:next
-corepack yarn dev:next
+corepack pnpm install --frozen-lockfile
+corepack pnpm --filter dsh-community-market build
+corepack pnpm --filter dsh-desktop-next run check
+corepack pnpm --filter dsh-desktop-next run dev
 ```
 
-`check:next` builds Market and Next, runs typechecks, unit tests, official-frontend and sandboxed-preload checks, and a real Host smoke in a temporary home. It never opens a graphical application. The smoke uses an offline local fixture plugin to exercise pnpm, Market removal and restart requests, authentication, profile switching, and recovery boot, then cleans up its processes and files. An additional real-runtime smoke exercises the native-only HTTP/WebSocket gate, browser access changes, corrupt manifests, isolated safe mode, global-patch repair, and process teardown.
+`check` builds Next, runs typechecks, unit tests, official-frontend and sandboxed-preload checks, and a real Host smoke in a temporary home. It never opens a graphical application. The smoke uses an offline local fixture plugin to exercise pnpm, Market removal and restart requests, authentication, profile switching, and recovery boot, then cleans up its processes and files. An additional real-runtime smoke exercises the native-only HTTP/WebSocket gate, browser access changes, corrupt manifests, isolated safe mode, global-patch repair, and process teardown. Build Market first when Market sources changed.
 
-`dev:next` explicitly launches the graphical application. Use `corepack yarn start:next` with an existing build. An uncached Electron binary is downloaded on first use. To additionally exercise the real Electron executable in Node mode, build first and run:
+`dev` explicitly launches the graphical application. Use `corepack pnpm --filter dsh-desktop-next run start` with an existing build. An uncached Electron binary is downloaded on first use. To additionally exercise the real Electron executable in Node mode, build first and run:
 
 ```sh
-corepack yarn workspace dsh-desktop-next verify:host:electron
+corepack pnpm --filter dsh-desktop-next run verify:host:electron
 ```
 
 This check opens no Electron window. Window presentation, native dialogs, and a real phone connection still require manual acceptance.
 
-CI also runs `xvfb-run --auto-servernum corepack yarn workspace dsh-desktop-next verify:protocol --no-sandbox` on Linux. This separate test uses a real Electron renderer and custom protocol with a temporary Host, exercises Market source changes with ordinary browser access disabled, and rejects requests from a different page origin. It is not part of the portable `check:next` command. The sandbox flag applies only to the isolated CI process.
+CI also runs `xvfb-run --auto-servernum corepack pnpm --filter dsh-desktop-next run verify:protocol --no-sandbox` on Linux. This separate test uses a real Electron renderer and custom protocol with a temporary Host, exercises Market source changes with ordinary browser access disabled, and rejects requests from a different page origin. It is not part of the portable `check:next` command. The sandbox flag applies only to the isolated CI process.
 
 On the same Linux/Xvfb runner, `verify:sidebar-browser --no-sandbox` checks real lease-gated guest pages against a local fixture with both `frame-ancestors 'none'` and `X-Frame-Options: DENY`. It verifies blocked iframe embedding, successful native loading, the guest's own security settings, app-cookie and preload isolation, native history, refusal of a forged lease, workspace partition separation and cleanup on release. The portable `verify:window-controls` check exercises the official toolbar, pane resizing, modal overlap, tab switching and closure with a simulated native bridge, and checks the iframe fallback in a regular Web client.
 
 The macOS sidebar and titlebar regression runs the official frontend's Desktop boot branch in headless Chromium with a temporary home. It serves the same entry document as Next, supplies real Host injections through a simulated preload contract, and asserts that Desktop transport is active. It checks the shared official header before Workspace selection and after a real blank Session is created, sidebar reopening on the homepage and plugin list/detail pages, the fixed transparent drag region while the original plugin title scrolls, and clickable actions even when scrolled into that region. It also opens the Desktop settings section inside the official Settings dialog, verifies preference and Profile commands, and renders the exact standalone recovery artifact with no Host dependency. Native IPC is simulated for these browser checks. After building, install the test browser once and run:
 
 ```sh
-corepack yarn workspace dsh-desktop-next exec playwright install chromium
-corepack yarn workspace dsh-desktop-next verify:window-controls
-corepack yarn workspace dsh-desktop-next verify:onboarding
+corepack pnpm --filter dsh-desktop-next exec playwright install chromium
+corepack pnpm --filter dsh-desktop-next run verify:window-controls
+corepack pnpm --filter dsh-desktop-next run verify:onboarding
 ```
 
 Set `DSH_NEXT_TEST_BROWSER_CHANNEL=chrome` to use an installed Google Chrome instead. Screenshots are saved under `dsh-desktop-next/.desktop-next/verification/`. Native macOS window movement still needs manual verification. Version-scoped package patches share the official conversation header frame and sidebar controls with the empty homepage. On plugin list and detail pages, the collapsed-sidebar toggle reuses the official control and stays fixed beside the macOS traffic lights, independently of content width and scrolling. It does not add the conversation's New Session action. The plugin page keeps its original title, toolbar, layout, and scrolling behavior. An invisible 52px drag region belongs to the stable main column and reaches the top and side gutters without taking layout space or painting over content. Buttons, links, inputs, and other interactive controls opt out of native dragging, including when they scroll into this region.
 
 ## App icon resources
 
-`build/app-icon.icon` is the editable Icon Composer project with the final NEXT badge layout and System Dark background. On macOS with Xcode 27 and Icon Composer, run `corepack yarn icons:export --channel next` from the repository root to refresh `build/app-icon.png`, the Windows `build/app-icon.ico`, native compiler output `build/app-icon.icns`, and the development Dock image `build/app-icon-mac.png`. Commit these files and `build/app-icon.resources.json` together; `corepack yarn icons:check` verifies them headlessly on any OS.
+`build/app-icon.icon` is the editable Icon Composer project with the final NEXT badge layout and System Dark background. On macOS with Xcode 27 and Icon Composer, run `corepack pnpm --filter dsh-desktop-next run icons:export --channel next` from the repository root to refresh `build/app-icon.png`, the Windows `build/app-icon.ico`, native compiler output `build/app-icon.icns`, and the development Dock image `build/app-icon-mac.png`. Commit these files and `build/app-icon.resources.json` together; `node ../scripts/export-app-icons.mjs --check --channel next` verifies them headlessly on any OS.
 
 Next macOS packaging consumes the layered `.icon` source and compiles `Assets.car`, as Stable and Beta do. The raster Dock image is used only during unpackaged development; Windows and Linux windows use their ICO and PNG exports respectively.
 
@@ -94,14 +94,14 @@ Client requests require an active user gesture and the owning foreground window.
 
 Screen sharing uses `navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })` directly from the user's Share button. On macOS 15 and later, Electron uses the system picker; other systems use a native source-selection menu. No source is selected automatically. Per-capture system-picker consent can differ from the global screen-recording grant. The permission service does not record media, and screen sharing does not grant computer input control. The development Electron app already declares microphone usage in its Info.plist; a future packaged Next app must retain `NSMicrophoneUsageDescription` with the product's explanation.
 
-The official `@deepseek-ai/dsh-experimental-computer-use-cua-driver-native@0.1.6-alpha.2` provider is bundled and **disabled by default**. Use the Computer Use section at the top of **Plugins** to enable it and read its live loading status. This entry uses the official Plugins slot, switch and plugin manager; its Profile row ID is `computer-use-cua-driver-native`. The shared `computer-use` registry is already provided. Tools and screenshots use existing conversation tool cards and image attachments; screenshot understanding requires a model route declaring image input. The gear to the left of the switch opens the permission dialog.
+The official `@deepseek-ai/dsh-experimental-computer-use-cua-driver-native@0.1.7-rc.2` provider is bundled and **disabled by default**. Use the Computer Use section at the top of **Plugins** to enable it and read its live loading status. This entry uses the official Plugins slot, switch and plugin manager; its Profile row ID is `computer-use-cua-driver-native`. The shared `computer-use` registry is already provided. Tools and screenshots use existing conversation tool cards and image attachments; screenshot understanding requires a model route declaring image input. The gear to the left of the switch opens the permission dialog.
 
-The version-scoped Yarn patch at `patches/dsh-experimental-computer-use-cua-driver-native@0.1.6-alpha.2.patch` routes `check_permissions` through `desktopPermissions` when available. `prompt: true` reveals the permission dialog for missing grants, then the driver performs a read-only check with `prompt: false`. The driver remains the authority for its own actual permission status; no grant is inferred from the Desktop response. Without the Desktop service, the provider retains upstream behavior. The pinned `@trycua/cua-driver@0.28.0` binary, operation tools, image handling and shutdown ownership are unchanged. Only one provider can register, but that does not serialize concurrent Sessions operating the same desktop.
+The version-scoped Yarn patch at `patches/dsh-experimental-computer-use-cua-driver-native@0.1.7-rc.2.patch` routes `check_permissions` through `desktopPermissions` when available. `prompt: true` reveals the permission dialog for missing grants, then the driver performs a read-only check with `prompt: false`. The driver remains the authority for its own actual permission status; no grant is inferred from the Desktop response. Without the Desktop service, the provider retains upstream behavior. The pinned `@trycua/cua-driver@0.28.0` binary, operation tools, image handling and shutdown ownership are unchanged. Only one provider can register, but that does not serialize concurrent Sessions operating the same desktop.
 
 Unit tests exercise the installed patched provider with a fake native SDK. The optional native activation check requires a supported SDK platform, loads and shuts down the real provider, and sends no input or screenshots:
 
 ```sh
-corepack yarn workspace dsh-desktop-next verify:host --computer-use
+corepack pnpm --filter dsh-desktop-next run verify:host --computer-use
 ```
 
 The optional `verify:window-controls --computer-use` smoke also enables and disables the real provider through the official frontend in headless Chromium, without calling its computer tools. Native OS consent and actual computer actions still need manual acceptance.
@@ -153,10 +153,10 @@ Packaging entry points and the Next update client are implemented. Releases stil
 The product version is `2.0.14-next`. Run from the repository root:
 
 ```sh
-corepack yarn package:dir:next
-corepack yarn dist:mac-smoke:next
-corepack yarn dist:mac:next
-corepack yarn dist:win:next
+corepack pnpm --filter dsh-desktop-next run package:dir
+corepack pnpm --filter dsh-desktop-next run dist:mac-smoke
+corepack pnpm --filter dsh-desktop-next run dist:mac
+corepack pnpm --filter dsh-desktop-next run dist:win
 ```
 
 Packaging reuses Beta's directory builds, universal macOS DMGs, signing/notarization preflight and Windows x64 NSIS flow, including its unsigned Windows build policy. Runtime layout remains `asar: false`, with `RunAsNode`, a complete dependency closure and both macOS native architectures. Next does not require the legacy shell's fs-ext lock binding. These commands build artifacts without publishing or opening a GUI; release gates still require the latest AA preparation and repository checks.

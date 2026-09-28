@@ -2,46 +2,46 @@
 
 [English](README.md) | 中文
 
-基于 DeepSeek Harness **0.1.6-alpha.2** 的独立实验包。主窗口直接加载官方发布的 `@deepseek-ai/dsh-web-frontend`，复用官方 Web 应用、插件管理器和基本桌面样式；Next 添加系统托盘、桌面设置和工具、Profile、恢复、Agents Anywhere 手机远控、社区市场和 dshmarket。
+基于 DeepSeek Harness **0.1.7-rc.2** 的独立实验包。主窗口直接加载官方发布的 `@deepseek-ai/dsh-web-frontend`，复用官方 Web 应用、插件管理器和基本桌面样式；Next 添加系统托盘、桌面设置和工具、Profile、恢复、Agents Anywhere 手机远控、社区市场和 dshmarket。
 
 ## 开发与验证
 
-在外层仓库根目录执行，使用 Node.js `^22.19.0` 或 `>=24.0.0`，以及 Corepack 提供的 Yarn 4.18.0：
+在外层仓库根目录执行，使用 Node.js `^22.19.0` 或 `>=24.0.0`，以及根 pnpm 发行版（Corepack）。`dsh-desktop-next` 是根 pnpm workspace 成员，其 `@deepseek-ai/dsh-*` 依赖经 `linkWorkspacePackages` 解析到 sibling fork 源：
 
 ```sh
-git submodule update --init --recursive
-corepack yarn install --immutable
-corepack yarn check:next
-corepack yarn dev:next
+corepack pnpm install --frozen-lockfile
+corepack pnpm --filter dsh-community-market build
+corepack pnpm --filter dsh-desktop-next run check
+corepack pnpm --filter dsh-desktop-next run dev
 ```
 
-`check:next` 构建市场与 Next，执行类型检查、单元测试、官方前端与沙箱 preload 检查，以及临时目录中的真实 Host 检查，不打开图形应用。后者使用离线本地测试插件验证 pnpm、市场卸载与重启请求、鉴权、Profile 切换和恢复后启动，并清理测试进程与文件。额外的真实运行时检查覆盖原生 HTTP/WebSocket 访问限制、浏览器访问切换、损坏清单、独立安全模式、全局补丁修复与进程退出。
+`check` 构建 Next，执行类型检查、单元测试、官方前端与沙箱 preload 检查，以及临时目录中的真实 Host 检查，不打开图形应用。后者使用离线本地测试插件验证 pnpm、市场卸载与重启请求、鉴权、Profile 切换和恢复后启动，并清理测试进程与文件。额外的真实运行时检查覆盖原生 HTTP/WebSocket 访问限制、浏览器访问切换、损坏清单、独立安全模式、全局补丁修复与进程退出。市场源变更后先构建 Market。
 
-`dev:next` 是显式的图形启动命令；已有构建可用 `corepack yarn start:next` 启动。Electron 二进制尚未缓存时会下载。需要额外检查真实 Electron Node 模式时，先完成构建，再运行：
+`dev` 是显式的图形启动命令；已有构建可用 `corepack pnpm --filter dsh-desktop-next run start` 启动。Electron 二进制尚未缓存时会下载。需要额外检查真实 Electron Node 模式时，先完成构建，再运行：
 
 ```sh
-corepack yarn workspace dsh-desktop-next verify:host:electron
+corepack pnpm --filter dsh-desktop-next run verify:host:electron
 ```
 
 此检查不打开 Electron 窗口。主窗口呈现、原生对话框和真实手机连接仍需手动验收。
 
-CI 还会在 Linux 中运行 `xvfb-run --auto-servernum corepack yarn workspace dsh-desktop-next verify:protocol --no-sandbox`。此独立测试使用真实 Electron 渲染进程、自定义协议和临时 Host，在关闭普通浏览器访问时验证市场源操作，并拒绝其他页面来源的请求。它不属于跨平台的 `check:next` 命令；关闭沙箱的参数仅用于这个隔离的 CI 进程。
+CI 还会在 Linux 中运行 `xvfb-run --auto-servernum corepack pnpm --filter dsh-desktop-next run verify:protocol --no-sandbox`。此独立测试使用真实 Electron 渲染进程、自定义协议和临时 Host，在关闭普通浏览器访问时验证市场源操作，并拒绝其他页面来源的请求。它不属于跨平台的 `check` 命令；关闭沙箱的参数仅用于这个隔离的 CI 进程。
 
 同一 Linux/Xvfb 环境中的 `verify:sidebar-browser --no-sandbox` 使用同时返回 `frame-ancestors 'none'` 和 `X-Frame-Options: DENY` 的本地测试页，验证 iframe 被拦截、凭租约挂载的真实访客页成功加载、访客自身的安全设置、应用 Cookie 与 preload 隔离、原生历史、伪造租约被拒、工作区分区隔离，以及释放后的清理。跨平台的 `verify:window-controls` 则通过模拟原生接口检查官方工具栏、分栏缩放、弹窗遮挡、标签切换与关闭，并验证普通 Web 客户端仍使用 iframe。
 
 macOS 侧栏和标题栏回归检查会用临时数据目录，在无界面的 Chromium 中运行官方前端的 Desktop 启动分支。测试使用与 Next 相同的入口文档，通过模拟的 preload 接口提供真实 Host 注入，并断言已进入 Desktop 传输模式；随后验证选择工作区之前与创建真实空白会话之后复用同一套官方顶栏，首页及插件列表／详情页可重新展开侧栏，透明拖动区域保持固定而插件标题按原样滚动，控件滚入拖动区域后仍可点击。测试还会打开官方设置中的“桌面设置”分区，验证设置和 Profile 操作，并在没有 Host 依赖时渲染独立恢复窗口的实际构建产物。这些浏览器检查使用模拟的原生 IPC。构建后，首次安装测试浏览器并运行：
 
 ```sh
-corepack yarn workspace dsh-desktop-next exec playwright install chromium
-corepack yarn workspace dsh-desktop-next verify:window-controls
-corepack yarn workspace dsh-desktop-next verify:onboarding
+corepack pnpm --filter dsh-desktop-next exec playwright install chromium
+corepack pnpm --filter dsh-desktop-next run verify:window-controls
+corepack pnpm --filter dsh-desktop-next run verify:onboarding
 ```
 
 设置 `DSH_NEXT_TEST_BROWSER_CHANNEL=chrome` 可使用已安装的 Google Chrome。截图保存在 `dsh-desktop-next/.desktop-next/verification/`。macOS 原生窗口拖动仍需手工验证。版本限定的包补丁让无会话首页复用官方会话顶栏框架及侧栏控件。在插件列表和详情页收起侧栏后，复用官方展开按钮，固定在 macOS 红黄绿按钮右侧，位置不受内容宽度和页面滚动影响，不额外显示会话页的“新会话”按钮。插件页保留原有标题、操作栏、布局与滚动行为。在不滚动的主栏顶部设置 52px 高的透明拖动区域，覆盖顶部及两侧留白，不占布局空间、不遮挡内容。按钮、链接、输入框等交互控件排除原生拖动，滚入该区域后仍可点击。
 
 ## 应用图标资源
 
-`build/app-icon.icon` 是可编辑的 Icon Composer 工程，保留最终 NEXT 徽标布局和 System Dark 背景。在安装了 Xcode 27 和 Icon Composer 的 Mac 上，从仓库根目录运行 `corepack yarn icons:export --channel next`，可更新 `build/app-icon.png`、Windows 使用的 `build/app-icon.ico`、原生编译生成的 `build/app-icon.icns` 和开发运行的 Dock 图标 `build/app-icon-mac.png`。这些文件需与 `build/app-icon.resources.json` 一起提交；`corepack yarn icons:check` 可在任何系统中无界面验证。
+`build/app-icon.icon` 是可编辑的 Icon Composer 工程，保留最终 NEXT 徽标布局和 System Dark 背景。在安装了 Xcode 27 和 Icon Composer 的 Mac 上，从仓库根目录运行 `corepack pnpm --filter dsh-desktop-next run icons:export --channel next`，可更新 `build/app-icon.png`、Windows 使用的 `build/app-icon.ico`、原生编译生成的 `build/app-icon.icns` 和开发运行的 Dock 图标 `build/app-icon-mac.png`。这些文件需与 `build/app-icon.resources.json` 一起提交；`node scripts/export-app-icons.mjs --check --channel next` 可在任何系统中无界面验证。
 
 Next 的 macOS 打包与 Stable、Beta 一样，直接使用分层 `.icon` 源工程编译 `Assets.car`。PNG Dock 图标仅用于未打包的开发运行；Windows 和 Linux 窗口分别使用 ICO 与 PNG 导出资源。
 
@@ -94,14 +94,14 @@ export async function record(ctx: Context) {
 
 屏幕共享应在用户点击“共享”时直接调用 `navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })`。macOS 15 及以上使用 Electron 的系统选择器，其余系统使用原生菜单选择来源，不自动选择屏幕。系统选择器的单次共享授权可能不同于全局屏幕录制权限。权限服务本身不录制媒体，屏幕共享也不授予电脑输入控制能力。开发使用的 Electron 应用已经在 Info.plist 中声明麦克风用途；将来打包 Next 时必须保留 `NSMicrophoneUsageDescription`，并填写产品用途说明。
 
-内置官方 `@deepseek-ai/dsh-experimental-computer-use-cua-driver-native@0.1.6-alpha.2`，**默认停用**。在**插件**页顶部的 Computer Use 分区中启用，并查看实际加载状态。入口复用官方插件槽位、开关和插件管理服务；Profile 条目 ID 为 `computer-use-cua-driver-native`。共享的 `computer-use` 注册服务已提供。操作和截图沿用现有对话工具卡片及图片附件；理解截图需要模型路由声明支持图片输入。开关左侧的齿轮打开授权弹窗。
+内置官方 `@deepseek-ai/dsh-experimental-computer-use-cua-driver-native@0.1.7-rc.2`，**默认停用**。在**插件**页顶部的 Computer Use 分区中启用，并查看实际加载状态。入口复用官方插件槽位、开关和插件管理服务；Profile 条目 ID 为 `computer-use-cua-driver-native`。共享的 `computer-use` 注册服务已提供。操作和截图沿用现有对话工具卡片及图片附件；理解截图需要模型路由声明支持图片输入。开关左侧的齿轮打开授权弹窗。
 
-版本限定的 Yarn 补丁位于 `patches/dsh-experimental-computer-use-cua-driver-native@0.1.6-alpha.2.patch`。存在 `desktopPermissions` 时，`check_permissions` 通过桌面服务查询权限；`prompt: true` 为缺失的权限打开授权弹窗，再以 `prompt: false` 由驱动执行只读检查。驱动始终报告其实际权限，不根据桌面返回值假定授权成功。没有桌面服务时保留上游行为。固定的 `@trycua/cua-driver@0.28.0` 二进制、操作工具、图片处理和关闭流程保持上游实现。只能注册一个 provider，但这不会自动串行化多个会话对同一桌面的操作。
+版本限定的 Yarn 补丁位于 `patches/dsh-experimental-computer-use-cua-driver-native@0.1.7-rc.2.patch`。存在 `desktopPermissions` 时，`check_permissions` 通过桌面服务查询权限；`prompt: true` 为缺失的权限打开授权弹窗，再以 `prompt: false` 由驱动执行只读检查。驱动始终报告其实际权限，不根据桌面返回值假定授权成功。没有桌面服务时保留上游行为。固定的 `@trycua/cua-driver@0.28.0` 二进制、操作工具、图片处理和关闭流程保持上游实现。只能注册一个 provider，但这不会自动串行化多个会话对同一桌面的操作。
 
 单元测试对安装后的补丁插件使用模拟原生 SDK。可选的原生验证要求 SDK 支持当前平台，会加载并关闭真实插件，不发送输入、不截图：
 
 ```sh
-corepack yarn workspace dsh-desktop-next verify:host --computer-use
+corepack pnpm --filter dsh-desktop-next run verify:host --computer-use
 ```
 
 可选的 `verify:window-controls --computer-use` 检查还会在无窗口 Chromium 中通过官方前端启用和停用真实驱动，不调用电脑操作工具。原生系统授权和实际电脑操作仍需手动验收。
@@ -153,10 +153,10 @@ Next 是正式的 Profile bundle，因此上游插件管理器重新组合配置
 产品版本为 `2.0.14-next`。在仓库根目录运行：
 
 ```sh
-corepack yarn package:dir:next
-corepack yarn dist:mac-smoke:next
-corepack yarn dist:mac:next
-corepack yarn dist:win:next
+corepack pnpm --filter dsh-desktop-next run package:dir
+corepack pnpm --filter dsh-desktop-next run dist:mac-smoke
+corepack pnpm --filter dsh-desktop-next run dist:mac
+corepack pnpm --filter dsh-desktop-next run dist:win
 ```
 
 打包复用 Beta 的目录构建、macOS universal DMG、签名公证预检和 Windows x64 NSIS 流程；Windows 安装包遵循现有未签名构建策略。运行时保持 `asar: false`、`RunAsNode`、完整依赖和双架构原生文件。Next 无需旧壳的 fs-ext 锁模块。所有入口仅构建产物，不发布、不启动 GUI；正式发布仍须先通过 AA 最新构建和仓库检查。

@@ -284,8 +284,9 @@ describe('desktop host process', () => {
 
   it.each([undefined, '', 7])('rejects malformed Platform account identity %s on private IPC', async (userId) => {
     const session = { origin: 'https://platform.deepseek.com', token: 'fixture-secret', userId }
-    const host = hostProcess(projectWithHost(
+    const runtime = projectWithHost(HTTP_HOST.replace("process.send({ type: 'ready'",
       `process.send({ type: 'platform-session', session: ${JSON.stringify(session)} }); process.send({ type: 'ready'`))
+    const host = hostProcess(runtime)
     await expect(host.start()).rejects.toThrow('invalid IPC event')
   })
 

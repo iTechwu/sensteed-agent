@@ -2,6 +2,7 @@ packages:
   - dsh-plugin-desktop
   - dsh-community-fabric
   - dsh-community-market
+  - dsh-desktop-next
   - deepseek-harness/apps/**
   - deepseek-harness/packages/**
   - deepseek-harness/native/**
