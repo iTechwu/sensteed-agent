@@ -8,7 +8,7 @@ const moduleCss = await readFile(new URL('../../../deepseek-harness/packages/cli
 const themeCss = await readFile(new URL('../../../deepseek-harness/packages/client/ui-theme/src/styles/design-platform.css', import.meta.url), 'utf8')
 // Retain local class names but unwrap the CSS Modules global body selector.
 const css = moduleCss.replaceAll(':global(body[data-ds-dark-theme])', 'body[data-ds-dark-theme]')
-const fixture = `<style>${themeCss}body{margin:0;background:var(--dsw-alias-bg-base);font:13px system-ui;color:var(--dsw-alias-label-primary)}${css}</style><main class="root"><div class="hostStatus">Ready to present files</div><div class="presented"><article class="file"><button class="cardPreview" aria-label="Open report"></button><span class="fileIcon">PDF</span><div class="fileBody"><div class="details"><strong class="fileName">Quarterly report.pdf</strong><span class="description">Ready for preview</span></div><div class="split"><button class="open">Open</button><button class="chevron" aria-label="More actions">&#x2304;</button></div></div></article><article class="file"><button class="cardPreview" aria-label="Open brief"></button><span class="fileIcon">DOC</span><div class="fileBody"><div class="details"><strong class="fileName">Product brief.docx</strong><span class="description">Ready for preview</span></div><div class="split"><button class="open">Open</button><button class="chevron" aria-label="More actions">&#x2304;</button></div></div></article></div><button class="toggle">Show fewer files</button></main>`
+const fixture = `<style>${themeCss}body{margin:0;background:var(--dsw-alias-bg-base);font:13px system-ui;color:var(--dsw-alias-label-primary)}${css}</style><main class="root"><div class="hostStatus">Ready to present files</div><div class="presented"><article class="file"><button class="cardPreview" aria-label="Open report"></button><span class="fileIcon">PDF</span><div class="fileBody"><div class="details"><strong class="fileName">Quarterly report.pdf</strong><span class="description">Ready for preview</span></div><div class="actions"><button type="button">Open</button><button type="button" aria-label="More actions">&#x2304;</button></div></div></article><article class="file"><button class="cardPreview" aria-label="Open brief"></button><span class="fileIcon">DOC</span><div class="fileBody"><div class="details"><strong class="fileName">Product brief.docx</strong><span class="description">Ready for preview</span></div><div class="actions"><button type="button">Open</button><button type="button" aria-label="More actions">&#x2304;</button></div></div></article></div><button class="toggle">Show fewer files</button></main>`
 const themes = [
   { name: 'light', background: 'rgb(250, 250, 250)', foreground: 'rgb(15, 17, 21)' },
   { name: 'dark', background: 'rgb(33, 33, 35)', foreground: 'rgb(249, 250, 251)' },
@@ -38,7 +38,7 @@ try {
         cards: [...list.querySelectorAll('.file')].map(card => ({
           radius: getComputedStyle(card).borderRadius,
           iconRadius: getComputedStyle(card.querySelector('.fileIcon')).borderRadius,
-          splitRadius: getComputedStyle(card.querySelector('.split')).borderRadius,
+          actionsPointerEvents: getComputedStyle(card.querySelector('.actions')).pointerEvents,
           background: getComputedStyle(card).backgroundColor,
           color: getComputedStyle(card).color,
           width: Math.round(card.getBoundingClientRect().width),
@@ -48,7 +48,7 @@ try {
       assert.equal(result.columns, viewport.width <= 620 ? 1 : 2)
       assert.equal(result.cards.length, 2)
       assert(
-        result.cards.every(card => card.radius === '18px' && card.iconRadius === '10px' && card.splitRadius === '10px' && card.background === theme.background && card.color === theme.foreground && card.width <= viewport.width),
+        result.cards.every(card => card.radius === '18px' && card.iconRadius === '10px' && card.actionsPointerEvents === 'auto' && card.background === theme.background && card.color === theme.foreground && card.width <= viewport.width),
         `delivery card theme/layout mismatch: ${JSON.stringify({ theme, viewport, result })}`,
       )
       assert(result.scrollWidth <= viewport.width)
@@ -59,4 +59,4 @@ try {
 } finally {
   await browser.close()
 }
-console.log('deliverables-browser: upstream 18px cards, 10px controls, and live light/dark/light theme switching verified at 320px, 390px, 768px, 1024px, and 1440px')
+console.log('deliverables-browser: restored upstream contract (18px cards, 10px icon, clickable actions) and live light/dark/light theme switching verified at 320px, 390px, 768px, 1024px, and 1440px')
