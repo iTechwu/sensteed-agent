@@ -32,11 +32,11 @@ try {
   })
   await page.goto(`http://127.0.0.1:${vite.httpServer.address().port}`)
   await page.getByRole('button', { name: '财务管理', exact: true }).click()
-  await page.getByRole('heading', { name: '财务管理', exact: true }).waitFor()
+  await page.getByRole('heading', { name: '经营总览', exact: true }).waitFor()
   await page.getByText('测试主体', { exact: true }).first().waitFor({ state: 'attached' })
   await page.screenshot({ path: resolve(evidence, 'overview.png') })
   // Every top-level section must render, including empty-data state.
-  for (const tab of ['预算', '经营', '资金', '预警', '数据中心', '录入', '深度分析']) {
+  for (const tab of ['预算执行', '经营分析', '资金分析', '预警中心', '数据中心', '录入', '深度分析']) {
     await page.locator('.sf-tabs').getByRole('button', { name: tab, exact: true }).click()
     await page.screenshot({ path: resolve(evidence, `tab-${tab}.png`) })
   }
@@ -46,12 +46,12 @@ try {
   for (let i = 0; i < count; i++) await analyses.nth(i).click()
   assert.equal(await page.evaluate(() => window.analysisPrompts.length), count)
   assert((await page.evaluate(() => window.analysisPrompts)).every(p => typeof p === 'string' && p.length > 40))
-  await page.locator('.sf-tabs').getByRole('button', { name: '预算', exact: true }).click()
+  await page.locator('.sf-tabs').getByRole('button', { name: '预算执行', exact: true }).click()
   for (const button of await page.locator('.sf-pilltabs button').all()) await button.click()
-  await page.locator('.sf-tabs').getByRole('button', { name: '总览', exact: true }).click()
+  await page.locator('.sf-tabs').getByRole('button', { name: '经营总览', exact: true }).click()
   await page.locator('.sf-kpis').getByText('已打 PR', { exact: true }).click()
   await page.waitForFunction(() => document.querySelector('.sf-pilltabs button[aria-selected="true"]')?.textContent?.includes('台账'))
-  await page.locator('.sf-tabs').getByRole('button', { name: '总览', exact: true }).click()
+  await page.locator('.sf-tabs').getByRole('button', { name: '经营总览', exact: true }).click()
   failBrief = true
   await page.getByRole('button', { name: '刷新数据', exact: true }).click()
   await page.locator('[role="alert"]').waitFor()

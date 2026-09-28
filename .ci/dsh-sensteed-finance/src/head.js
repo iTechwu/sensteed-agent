@@ -7,6 +7,7 @@ const REQUEST_TIMEOUT_MS = 30000
 const { createElement: h, useEffect, useState, useRef, useCallback, useMemo, useSyncExternalStore } = React
 const {
   IconAlarmClockOutlineRegular,
+  IconGaugeOutlineRegular,
   IconCheckOutlineRegular,
   IconChevronDownOutlineRegular,
   IconChevronLeftOutlineRegular,
@@ -72,8 +73,9 @@ const ANALYSIS_ENTRIES = [
 const copy = {
   zh: {
     copyFailed: '无法复制分析指令，请重试。',
-    open: '财务管理', title: '财务管理', subtitle: '总览 · 预算 · 经营 · 资金 · 预警 · 数据中心 · 录入 · 深度分析', close: '关闭财务管理', refresh: '刷新数据', operatorAs: '当前操作者',
-    tabOverview: '总览', tabBudget: '预算', tabOperations: '经营', tabCash: '资金', tabAlerts: '预警', tabDatacenter: '数据中心', tabEntry: '录入', tabAnalyze: '深度分析',
+    open: '财务管理', title: '财务管理', eyebrow: '财务数据中心',
+    descOverview: '集团核心财务指标、预算进度与异常事项', descBudget: '查看已发布预算、实际付款与责任中心差异', descOperations: '预算执行、费用构成与计划实际收支对比', descCash: '资金余额、收支计划与流动性风险', descAlerts: '集中处理预算、资金与数据质量异常', descDatacenter: '财务数据源、质量规则与主数据覆盖', descEntry: '财务数据录入、回填与复核', descAnalyze: '基于财务数据中心 MCP 的可信深度分析', close: '关闭财务管理', refresh: '刷新数据', operatorAs: '当前操作者',
+    tabOverview: '经营总览', tabBudget: '预算执行', tabOperations: '经营分析', tabCash: '资金分析', tabAlerts: '预警中心', tabDatacenter: '数据中心', tabEntry: '录入', tabAnalyze: '深度分析',
     year: '年度', org: '主体', allOrgs: '全部主体（集团）', loading: '正在加载财务数据...', retry: '重新加载', loadError: '数据加载失败', refreshedAt: '更新于', unitWan: '万元', unitYuan: '元', unitNote: '单位：万元', total: '合计',
     kpiBudget: '年度预算', kpiPrSubmitted: '已打 PR', kpiPrEstimated: '预计 PR', kpiPaid: '实际付款', kpiAlerts: '未处理预警', kpiExecRate: '预算执行率', kpiPayRate: 'PR 付款率', kpiNetInflow: '实际净流入', kpiRevenueAch: '收入达成', kpiSpendExec: '支出执行', kpiHealth: '预算健康度',
     trendTitle: 'PR 与付款月度趋势', month: '月份', amount: '金额', empty: '暂无数据', orgSummary: '主体预算执行', alertSummary: '未处理预警 TOP5', orgSummaryFull: '分主体汇总', showFirst: '仅显示前 {n} 条，可缩小范围或翻页', partialLoad: '部分数据块加载失败，当前展示已获取部分；刷新可重试。',
@@ -125,8 +127,9 @@ const copy = {
   },
   en: {
     copyFailed: 'Could not copy the analysis prompt. Please retry.',
-    open: 'Finance', title: 'Finance Workspace', subtitle: 'Overview · Budget · Operations · Cash · Alerts · Data center · Entry · Deep analysis', close: 'Close finance workspace', refresh: 'Refresh', operatorAs: 'Operating as',
-    tabOverview: 'Overview', tabBudget: 'Budget', tabOperations: 'Operations', tabCash: 'Cash', tabAlerts: 'Alerts', tabDatacenter: 'Data center', tabEntry: 'Entry', tabAnalyze: 'Deep analysis',
+    open: 'Finance', title: 'Finance Workspace', eyebrow: 'Finance data center',
+    descOverview: 'Group-level financial metrics, budget progress and exceptions', descBudget: 'Published budgets, actual payments and responsibility-center variance', descOperations: 'Budget execution, cost mix and plan-vs-actual comparison', descCash: 'Cash balance, payment plans and liquidity risk', descAlerts: 'Central handling of budget, cash and data-quality anomalies', descDatacenter: 'Finance data sources, quality rules and master-data coverage', descEntry: 'Finance data entry, backfill and review', descAnalyze: 'Trusted deep analysis on the finance data center MCP', close: 'Close finance workspace', refresh: 'Refresh', operatorAs: 'Operating as',
+    tabOverview: 'Overview', tabBudget: 'Budget execution', tabOperations: 'Operations analysis', tabCash: 'Cash analysis', tabAlerts: 'Alert center', tabDatacenter: 'Data center', tabEntry: 'Entry', tabAnalyze: 'Deep analysis',
     year: 'Year', org: 'Org', allOrgs: 'All orgs (group)', loading: 'Loading finance data...', retry: 'Retry', loadError: 'Failed to load', refreshedAt: 'Updated', unitWan: '10k CNY', unitYuan: 'CNY', unitNote: 'Unit: 10k CNY', total: 'Total',
     kpiBudget: 'Annual budget', kpiPrSubmitted: 'PR submitted', kpiPrEstimated: 'PR estimated', kpiPaid: 'Paid', kpiAlerts: 'Open alerts', kpiExecRate: 'Execution rate', kpiPayRate: 'PR payment rate', kpiNetInflow: 'Net inflow', kpiRevenueAch: 'Revenue attainment', kpiSpendExec: 'Spend execution', kpiHealth: 'Budget health',
     trendTitle: 'PR & payment monthly trend', month: 'Month', amount: 'Amount', empty: 'No data', orgSummary: 'Budget execution by org', alertSummary: 'Top 5 open alerts', orgSummaryFull: 'By org', showFirst: 'Showing first {n} rows; narrow or paginate', partialLoad: 'Some blocks failed to load; showing what succeeded. Refresh to retry.',

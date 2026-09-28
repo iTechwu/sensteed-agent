@@ -11,6 +11,7 @@ window.__ModuleLoader__.load({
     const { createElement: h, useEffect, useState, useRef, useCallback, useMemo, useSyncExternalStore } = React
     const {
       IconAlarmClockOutlineRegular,
+      IconGaugeOutlineRegular,
       IconCheckOutlineRegular,
       IconChevronDownOutlineRegular,
       IconChevronLeftOutlineRegular,
@@ -76,8 +77,9 @@ window.__ModuleLoader__.load({
     const copy = {
       zh: {
         copyFailed: '无法复制分析指令，请重试。',
-        open: '财务管理', title: '财务管理', subtitle: '总览 · 预算 · 经营 · 资金 · 预警 · 数据中心 · 录入 · 深度分析', close: '关闭财务管理', refresh: '刷新数据', operatorAs: '当前操作者',
-        tabOverview: '总览', tabBudget: '预算', tabOperations: '经营', tabCash: '资金', tabAlerts: '预警', tabDatacenter: '数据中心', tabEntry: '录入', tabAnalyze: '深度分析',
+        open: '财务管理', title: '财务管理', eyebrow: '财务数据中心',
+        descOverview: '集团核心财务指标、预算进度与异常事项', descBudget: '查看已发布预算、实际付款与责任中心差异', descOperations: '预算执行、费用构成与计划实际收支对比', descCash: '资金余额、收支计划与流动性风险', descAlerts: '集中处理预算、资金与数据质量异常', descDatacenter: '财务数据源、质量规则与主数据覆盖', descEntry: '财务数据录入、回填与复核', descAnalyze: '基于财务数据中心 MCP 的可信深度分析', close: '关闭财务管理', refresh: '刷新数据', operatorAs: '当前操作者',
+        tabOverview: '经营总览', tabBudget: '预算执行', tabOperations: '经营分析', tabCash: '资金分析', tabAlerts: '预警中心', tabDatacenter: '数据中心', tabEntry: '录入', tabAnalyze: '深度分析',
         year: '年度', org: '主体', allOrgs: '全部主体（集团）', loading: '正在加载财务数据...', retry: '重新加载', loadError: '数据加载失败', refreshedAt: '更新于', unitWan: '万元', unitYuan: '元', unitNote: '单位：万元', total: '合计',
         kpiBudget: '年度预算', kpiPrSubmitted: '已打 PR', kpiPrEstimated: '预计 PR', kpiPaid: '实际付款', kpiAlerts: '未处理预警', kpiExecRate: '预算执行率', kpiPayRate: 'PR 付款率', kpiNetInflow: '实际净流入', kpiRevenueAch: '收入达成', kpiSpendExec: '支出执行', kpiHealth: '预算健康度',
         trendTitle: 'PR 与付款月度趋势', month: '月份', amount: '金额', empty: '暂无数据', orgSummary: '主体预算执行', alertSummary: '未处理预警 TOP5', orgSummaryFull: '分主体汇总', showFirst: '仅显示前 {n} 条，可缩小范围或翻页', partialLoad: '部分数据块加载失败，当前展示已获取部分；刷新可重试。',
@@ -129,8 +131,9 @@ window.__ModuleLoader__.load({
       },
       en: {
         copyFailed: 'Could not copy the analysis prompt. Please retry.',
-        open: 'Finance', title: 'Finance Workspace', subtitle: 'Overview · Budget · Operations · Cash · Alerts · Data center · Entry · Deep analysis', close: 'Close finance workspace', refresh: 'Refresh', operatorAs: 'Operating as',
-        tabOverview: 'Overview', tabBudget: 'Budget', tabOperations: 'Operations', tabCash: 'Cash', tabAlerts: 'Alerts', tabDatacenter: 'Data center', tabEntry: 'Entry', tabAnalyze: 'Deep analysis',
+        open: 'Finance', title: 'Finance Workspace', eyebrow: 'Finance data center',
+        descOverview: 'Group-level financial metrics, budget progress and exceptions', descBudget: 'Published budgets, actual payments and responsibility-center variance', descOperations: 'Budget execution, cost mix and plan-vs-actual comparison', descCash: 'Cash balance, payment plans and liquidity risk', descAlerts: 'Central handling of budget, cash and data-quality anomalies', descDatacenter: 'Finance data sources, quality rules and master-data coverage', descEntry: 'Finance data entry, backfill and review', descAnalyze: 'Trusted deep analysis on the finance data center MCP', close: 'Close finance workspace', refresh: 'Refresh', operatorAs: 'Operating as',
+        tabOverview: 'Overview', tabBudget: 'Budget execution', tabOperations: 'Operations analysis', tabCash: 'Cash analysis', tabAlerts: 'Alert center', tabDatacenter: 'Data center', tabEntry: 'Entry', tabAnalyze: 'Deep analysis',
         year: 'Year', org: 'Org', allOrgs: 'All orgs (group)', loading: 'Loading finance data...', retry: 'Retry', loadError: 'Failed to load', refreshedAt: 'Updated', unitWan: '10k CNY', unitYuan: 'CNY', unitNote: 'Unit: 10k CNY', total: 'Total',
         kpiBudget: 'Annual budget', kpiPrSubmitted: 'PR submitted', kpiPrEstimated: 'PR estimated', kpiPaid: 'Paid', kpiAlerts: 'Open alerts', kpiExecRate: 'Execution rate', kpiPayRate: 'PR payment rate', kpiNetInflow: 'Net inflow', kpiRevenueAch: 'Revenue attainment', kpiSpendExec: 'Spend execution', kpiHealth: 'Budget health',
         trendTitle: 'PR & payment monthly trend', month: 'Month', amount: 'Amount', empty: 'No data', orgSummary: 'Budget execution by org', alertSummary: 'Top 5 open alerts', orgSummaryFull: 'By org', showFirst: 'Showing first {n} rows; narrow or paginate', partialLoad: 'Some blocks failed to load; showing what succeeded. Refresh to retry.',
@@ -548,19 +551,19 @@ window.__ModuleLoader__.load({
     // dsw token 映射前端四色语义：rose=error / amber=warn / emerald=success / sky+blue=business。
     // pill/徽章底色用 color-mix 低透明度，浅色/深色皮肤均由宿主 token 适配。
     const css = `
-    .sf-root{--sf-rose:var(--dsw-alias-state-error-primary);--sf-amber:var(--dsw-alias-state-warn-primary);--sf-green:var(--dsw-alias-state-success-primary);--sf-blue:var(--dsw-alias-state-business-primary);--sf-sky:var(--dsw-alias-state-business-primary);--sf-line:var(--dsw-alias-border-l1);--sf-line2:var(--dsw-alias-border-l2);--sf-bg:var(--dsw-alias-bg-base);--sf-card:var(--dsw-alias-bg-layer-1);--sf-hover:var(--dsw-alias-bg-layer-2);--sf-ink:var(--dsw-alias-label-primary);--sf-ink2:var(--dsw-alias-label-secondary);--sf-ink3:var(--dsw-alias-label-tertiary);--sf-brand:var(--dsw-alias-brand-primary);--sf-on-brand:var(--dsw-alias-label-primary-foreground)}
+    .sf-root{--sf-rose:var(--dsw-alias-state-error-primary);--sf-amber:var(--dsw-alias-state-warn-primary);--sf-green:var(--dsw-alias-state-success-primary);--sf-blue:var(--dsw-alias-state-business-primary);--sf-sky:var(--dsw-alias-state-business-primary);--sf-line:var(--dsw-alias-border-l1);--sf-line2:var(--dsw-alias-border-l2);--sf-bg:color-mix(in srgb,var(--dsw-alias-bg-layer-2) 45%,var(--dsw-alias-bg-base));--sf-card:var(--dsw-alias-bg-base);--sf-hover:var(--dsw-alias-bg-layer-2);--sf-ink:var(--dsw-alias-label-primary);--sf-ink2:var(--dsw-alias-label-secondary);--sf-ink3:var(--dsw-alias-label-tertiary);--sf-brand:var(--dsw-alias-brand-primary);--sf-on-brand:var(--dsw-alias-label-primary-foreground)}
     .sf-button{display:flex;width:36px;height:36px;align-items:center;justify-content:center;gap:8px;border:0;border-radius:6px;background:transparent;color:var(--sf-ink2);cursor:pointer}.sf-button:hover{background:var(--sf-hover);color:var(--sf-ink)}.sf-wide{width:100%;height:34px;justify-content:flex-start;padding:0 10px}.sf-wide span{font-size:13px}
-    .sf-overlay{position:fixed;inset:0;z-index:510;background:var(--sf-bg);color:var(--sf-ink);font-size:13px}.sf-shell{display:grid;grid-template-rows:auto auto auto 1fr;width:100%;height:100%;overflow:hidden}
-    .sf-header{display:flex;min-height:72px;align-items:center;justify-content:space-between;gap:18px;padding:14px 24px;border-bottom:1px solid var(--sf-line)}.sf-header h1{margin:0;font-size:18px;line-height:1.3}.sf-header p{margin:4px 0 0;color:var(--sf-ink2);font-size:12px}.sf-header-buttons{display:flex;gap:6px}
+    .sf-overlay{position:fixed;inset:0;z-index:510;background:var(--sf-bg);color:var(--sf-ink);font-size:13px}.sf-shell{display:grid;grid-template-rows:auto auto 1fr;width:100%;height:100%;overflow:hidden}
+    .sf-header{display:flex;min-height:72px;align-items:flex-end;justify-content:space-between;gap:18px;padding:14px 28px 16px;border-bottom:1px solid var(--sf-line);flex-wrap:wrap}.sf-header-main{min-width:0}.sf-eyebrow{margin:0 0 2px;color:var(--sf-ink3);font-size:11px;font-weight:650;letter-spacing:.06em;text-transform:uppercase}.sf-header h1{margin:0;font-size:20px;line-height:1.35;font-weight:650}.sf-desc{margin:2px 0 0;color:var(--sf-ink2);font-size:12.5px}.sf-header-side{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap}.sf-filter{display:grid;gap:4px}.sf-filter>span{color:var(--sf-ink3);font-size:11px}.sf-filter select{min-width:130px;height:30px;padding:4px 10px;border:1px solid var(--sf-line2);border-radius:6px;background:var(--sf-card);color:inherit;font:inherit;font-size:12.5px;cursor:pointer}.sf-header-buttons{display:flex;gap:6px}
     .sf-icon-button{display:grid;width:36px;height:36px;place-items:center;border:1px solid var(--sf-line);border-radius:6px;background:var(--sf-card);color:inherit;cursor:pointer}.sf-icon-button:hover{background:var(--sf-hover)}
-    .sf-toolbar{display:flex;align-items:center;gap:14px;padding:10px 28px;border-bottom:1px solid var(--sf-line);flex-wrap:wrap}.sf-toolbar .sf-form-row{margin:0}
-    .sf-tabs{display:flex;gap:2px;padding:0 28px;border-bottom:1px solid var(--sf-line);overflow-x:auto}.sf-tabs button{height:40px;padding:0 14px;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--sf-ink2);font:inherit;font-size:13px;white-space:nowrap;cursor:pointer}.sf-tabs button[aria-current]{border-bottom-color:var(--sf-brand);color:var(--sf-ink);font-weight:650}
-    .sf-content{overflow:auto;padding:18px 28px 44px}.sf-content.sf-refreshing{opacity:.62;transition:opacity .2s}
+
+    .sf-tabs{display:inline-flex;gap:2px;margin:12px 28px 0;padding:3px;border:1px solid var(--sf-line);border-radius:8px;background:color-mix(in srgb,var(--dsw-alias-bg-layer-2) 62%,transparent);width:fit-content;max-width:calc(100% - 56px);overflow-x:auto}.sf-tabs button{height:30px;padding:0 14px;border:0;border-radius:6px;background:transparent;color:var(--sf-ink2);font:inherit;font-size:12.5px;white-space:nowrap;cursor:pointer}.sf-tabs button[aria-current]{background:var(--sf-card);color:var(--sf-ink);font-weight:650;box-shadow:0 1px 2px color-mix(in srgb,var(--sf-ink) 8%,transparent)}
+    .sf-content{overflow:auto;padding:16px 28px 44px}.sf-content.sf-refreshing{opacity:.62;transition:opacity .2s}
     .sf-view{display:grid;gap:16px;max-width:1680px;margin:0 auto}
     /* 卡片：去阴影直角 + 标题分隔线（对齐前端 Card 约定） */
     .sf-card{min-width:0;border:1px solid var(--sf-line);border-radius:8px;background:var(--sf-card)}.sf-card-head{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--sf-line)}.sf-card-head h2{margin:0;font-size:13px;font-weight:650}.sf-card-unit{color:var(--sf-ink3);font-size:11px}.sf-card-actions{display:flex;align-items:center;gap:8px;margin-left:auto}.sf-card-body{padding:12px 16px}.sf-card-body.is-flush{padding:0}
     /* KPI 卡 */
-    .sf-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}.sf-kpi{display:grid;gap:6px;align-content:start;padding:14px 16px;border:1px solid var(--sf-line);border-radius:8px;background:var(--sf-card)}.sf-kpi.is-clickable{cursor:pointer;transition:border-color .15s}.sf-kpi.is-clickable:hover{border-color:var(--sf-brand)}.sf-kpi-top{display:flex;align-items:center;justify-content:space-between}.sf-kpi-label{color:var(--sf-ink2);font-size:12px}.sf-kpi-icon{display:grid;width:26px;height:26px;place-items:center;border:1px solid var(--sf-line);border-radius:6px;background:var(--sf-hover);color:var(--sf-ink2)}.sf-kpi-value{font-size:22px;line-height:1.15;font-weight:650;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}.sf-kpi.is-neg .sf-kpi-value{color:color-mix(in srgb,var(--sf-rose) 70%,var(--sf-ink))}.sf-kpi-hint{color:var(--sf-ink3);font-size:11px}.sf-hint-up{color:color-mix(in srgb,var(--sf-green) 75%,var(--sf-ink))}.sf-hint-down{color:color-mix(in srgb,var(--sf-rose) 75%,var(--sf-ink))}.sf-hint-warn{color:color-mix(in srgb,var(--sf-amber) 75%,var(--sf-ink))}
+    .sf-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}.sf-kpi{display:grid;gap:6px;align-content:start;padding:14px 16px;border:1px solid var(--sf-line);border-radius:8px;background:var(--sf-card)}.sf-kpi.is-clickable{cursor:pointer;transition:border-color .15s}.sf-kpi.is-clickable:hover{border-color:var(--sf-brand)}.sf-kpi-top{display:flex;align-items:center;justify-content:space-between}.sf-kpi-label{color:var(--sf-ink2);font-size:12px}.sf-kpi-icon{display:grid;width:32px;height:32px;place-items:center;border:1px solid var(--sf-line);border-radius:6px;background:color-mix(in srgb,var(--sf-hover) 55%,transparent);color:color-mix(in srgb,var(--sf-ink) 70%,var(--sf-ink2))}.sf-kpi-value{font-size:20px;line-height:1.2;font-weight:650;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}.sf-kpi.is-neg .sf-kpi-value{color:color-mix(in srgb,var(--sf-rose) 70%,var(--sf-ink))}.sf-kpi-hint{color:var(--sf-ink3);font-size:11px}.sf-hint-up{color:color-mix(in srgb,var(--sf-green) 75%,var(--sf-ink))}.sf-hint-down{color:color-mix(in srgb,var(--sf-rose) 75%,var(--sf-ink))}.sf-hint-warn{color:color-mix(in srgb,var(--sf-amber) 75%,var(--sf-ink))}
     /* 统计卡（预警中心）：可点击筛选，激活 ring */
     .sf-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.sf-stat{display:grid;gap:2px;justify-items:start;padding:12px 14px;border:1px solid var(--sf-line);border-radius:8px;background:var(--sf-card);color:inherit;font:inherit;text-align:left}.sf-stat.is-clickable{cursor:pointer}.sf-stat.is-active{box-shadow:0 0 0 2px var(--sf-brand)}.sf-stat strong{font-size:20px;font-variant-numeric:tabular-nums}.sf-stat span{color:var(--sf-ink2);font-size:12px}.sf-stat-rose strong{color:color-mix(in srgb,var(--sf-rose) 75%,var(--sf-ink))}.sf-stat-amber strong{color:color-mix(in srgb,var(--sf-amber) 75%,var(--sf-ink))}.sf-stat-sky strong{color:color-mix(in srgb,var(--sf-sky) 75%,var(--sf-ink))}.sf-stat-green strong{color:color-mix(in srgb,var(--sf-green) 75%,var(--sf-ink))}
     /* 徽章与 pill */
@@ -599,7 +602,7 @@ window.__ModuleLoader__.load({
     .sf-timeline{display:grid;gap:0}.sf-timeline-row{display:grid;grid-template-columns:16px 1fr auto;gap:10px;padding:8px 0;border-bottom:1px solid var(--sf-line);align-items:start}.sf-timeline-row:last-child{border-bottom:0}.sf-timeline-dot{width:8px;height:8px;border-radius:50%;margin-top:5px;background:var(--sf-blue)}.sf-timeline-dot.is-green{background:var(--sf-green)}.sf-timeline-dot.is-rose{background:var(--sf-rose)}.sf-timeline-dot.is-amber{background:var(--sf-amber)}.sf-timeline-main{display:grid;gap:2px;min-width:0}.sf-timeline-main small{color:var(--sf-ink3);font-size:11px}
     .sf-pager{display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:8px 2px;color:var(--sf-ink2);font-size:12px}.sf-pager button{display:grid;place-items:center;width:26px;height:26px;border:1px solid var(--sf-line2);border-radius:6px;background:var(--sf-card);color:inherit;cursor:pointer}.sf-pager button:disabled{opacity:.4;cursor:default}
     .sf-inline-form{display:grid;gap:10px;margin-bottom:12px;padding:12px;border:1px solid var(--sf-line2);border-radius:8px}
-    @media(max-width:900px){.sf-header,.sf-toolbar,.sf-tabs{padding-left:16px;padding-right:16px}.sf-content{padding:16px}.sf-kpis,.sf-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.sf-two-col{grid-template-columns:1fr}.sf-form-row{grid-template-columns:110px minmax(0,1fr)}}
+    @media(max-width:900px){.sf-header{padding:12px 16px}.sf-tabs{margin-left:16px;margin-right:16px;max-width:calc(100% - 32px)}.sf-content{padding:16px}.sf-kpis,.sf-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.sf-two-col{grid-template-columns:1fr}.sf-form-row{grid-template-columns:110px minmax(0,1fr)}}
     `
 
     // 片段 5/7 视图：总览（对齐前端 overview-section：5 KPI + 月度趋势 + 主体执行 + 收支达成 + 预警 TOP5）
@@ -2311,6 +2314,18 @@ window.__ModuleLoader__.load({
 
     const sfAnalysisGrid = '.sf-analysis-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}.sf-analysis-card{display:grid;gap:10px;align-content:start;padding:16px}.sf-analysis-head{display:flex;align-items:center;gap:8px}.sf-analysis-head h2{margin:0;font-size:13px}.sf-analysis-card>p{margin:0;color:var(--sf-ink2);font-size:12px;line-height:1.55}.sf-analysis-card>div:last-child{justify-self:start}'
 
+    // 版块元数据对齐 datasource 网页端 sectionCopy：标题 + 描述随页签切换
+    const SECTION_META = {
+      overview: ['tabOverview', 'descOverview'],
+      budget: ['tabBudget', 'descBudget'],
+      operations: ['tabOperations', 'descOperations'],
+      cash: ['tabCash', 'descCash'],
+      alerts: ['tabAlerts', 'descAlerts'],
+      datacenter: ['tabDatacenter', 'descDatacenter'],
+      entry: ['tabEntry', 'descEntry'],
+      analyze: ['tabAnalyze', 'descAnalyze'],
+    }
+
     function Dashboard({ t }) {
       const [tab, setTab] = useState('overview')
       // 下钻参数：onDrill(target, params) 切 tab 时可带子视图/月份等初始状态
@@ -2391,20 +2406,23 @@ window.__ModuleLoader__.load({
       return h('div', { className: 'sf-overlay sf-root', role: 'dialog', 'aria-modal': true, 'aria-labelledby': 'sf-title' },
         h('main', { className: 'sf-shell', 'aria-labelledby': 'sf-title', ref: shellRef, tabIndex: -1 },
           h('header', { className: 'sf-header' },
-            h('div', null, h('h1', { id: 'sf-title' }, t('title')), h('p', null, operator ? `${t('operatorAs')} ${operator} · ${t('subtitle')}` : t('subtitle'))),
-            h('div', { className: 'sf-header-buttons' },
-              h(Tooltip, { label: t('refresh') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('refresh'), onClick: refresh }, h(IconRefreshOutlineRegular, { size: 16 }))),
-              h(Tooltip, { label: t('close') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('close'), onClick: closeOverlay }, h(IconCloseOutlineRegular, { size: 16 }))))),
-          h('div', { className: 'sf-toolbar' },
-            h(FormRow, { label: t('year') }, h(Select, { value: year, onChange: value => { setYear(value); setDrillParams(null) }, options: yearOptions() })),
-            h(FormRow, { label: t('org') }, h(Select, { value: orgId, onChange: value => { setOrgId(value); setDrillParams(null) }, options: orgs.map(org => [org.id, org.name]), placeholder: t('allOrgs') }))),
+            h('div', { className: 'sf-header-main' },
+              h('p', { className: 'sf-eyebrow' }, t('eyebrow')),
+              h('h1', { id: 'sf-title' }, t(SECTION_META[tab]?.[0] ?? 'title')),
+              h('p', { className: 'sf-desc' }, operator ? `${t('operatorAs')} ${operator} · ${t(SECTION_META[tab]?.[1] ?? 'subtitle')}` : t(SECTION_META[tab]?.[1] ?? 'subtitle'))),
+            h('div', { className: 'sf-header-side' },
+              h('label', { className: 'sf-filter' }, h('span', null, t('year')), h(Select, { value: year, onChange: value => { setYear(value); setDrillParams(null) }, options: yearOptions() })),
+              h('label', { className: 'sf-filter' }, h('span', null, t('org')), h(Select, { value: orgId, onChange: value => { setOrgId(value); setDrillParams(null) }, options: orgs.map(org => [org.id, org.name]), placeholder: t('allOrgs') })),
+              h('div', { className: 'sf-header-buttons' },
+                h(Tooltip, { label: t('refresh') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('refresh'), onClick: refresh }, h(IconRefreshOutlineRegular, { size: 16 }))),
+                h(Tooltip, { label: t('close') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('close'), onClick: closeOverlay }, h(IconCloseOutlineRegular, { size: 16 })))))),
           h('nav', { className: 'sf-tabs', 'aria-label': t('title') }, ...TABS.map(([id, key]) =>
             h('button', { type: 'button', key: id, 'aria-current': tab === id ? 'page' : undefined, onClick: () => { setTab(id); setDrillParams(null) } }, t(key)))),
           h('div', { className: `sf-content${briefState === 'loading' && !brief ? ' sf-refreshing' : ''}`, 'aria-busy': briefState === 'loading' && !brief }, body)))
     }
 
     function Button({ wide, t }) {
-      return h(Tooltip, { label: t('open'), disabled: wide }, h('button', { type: 'button', className: `sf-button${wide ? ' sf-wide' : ''}`, 'aria-label': t('open'), onClick: openOverlay }, h(IconDataOutlineRegular, { size: wide ? 14 : 18 }), wide ? h('span', null, t('open')) : null))
+      return h(Tooltip, { label: t('open'), disabled: wide }, h('button', { type: 'button', className: `sf-button${wide ? ' sf-wide' : ''}`, 'aria-label': t('open'), onClick: openOverlay }, h(IconGaugeOutlineRegular, { size: wide ? 14 : 18 }), wide ? h('span', null, t('open')) : null))
     }
 
     function apply(ctx) {

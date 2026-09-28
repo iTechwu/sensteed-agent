@@ -2,6 +2,18 @@
 
 const sfAnalysisGrid = '.sf-analysis-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}.sf-analysis-card{display:grid;gap:10px;align-content:start;padding:16px}.sf-analysis-head{display:flex;align-items:center;gap:8px}.sf-analysis-head h2{margin:0;font-size:13px}.sf-analysis-card>p{margin:0;color:var(--sf-ink2);font-size:12px;line-height:1.55}.sf-analysis-card>div:last-child{justify-self:start}'
 
+// 版块元数据对齐 datasource 网页端 sectionCopy：标题 + 描述随页签切换
+const SECTION_META = {
+  overview: ['tabOverview', 'descOverview'],
+  budget: ['tabBudget', 'descBudget'],
+  operations: ['tabOperations', 'descOperations'],
+  cash: ['tabCash', 'descCash'],
+  alerts: ['tabAlerts', 'descAlerts'],
+  datacenter: ['tabDatacenter', 'descDatacenter'],
+  entry: ['tabEntry', 'descEntry'],
+  analyze: ['tabAnalyze', 'descAnalyze'],
+}
+
 function Dashboard({ t }) {
   const [tab, setTab] = useState('overview')
   // 下钻参数：onDrill(target, params) 切 tab 时可带子视图/月份等初始状态
@@ -82,20 +94,23 @@ function Dashboard({ t }) {
   return h('div', { className: 'sf-overlay sf-root', role: 'dialog', 'aria-modal': true, 'aria-labelledby': 'sf-title' },
     h('main', { className: 'sf-shell', 'aria-labelledby': 'sf-title', ref: shellRef, tabIndex: -1 },
       h('header', { className: 'sf-header' },
-        h('div', null, h('h1', { id: 'sf-title' }, t('title')), h('p', null, operator ? `${t('operatorAs')} ${operator} · ${t('subtitle')}` : t('subtitle'))),
-        h('div', { className: 'sf-header-buttons' },
-          h(Tooltip, { label: t('refresh') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('refresh'), onClick: refresh }, h(IconRefreshOutlineRegular, { size: 16 }))),
-          h(Tooltip, { label: t('close') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('close'), onClick: closeOverlay }, h(IconCloseOutlineRegular, { size: 16 }))))),
-      h('div', { className: 'sf-toolbar' },
-        h(FormRow, { label: t('year') }, h(Select, { value: year, onChange: value => { setYear(value); setDrillParams(null) }, options: yearOptions() })),
-        h(FormRow, { label: t('org') }, h(Select, { value: orgId, onChange: value => { setOrgId(value); setDrillParams(null) }, options: orgs.map(org => [org.id, org.name]), placeholder: t('allOrgs') }))),
+        h('div', { className: 'sf-header-main' },
+          h('p', { className: 'sf-eyebrow' }, t('eyebrow')),
+          h('h1', { id: 'sf-title' }, t(SECTION_META[tab]?.[0] ?? 'title')),
+          h('p', { className: 'sf-desc' }, operator ? `${t('operatorAs')} ${operator} · ${t(SECTION_META[tab]?.[1] ?? 'subtitle')}` : t(SECTION_META[tab]?.[1] ?? 'subtitle'))),
+        h('div', { className: 'sf-header-side' },
+          h('label', { className: 'sf-filter' }, h('span', null, t('year')), h(Select, { value: year, onChange: value => { setYear(value); setDrillParams(null) }, options: yearOptions() })),
+          h('label', { className: 'sf-filter' }, h('span', null, t('org')), h(Select, { value: orgId, onChange: value => { setOrgId(value); setDrillParams(null) }, options: orgs.map(org => [org.id, org.name]), placeholder: t('allOrgs') })),
+          h('div', { className: 'sf-header-buttons' },
+            h(Tooltip, { label: t('refresh') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('refresh'), onClick: refresh }, h(IconRefreshOutlineRegular, { size: 16 }))),
+            h(Tooltip, { label: t('close') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('close'), onClick: closeOverlay }, h(IconCloseOutlineRegular, { size: 16 })))))),
       h('nav', { className: 'sf-tabs', 'aria-label': t('title') }, ...TABS.map(([id, key]) =>
         h('button', { type: 'button', key: id, 'aria-current': tab === id ? 'page' : undefined, onClick: () => { setTab(id); setDrillParams(null) } }, t(key)))),
       h('div', { className: `sf-content${briefState === 'loading' && !brief ? ' sf-refreshing' : ''}`, 'aria-busy': briefState === 'loading' && !brief }, body)))
 }
 
 function Button({ wide, t }) {
-  return h(Tooltip, { label: t('open'), disabled: wide }, h('button', { type: 'button', className: `sf-button${wide ? ' sf-wide' : ''}`, 'aria-label': t('open'), onClick: openOverlay }, h(IconDataOutlineRegular, { size: wide ? 14 : 18 }), wide ? h('span', null, t('open')) : null))
+  return h(Tooltip, { label: t('open'), disabled: wide }, h('button', { type: 'button', className: `sf-button${wide ? ' sf-wide' : ''}`, 'aria-label': t('open'), onClick: openOverlay }, h(IconGaugeOutlineRegular, { size: wide ? 14 : 18 }), wide ? h('span', null, t('open')) : null))
 }
 
 function apply(ctx) {
