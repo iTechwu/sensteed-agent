@@ -1,17 +1,17 @@
 {
   "repository": "https://github.com/deepseek-ai/deepseek-harness",
-  "commit": "00102833dfaee1da9f48a3a8eae9d34005a75218",
-  "version": "0.1.7-rc.1",
+  "commit": "3d34decd9db3589c89a8ec91533a181cc80b43c4",
+  "version": "0.1.7-rc.2",
   "files": [
     {
       "upstream": "apps/desktop/src/host-process.ts",
       "local": "src/host-process.ts",
-      "upstreamSha256": "fcf374983576db367fc917c00041819716db77a9d611bfcf7790346c11469d77"
+      "upstreamSha256": "6b9d3e558f526b7832020fb43d6682a07a68bf2d5657f26951f50a4f3eabfa28"
     },
     {
       "upstream": "apps/desktop/src/browser-guests.ts",
       "local": "src/browser-guests.ts",
-      "upstreamSha256": "5f3aa314d40c77a303436e834cc76df6cb8732b6a54b40a90495eadd69af59c2"
+      "upstreamSha256": "5911d6bcbce79b68bd951d27da40bf8b8c9ab57b7d715dd0586d5e74e8e515f4"
     },
     {
       "upstream": "apps/desktop/src/preload-browser.ts",
@@ -46,7 +46,7 @@
     {
       "upstream": "apps/desktop/tests/host-process.spec.ts",
       "local": "tests/host-process.spec.ts",
-      "upstreamSha256": "aa6e1af85ab75a06b50eba55666787cc0e2230ead775f997021db2c5e79da6f8"
+      "upstreamSha256": "b539b90d064ba2b52f2a5a2faf3a83d08911cc69f8644bc4783f17dbc98fcb86"
     },
     {
       "upstream": "apps/desktop/tests/node-environment.spec.ts",
@@ -86,7 +86,7 @@
     {
       "upstream": "apps/desktop/src/preload-menu.ts",
       "local": "src/preload-menu.ts",
-      "upstreamSha256": "e9a7383739abbfa6446a6415af9e00c7aabc927a9f479264c98319b7671ea162"
+      "upstreamSha256": "456b5004c2c0c7f511e7b2d732ad1bfc394712cb26c9f38d8852aba75c0d1c60"
     },
     {
       "upstream": "apps/desktop/src/windows-layout.ts",

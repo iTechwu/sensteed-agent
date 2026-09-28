@@ -264,7 +264,8 @@ function openMain(): void {
   mainWindow = createWindow('preload-app.cjs', true)
   const owner = mainWindow
   // The guest owner installs its own navigation, crash and destruction release paths.
-  browserGuests.bind(owner)
+  // Native guest input attach arrives with the desktop-next keyboard layer; pass a no-op until then.
+  browserGuests.bind(owner, () => () => {})
   mainWindow.on('closed', () => { mainWindow = undefined })
   mainWindow.webContents.on('render-process-gone', (_event, details) => { if (!quitting) runtime.report(new Error(`Renderer: ${details.reason}`)) })
   mainWindow.webContents.on('preload-error', (_event, _path, error) => runtime.report(error))
