@@ -31,7 +31,7 @@ function harness(overrides = {}) {
     },
     systemPrompt: { section: vi.fn() },
     plugin: vi.fn(async () => ({ dispose() {} })),
-    on: vi.fn(), provide: vi.fn(), logger: { error: vi.fn() },
+    on: vi.fn(), provide: vi.fn(), logger: { error: vi.fn(), info: vi.fn() },
     effect: (effect: () => (() => unknown)) => { effects.push(effect()) },
   }
   return {

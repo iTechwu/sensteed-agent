@@ -68,7 +68,7 @@ export class DofeAuthService {
     private readonly credentials: CredentialProvider,
     private readonly fetcher: typeof fetch = globalThis.fetch,
     private readonly onBound?: (snapshot: DofeAuthSnapshot) => Promise<void>,
-    private readonly logger?: Pick<DesktopLogger, 'error'>,
+    private readonly logger?: Pick<DesktopLogger, 'error' | 'info'>,
   ) {}
 
   getStatus(): DofeAuthSnapshot { return structuredClone(this.snapshot) }
@@ -141,15 +141,20 @@ export class DofeAuthService {
         return
       }
     }
+    const loginStartedAt = Date.now()
+    const discoveryStartedAt = Date.now()
     const discovery = await this.readDiscovery()
+    const discoveryMs = Date.now() - discoveryStartedAt
     this.abort.signal.throwIfAborted()
     let accessToken: string | undefined
+    let refreshMs: number | undefined
     // Rotate inside the credential provider's cross-process lock, and persist
     // the replacement before provisioning so a Models outage cannot lose it.
     await this.credentials.modifyRecord(DOFE_AUTH_GRANT_KEY, async record => {
       const payload = record?.kind === 'grant' ? record.payload as { refreshToken?: unknown } | null : null
       const refreshToken = asString(payload?.refreshToken)
       if (refreshToken === undefined) return undefined
+      const refreshStartedAt = Date.now()
       try {
         const token = await this.exchangeRefresh(discovery, refreshToken)
         accessToken = token.accessToken
@@ -157,11 +162,15 @@ export class DofeAuthService {
       } catch (error) {
         if (!(error instanceof DofeAuthTokenError) || error.code !== 'invalid_grant') throw error
         return { kind: 'grant', payload: {} }
+      } finally {
+        refreshMs = Date.now() - refreshStartedAt
       }
     })
     this.abort.signal.throwIfAborted()
     if (accessToken !== undefined) {
+      const provisionStartedAt = Date.now()
       await this.provision(discovery, accessToken)
+      this.logger?.info(`dsh-plugin-desktop: dofe 静默恢复分段耗时 discovery=${discoveryMs}ms refresh=${String(refreshMs)}ms provision=${Date.now() - provisionStartedAt}ms total=${Date.now() - loginStartedAt}ms`)
       return
     }
     if (!interactive) throw new DofeAuthTokenError('登录授权已失效', 'invalid_grant')
@@ -184,12 +193,17 @@ export class DofeAuthService {
       this.closeLoopback()
       this.abort.signal.throwIfAborted()
       this.snapshot = { status: 'issued' }
+      const interactiveStartedAt = Date.now()
+      const authorizedMs = interactiveStartedAt - loginStartedAt
       const token = await this.exchangeCode(discovery, session.redirectUri, session.verifier, code)
+      const exchangeMs = Date.now() - interactiveStartedAt
       this.abort.signal.throwIfAborted()
       if (token.refreshToken !== undefined) {
         await this.credentials.modifyRecord(DOFE_AUTH_GRANT_KEY, async () => ({ kind: 'grant', payload: { refreshToken: token.refreshToken } }))
       }
+      const provisionStartedAt = Date.now()
       await this.provision(discovery, token.accessToken)
+      this.logger?.info(`dsh-plugin-desktop: dofe 登录分段耗时 discovery=${discoveryMs}ms authorize=${authorizedMs}ms exchange=${exchangeMs}ms provision=${Date.now() - provisionStartedAt}ms total=${Date.now() - loginStartedAt}ms`)
     } finally {
       this.cancelPending = undefined
       this.closeLoopback()
