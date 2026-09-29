@@ -33,6 +33,8 @@
       name: dsh-plugin-desktop/dofe-managed
     - id: personal-knowledge-files
       name: dsh-plugin-desktop/personal-knowledge-files
+    - id: personal-knowledge-management
+      name: '@dofe/dsh-sensteed-knowledge'
     # dofe-managed owns the OpenMontage MCP transport. This shared Host module
     # adds workflow guidance, Agent-scoped projection, and stalled-call blocking.
     - id: openmontage-guidance

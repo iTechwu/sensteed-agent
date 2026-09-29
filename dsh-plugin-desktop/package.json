@@ -479,6 +479,7 @@
     "@deepseek-ai/dsh-workspace-changes": "workspace:*",
     "@deepseek-ai/schemastery": "workspace:*",
     "@dofe/dsh-knowledge-capture": "file:../../docker-helm.dofe.ai/plugins/dsh-knowledge-capture",
+    "@dofe/dsh-sensteed-knowledge": "file:../../docker-helm.dofe.ai/plugins/dsh-sensteed-knowledge",
     "@dofe/dsh-opencli": "file:../../docker-helm.dofe.ai/plugins/dsh-opencli",
     "@dofe/dsh-openmontage-mcp": "workspace:*",
     "@dofe/dsh-sensteed-finance": "file:../../docker-helm.dofe.ai/plugins/dsh-sensteed-finance",

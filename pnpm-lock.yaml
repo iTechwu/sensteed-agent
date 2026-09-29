@@ -2323,6 +2323,9 @@ importers:
       '@dofe/dsh-sensteed-finance':
         specifier: file:../../docker-helm.dofe.ai/plugins/dsh-sensteed-finance
         version: file:../docker-helm.dofe.ai/plugins/dsh-sensteed-finance
+      '@dofe/dsh-sensteed-knowledge':
+        specifier: file:../../docker-helm.dofe.ai/plugins/dsh-sensteed-knowledge
+        version: file:../docker-helm.dofe.ai/plugins/dsh-sensteed-knowledge
       '@dofe/dsh-sensteed-supplier-intelligence':
         specifier: file:../../docker-helm.dofe.ai/plugins/dsh-sensteed-supplier-intelligence
         version: file:../docker-helm.dofe.ai/plugins/dsh-sensteed-supplier-intelligence
@@ -3324,6 +3327,9 @@ packages:
 
   '@dofe/dsh-sensteed-finance@file:../docker-helm.dofe.ai/plugins/dsh-sensteed-finance':
     resolution: {directory: ../docker-helm.dofe.ai/plugins/dsh-sensteed-finance, type: directory}
+
+  '@dofe/dsh-sensteed-knowledge@file:../docker-helm.dofe.ai/plugins/dsh-sensteed-knowledge':
+    resolution: {directory: ../docker-helm.dofe.ai/plugins/dsh-sensteed-knowledge, type: directory}
 
   '@dofe/dsh-sensteed-supplier-intelligence@file:../docker-helm.dofe.ai/plugins/dsh-sensteed-supplier-intelligence':
     resolution: {directory: ../docker-helm.dofe.ai/plugins/dsh-sensteed-supplier-intelligence, type: directory}
@@ -9137,6 +9143,8 @@ snapshots:
   '@dofe/dsh-opencli@file:../docker-helm.dofe.ai/plugins/dsh-opencli': {}
 
   '@dofe/dsh-sensteed-finance@file:../docker-helm.dofe.ai/plugins/dsh-sensteed-finance': {}
+
+  '@dofe/dsh-sensteed-knowledge@file:../docker-helm.dofe.ai/plugins/dsh-sensteed-knowledge': {}
 
   '@dofe/dsh-sensteed-supplier-intelligence@file:../docker-helm.dofe.ai/plugins/dsh-sensteed-supplier-intelligence': {}
 
