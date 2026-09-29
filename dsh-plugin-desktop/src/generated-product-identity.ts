@@ -41,8 +41,8 @@ export const BRAND_SHORTCUT_NAME = "Sensteed-Agent Beta"
 
 /** Display names shown in chrome that is identical across release channels. */
 export const BRAND_DISPLAY_NAME = Object.freeze({
-  titlebar: "山子Agent",
-  locale: "山子Agent",
+  titlebar: "哪吒Agent",
+  locale: "哪吒Agent",
 })
 
 /** Brand mission shown by the client brand surfaces. */

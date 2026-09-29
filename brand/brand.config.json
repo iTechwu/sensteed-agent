@@ -19,8 +19,8 @@
   },
   "packageName": "dsh-plugin-desktop",
   "displayName": {
-    "titlebar": "山子Agent",
-    "locale": "山子Agent"
+    "titlebar": "哪吒Agent",
+    "locale": "哪吒Agent"
   },
   "mission": {
     "zh": "成就中国智造的全球竞争力",

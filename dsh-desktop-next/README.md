@@ -96,9 +96,9 @@ Screen sharing uses `navigator.mediaDevices.getDisplayMedia({ video: true, audio
 
 The official `@deepseek-ai/dsh-experimental-computer-use-cua-driver-native@0.1.7-rc.2` provider is bundled and **disabled by default**. Use the Computer Use section at the top of **Plugins** to enable it and read its live loading status. This entry uses the official Plugins slot, switch and plugin manager; its Profile row ID is `computer-use-cua-driver-native`. The shared `computer-use` registry is already provided. Tools and screenshots use existing conversation tool cards and image attachments; screenshot understanding requires a model route declaring image input. The gear to the left of the switch opens the permission dialog.
 
-The version-scoped Yarn patch at `patches/dsh-experimental-computer-use-cua-driver-native@0.1.7-rc.2.patch` routes `check_permissions` through `desktopPermissions` when available. `prompt: true` reveals the permission dialog for missing grants, then the driver performs a read-only check with `prompt: false`. The driver remains the authority for its own actual permission status; no grant is inferred from the Desktop response. Without the Desktop service, the provider retains upstream behavior. The pinned `@trycua/cua-driver@0.28.0` binary, operation tools, image handling and shutdown ownership are unchanged. Only one provider can register, but that does not serialize concurrent Sessions operating the same desktop.
+Since the 0.1.7-rc.2 upgrade the provider ships upstream behavior only: `check_permissions` performs the native SDK's own permission checks, and the former Desktop permissions bridge — an out-of-tree patch that no longer applies — was retired. Only one provider can register, but that does not serialize concurrent Sessions operating the same desktop.
 
-Unit tests exercise the installed patched provider with a fake native SDK. The optional native activation check requires a supported SDK platform, loads and shuts down the real provider, and sends no input or screenshots:
+The optional native activation check requires a supported SDK platform, loads and shuts down the real provider, and sends no input or screenshots:
 
 ```sh
 corepack pnpm --filter dsh-desktop-next run verify:host --computer-use
