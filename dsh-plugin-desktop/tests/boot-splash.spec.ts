@@ -77,16 +77,16 @@ describe('boot splash', () => {
   it('installs one styled overlay carrying the brand name and a lifetime cap', () => {
     vi.useFakeTimers()
     const { head, body } = stubDocument()
-    installBootSplash('山子Agent')
+    installBootSplash('哪吒Agent')
 
     expect(head.children).toHaveLength(1)
     expect(body.children).toHaveLength(1)
     const splash = body.children[0]!
     expect(splash.id).toBe(DESKTOP_BOOT_SPLASH_ID)
-    expect(splash.children[0]?.textContent).toContain('山子Agent')
+    expect(splash.children[0]?.textContent).toContain('哪吒Agent')
 
     // Re-running the preload against the same document must stay one splash.
-    installBootSplash('山子Agent')
+    installBootSplash('哪吒Agent')
     expect(body.children).toHaveLength(1)
 
     // The lifetime cap dismisses a splash the client never dismissed.
@@ -97,7 +97,7 @@ describe('boot splash', () => {
   it('fades out once on dismissal and ignores later calls during the fade', () => {
     vi.useFakeTimers()
     const { body } = stubDocument()
-    installBootSplash('山子Agent')
+    installBootSplash('哪吒Agent')
     const splash = body.children[0]!
 
     dismissBootSplash()
@@ -111,7 +111,7 @@ describe('boot splash', () => {
 
   it('is inert without a document', () => {
     vi.stubGlobal('document', undefined)
-    expect(() => installBootSplash('山子Agent')).not.toThrow()
+    expect(() => installBootSplash('哪吒Agent')).not.toThrow()
     expect(() => dismissBootSplash()).not.toThrow()
   })
 })
@@ -120,7 +120,7 @@ describe('boot splash dismissal', () => {
   it('waits for readiness, then dismisses after two animation frames', () => {
     vi.useFakeTimers()
     stubDocument()
-    installBootSplash('山子Agent')
+    installBootSplash('哪吒Agent')
     const frames: FrameRequestCallback[] = []
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
       frames.push(callback)

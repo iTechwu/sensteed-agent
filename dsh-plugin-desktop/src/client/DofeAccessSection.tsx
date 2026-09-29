@@ -229,7 +229,7 @@ export function blockDofeApplicationRoot(): () => void {
   }
 }
 
-function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, onDone }: DofeAccessInjected & { onboarding?: boolean; onDone?: () => void }): ReactNode {
+function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, onDone, sessionDead }: DofeAccessInjected & { onboarding?: boolean; onDone?: () => void; sessionDead?: boolean }): ReactNode {
   const [configured, setConfigured] = useState<boolean | undefined>()
   const [draft, setDraft] = useState('')
   const settingsStore = useMemo(() => dofeAccessSettingsStore(settingsScope), [settingsScope])
@@ -246,7 +246,10 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
   const busyRef = useRef(false)
   const [error, setError] = useState<string>()
   const [success, setSuccess] = useState(false)
-  const ssoBound = settings.value?.authMode === 'feishu' && Boolean(settings.value.identity?.ssoSub)
+  // The live SSO probe outranks the persisted identity: a definitively dead
+  // session must render the login form, not a stale name and entitlements.
+  const ssoBound = sessionDead !== true
+    && settings.value?.authMode === 'feishu' && Boolean(settings.value.identity?.ssoSub)
   const showSetup = BRAND_VARIANT !== 'sensteed' || ssoBound
   const showCapabilities = BRAND_VARIANT === 'sensteed' ? ssoBound : onboarding === true
   const bindFeishuLogin = async (status: DofeAuthSnapshot): Promise<void> => {
@@ -575,7 +578,7 @@ export function DofeAccessGate({ credentials, settingsApi, settingsScope, t, onA
   if (settings.value === undefined || credentialConfigured === undefined) return credentialReadFailed
     ? <div className="dshDofeAccessLoading" role="status">{t('loadError')}</div> : null
   const ssoBound = ssoBoundStatic && !sessionDead
-  return <DofeOnboardingModal eyebrow={t('onboardingEyebrow')} title={BRAND_VARIANT === 'sensteed' ? ssoBound ? t('sensteedSetupTitle') : t('sensteedLoginTitle') : t('onboardingTitle')} description={BRAND_VARIANT === 'sensteed' ? ssoBound ? t('sensteedSetupIntro') : t('sensteedLoginIntro') : t('onboardingIntro')} brandLogo={heroBrandDataUrl} brandLogoAlt={BRAND_TENANT}><AccessForm credentials={credentials} settingsApi={settingsApi} settingsScope={settingsScope} t={t} onboarding onDone={() => { setCredentialConfigured(true); setSuccess(true) }} /></DofeOnboardingModal>
+  return <DofeOnboardingModal eyebrow={t('onboardingEyebrow')} title={BRAND_VARIANT === 'sensteed' ? ssoBound ? t('sensteedSetupTitle') : t('sensteedLoginTitle') : t('onboardingTitle')} description={BRAND_VARIANT === 'sensteed' ? ssoBound ? t('sensteedSetupIntro') : t('sensteedLoginIntro') : t('onboardingIntro')} brandLogo={heroBrandDataUrl} brandLogoAlt={BRAND_TENANT}><AccessForm credentials={credentials} settingsApi={settingsApi} settingsScope={settingsScope} t={t} onboarding sessionDead={sessionDead} onDone={() => { setCredentialConfigured(true); setSuccess(true) }} /></DofeOnboardingModal>
 }
 
 /** Mount the mandatory credential gate independently of upstream session onboarding. */
