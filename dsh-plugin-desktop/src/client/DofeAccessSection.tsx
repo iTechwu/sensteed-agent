@@ -229,7 +229,7 @@ export function blockDofeApplicationRoot(): () => void {
   }
 }
 
-function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, onDone, sessionDead }: DofeAccessInjected & { onboarding?: boolean; onDone?: () => void; sessionDead?: boolean }): ReactNode {
+function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, onDone, sessionDead, onSessionRevoked }: DofeAccessInjected & { onboarding?: boolean; onDone?: () => void; sessionDead?: boolean; onSessionRevoked?: () => void }): ReactNode {
   const [configured, setConfigured] = useState<boolean | undefined>()
   const [draft, setDraft] = useState('')
   const settingsStore = useMemo(() => dofeAccessSettingsStore(settingsScope), [settingsScope])
@@ -291,7 +291,11 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
     return () => { cancelled = true }
   }, [credentials, t])
   const loadModels = async (overrides: { key?: string; protocol?: DofeProtocol; configured?: boolean; preferredModel?: string } = {}): Promise<void> => {
-    const request = dofeModelsRequestBody(overrides.key ?? draft, overrides.configured ?? configured, overrides.protocol ?? protocol)
+    // An SSO-bound session implies the stored credential, same as `save`:
+    // gating on the `configured` flag alone left a protocol switch stuck on
+    // the placeholder whenever the flag lagged behind a remount.
+    const storedUsable = ssoBound || (overrides.configured ?? configured) === true
+    const request = dofeModelsRequestBody(overrides.key ?? draft, storedUsable, overrides.protocol ?? protocol)
     const preferredModel = (overrides.preferredModel ?? settings.value?.entitlements?.defaultModel)?.trim()
     if ((!request.key && !request.useStored) || loadingRef.current || busyRef.current) return
     loadingRef.current = true
@@ -468,6 +472,9 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
     busyRef.current = false
     setBusy(false)
     setConfigured(false)
+    // Flip the live-session gate immediately; waiting for the 60-second probe
+    // left the form rendering the revoked identity for a full minute.
+    onSessionRevoked?.()
   }
   const interactionBusy = busy || loadingModels
   return <div className={`dshDofeAccess${onboarding ? ' dshDofeAccessOnboarding' : ''}`} aria-busy={interactionBusy}>
@@ -578,7 +585,7 @@ export function DofeAccessGate({ credentials, settingsApi, settingsScope, t, onA
   if (settings.value === undefined || credentialConfigured === undefined) return credentialReadFailed
     ? <div className="dshDofeAccessLoading" role="status">{t('loadError')}</div> : null
   const ssoBound = ssoBoundStatic && !sessionDead
-  return <DofeOnboardingModal eyebrow={t('onboardingEyebrow')} title={BRAND_VARIANT === 'sensteed' ? ssoBound ? t('sensteedSetupTitle') : t('sensteedLoginTitle') : t('onboardingTitle')} description={BRAND_VARIANT === 'sensteed' ? ssoBound ? t('sensteedSetupIntro') : t('sensteedLoginIntro') : t('onboardingIntro')} brandLogo={heroBrandDataUrl} brandLogoAlt={BRAND_TENANT}><AccessForm credentials={credentials} settingsApi={settingsApi} settingsScope={settingsScope} t={t} onboarding sessionDead={sessionDead} onDone={() => { setCredentialConfigured(true); setSuccess(true) }} /></DofeOnboardingModal>
+  return <DofeOnboardingModal eyebrow={t('onboardingEyebrow')} title={BRAND_VARIANT === 'sensteed' ? ssoBound ? t('sensteedSetupTitle') : t('sensteedLoginTitle') : t('onboardingTitle')} description={BRAND_VARIANT === 'sensteed' ? ssoBound ? t('sensteedSetupIntro') : t('sensteedLoginIntro') : t('onboardingIntro')} brandLogo={heroBrandDataUrl} brandLogoAlt={BRAND_TENANT}><AccessForm credentials={credentials} settingsApi={settingsApi} settingsScope={settingsScope} t={t} onboarding sessionDead={sessionDead} onSessionRevoked={() => setSessionDead(true)} onDone={() => { setCredentialConfigured(true); setSuccess(true) }} /></DofeOnboardingModal>
 }
 
 /** Mount the mandatory credential gate independently of upstream session onboarding. */

@@ -256,7 +256,10 @@ describe('mandatory DoFe access gate', () => {
     const source = await readFile(resolve(process.cwd(), 'src/client/DofeAccessSection.tsx'), 'utf8')
 
     expect(source).toContain('body: JSON.stringify(request),')
-    expect(source).toContain('const request = dofeModelsRequestBody(overrides.key ?? draft, overrides.configured ?? configured, overrides.protocol ?? protocol)')
+    // The draft key stays the request's first source; the stored credential is
+    // a fallback, additionally unlocked by a live SSO binding.
+    expect(source).toContain('const request = dofeModelsRequestBody(overrides.key ?? draft, storedUsable, overrides.protocol ?? protocol)')
+    expect(source).toContain('const storedUsable = ssoBound || (overrides.configured ?? configured) === true')
     expect(source).not.toContain('const key = (keyOverride ?? draft).trim()')
   })
 
