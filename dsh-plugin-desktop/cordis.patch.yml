@@ -10,6 +10,10 @@
       name: '@dofe/dsh-sensteed-finance'
     - id: dofe-sensteed-supplier-intelligence
       name: '@dofe/dsh-sensteed-supplier-intelligence'
+    # dsh-soup：项目资源管理器（独立插件）。宿主半区注册 /api/dsh-soup
+    # 文件操作路由；浏览器半区注册 details 右列面板与 Session log 📁 切换。
+    - id: ui-dsh-soup
+      name: '@lyhue1991/dsh-soup'
     - id: desktop-terminal
       name: dsh-plugin-desktop/terminal
       disabled: !!js process.platform === 'linux'

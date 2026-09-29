@@ -144,6 +144,18 @@ describe('published package surface', () => {
       expect(manifest.dependencies?.[name])
         .toBe(`file:../../docker-helm.dofe.ai/plugins/${directory}`)
     }
+    // 打包只是把文件带进安装目录；桌面 overlay 不登记 insert 行，插件就不会加载。
+    const desktopPatch = parseYaml(
+      readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8'),
+    ) as Array<{ insert?: Array<{ id?: unknown, name?: unknown }> }>
+    const overlayNames = new Set(
+      desktopPatch.flatMap(statement => statement.insert ?? [])
+        .map(row => typeof row.name === 'string' ? row.name : undefined)
+        .filter((name): name is string => name !== undefined),
+    )
+    for (const overlayed of ['@dofe/dsh-sensteed-finance', '@dofe/dsh-sensteed-supplier-intelligence', '@lyhue1991/dsh-soup']) {
+      expect(overlayNames.has(overlayed), `cordis.patch.yml must insert ${overlayed}`).toBe(true)
+    }
     expect(workspaceManifest.scripts?.['dofe-ui:build'])
       .toBe('node scripts/build-dofe-ui.mjs')
     expect(dofeUiBuild).not.toContain("'dsh-yootun-audit'")
