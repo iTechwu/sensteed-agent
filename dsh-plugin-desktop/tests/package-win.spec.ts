@@ -65,7 +65,7 @@ describe('Windows x64 installer packaging', () => {
         '/d',
         '/s',
         '/c',
-        'node ../node_modules/.pnpm/@electron+rebuild@4.2.0/node_modules/@electron/rebuild/lib/cli.js --version 43.4.0 --module-dir ../deepseek-harness --which-module fs-ext --arch x64',
+        'node ../node_modules/.pnpm/@electron+rebuild@4.2.0/node_modules/@electron/rebuild/lib/cli.js --version 44.0.0 --module-dir ../deepseek-harness --which-module fs-ext --arch x64',
       ],
       cwd: 'C:\\repo\\dsh-plugin-desktop',
       env: { PATH: 'C:\\Windows\\System32', SAFE_VALUE: 'kept' },
@@ -120,7 +120,7 @@ describe('Windows x64 installer packaging', () => {
       '/d',
       '/s',
       '/c',
-      'node ../node_modules/.pnpm/@electron+rebuild@4.2.0/node_modules/@electron/rebuild/lib/cli.js --version 43.4.0 --module-dir ../deepseek-harness --which-module fs-ext --arch x64',
+      'node ../node_modules/.pnpm/@electron+rebuild@4.2.0/node_modules/@electron/rebuild/lib/cli.js --version 44.0.0 --module-dir ../deepseek-harness --which-module fs-ext --arch x64',
     ])
     expect(calls[2]?.args).toEqual([
       'C:\\repo\\node_modules\\electron-builder\\cli.js',
@@ -161,7 +161,7 @@ describe('Windows x64 installer packaging', () => {
       '/d',
       '/s',
       '/c',
-      'node ../node_modules/.pnpm/@electron+rebuild@4.2.0/node_modules/@electron/rebuild/lib/cli.js --version 43.4.0 --module-dir ../deepseek-harness --which-module fs-ext --arch x64',
+      'node ../node_modules/.pnpm/@electron+rebuild@4.2.0/node_modules/@electron/rebuild/lib/cli.js --version 44.0.0 --module-dir ../deepseek-harness --which-module fs-ext --arch x64',
     ])
     expect(calls[1]?.args).toEqual([
       'C:\\repo\\node_modules\\electron-builder\\cli.js',

@@ -977,12 +977,12 @@ describe('published package surface', () => {
       .toBe('pnpm --filter dsh-community-market build && pnpm --filter dsh-plugin-desktop dist:linux')
     expect(builderConfig?.afterPack).toBe('./scripts/verify-packaged-runtime.ts')
     expect(builderConfig?.electronDownload?.checksums).toEqual({
-      'electron-v43.4.0-darwin-arm64.zip':
-        '827f9f182566f46846377575b51c547b9926b111637313a373b6f717462aebac',
-      'electron-v43.4.0-darwin-x64.zip':
-        '7ab39ec1b0bcf5463f2dc0040142fbc1c30cd7bc3f99086066f588c717b11e24',
-      'electron-v43.4.0-win32-x64.zip':
-        'ef0709cfa719739acce73de6f9b684304baf38c6454376638a70d34a7cecffe0',
+      'electron-v44.0.0-darwin-arm64.zip':
+        '076d79742986e1b100b69ebecc691cb07368045e54c9087cef631b8622b76a80',
+      'electron-v44.0.0-darwin-x64.zip':
+        '28429e700ad68d9624aaa90b6543ffe891a48c14121fd904cd294e5edcee63ff',
+      'electron-v44.0.0-win32-x64.zip':
+        'e61aa3bcea8152bc0730abd015e47c032d778a0ef10e2a1c78ba3c4ea47942f9',
     })
     expect(builderConfig?.mac).toEqual(expect.objectContaining({
       extendInfo: {
@@ -1119,8 +1119,8 @@ describe('published package surface', () => {
 
   it('keeps Electron out of production dependencies consumed by electron-builder', () => {
     expect(manifest.dependencies).not.toHaveProperty('electron')
-    expect(manifest.peerDependencies?.electron).toBe('43.4.0')
-    expect(manifest.devDependencies?.electron).toBe('43.4.0')
+    expect(manifest.peerDependencies?.electron).toBe('44.0.0')
+    expect(manifest.devDependencies?.electron).toBe('44.0.0')
     expect(manifest.dependencies?.pnpm).toBe('11.7.0')
   })
 
