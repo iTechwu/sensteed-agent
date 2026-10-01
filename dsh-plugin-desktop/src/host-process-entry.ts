@@ -33,6 +33,17 @@ const rpc = new HostRpc({
 }, 120_000)
 let host: DesktopStartupGenerationHost | undefined
 let inspectServices = () => ({ aaRuntime: false, aaOnboarding: false })
+// Set once the generation mounts and the product layer's quit inspection row is live.
+let inspectQuit: (() => Promise<{ activeTasks: boolean; scheduledTasks: boolean }>) | undefined
+rpc.handle('quitInspection', async () => {
+  if (inspectQuit === undefined) return { available: false }
+  try {
+    const inspection = await inspectQuit()
+    return { available: true, activeTasks: inspection.activeTasks, scheduledTasks: inspection.scheduledTasks }
+  } catch (cause) {
+    return { available: false, error: cause instanceof Error ? cause.message : String(cause) }
+  }
+})
 rpc.handle('status', () => ({ pid: process.pid, services: inspectServices() }))
 let starting = false
 let stopping = false
@@ -76,7 +87,15 @@ rpc.handle('boot', async args => {
       prepareCertificate: () => rpc.call('certificate'),
     })
     inspectServices = await bootDesktopHost(options, runtime, browser, lan,
-      value => { host = value }, code => { void rpc.call('quit', [code]).catch(() => {}) })
+      hostCtx => {
+        host = hostCtx
+        const injectable = hostCtx as unknown as {
+          inject(names: readonly string[], wire: (scope: { sensteedQuitInspection: { inspect(): Promise<{ activeTasks: boolean; scheduledTasks: boolean }> } }) => void): void
+        }
+        injectable.inject(['sensteedQuitInspection'], scope => {
+          inspectQuit = async () => await scope.sensteedQuitInspection.inspect()
+        })
+      }, code => { void rpc.call('quit', [code]).catch(() => {}) })
     if (stopping) { await host?.fiber.dispose(); throw new Error('DSH Host stopped during startup') }
     await runtime.mountScheduled()
     return { pid: process.pid }

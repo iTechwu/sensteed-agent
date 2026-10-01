@@ -10,7 +10,7 @@
 import { formatUnexpectedHostExit, startIsolatedDesktopHost } from './host-process.ts'
 import { createDesktopProfileBoot } from './profile-context.ts'
 import { logInactiveStartupEntries } from './startup-audit.ts'
-import { app, crashReporter, safeStorage, session, shell } from 'electron'
+import { app, crashReporter, dialog, safeStorage, session, shell } from 'electron'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
@@ -179,6 +179,8 @@ import {
   ProfileMaterializationError,
 } from './profile-materializer.ts'
 import { runDesktopProfileRepair, scheduleDesktopProfileRepair } from './profile-repair.ts'
+import { createDesktopQuitGate, type DesktopQuitInspectionResult } from './quit-gate.ts'
+import type {} from '@dofe/dsh-sensteed-product/quit-inspection'
 import { ensureDesktopPnpmStoreDir } from './profile-store-dir.ts'
 import {
   formatRecoveryPluginRemoveFailure,
@@ -665,13 +667,35 @@ async function start(): Promise<void> {
     async () => { await generation.release() },
     finalExit,
   )
-  const requestQuit = (code: number): void => { void shutdown.request(code) }
+  const rawRequestQuit = (code: number): void => { void shutdown.request(code) }
+  let quitInspectionProbe: (() => Promise<DesktopQuitInspectionResult>) | undefined
+  const quitGate = createDesktopQuitGate({
+    enabled: process.env.DSH_DESKTOP_QUIT_GATE !== '0',
+    locale: () => app.getLocale(),
+    canPrompt: () => app.isReady(),
+    inspect: async () => await (quitInspectionProbe?.() ?? Promise.resolve({ source: 'unavailable' as const })),
+    confirm: async copy => {
+      const choice = await dialog.showMessageBox({
+        type: 'warning', buttons: [copy.cancel, copy.confirm], defaultId: 1, cancelId: 0,
+        title: copy.title, message: copy.title, detail: copy.detail,
+      })
+      return choice.response === 1
+    },
+  })
+  // `source` marks origins that must never raise the interactive gate: OS
+  // signals (no user to answer), the installer handshake, and the crash path.
+  const requestQuit = (code: number, source?: 'signal' | 'installer' | 'crash'): void => {
+    if (source !== undefined) { rawRequestQuit(code); return }
+    void quitGate.run().then(proceed => { if (proceed) rawRequestQuit(code) })
+  }
   removeUncaughtExceptionLogging = installDesktopUncaughtExceptionLogging(
     process,
     electronLogger,
-    requestQuit,
+    code => { requestQuit(code, 'crash') },
   )
-  removeShutdownRequests = installShutdownRequests(process, app, requestQuit)
+  removeShutdownRequests = installShutdownRequests(process, app, (code, source) => {
+    requestQuit(code, source === 'before-quit' ? undefined : source)
+  })
 
   const openStartupRecoveryWindow = async (
     failureDetail: string,
@@ -1726,6 +1750,11 @@ async function start(): Promise<void> {
         // `{ fiber: { dispose } }`, never a Context, and must not be handed
         // to `profileBoot.prepare`.
         bindHost: host => { generation.bindHost(host) }, requestQuit,
+        registerQuitInspection: impl => {
+          quitInspectionProbe = impl === undefined
+            ? undefined
+            : async () => ({ source: 'ready' as const, ...(await impl()) })
+        },
         onFailure: (error, exit) => {
           electronLogger.error(formatUnexpectedHostExit(error, exit))
           lifecycleRecorder.recordHostExit({
@@ -1782,6 +1811,12 @@ async function start(): Promise<void> {
           // Keep Host imports and browser bundle discovery on the same public
           // profile-overlay resolver used by packaged Electron.
           hostCtx.loader.internal = undefined
+          hostCtx.inject(['sensteedQuitInspection'], scope => {
+            quitInspectionProbe = async () => ({
+              source: 'ready' as const,
+              ...(await scope.sensteedQuitInspection.inspect()),
+            })
+          })
           generation.bindHost(hostCtx)
           await hostCtx.plugin(PluginPackages, { resolution })
           hostCtx.effect(

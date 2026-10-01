@@ -18,6 +18,8 @@ export interface IsolatedHostOptions {
   prepareCertificate: NonNullable<DesktopLanHttpsRuntimeOptions['prepareCertificate']>
   bindHost(host: DesktopStartupGenerationHost): void
   requestQuit(code: number): void
+  /** Receive the Host-side quit inspection probe once the generation mounts (undefined when absent). */
+  registerQuitInspection(impl: (() => Promise<DesktopQuitInspectionAnswer>) | undefined): void
   onFailure(error: Error, exit: IsolatedHostExit): void
 }
 
@@ -33,6 +35,17 @@ export interface IsolatedHostExit {
    */
   readonly stderrTail: string
 }
+
+/** Wire shape of the Host's quitInspection answer (mirrors dsh-desktop-next's protocol). */
+export interface DesktopQuitInspectionAnswer {
+  readonly available: boolean
+  readonly activeTasks?: boolean
+  readonly scheduledTasks?: boolean
+  readonly error?: string
+}
+
+/** The quit inspection RPC must answer quickly; a slow Host maps to unknown upstream. */
+export const QUIT_INSPECTION_DEADLINE_MS = 2_000
 
 /** Enough for a fail-loud diagnostic with its inspected cause chain, small enough for one log entry. */
 export const HOST_STDERR_TAIL_CHARS = 16 * 1024
@@ -65,6 +78,13 @@ export async function startIsolatedDesktopHost(options: IsolatedHostOptions): Pr
   }, 120_000)
   const releaseNative = bindNativeRuntime(rpc, options.runtime)
   rpc.handle('certificate', () => options.prepareCertificate())
+  options.registerQuitInspection?.(async () => await Promise.race([
+    rpc.call<DesktopQuitInspectionAnswer>('quitInspection', [], undefined, QUIT_INSPECTION_DEADLINE_MS),
+    new Promise<never>((_, reject) => {
+      const timer = setTimeout(() => reject(new Error('quit inspection timed out')), QUIT_INSPECTION_DEADLINE_MS)
+      timer.unref?.()
+    }),
+  ]))
   rpc.handle('quit', ([code]) => { setImmediate(() => options.requestQuit(code)) })
   let stopping = false
   let exited = false

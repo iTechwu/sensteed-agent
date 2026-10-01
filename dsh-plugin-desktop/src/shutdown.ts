@@ -129,13 +129,13 @@ export interface DesktopQuitSource {
 export function installShutdownRequests(
   signals: DesktopSignalSource,
   nativeApp: DesktopQuitSource,
-  requestQuit: (code: number) => void,
+  requestQuit: (code: number, source?: 'signal' | 'before-quit') => void,
 ): () => void {
-  const interrupt = (): void => { requestQuit(130) }
-  const terminate = (): void => { requestQuit(0) }
+  const interrupt = (): void => { requestQuit(130, 'signal') }
+  const terminate = (): void => { requestQuit(0, 'signal') }
   const beforeQuit = (event: DesktopQuitEvent): void => {
     event.preventDefault()
-    requestQuit(0)
+    requestQuit(0, 'before-quit')
   }
   // Electron otherwise quits by default when the last pre-Host window is
   // destroyed. Setup and recovery intentionally close before the main

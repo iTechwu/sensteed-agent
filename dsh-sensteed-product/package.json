@@ -25,7 +25,7 @@
     "./package-version": "./lib/package-version.js",
     "./package.json": "./package.json",
     "./personal-knowledge-files": "./lib/personal-knowledge-files.js",
-    "./quit-inspection": "./lib/quit-inspection.js",
+    "./quit-inspection": "./lib/desktop-quit-inspection.js",
     "./routes": "./lib/routes.js",
     "./yootun-audit-contract": "./lib/yootun-audit-contract.js",
     "./yootun-audit-models-client": "./lib/yootun-audit-models-client.js",
