@@ -19,6 +19,7 @@ import {
   Terminal,
   Trash2,
   Users,
+  Wrench,
 } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert.tsx'
@@ -106,6 +107,7 @@ export interface RecoveryState {
   readonly profiles?: readonly RecoveryProfile[]
   readonly profileActionToken?: string
   readonly terminalAvailable?: boolean
+  readonly dependencyRepairAvailable?: boolean
   readonly profileCreatorAvailable?: boolean
   readonly safeModeAvailable?: boolean
   readonly safeModeActive?: boolean
@@ -247,7 +249,7 @@ function DataManagementPanel({ copy, state }: { readonly copy: DesktopRecoveryCo
 }
 
 function DiagnosticsPanel({ copy, state }: { readonly copy: DesktopRecoveryCopy; readonly state: RecoveryState }): JSX.Element {
-  return <PanelScroll><Card><CardHeader><CardTitle>{copy.diagnostics}</CardTitle><CardDescription>{state.diagnostics.status === 'idle' ? copy.saveDiagnostics : state.diagnostics.status === 'saving' ? copy.savingDiagnostics : state.diagnostics.status === 'saved' ? copy.diagnosticsSaved : copy.diagnosticsFailed}</CardDescription></CardHeader><CardContent className="space-y-2">{state.diagnostics.filename === undefined ? null : <code className="block break-all rounded-lg bg-muted p-3 text-xs">{state.diagnostics.filename}</code>}<p className="text-xs text-muted-foreground">{copy.privacy}</p>{state.logs && <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-muted p-3 text-xs">{state.logs}</pre>}</CardContent><CardFooter className="flex-wrap justify-end gap-2"><Action action={state.diagnostics.status === 'saved' ? 'show-diagnostics' : 'export-diagnostics'} icon={<Archive />}>{state.diagnostics.status === 'saved' ? copy.showDiagnostics : copy.saveDiagnostics}</Action></CardFooter></Card>{state.configurationAvailable ? <Card><CardHeader><CardTitle>{copy.configurationFiles}</CardTitle><CardDescription>{copy.configurationFilesBody}</CardDescription></CardHeader><CardFooter className="flex-wrap gap-2 pt-6"><Action action="open-settings-document" icon={<FilePenLine />}>{copy.openSettingsDocument}</Action><Action action="open-profile-patch" icon={<FilePenLine />}>{copy.openProfilePatch}</Action><Action action="open-profile-manifest" icon={<FilePenLine />}>{copy.openProfileManifest}</Action><Action action="open-profile-directory" icon={<FolderOpen />}>{copy.openProfileDirectory}</Action></CardFooter></Card> : null}</PanelScroll>
+  return <PanelScroll><Card><CardHeader><CardTitle>{copy.diagnostics}</CardTitle><CardDescription>{state.diagnostics.status === 'idle' ? copy.saveDiagnostics : state.diagnostics.status === 'saving' ? copy.savingDiagnostics : state.diagnostics.status === 'saved' ? copy.diagnosticsSaved : copy.diagnosticsFailed}</CardDescription></CardHeader><CardContent className="space-y-2">{state.diagnostics.filename === undefined ? null : <code className="block break-all rounded-lg bg-muted p-3 text-xs">{state.diagnostics.filename}</code>}<p className="text-xs text-muted-foreground">{copy.privacy}</p>{state.logs && <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-muted p-3 text-xs">{state.logs}</pre>}</CardContent><CardFooter className="flex-wrap justify-end gap-2"><Action action={state.diagnostics.status === 'saved' ? 'show-diagnostics' : 'export-diagnostics'} icon={<Archive />}>{state.diagnostics.status === 'saved' ? copy.showDiagnostics : copy.saveDiagnostics}</Action></CardFooter></Card>{state.dependencyRepairAvailable ? <Card><CardHeader><CardTitle className="flex items-center gap-2"><Wrench className="size-5" />{copy.repairDependencies}</CardTitle><CardDescription>{copy.repairDependenciesBody}</CardDescription></CardHeader><CardFooter className="justify-end"><Action action="repair-dependencies" icon={<Wrench />}>{copy.repairDependencies}</Action></CardFooter></Card> : null}{state.configurationAvailable ? <Card><CardHeader><CardTitle>{copy.configurationFiles}</CardTitle><CardDescription>{copy.configurationFilesBody}</CardDescription></CardHeader><CardFooter className="flex-wrap gap-2 pt-6"><Action action="open-settings-document" icon={<FilePenLine />}>{copy.openSettingsDocument}</Action><Action action="open-profile-patch" icon={<FilePenLine />}>{copy.openProfilePatch}</Action><Action action="open-profile-manifest" icon={<FilePenLine />}>{copy.openProfileManifest}</Action><Action action="open-profile-directory" icon={<FolderOpen />}>{copy.openProfileDirectory}</Action></CardFooter></Card> : null}</PanelScroll>
 }
 
 function Reason({ copy, state }: { readonly copy: DesktopRecoveryCopy; readonly state: RecoveryState }): JSX.Element {
