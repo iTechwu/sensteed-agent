@@ -4,7 +4,7 @@ import { HostRpc } from './host-rpc.ts'
 import { parseDesktopPlatformLoginRequest } from './platform-login.ts'
 
 export type RuntimeSnapshot = Pick<DesktopRuntime, 'platform' | 'windowsBuild' | 'locale'> & {
-  updates: Omit<DesktopUpdateAdapter, 'request' | 'confirmDownload' | 'showManualCheckResult' | 'downloadAndOpen' | 'notify'>
+  updates: Omit<DesktopUpdateAdapter, 'request' | 'confirmDownload' | 'showManualCheckResult' | 'downloadAndOpen' | 'notify' | 'reportMandatoryUpdatePolicy'>
 }
 export function runtimeSnapshot(runtime: DesktopRuntime): RuntimeSnapshot {
   const { isPackaged, canDownload, currentVersion, releaseChannel, statePath, installationId } = runtime.updates
@@ -62,6 +62,7 @@ export function createHostRuntime(rpc: HostRpc, snapshot: RuntimeSnapshot): Desk
       downloadAndOpen: (version, signal, channel) => send('update:downloadAndOpen', [version, channel], signal),
       notify: notification => { void send('update:notify', [notification]) },
     },
+    reportMandatoryUpdatePolicy(policy) { void send('native:reportMandatoryUpdatePolicy', [policy]) },
     schedule(spec) {
       const callback = callbacks({ quit: spec.requestQuit, mode: spec.requestModeChange,
         ...(spec.readRemoteControl ? { remoteRead: spec.readRemoteControl } : {}),
@@ -173,6 +174,7 @@ export function bindNativeRuntime(rpc: HostRpc, runtime: DesktopRuntime): () => 
     onSubmit: name => callback(`${id}:submit`, [name]), onCancel: () => report(callback(`${id}:cancel`)),
   }))
   handle('native:openOpenMontage', ([apiKey]) => runtime.openOpenMontage(apiKey as string))
+  handle('native:reportMandatoryUpdatePolicy', ([policy]) => { runtime.reportMandatoryUpdatePolicy(policy as Parameters<DesktopRuntime['reportMandatoryUpdatePolicy']>[0]) })
   handle('native:openExternal', ([url]) => runtime.openExternal(url as string))
   handle('native:openBossWeb', ([url]) => runtime.openBossWeb(url as string | undefined))
   handle('native:openContentPlatformWeb', ([platform, url]) =>

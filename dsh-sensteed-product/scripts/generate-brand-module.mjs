@@ -48,6 +48,13 @@ export const BRAND_DISPLAY_NAME = Object.freeze({
   titlebar: ${JSON.stringify(config.displayName.titlebar)},
   locale: ${JSON.stringify(config.displayName.locale)},
 })
+
+/** Version service contract shared with the shell identity. */
+export const BRAND_UPDATE_SERVICE = Object.freeze({
+  endpoint: ${JSON.stringify(config.updates.endpoint)},
+  versionHeader: ${JSON.stringify(config.updates.versionHeader)},
+  channelHeader: ${JSON.stringify(config.updates.channelHeader)},
+})
 `
 }
 

@@ -9,6 +9,8 @@ export default defineConfig([
       index: 'src/index.ts',
       'desktop-version-semver': 'src/desktop-version-semver.ts',
       'desktop-quit-inspection': 'src/desktop-quit-inspection.ts',
+      'desktop-mandatory-policy': 'src/desktop-mandatory-policy.ts',
+      'update-policy': 'src/update-policy.ts',
       'package-version': 'src/package-version.ts',
       'dofe-models': 'src/dofe-models.ts',
       'dofe-plugins': 'src/dofe-plugins.ts',

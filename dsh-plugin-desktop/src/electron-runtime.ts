@@ -72,6 +72,7 @@ import { ElectronWorkspaceAdmission } from './workspace-admission.ts'
 import { ProfileCreateWindow, type ProfileCreateWindowOptions } from './profile-create-window.ts'
 import { OpenMontageWindow } from './openmontage-window.ts'
 import { BossWebWindow, BOSS_LOGIN_URL } from './yootun-boss-web-window.ts'
+import { setCachedMandatoryPolicy, type CachedMandatoryUpdatePolicy } from './mandatory-policy-cache.ts'
 import { ContentPlatformWebWindow } from './yootun-content-platform-window.ts'
 import { windowsBuildNumber } from './window-material.ts'
 import { desktopNativeCopy } from './native-dialog-copy.ts'
@@ -208,6 +209,11 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
       downloadAndOpen: (version, signal, channel, installerSha256) => this.downloadAndOpenUpdate(version, signal, channel, installerSha256),
       notify: notification => { this.showNotification(notification) },
     }
+  }
+
+  /** Record the Host's mandatory policy snapshot in the launcher cache. */
+  reportMandatoryUpdatePolicy(policy: CachedMandatoryUpdatePolicy | null): void {
+    setCachedMandatoryPolicy(policy)
   }
 
   /** Log an Electron-scope error to the sink, falling back to stderr without a logger. */

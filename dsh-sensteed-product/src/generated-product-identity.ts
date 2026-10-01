@@ -17,3 +17,10 @@ export const BRAND_DISPLAY_NAME = Object.freeze({
   titlebar: "哪吒Agent",
   locale: "哪吒Agent",
 })
+
+/** Version service contract shared with the shell identity. */
+export const BRAND_UPDATE_SERVICE = Object.freeze({
+  endpoint: "https://ai.hozonauto.com/api/desktop/version",
+  versionHeader: "X-Sensteed-Agent-Version",
+  channelHeader: "X-Sensteed-Agent-Channel",
+})

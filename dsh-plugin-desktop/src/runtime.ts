@@ -220,6 +220,8 @@ export interface DesktopRuntime {
 
   /** Request native attention for background activity while the window is unfocused. */
   notifyAttention(notification: DesktopNotification): void
+  /** Push the current mandatory update policy snapshot (null clears a previously reported block). */
+  reportMandatoryUpdatePolicy(policy: { phase: 'none' | 'notice' | 'blocking'; minVersion?: string; deadline?: string; observedAt: string } | null): void
 
   /**
    * Contribute one command to the native tray for the current Cordis lifetime.

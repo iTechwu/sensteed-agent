@@ -28,3 +28,5 @@
       name: '@dofe/dsh-sensteed-product/routes'
     - id: sensteed-quit-inspection
       name: '@dofe/dsh-sensteed-product/quit-inspection'
+    - id: sensteed-update-policy
+      name: '@dofe/dsh-sensteed-product/update-policy'

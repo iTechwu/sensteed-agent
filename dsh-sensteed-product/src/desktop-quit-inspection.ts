@@ -45,6 +45,10 @@ export function hasUpcomingScheduledWork(
   })
 }
 
+declare module '@deepseek-ai/cordis' {
+  interface Context { sensteedQuitInspection: SensteedQuitInspection }
+}
+
 /** The Host-side inspection service consumed by the shell's quit gate. */
 export interface SensteedQuitInspection {
   inspect(): Promise<DesktopQuitInspection>
