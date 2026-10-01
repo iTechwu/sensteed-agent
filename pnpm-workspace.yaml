@@ -44,6 +44,11 @@ patchedDependencies:
   dshmarket@1.39.0: patches/dshmarket@1.39.0.patch
   open@11.0.1: patches/open@11.0.1.patch
 
+# 0.2.0 迁移期:AA 桥接等最新发布包要即刻可用,发布年龄门整体关闭;
+# 锁文件仍受解析期排除表与 tarball 一致性校验约束。
+minimumReleaseAge: 0
+
 minimumReleaseAgeExclude:
   - dshmarket@1.39.0
   - '@agents-anywhere/dsh-bridge-next@2.0.1'
+  - '@agents-anywhere/dsh-bridge-next@2.0.2'
