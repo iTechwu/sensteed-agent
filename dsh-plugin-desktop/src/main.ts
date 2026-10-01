@@ -18,8 +18,10 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   boot,
+  createRuntimeResolution,
   installFailLoud,
   loadLayeredEnv,
+  PluginPackages,
   PROFILE_PATCH_FILENAME,
   resolveProfileDir,
   type FailLoudProcess,
@@ -1711,6 +1713,10 @@ async function start(): Promise<void> {
       startupStage = 'host-boot'
       lifecycleRecorder.transitionStartupStage(startupStage)
       const releasePackageResolver = installProfilePackageResolver(prepared.bareModuleBaseUrl)
+      // Same pluginPackages contract as the isolated Host: the compatibility
+      // preflight must judge rows against this installation's versions, not
+      // the Profile's registry-installed @deepseek-ai copies.
+      const resolution = await createRuntimeResolution({ installAnchor: desktopInstallAnchor(), profile: prepared.profile })
       const ctx = await boot(
         BIN_NAME,
         prepared.rootConfig,
@@ -1720,6 +1726,7 @@ async function start(): Promise<void> {
           // profile-overlay resolver used by packaged Electron.
           hostCtx.loader.internal = undefined
           generation.bindHost(hostCtx)
+          await hostCtx.plugin(PluginPackages, { resolution })
           hostCtx.effect(
             () => async () => { await flushProfilePreferencesWrites() },
             'dsh-plugin-desktop: flush Profile preference writes',
