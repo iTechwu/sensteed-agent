@@ -7,6 +7,8 @@
 # at this package's own subpaths, with external DoFe plugins resolved through
 # the host install anchor exactly as the shell patch did.
 - insert:
+    - id: dofe-product-client
+      name: '@dofe/dsh-sensteed-product'
     - id: dofe-managed
       name: '@dofe/dsh-sensteed-product/dofe-managed'
     - id: personal-knowledge-files
