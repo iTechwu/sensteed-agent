@@ -1,11 +1,14 @@
 import { defineConfig } from 'vitest/config'
 
+const HOST_BOOT_SPECS = ['tests/host-process-integration.spec.ts', 'tests/agent-error-logging.host.spec.ts']
+
+// Desktop and sibling UI packages must share the renderer's React instance.
+const SHARED_RESOLVE = { dedupe: ['react', 'react-dom'] } as const
+
 export default defineConfig({
-  // Desktop and sibling UI packages must share the renderer's React instance.
-  resolve: { dedupe: ['react', 'react-dom'] },
+  resolve: SHARED_RESOLVE,
   test: {
     environment: 'node',
-    include: ['tests/**/*.spec.ts'],
     globalSetup: process.platform === 'win32' ? ['../scripts/prepare-test-electron.mjs'] : [],
     // This patched host package is exercised with a mocked node:fs/promises.
     // Keep it in Vitest's module graph so the builtin mock reaches its imports.
@@ -14,8 +17,30 @@ export default defineConfig({
         inline: ['@deepseek-ai/dsh-host-directory-picker-browse', '@deepseek-ai/dsh-client-ui-primitives'],
       },
     },
-    // Profile integration tests create a full package-junction closure; higher
-    // Windows file concurrency makes their latency depend on NTFS/Defender load.
-    maxWorkers: process.platform === 'win32' ? 2 : undefined,
+    projects: [
+      {
+        resolve: SHARED_RESOLVE,
+        test: {
+          name: 'unit',
+          include: ['tests/**/*.spec.ts'],
+          exclude: [...HOST_BOOT_SPECS],
+          // Profile integration tests create a full package-junction closure; higher
+          // Windows file concurrency makes their latency depend on NTFS/Defender load.
+          maxWorkers: process.platform === 'win32' ? 2 : undefined,
+        },
+      },
+      {
+        resolve: SHARED_RESOLVE,
+        test: {
+          name: 'host',
+          include: [...HOST_BOOT_SPECS],
+          // These specs boot real Host processes; a loaded machine makes their
+          // boot latency spike, so they never run concurrently with each other.
+          fileParallelism: false,
+          maxWorkers: 1,
+          testTimeout: 300_000,
+        },
+      },
+    ],
   },
 })
