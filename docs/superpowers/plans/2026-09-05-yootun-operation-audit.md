@@ -19,7 +19,7 @@
 - 单事件不超过 32 KiB；一批最多 50 条且总请求体不超过 512 KiB；`changes` 最多 20 项，`effects` 最多 10 项。
 - 业务操作不能因审计写入、同步或查询失败而失败；本地事件先持久化，再异步补传。
 - 服务端保留 365 天，本机可信查询缓存保留 30 天，pending/quarantine 在确认处理前不自动删除。
-- Models API 使用 `https://ixicai.cn/api/v1/yootun/audit-events`；Renderer 只访问 `/api/desktop/yootun/audit`，不得读取 API Key 或直连 Models。
+- Models API 使用 `https://ai.hozonauto.com/api/v1/yootun/audit-events`；Renderer 只访问 `/api/desktop/yootun/audit`，不得读取 API Key 或直连 Models。
 - Node.js 必须为 `^22.19.0` 或 `>=24.0.0`；Desktop 使用根目录 Corepack pnpm `11.7.0`。
 - 三个仓库都先读取各自 `AGENTS.md`，保留用户已有改动；每个任务只提交列出的文件，提交信息使用中文 Conventional Commits，并立即推送至该仓库 `origin` 当前分支。
 - Models 测试不得运行无并发限制的根 `pnpm test`；单文件 Jest 使用 `pnpm --filter @repo/api exec jest <file> --runInBand`。
@@ -708,7 +708,7 @@ interface YootunAuditStore {
 
 - [ ] **Step 4: Implement the Models client and verify classifications**
 
-Use base `https://ixicai.cn/api/v1/yootun/audit-events`, 10-second timeout, `redirect: 'error'`, `Accept: application/json`, and Bearer credential. Parse every response before returning. Map failures to stable kinds:
+Use base `https://ai.hozonauto.com/api/v1/yootun/audit-events`, 10-second timeout, `redirect: 'error'`, `Accept: application/json`, and Bearer credential. Parse every response before returning. Map failures to stable kinds:
 
 ```ts
 type AuditRemoteFailure =
