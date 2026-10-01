@@ -25,15 +25,18 @@
   },
   "scripts": {
     "clean": "node scripts/clean.mjs",
-    "build": "node scripts/clean.mjs && tsdown && tsc -p tsconfig.json --emitDeclarationOnly",
+    "generate:brand": "node scripts/generate-brand-module.mjs",
+    "verify:brand": "node scripts/verify-brand-sync.mjs && node --test tests/brand-round-trip.spec.mjs",
+    "build": "node scripts/generate-brand-module.mjs && node scripts/clean.mjs && tsdown && tsc -p tsconfig.json --emitDeclarationOnly",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.tests.json --noEmit",
     "test": "vitest run",
-    "check": "corepack pnpm run build && corepack pnpm run typecheck && corepack pnpm run test"
+    "check": "corepack pnpm run verify:brand && corepack pnpm run build && corepack pnpm run typecheck && corepack pnpm run test"
   },
   "devDependencies": {
     "@types/node": "^22.20.0",
     "tsdown": "0.22.2",
     "typescript": "6.0.3",
-    "vitest": "4.1.8"
+    "vitest": "4.1.8",
+    "sharp": "0.35.3"
   }
 }

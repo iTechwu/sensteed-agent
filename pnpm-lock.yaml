@@ -2632,6 +2632,9 @@ importers:
       '@types/node':
         specifier: ^22.20.0
         version: 22.20.1
+      sharp:
+        specifier: 0.35.3
+        version: 0.35.3(@types/node@22.20.1)
       tsdown:
         specifier: 0.22.2
         version: 0.22.2(tsx@4.23.12)(typescript@6.0.3)
