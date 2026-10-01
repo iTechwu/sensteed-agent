@@ -7,6 +7,7 @@ export default defineConfig([
     name: PACKAGE_NAME,
     entry: {
       index: 'src/index.ts',
+      'desktop-version-semver': 'src/desktop-version-semver.ts',
       'package-version': 'src/package-version.ts',
       'dofe-models': 'src/dofe-models.ts',
       'dofe-plugins': 'src/dofe-plugins.ts',

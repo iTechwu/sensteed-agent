@@ -9,6 +9,7 @@
     ".": "./lib/index.js",
     "./client": "./lib/client.js",
     "./cordis.patch.yml": "./cordis.patch.yml",
+    "./desktop-version-semver": "./lib/desktop-version-semver.js",
     "./dofe-access-route": "./lib/dofe-access-route.js",
     "./dofe-auth-audit": "./lib/dofe-auth-audit.js",
     "./dofe-auth-contract": "./lib/dofe-auth-contract.js",
