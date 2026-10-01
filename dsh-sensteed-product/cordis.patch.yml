@@ -2,6 +2,25 @@
 # routing, and business routes. Activation is launcher-owned on the Desktop
 # shell (appended bundle layer) and `dsh plugin --profile desktop add` on the
 # official shell; the rows themselves live in this self-declared patch so the
-# package composes identically in both shells. Populated by the staged
-# extraction from dsh-plugin-desktop.
-[]
+# package composes identically in both shells. Row ids are the historical
+# product ids (settings documents and verifiers depend on them); names point
+# at this package's own subpaths, with external DoFe plugins resolved through
+# the host install anchor exactly as the shell patch did.
+- insert:
+    - id: dofe-managed
+      name: '@dofe/dsh-sensteed-product/dofe-managed'
+    - id: personal-knowledge-files
+      name: '@dofe/dsh-sensteed-product/personal-knowledge-files'
+    # Sensteed 数据源插件；bundle 自带 MCP 与 guidance。
+    - id: dofe-sensteed-finance
+      name: '@dofe/dsh-sensteed-finance'
+    - id: personal-knowledge-management
+      name: '@dofe/dsh-sensteed-knowledge'
+    # dofe-managed owns the OpenMontage MCP transport. This shared Host module
+    # adds workflow guidance, Agent-scoped projection, and stalled-call blocking.
+    - id: openmontage-guidance
+      name: '@dofe/dsh-openmontage-mcp'
+      config:
+        stalledOutcomeThreshold: 3
+    - id: dofe-opencli
+      name: '@dofe/dsh-sensteed-product/dofe-opencli'

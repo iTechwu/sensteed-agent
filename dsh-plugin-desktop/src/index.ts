@@ -20,10 +20,10 @@ import {
   DOFE_ACCESS_VALIDATE_PATH,
   handleDofeAccessValidationRequest,
   handleDofeModelCatalogRequest,
-} from './dofe-access-route.ts'
-import { DOFE_AUTH_PATHS, handleDofeAuthRequest } from './dofe-auth-route.ts'
-import type {} from './dofe-managed.ts'
-import { watchDofeAuthAudit } from './dofe-auth-audit.ts'
+} from '@dofe/dsh-sensteed-product/dofe-access-route'
+import { DOFE_AUTH_PATHS, handleDofeAuthRequest } from '@dofe/dsh-sensteed-product/dofe-auth-route'
+import type {} from '@dofe/dsh-sensteed-product/dofe-managed'
+import { watchDofeAuthAudit } from '@dofe/dsh-sensteed-product/dofe-auth-audit'
 import { BRAND_VARIANT } from './generated-product-identity.ts'
 import { YootunAuditModelsClient } from '@dofe/dsh-sensteed-product/yootun-audit-models-client'
 import { handleYootunAuditRequest, YOOTUN_AUDIT_PATH } from '@dofe/dsh-sensteed-product/yootun-audit-route'

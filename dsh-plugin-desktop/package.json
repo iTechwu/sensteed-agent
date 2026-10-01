@@ -47,18 +47,6 @@
       "types": "./lib/types/ci-tools.d.ts",
       "default": "./lib/ci-tools.js"
     },
-    "./dofe-managed": {
-      "types": "./lib/types/dofe-managed.d.ts",
-      "default": "./lib/dofe-managed.js"
-    },
-    "./personal-knowledge-files": {
-      "types": "./lib/types/personal-knowledge-files.d.ts",
-      "default": "./lib/personal-knowledge-files.js"
-    },
-    "./dofe-opencli": {
-      "types": "./lib/types/dofe-opencli.d.ts",
-      "default": "./lib/dofe-opencli.js"
-    },
     "./terminal": {
       "types": "./lib/types/terminal.d.ts",
       "default": "./lib/terminal.js"

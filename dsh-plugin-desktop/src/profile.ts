@@ -1519,6 +1519,15 @@ export function prepareDesktopProfile(
   patches.push({ id: 'desktop-shell', disabled: false })
   // Boot-time closure triage never installs: a sealed-tree disagreement is a
   // corruption signal for the recovery surface, not a pnpm job.
+  if (loadedProfile.productFailure === undefined) {
+    // The launcher-owned product layer must contribute its rows whenever it
+    // resolved; an empty layer is a silent-extraction regression, not a
+    // user-facing state.
+    const composedRows = composeEntries([patches])
+    if (!composedRows.some(row => row.id === 'dofe-managed')) {
+      throw new Error('dsh-plugin-desktop: launcher product layer resolved without its rows')
+    }
+  }
   const preparedClosure = readDesktopProfileClosure()
   const closureViolations = preparedClosure === undefined
     ? []

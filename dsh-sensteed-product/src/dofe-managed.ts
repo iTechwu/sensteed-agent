@@ -4,6 +4,7 @@ import { apply as applyMcpClient, name as mcpClientName, inject as mcpClientInje
 import type { Config as McpConfig } from '@deepseek-ai/dsh-mcp-client'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import type {} from '@deepseek-ai/dsh-system-prompt'
+import type {} from '@deepseek-ai/dsh-settings'
 import z from '@deepseek-ai/schemastery'
 import {
   DEFAULT_DOFE_PLUGIN_IDS,
@@ -12,11 +13,11 @@ import {
   type DofeAccessSettings,
   type DofePluginId,
   normalizeDofePluginIds,
-} from '@dofe/dsh-sensteed-product/dofe-plugins'
+} from './dofe-plugins.ts'
 import { BRAND_TENANT, BRAND_VARIANT } from './generated-product-identity.ts'
-import { KNOWLEDGE_ROUTING_PROMPT } from '@dofe/dsh-sensteed-product/knowledge-routing'
+import { KNOWLEDGE_ROUTING_PROMPT } from './knowledge-routing.ts'
 import { DofeAuthService } from './dofe-auth-service.ts'
-import { financeMcpConfig } from '@dofe/dsh-sensteed-product/finance-mcp'
+import { financeMcpConfig } from './finance-mcp.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context { dofeAuth: DofeAuthService }

@@ -12,7 +12,7 @@ import { heroBrandDataUrl } from './generated-brand-assets.ts'
 import { BRAND_TENANT, BRAND_VARIANT } from '../generated-product-identity.ts'
 import { DOFE_ACCESS_KEY, type DofeAccessLocaleKey } from './dofe-access.ts'
 import { dofePluginsForBrand, normalizeDofePluginIds, DOFE_ACCESS_SETTINGS_NAMESPACE, DOFE_ACCESS_VALIDATION_VERSION, type DofeAccessSettings, type DofePluginId, DEFAULT_DOFE_PLUGIN_IDS } from '@dofe/dsh-sensteed-product/dofe-plugins'
-import { DOFE_ACCESS_MODELS_PATH, DOFE_ACCESS_VALIDATE_PATH } from '../dofe-access-route.ts'
+import { DOFE_ACCESS_MODELS_PATH, DOFE_ACCESS_VALIDATE_PATH } from '@dofe/dsh-sensteed-product/dofe-access-route'
 import { DEFAULT_DOFE_PROTOCOL, DOFE_ANTHROPIC_BASE_URL, normalizeDofeUiProtocol, parseDofeModelCatalog, UI_DOFE_PROTOCOLS, type DofeModel, type DofeProtocol } from '@dofe/dsh-sensteed-product/dofe-models'
 
 const STYLE_ID = 'dsh-dofe-access-styles'

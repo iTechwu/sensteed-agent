@@ -49,7 +49,7 @@ const desktopExtendedStyles = await readFile(new URL('../dsh-plugin-desktop/src/
 const dofeAccessSource = await readFile(new URL('../dsh-plugin-desktop/src/client/DofeAccessSection.tsx', import.meta.url), 'utf8')
 const desktopSettingsApiSource = await readFile(new URL('../dsh-plugin-desktop/src/client/desktop-settings-api.ts', import.meta.url), 'utf8')
 const bootHealthSource = await readFile(new URL('../dsh-plugin-desktop/src/client/boot-health.ts', import.meta.url), 'utf8')
-const dofeManagedSource = await readFile(new URL('../dsh-plugin-desktop/src/dofe-managed.ts', import.meta.url), 'utf8')
+const dofeManagedSource = await readFile(new URL('../dsh-sensteed-product/src/dofe-managed.ts', import.meta.url), 'utf8')
 const themeSource = await readFile(new URL('../deepseek-harness/packages/client/ui-theme/src/styles/design-platform.css', import.meta.url), 'utf8')
 const layoutFrameSource = await readFile(new URL('../deepseek-harness/packages/client/ui-layout/src/client/AppFrame.tsx', import.meta.url), 'utf8')
 const deliverablesStyles = await readFile(new URL('../deepseek-harness/packages/client/ui-deliverables/src/client/Deliverables.module.css', import.meta.url), 'utf8')
@@ -150,7 +150,7 @@ const desktopClientStyles = `${desktopStyles}\n${desktopSettingsStyles}\n${deskt
 const pluginConsoleClient = await readFile(new URL('../.ci/dsh-plugin-console/lib/client.js', import.meta.url), 'utf8')
 const pluginConsoleHost = await readFile(new URL('../.ci/dsh-plugin-console/lib/index.js', import.meta.url), 'utf8')
 const openCliSource = await readFile(new URL('../.ci/dsh-opencli/index.js', import.meta.url), 'utf8')
-const dofeOpenCliSource = await readFile(new URL('../dsh-plugin-desktop/src/dofe-opencli.ts', import.meta.url), 'utf8')
+const dofeOpenCliSource = await readFile(new URL('../dsh-sensteed-product/src/dofe-opencli.ts', import.meta.url), 'utf8')
 const directMcpServers = [...dofeManagedSource.matchAll(/serverName:\s*'([^']+)'/gu)].map(match => match[1])
 const toolsMcpPaths = dofeManagedSource.match(/\.\.\.\[([\s\S]*?)\]\.map\(path => \(\{ plugin: 'tools'/u)?.[1]
   ?.match(/'[^']+'/gu)?.map(value => value.slice(1, -1)) || []
@@ -158,8 +158,8 @@ const managedMcpServers = new Set([...directMcpServers, ...toolsMcpPaths.map(pat
 const localToolSources = await Promise.all([
   '../dsh-plugin-desktop/src/browser-tools.ts',
   '../dsh-plugin-desktop/src/ci-tools.ts',
-  '../dsh-plugin-desktop/src/yootun-recruiter-tools.ts',
-  '../dsh-plugin-desktop/src/dofe-opencli.ts',
+  '../dsh-sensteed-product/src/yootun-recruiter-tools.ts',
+  '../dsh-sensteed-product/src/dofe-opencli.ts',
   ...ciEntries.filter(name => name.startsWith('dsh-yootun-')).flatMap(name => [
     `../.ci/${name}/index.js`,
     `../.ci/${name}/tool.js`,

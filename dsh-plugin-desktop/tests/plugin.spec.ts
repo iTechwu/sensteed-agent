@@ -44,8 +44,8 @@ import { DESKTOP_LAN_HTTPS_CA_PATH, DesktopLanHttpsRuntime } from '../src/lan-ht
 import {
   DOFE_ACCESS_MODELS_PATH,
   DOFE_ACCESS_VALIDATE_PATH,
-} from '../src/dofe-access-route.ts'
-import { DOFE_AUTH_PATHS } from '../src/dofe-auth-route.ts'
+} from '@dofe/dsh-sensteed-product/dofe-access-route'
+import { DOFE_AUTH_PATHS } from '@dofe/dsh-sensteed-product/dofe-auth-route'
 import { YOOTUN_AUDIT_PATH } from '@dofe/dsh-sensteed-product/yootun-audit-route'
 import { RENDERER_BOOT_REPORT_PATH, type RendererBootReport } from '../src/renderer-boot-contract.ts'
 

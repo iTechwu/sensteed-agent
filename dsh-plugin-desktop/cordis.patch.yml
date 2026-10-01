@@ -5,9 +5,6 @@
       name: dsh-plugin-desktop
       config:
         mode: compatibility
-    # Sensteed 数据源插件；bundle 自带 MCP 与 guidance。
-    - id: dofe-sensteed-finance
-      name: '@dofe/dsh-sensteed-finance'
     - id: dofe-sensteed-supplier-intelligence
       name: '@dofe/dsh-sensteed-supplier-intelligence'
     # dsh-soup：项目资源管理器（独立插件）。宿主半区注册 /api/dsh-soup
@@ -29,20 +26,6 @@
       name: dsh-plugin-desktop/updates
     - id: desktop-browser-tools
       name: dsh-plugin-desktop/browser-tools
-    - id: dofe-managed
-      name: dsh-plugin-desktop/dofe-managed
-    - id: personal-knowledge-files
-      name: dsh-plugin-desktop/personal-knowledge-files
-    - id: personal-knowledge-management
-      name: '@dofe/dsh-sensteed-knowledge'
-    # dofe-managed owns the OpenMontage MCP transport. This shared Host module
-    # adds workflow guidance, Agent-scoped projection, and stalled-call blocking.
-    - id: openmontage-guidance
-      name: '@dofe/dsh-openmontage-mcp'
-      config:
-        stalledOutcomeThreshold: 3
-    - id: dofe-opencli
-      name: dsh-plugin-desktop/dofe-opencli
 
 # DoFe owns the model route in the Desktop distribution. The upstream adapter
 # remains in place, but Desktop fixes its single managed key and endpoint.

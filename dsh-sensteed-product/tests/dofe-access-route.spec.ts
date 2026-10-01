@@ -39,7 +39,8 @@ function response(): ServerResponse & { body: string } {
 
 describe('DoFe model_api_key validation route', () => {
   it('registers both handlers on the Desktop private web surface', () => {
-    const source = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
+    // Registration still lives in the shell's index.ts until the product routes row lands.
+    const source = readFileSync(new URL('../../dsh-plugin-desktop/src/index.ts', import.meta.url), 'utf8')
 
     expect(source).toContain('[DOFE_ACCESS_MODELS_PATH, handleDofeModelCatalogRequest]')
     expect(source).toContain('[DOFE_ACCESS_VALIDATE_PATH, handleDofeAccessValidationRequest]')

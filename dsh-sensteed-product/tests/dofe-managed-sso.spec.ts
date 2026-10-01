@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { apply } from '../src/dofe-managed.ts'
-import { DOFE_ACCESS_VALIDATION_VERSION } from '@dofe/dsh-sensteed-product/dofe-plugins'
+import { DOFE_ACCESS_VALIDATION_VERSION } from '../src/dofe-plugins.ts'
 
 vi.mock('../src/generated-product-identity.ts', () => ({ BRAND_VARIANT: 'sensteed', BRAND_TENANT: 'sensteed' }))
 

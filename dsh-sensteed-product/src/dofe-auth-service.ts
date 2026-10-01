@@ -1,17 +1,16 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import type { CredentialProvider } from '@deepseek-ai/dsh-credentials'
 import { credentialKey, credentialRef } from '@deepseek-ai/dsh-credentials'
-import type { DesktopLogger } from './desktop-logger.ts'
-import { formatDesktopErrorDetails } from './desktop-logger.ts'
-import type { DofeAuthSnapshot } from '@dofe/dsh-sensteed-product/dofe-auth-contract'
-export * from '@dofe/dsh-sensteed-product/dofe-auth-contract'
+import { formatDesktopErrorDetails } from './error-format.ts'
+import type { DofeAuthSnapshot } from './dofe-auth-contract.ts'
+export * from './dofe-auth-contract.ts'
 import {
   createOidcAuthorizationSession,
   parseOidcCallback,
   SENSTEED_SSO_CLIENT_ID,
   SENSTEED_SSO_DISCOVERY_URL,
   type OidcDiscovery,
-} from '@dofe/dsh-sensteed-product/dofe-auth-oidc'
+} from './dofe-auth-oidc.ts'
 
 export const DOFE_AUTH_GRANT_KEY = credentialKey('dsh-plugin-desktop', 'sensteed-auth')
 const MODELS_API_KEY_REF = credentialRef('MODELS_API_KEY')
@@ -68,7 +67,7 @@ export class DofeAuthService {
     private readonly credentials: CredentialProvider,
     private readonly fetcher: typeof fetch = globalThis.fetch,
     private readonly onBound?: (snapshot: DofeAuthSnapshot) => Promise<void>,
-    private readonly logger?: Pick<DesktopLogger, 'error' | 'info'>,
+    private readonly logger?: { error(message: string): void; info(message: string): void },
   ) {}
 
   getStatus(): DofeAuthSnapshot { return structuredClone(this.snapshot) }

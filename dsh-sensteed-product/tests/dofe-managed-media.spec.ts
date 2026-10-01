@@ -7,7 +7,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { DOFE_MCP_BASE_URL, MODELS_API_KEY } from '../src/dofe-managed.ts'
-import { DEFAULT_DOFE_PLUGIN_IDS, DOFE_PLUGIN_CATALOG } from '@dofe/dsh-sensteed-product/dofe-plugins'
+import { DEFAULT_DOFE_PLUGIN_IDS, DOFE_PLUGIN_CATALOG } from '../src/dofe-plugins.ts'
 
 const managedSource = readFileSync(new URL('../src/dofe-managed.ts', import.meta.url), 'utf8')
 

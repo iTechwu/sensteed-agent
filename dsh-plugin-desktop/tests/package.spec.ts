@@ -153,7 +153,18 @@ describe('published package surface', () => {
         .map(row => typeof row.name === 'string' ? row.name : undefined)
         .filter((name): name is string => name !== undefined),
     )
-    for (const overlayed of ['@dofe/dsh-sensteed-finance', '@dofe/dsh-sensteed-supplier-intelligence', '@lyhue1991/dsh-soup']) {
+    const productPatch = parseYaml(
+      readFileSync(new URL('../dsh-sensteed-product/cordis.patch.yml', packageRoot), 'utf8'),
+    ) as Array<{ insert?: Array<{ id?: unknown, name?: unknown }> }>
+    const productNames = new Set(
+      productPatch.flatMap(statement => statement.insert ?? [])
+        .map(row => typeof row.name === 'string' ? row.name : undefined)
+        .filter((name): name is string => name !== undefined),
+    )
+    for (const overlayed of ['@dofe/dsh-sensteed-finance']) {
+      expect(productNames.has(overlayed), `product cordis.patch.yml must insert ${overlayed}`).toBe(true)
+    }
+    for (const overlayed of ['@dofe/dsh-sensteed-supplier-intelligence', '@lyhue1991/dsh-soup']) {
       expect(overlayNames.has(overlayed), `cordis.patch.yml must insert ${overlayed}`).toBe(true)
     }
     expect(workspaceManifest.scripts?.['dofe-ui:build'])
@@ -181,9 +192,10 @@ describe('published package surface', () => {
     for (const name of ['dsh-yootun-ui', 'dsh-yootun-douyin-operation', 'dsh-geoflow-mcp', 'dsh-georank-mcp']) {
       expect(existsSync(new URL(`../.ci/${name}/package.json`, packageRoot))).toBe(false)
     }
-    for (const file of ['lib/index.js', 'lib/dofe-managed.js', 'lib/client.js']) {
+    for (const file of ['lib/index.js', 'lib/client.js']) {
       expect(readFileSync(new URL(file, packageRoot), 'utf8')).not.toContain('ixicai.cn')
     }
+    expect(readFileSync(new URL('../dsh-sensteed-product/lib/dofe-managed.js', packageRoot), 'utf8')).not.toContain('ixicai.cn')
   })
 
   it('keeps the capture SDK fallback loadable as Node ESM', () => {
@@ -299,7 +311,8 @@ describe('published package surface', () => {
     expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop/diagnostics')
     expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop/notifications')
     expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop/updates')
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop/dofe-managed')
+    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).not.toContain('dsh-plugin-desktop/dofe-managed')
+    expect(readFileSync(new URL('../dsh-sensteed-product/cordis.patch.yml', packageRoot), 'utf8')).toContain("name: '@dofe/dsh-sensteed-product/dofe-managed'")
     expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).not.toContain('name: dsh-plugin-desktop/yootun-recruiter-tools')
     const patchSource = readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')
     expect(patchSource).not.toContain("name: '@dofe/dsh-yootun-")

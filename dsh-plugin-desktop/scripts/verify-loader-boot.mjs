@@ -160,7 +160,7 @@ try {
     prepared.rootConfig,
     [{ insert: [
       // sensteed builds: desktop-shell injects 'dofeAuth', which this plugin provides.
-      { id: 'dofe-managed', name: 'dsh-plugin-desktop/dofe-managed' },
+      { id: 'dofe-managed', name: '@dofe/dsh-sensteed-product/dofe-managed' },
       { id: 'desktop-shell', name: 'dsh-plugin-desktop' },
       { id: 'community-market', name: 'dsh-community-market' },
       { id: 'dsh-market', name: 'dshmarket' },
