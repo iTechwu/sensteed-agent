@@ -27,7 +27,6 @@ export default defineConfig([
       terminal: 'src/terminal.ts',
       'browser-tools': 'src/browser-tools.ts',
       'ci-tools': 'src/ci-tools.ts',
-      'yootun-recruiter-tools': 'src/yootun-recruiter-tools.ts',
       'dofe-managed': 'src/dofe-managed.ts',
       'personal-knowledge-files': 'src/personal-knowledge-files.ts',
       'dofe-opencli': 'src/dofe-opencli.ts',

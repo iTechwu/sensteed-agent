@@ -2632,9 +2632,36 @@ importers:
       '@deepseek-ai/dsh-atomic-write':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/util/atomic-write
+      '@deepseek-ai/dsh-credentials':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/credentials/credentials
+      '@deepseek-ai/dsh-home-paths':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/util/home-paths
+      '@deepseek-ai/dsh-llm':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/llm/llm
       '@deepseek-ai/dsh-mcp-client':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/mcp/mcp-client
+      '@deepseek-ai/dsh-session':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/core/session
+      '@deepseek-ai/dsh-session-persistence':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/session/session-persistence
+      '@deepseek-ai/dsh-system-prompt':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/core/system-prompt
+      '@deepseek-ai/dsh-tools':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/core/tools
+      '@deepseek-ai/dsh-util-values':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/util/values
+      '@deepseek-ai/schemastery':
+        specifier: workspace:*
+        version: link:../deepseek-harness/vendor/schemastery
       '@types/node':
         specifier: ^22.20.0
         version: 22.20.1

@@ -6,8 +6,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { dirname } from 'node:path'
 import { writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 import { credentialRef, type CredentialProvider } from '@deepseek-ai/dsh-credentials'
-import { safeYootunAuditTargetId, type YootunAuditRecordInput, type YootunAuditRecorder } from '@dofe/dsh-sensteed-product/yootun-audit-contract'
-import { desktopPackageVersion } from './desktop-package-version.ts'
+import { safeYootunAuditTargetId, type YootunAuditRecordInput, type YootunAuditRecorder } from './yootun-audit-contract.ts'
+import { productPackageVersion } from './package-version.ts'
 
 export const YOOTUN_RECRUITER_PATH = '/api/desktop/yootun/recruiter'
 
@@ -1030,7 +1030,7 @@ export interface RecruiterRouteDependencies {
 }
 
 const RECRUITER_AUDIT_SOURCE = Object.freeze({
-  pluginId: 'dsh-plugin-desktop/yootun-recruiter', pluginVersion: desktopPackageVersion(), surface: 'human_ui' as const,
+  pluginId: 'dsh-plugin-desktop/yootun-recruiter', pluginVersion: productPackageVersion(), surface: 'human_ui' as const,
 })
 
 async function recordRecruiterAudit(audit: YootunAuditRecorder | undefined, input: YootunAuditRecordInput | undefined): Promise<void> {

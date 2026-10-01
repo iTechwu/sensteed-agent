@@ -270,10 +270,7 @@ describe('published package surface', () => {
       types: './lib/types/notifications.d.ts',
       default: './lib/notifications.js',
     })
-    expect(manifest.exports).toHaveProperty('./yootun-recruiter-tools', {
-      types: './lib/types/yootun-recruiter-tools.d.ts',
-      default: './lib/yootun-recruiter-tools.js',
-    })
+    expect(manifest.exports).not.toHaveProperty('./yootun-recruiter-tools')
     expect(manifest.exports).not.toHaveProperty('./windows-acl-runner')
     expect(manifest.exports).not.toHaveProperty('./desktop-cli')
     expect(manifest.exports).not.toHaveProperty('./desktop-runtime-environment')
