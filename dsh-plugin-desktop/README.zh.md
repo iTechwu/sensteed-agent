@@ -57,6 +57,8 @@ profile 组合默认注入企业模型路由：`llm-deepseek` 指向 DoFe 网关
 
 Electron 可执行文件只包含最小启动代码。它获取单实例锁、解析当前选中的 DSH profile、提供原生运行时能力，并在 Electron main 进程中启动 Host Cordis 根。`desktop-shell` Host 插件通过 Cordis effect 拥有 `BrowserWindow`、导航策略、settings namespace，以及关闭与退出生命周期。原生 runtime 拥有实体托盘；`desktop-shell`、`desktop-profiles`、`desktop-terminal` 与 `desktop-updates` 则通过有序 item registry 提供 effect-scoped 命令。
 
+启动关键路径保持零 pnpm：健康 Profile 全程不产生 pnpm 子进程；Profile 依赖元数据失配不阻塞启动，而是启动后经数据操作锁离线优先地后台修复（详见 [docs/startup-zero-pnpm.md](docs/startup-zero-pnpm.md)）。打包期冻结的一方依赖闭包清单（`lib/profile-closure.json`）随 app.asar 分发，启动期仅做逐包快校验并只产出违规记录；第三方 bundle 损坏按 AA provider 同款模式降级跳过，由恢复窗的"修复依赖元数据"动作处理。
+
 ### 呈现模式与 Web carrier
 
 三种呈现模式都复用现有 Web carrier。profile 挂载普通 `dsh-base` 与 `dsh-web-app` bundle。Host 默认把 HTTP 与 WebSocket surface 绑定到 `127.0.0.1` 的临时端口；只有明确确认的局域网设置才会绑定所有接口，Electron 则始终从 loopback 地址在沙箱 renderer 中加载同源页面。Electron 不维护自有插件 roster，不使用 preload bridge，renderer 也不会获得原始 Electron API。
