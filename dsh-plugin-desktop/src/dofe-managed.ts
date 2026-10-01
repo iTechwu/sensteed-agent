@@ -23,7 +23,52 @@ declare module '@deepseek-ai/cordis' {
 }
 
 export const name = 'dofe-managed'
-export const inject = ['credentials', 'tools', 'systemPrompt', 'desktopRuntime', 'settings']
+export const inject = ['credentials', 'tools', 'systemPrompt', 'settings']
+
+/**
+ * Launcher capabilities this row degrades without: the OpenMontage tray item
+ * and the SSO browser open. Declared as the narrow shape the row actually
+ * uses (the `tests/dofe-managed-runtime.spec.ts` mock), observed through the
+ * Cordis `internal/service` event so an official shell without a launcher
+ * runtime simply leaves tray and SSO open degraded instead of pending.
+ */
+export interface DofeLauncherRuntime {
+  readonly platform: NodeJS.Platform
+  registerTrayItem(item: {
+    group: string
+    order: number
+    label: () => string
+    enabled: () => boolean
+    invoke: () => Promise<void>
+  }): { refresh(): void; dispose(): void }
+  openOpenMontage(key: string): Promise<void>
+  openExternal(url: string): Promise<void>
+}
+
+/** Run once with the launcher runtime whenever it appears (or immediately if present). */
+function observeLauncherRuntime(ctx: Context, onReady: (runtime: DofeLauncherRuntime) => void): void {
+  let observed: DofeLauncherRuntime | undefined
+  const tryNow = (): void => {
+    if (observed !== undefined) return
+    try {
+      const runtime = (ctx as { desktopRuntime?: DofeLauncherRuntime }).desktopRuntime
+      if (runtime !== undefined && runtime !== null) {
+        observed = runtime
+        onReady(runtime)
+      }
+    } catch {
+      // Strict service access throws while the launcher has not provided the
+      // runtime; the internal/service event covers the late-arrival case.
+    }
+  }
+  tryNow()
+  const events = (ctx as { events?: { on(event: string, listener: (...args: unknown[]) => void): void } }).events
+  events?.on('internal/service', (...args: unknown[]) => {
+    const name = args[0]
+    const value = args[1]
+    if (name === 'desktopRuntime' && value) tryNow()
+  })
+}
 
 export const MODELS_API_KEY = 'MODELS_API_KEY'
 const MODELS_API_KEY_REF = credentialRef(MODELS_API_KEY)
@@ -82,7 +127,16 @@ export async function apply(ctx: Context): Promise<void> {
   )
   let financeAuth: DofeAuthService | undefined
   if (BRAND_VARIANT === 'sensteed') {
-    const auth = new DofeAuthService(ctx.desktopRuntime, ctx.credentials, globalThis.fetch, async snapshot => {
+    const auth = new DofeAuthService(
+      {
+        openExternal: async url => {
+          if (launcher === undefined) throw new Error('dofe-managed: launcher runtime is not available for SSO')
+          await launcher.openExternal(url)
+        },
+      },
+      ctx.credentials,
+      globalThis.fetch,
+      async snapshot => {
       const current = access.get()
       const entitlements = snapshot.entitlements!
       const sameUser = current.identity?.ssoSub === snapshot.user!.ssoSub
@@ -133,6 +187,19 @@ export async function apply(ctx: Context): Promise<void> {
   let activeKey: string | undefined
   let tray: { refresh(): void; dispose(): void } | undefined
   let reload: Promise<void> = Promise.resolve()
+  let launcher: DofeLauncherRuntime | undefined
+  observeLauncherRuntime(ctx, runtime => {
+    launcher = runtime
+    tray = runtime.registerTrayItem({
+      group: 'tools',
+      order: 5,
+      label: () => 'OpenMontage',
+      enabled: () => activeKey !== undefined,
+      invoke: async () => {
+        if (activeKey !== undefined) await runtime.openOpenMontage(activeKey)
+      },
+    })
+  })
 
   const reconcile = async (): Promise<void> => {
     const resolved = await ctx.credentials.resolve(MODELS_API_KEY_REF)
@@ -194,15 +261,6 @@ export async function apply(ctx: Context): Promise<void> {
   if (financeAuth) ctx.effect(() => financeAuth.watchBinding(() => { if (observingFinance) schedule() }), 'dofe-managed: finance SSO renewal')
   observingFinance = true
   schedule()
-  tray = ctx.desktopRuntime.registerTrayItem({
-    group: 'tools',
-    order: 5,
-    label: () => 'OpenMontage',
-    enabled: () => activeKey !== undefined,
-    invoke: async () => {
-      if (activeKey !== undefined) await ctx.desktopRuntime.openOpenMontage(activeKey)
-    },
-  })
   ctx.on('credentials/reference-updated', ref => {
     if (ref === MODELS_API_KEY) schedule()
   })

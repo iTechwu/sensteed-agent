@@ -3,7 +3,6 @@ import type { CredentialProvider } from '@deepseek-ai/dsh-credentials'
 import { credentialKey, credentialRef } from '@deepseek-ai/dsh-credentials'
 import type { DesktopLogger } from './desktop-logger.ts'
 import { formatDesktopErrorDetails } from './desktop-logger.ts'
-import type { DesktopRuntime } from './runtime.ts'
 import type { DofeAuthSnapshot } from '@dofe/dsh-sensteed-product/dofe-auth-contract'
 export * from '@dofe/dsh-sensteed-product/dofe-auth-contract'
 import {
@@ -64,7 +63,8 @@ export class DofeAuthService {
   private readonly bindingListeners = new Set<(snapshot: DofeAuthSnapshot) => void>()
 
   constructor(
-    private readonly runtime: DesktopRuntime,
+    /** Only the browser-open capability is required; anything else stays launcher-owned. */
+    private readonly runtime: { openExternal(url: string): Promise<void> },
     private readonly credentials: CredentialProvider,
     private readonly fetcher: typeof fetch = globalThis.fetch,
     private readonly onBound?: (snapshot: DofeAuthSnapshot) => Promise<void>,
