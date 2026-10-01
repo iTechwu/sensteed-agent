@@ -5,7 +5,8 @@ import { Context } from '@deepseek-ai/cordis'
 import type { SubprocessHandle, SubprocessOutcome, SubprocessRuntime, SubprocessSpawnSpec } from '@deepseek-ai/dsh-subprocess'
 import { describe, expect, it, vi } from 'vitest'
 import { apply, inject, name, type DesktopPnpm, type DesktopPnpmBootstrap } from '../src/pnpm.ts'
-import { PNPM_IGNORE_MINIMUM_RELEASE_AGE, withDesktopPnpmPolicy } from '../src/pnpm-policy.ts'
+import { PNPM_IGNORE_MINIMUM_RELEASE_AGE, withDesktopPnpmPolicy, withDesktopPnpmStoreDir } from '../src/pnpm-policy.ts'
+import { desktopPnpmStoreDir } from '../src/profile-store-dir.ts'
 
 interface Deferred<T> { promise: Promise<T>; resolve(value: T): void; reject(cause: unknown): void }
 interface ControlledSubprocess extends SubprocessHandle {
@@ -98,6 +99,16 @@ describe('desktop pnpm execution service', () => {
     ])
   })
 
+  it('appends the pinned store directory to direct pnpm argv exactly once', () => {
+    const storeDir = desktopPnpmStoreDir('/home')
+    expect(withDesktopPnpmStoreDir(['add', 'example'], storeDir)).toEqual([
+      'add', 'example', '--store-dir', storeDir,
+    ])
+    expect(withDesktopPnpmStoreDir(['--store-dir', '/already/pinned', 'add'], storeDir)).toEqual([
+      '--store-dir', '/already/pinned', 'add',
+    ])
+  })
+
   it('starts packaged pnpm in the active Profile without recovery side effects', async () => {
     const process = child()
     const target = await harness([process])
@@ -115,6 +126,8 @@ describe('desktop pnpm execution service', () => {
         'add',
         '--save-exact',
         'example@1.2.3',
+        '--store-dir',
+        desktopPnpmStoreDir(bootstrap().homeDir),
       ],
       cwd: bootstrap().activeProfileDir,
       stdio: { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' },

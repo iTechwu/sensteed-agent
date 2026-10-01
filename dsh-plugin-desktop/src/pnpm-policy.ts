@@ -12,6 +12,14 @@ export function withDesktopPnpmPolicy(argv: readonly string[]): string[] {
   return [PNPM_IGNORE_MINIMUM_RELEASE_AGE, ...argv]
 }
 
+const PNPM_STORE_DIR_FLAG = '--store-dir'
+
+/** Append the Desktop-pinned pnpm store to one direct pnpm argv without adding it twice. */
+export function withDesktopPnpmStoreDir(argv: readonly string[], storeDir: string): string[] {
+  if (argv.includes(PNPM_STORE_DIR_FLAG)) return [...argv]
+  return [...argv, PNPM_STORE_DIR_FLAG, storeDir]
+}
+
 /**
  * `dsh plugin` ultimately resolves the Desktop pnpm shim, which owns the one
  * policy argument. Remove an eagerly forwarded copy before that boundary.

@@ -91,6 +91,68 @@ describe('profile materializer', () => {
     expect(result.exitCode).toBe(0)
   })
 
+  it('pins the pnpm content store without changing the connectivity policy', async () => {
+    const child = fakeChild()
+    let args: readonly string[] = []
+    const spawn = vi.fn((_command: string, selectedArgs: readonly string[]) => {
+      args = selectedArgs
+      return child as unknown as ChildProcess
+    }) as unknown as ProfileMaterializerSpawn
+
+    const resultPromise = materializeProfile({ ...options(spawn), storeDir: '/home/.dsh/pnpm-store' })
+    child.stdout.end('installed\n')
+    child.stderr.end('')
+    child.emit('close', 0, null)
+    const result = await resultPromise
+
+    expect(args).toContain('/home/.dsh/pnpm-store')
+    expect(args.slice(args.indexOf('--store-dir') + 1, args.indexOf('install'))).toEqual(['/home/.dsh/pnpm-store'])
+    expect(args).not.toContain('--offline')
+    expect(result.attempt).toBe('online')
+  })
+
+  it('runs a single offline attempt under the always policy', async () => {
+    const child = fakeChild()
+    const spawn = vi.fn((_command: string, selectedArgs: readonly string[]) => {
+      void selectedArgs
+      return child as unknown as ChildProcess
+    }) as unknown as ProfileMaterializerSpawn
+
+    const resultPromise = materializeProfile({ ...options(spawn), offline: 'always' })
+    child.stdout.end('offline\n')
+    child.stderr.end('')
+    child.emit('close', 0, null)
+    const result = await resultPromise
+
+    expect(result.attempt).toBe('offline')
+  })
+
+  it('retries online once after an offline miss under the prefer policy', async () => {
+    const offlineChild = fakeChild()
+    const onlineChild = fakeChild()
+    const spawns: readonly (readonly string[])[] = []
+    const spawn = vi.fn((_command: string, selectedArgs: readonly string[]) => {
+      ;(spawns as string[][]).push([...selectedArgs])
+      return (spawns.length === 1 ? offlineChild : onlineChild) as unknown as ChildProcess
+    }) as unknown as ProfileMaterializerSpawn
+
+    const resultPromise = materializeProfile({ ...options(spawn), offline: 'prefer' })
+    offlineChild.stdout.end('')
+    offlineChild.stderr.end('store miss\n')
+    offlineChild.emit('close', 1, null)
+    await vi.waitFor(() => expect(spawns).toHaveLength(2))
+    onlineChild.stdout.end('installed online\n')
+    onlineChild.stderr.end('')
+    onlineChild.emit('close', 0, null)
+    const result = await resultPromise
+
+    expect(spawns).toHaveLength(2)
+    expect(spawns[0]).toContain('--offline')
+    expect(spawns[1]).not.toContain('--offline')
+    expect(result.attempt).toBe('online')
+    expect(result.stdout).toBe('installed online\n')
+  })
+
   it('allows a controlled lockfile update while migrating an old Profile layout', async () => {
     const child = fakeChild()
     let args: readonly string[] = []

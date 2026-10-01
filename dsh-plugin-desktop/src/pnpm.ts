@@ -10,7 +10,8 @@ import type {
   SubprocessSpawnSpec,
 } from '@deepseek-ai/dsh-subprocess'
 import { assertDesktopProfileName } from './profile-manager.ts'
-import { withDesktopPnpmPolicy } from './pnpm-policy.ts'
+import { withDesktopPnpmPolicy, withDesktopPnpmStoreDir } from './pnpm-policy.ts'
+import { desktopPnpmStoreDir } from './profile-store-dir.ts'
 
 const BIN_NAME = 'dsh-plugin-desktop'
 const ELECTRON_HEADERS_URL = 'https://electronjs.org/headers'
@@ -151,7 +152,10 @@ class DesktopPnpmService extends Service implements DesktopPnpm {
   }
 
   run(argv: readonly string[], signal?: AbortSignal): DesktopPnpmHandle {
-    const args = withDesktopPnpmPolicy(validatedArgv(argv))
+    const args = withDesktopPnpmStoreDir(
+      withDesktopPnpmPolicy(validatedArgv(argv)),
+      desktopPnpmStoreDir(this.bootstrap.homeDir),
+    )
     return this.start({
       argv: [
         this.bootstrap.appExecutable,

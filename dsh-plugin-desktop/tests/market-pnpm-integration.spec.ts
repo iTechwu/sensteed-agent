@@ -9,6 +9,7 @@ import { FileSettingsProvider } from '@deepseek-ai/dsh-settings-file'
 import type { SubprocessHandle, SubprocessRuntime, SubprocessSpawnSpec } from '@deepseek-ai/dsh-subprocess'
 import { describe, expect, it, vi } from 'vitest'
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml'
+import { desktopPnpmStoreDir } from '../src/profile-store-dir.ts'
 import {
   apply as applyDesktopPnpm,
   inject as desktopPnpmInject,
@@ -219,6 +220,8 @@ describe('desktop pnpm and community market integration', () => {
           '--config.minimumReleaseAge=0',
           'remove',
           PACKAGE_NAME,
+          '--store-dir',
+          desktopPnpmStoreDir(selectedBootstrap.homeDir),
         ],
         cwd: profileDir,
         env: { ELECTRON_RUN_AS_NODE: '1', DSH_HOME: selectedBootstrap.homeDir },
