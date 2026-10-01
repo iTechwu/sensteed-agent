@@ -1,7 +1,7 @@
 /** Built-in, read-only OpenCLI bridge shipped with Sensteed-Agent. */
 import { execFile } from 'node:child_process'
 import type { Context } from '@deepseek-ai/cordis'
-import { DOFE_ACCESS_SETTINGS_NAMESPACE, DOFE_ACCESS_VALIDATION_VERSION, type DofeAccessSettings } from './dofe-plugins.ts'
+import { DOFE_ACCESS_SETTINGS_NAMESPACE, DOFE_ACCESS_VALIDATION_VERSION, type DofeAccessSettings } from '@dofe/dsh-sensteed-product/dofe-plugins'
 
 export const name = 'dofe-opencli'
 export const inject = ['tools', 'settings']

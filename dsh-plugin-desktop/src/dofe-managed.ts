@@ -12,11 +12,11 @@ import {
   type DofeAccessSettings,
   type DofePluginId,
   normalizeDofePluginIds,
-} from './dofe-plugins.ts'
+} from '@dofe/dsh-sensteed-product/dofe-plugins'
 import { BRAND_TENANT, BRAND_VARIANT } from './generated-product-identity.ts'
-import { KNOWLEDGE_ROUTING_PROMPT } from './knowledge-routing.ts'
+import { KNOWLEDGE_ROUTING_PROMPT } from '@dofe/dsh-sensteed-product/knowledge-routing'
 import { DofeAuthService } from './dofe-auth-service.ts'
-import { financeMcpConfig } from './finance-mcp.ts'
+import { financeMcpConfig } from '@dofe/dsh-sensteed-product/finance-mcp'
 
 declare module '@deepseek-ai/cordis' {
   interface Context { dofeAuth: DofeAuthService }

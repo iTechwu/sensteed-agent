@@ -4,15 +4,15 @@ import { credentialKey, credentialRef } from '@deepseek-ai/dsh-credentials'
 import type { DesktopLogger } from './desktop-logger.ts'
 import { formatDesktopErrorDetails } from './desktop-logger.ts'
 import type { DesktopRuntime } from './runtime.ts'
-import type { DofeAuthSnapshot } from './dofe-auth-contract.ts'
-export * from './dofe-auth-contract.ts'
+import type { DofeAuthSnapshot } from '@dofe/dsh-sensteed-product/dofe-auth-contract'
+export * from '@dofe/dsh-sensteed-product/dofe-auth-contract'
 import {
   createOidcAuthorizationSession,
   parseOidcCallback,
   SENSTEED_SSO_CLIENT_ID,
   SENSTEED_SSO_DISCOVERY_URL,
   type OidcDiscovery,
-} from './dofe-auth-oidc.ts'
+} from '@dofe/dsh-sensteed-product/dofe-auth-oidc'
 
 export const DOFE_AUTH_GRANT_KEY = credentialKey('dsh-plugin-desktop', 'sensteed-auth')
 const MODELS_API_KEY_REF = credentialRef('MODELS_API_KEY')

@@ -2629,6 +2629,9 @@ importers:
         specifier: '>=0.2.0-rc.0 <1'
         version: link:../deepseek-harness/apps/cli
     devDependencies:
+      '@deepseek-ai/dsh-mcp-client':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/mcp/mcp-client
       '@types/node':
         specifier: ^22.20.0
         version: 22.20.1

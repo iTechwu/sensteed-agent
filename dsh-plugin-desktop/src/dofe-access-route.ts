@@ -1,6 +1,6 @@
 /** Same-origin Host route for validating model_api_key without browser CORS. */
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { DEFAULT_DOFE_PROTOCOL, dofeModelCatalogUrl, parseDofeModelCatalog, type DofeProtocol } from './dofe-models.ts'
+import { DEFAULT_DOFE_PROTOCOL, dofeModelCatalogUrl, parseDofeModelCatalog, type DofeProtocol } from '@dofe/dsh-sensteed-product/dofe-models'
 import { BRAND_TENANT, BRAND_TENANT_ID } from './generated-product-identity.ts'
 
 export const DOFE_ACCESS_VALIDATE_PATH = '/api/desktop/dofe/validate'

@@ -43,7 +43,6 @@
     "dsh-plugin-desktop/src/client/brand.tsx": 9,
     "dsh-plugin-desktop/src/dofe-auth-audit.ts": 4,
     "dsh-plugin-desktop/src/index.ts": 9,
-    "dsh-plugin-desktop/src/knowledge-routing.ts": 1,
     "dsh-plugin-desktop/src/update-download.ts": 4,
     "dsh-plugin-desktop/src/yootun-audit-contract.ts": 28,
     "dsh-plugin-desktop/src/yootun-audit-models-client.ts": 53,
@@ -60,7 +59,6 @@
     "dsh-plugin-desktop/tests/dofe-auth-audit.spec.ts": 2,
     "dsh-plugin-desktop/tests/dofe-opencli.spec.ts": 2,
     "dsh-plugin-desktop/tests/electron-runtime.spec.ts": 8,
-    "dsh-plugin-desktop/tests/knowledge-routing.spec.ts": 2,
     "dsh-plugin-desktop/tests/package.spec.ts": 5,
     "dsh-plugin-desktop/tests/setup-wizard-copy.spec.ts": 3,
     "dsh-plugin-desktop/tests/update-download.spec.ts": 7,
@@ -86,6 +84,8 @@
     "scripts/ci-snapshots/dsh-knowledge-capture/README.md": 1,
     "scripts/ci-snapshots/dsh-knowledge-capture/index.js": 1,
     "scripts/ci-snapshots/dsh-knowledge-capture/package.json": 1,
-    "scripts/verify-brand-isolation.mjs": 5
+    "scripts/verify-brand-isolation.mjs": 5,
+    "dsh-sensteed-product/src/knowledge-routing.ts": 1,
+    "dsh-sensteed-product/tests/knowledge-routing.spec.ts": 2
   }
 }

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { LogIn, LogOut, Loader2, X } from 'lucide-react'
 import { DofeUserAvatar } from './DofeUserAvatar.tsx'
 import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
-import { DOFE_AUTH_CANCEL_PATH, DOFE_AUTH_SESSION_PATH, DOFE_AUTH_STATUS_PATH, type DofeAuthSnapshot } from '../dofe-auth-contract.ts'
+import { DOFE_AUTH_CANCEL_PATH, DOFE_AUTH_SESSION_PATH, DOFE_AUTH_STATUS_PATH, type DofeAuthSnapshot } from '@dofe/dsh-sensteed-product/dofe-auth-contract'
 
 async function request(path: string, signal?: AbortSignal): Promise<DofeAuthSnapshot> {
   const response = await fetch(path, {

@@ -3,7 +3,7 @@ import { chmod, lstat, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { parseDocument } from 'yaml'
 import { withFileLock, writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
-import { dofeModelInputModalities } from './dofe-models.ts'
+import { dofeModelInputModalities } from '@dofe/dsh-sensteed-product/dofe-models'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)

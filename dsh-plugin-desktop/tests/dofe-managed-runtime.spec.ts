@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { apply, DOFE_MCP_BASE_URL } from '../src/dofe-managed.ts'
-import { DOFE_ACCESS_VALIDATION_VERSION, DEFAULT_DOFE_PLUGIN_IDS, normalizeDofePluginIds, type DofeAccessSettings } from '../src/dofe-plugins.ts'
+import { DOFE_ACCESS_VALIDATION_VERSION, DEFAULT_DOFE_PLUGIN_IDS, normalizeDofePluginIds, type DofeAccessSettings } from '@dofe/dsh-sensteed-product/dofe-plugins'
 import { BRAND_VARIANT } from '../src/generated-product-identity.ts'
 
 // The first three clients created before the simulated fourth route failure.

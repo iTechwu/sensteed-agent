@@ -3,7 +3,7 @@ import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { expect, it, vi } from 'vitest'
 import { DofePluginCard, dofePluginCardState, registerDofePluginItems } from '../src/client/DofePluginItems.tsx'
-import { dofePluginsForBrand, DOFE_ACCESS_VALIDATION_VERSION, type DofeAccessSettings } from '../src/dofe-plugins.ts'
+import { dofePluginsForBrand, DOFE_ACCESS_VALIDATION_VERSION, type DofeAccessSettings } from '@dofe/dsh-sensteed-product/dofe-plugins'
 import { DOFE_ACCESS_COPY } from '../src/client/dofe-access.ts'
 
 vi.mock('../src/generated-product-identity.ts', async importOriginal => ({

@@ -7,8 +7,14 @@
   "main": "lib/index.js",
   "exports": {
     ".": "./lib/index.js",
-    "./package.json": "./package.json",
-    "./cordis.patch.yml": "./cordis.patch.yml"
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./dofe-auth-contract": "./lib/dofe-auth-contract.js",
+    "./dofe-auth-oidc": "./lib/dofe-auth-oidc.js",
+    "./dofe-models": "./lib/dofe-models.js",
+    "./dofe-plugins": "./lib/dofe-plugins.js",
+    "./finance-mcp": "./lib/finance-mcp.js",
+    "./knowledge-routing": "./lib/knowledge-routing.js",
+    "./package.json": "./package.json"
   },
   "files": [
     "lib",
@@ -21,7 +27,8 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": ">=4.0.0 <5",
-    "@deepseek-ai/dsh": ">=0.2.0-rc.0 <1"
+    "@deepseek-ai/dsh": ">=0.2.0-rc.0 <1",
+    "@deepseek-ai/dsh-mcp-client": ">=0.2.0-rc.0 <1"
   },
   "scripts": {
     "clean": "node scripts/clean.mjs",
@@ -33,10 +40,11 @@
     "check": "corepack pnpm run verify:brand && corepack pnpm run build && corepack pnpm run typecheck && corepack pnpm run test"
   },
   "devDependencies": {
+    "@deepseek-ai/dsh-mcp-client": "workspace:*",
     "@types/node": "^22.20.0",
+    "sharp": "0.35.3",
     "tsdown": "0.22.2",
     "typescript": "6.0.3",
-    "vitest": "4.1.8",
-    "sharp": "0.35.3"
+    "vitest": "4.1.8"
   }
 }
