@@ -41,6 +41,7 @@ import {
   smokePackagedFsExtRuntime,
   summarizeUnpackedRuntime,
   verifyPackagedAgentsAnywhere,
+  verifyProfileClosureArtifact,
   verifyPackagedRuntime,
   verifyPackagedProfileModuleFallback,
   verifySelectiveUnpackedRuntime,
@@ -284,6 +285,8 @@ describe('packaged desktop runtime verification', () => {
       },
       () => calls.push('aa'),
       () => calls.push('native'),
+      () => {},
+      () => {},
     )
 
     expect(calls).toEqual(['static', 'aa', 'report', 'native'])
@@ -304,9 +307,10 @@ describe('packaged desktop runtime verification', () => {
       () => calls.push('aa'),
       () => calls.push('native'),
       () => calls.push('hydrate'),
+      () => calls.push('closure'),
     )
 
-    expect(calls).toEqual(['hydrate', 'static', 'aa', 'report', 'native'])
+    expect(calls).toEqual(['hydrate', 'static', 'aa', 'closure', 'report', 'native'])
   })
 
   it.skipIf(process.platform === 'win32')('rejects a 0644 packaged uv before signing', () => {
@@ -328,6 +332,41 @@ describe('packaged desktop runtime verification', () => {
       expect(() => verifyPackagedAgentsAnywhere(target, read, read)).toThrow()
       for (const path of files) chmodSync(path, 0o755)
       expect(() => verifyPackagedAgentsAnywhere(target, read, read)).not.toThrow()
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects a stale or missing Profile closure manifest before signing', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-profile-closure-'))
+    try {
+      const target = context(root, 'darwin')
+      const closure = {
+        schemaVersion: 1,
+        desktopVersion: '2.0.11-beta.18',
+        dshVersion: '0.2.0-rc.2',
+        packages: { '@deepseek-ai/dsh': '0.2.0-rc.2' },
+      }
+      const consistent = (path: string): Buffer => {
+        if (path === 'lib/profile-closure.json') return Buffer.from(JSON.stringify(closure))
+        if (path === 'package.json') return Buffer.from(JSON.stringify({ version: '2.0.11-beta.18' }))
+        return Buffer.from(JSON.stringify({ version: '0.2.0-rc.2' }))
+      }
+      expect(() => verifyProfileClosureArtifact(target, consistent)).not.toThrow()
+
+      expect(() => verifyProfileClosureArtifact(target, () => {
+        throw Object.assign(new Error('missing'), { code: 'ENOENT' })
+      })).toThrow('missing or unreadable')
+
+      const staleDesktop = (path: string): Buffer =>
+        path === 'package.json' ? Buffer.from('{"version":"2.0.12"}') : consistent(path)
+      expect(() => verifyProfileClosureArtifact(target, staleDesktop)).toThrow('stale against the packaged')
+
+      const staleDsh = (path: string): Buffer =>
+        path === 'node_modules/@deepseek-ai/dsh/package.json'
+          ? Buffer.from('{"version":"0.2.0-rc.3"}')
+          : consistent(path)
+      expect(() => verifyProfileClosureArtifact(target, staleDsh)).toThrow('pins @deepseek-ai/dsh')
     } finally {
       rmSync(root, { recursive: true, force: true })
     }

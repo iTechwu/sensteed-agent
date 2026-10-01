@@ -1021,6 +1021,38 @@ export function reportUnpackedRuntime(summary: UnpackedRuntimeSummary): void {
   process.stdout.write(`dsh-plugin-desktop: packaged runtime inventory: ${formatUnpackedRuntimeSummary(summary)}\n`)
 }
 
+/**
+ * Verify the frozen Profile closure manifest sealed into the payload matches
+ * the packaged identity: same schema, same desktop version, and the pinned
+ * `@deepseek-ai/dsh` version equals the tree actually inside the archive.
+ */
+export function verifyProfileClosureArtifact(
+  context: PackagedRuntimeContext,
+  readPackaged: (path: string) => Buffer = path => usesAsarLayout(context)
+    ? extractFile(resolvePackagedAsarPath(context), path)
+    : readFileSync(join(resolvePackagedApplicationRoot(context), path)),
+): void {
+  let closure: { schemaVersion?: number; desktopVersion?: string; dshVersion?: string; packages?: Record<string, string> }
+  try {
+    closure = JSON.parse(readPackaged('lib/profile-closure.json').toString('utf8'))
+  } catch (cause) {
+    throw new Error(
+      `dsh-plugin-desktop: packaged Profile closure manifest is missing or unreadable: ${cause instanceof Error ? cause.message : String(cause)}`,
+    )
+  }
+  if (closure.schemaVersion !== 1) {
+    throw new Error(`dsh-plugin-desktop: Profile closure manifest has an unexpected schemaVersion ${String(closure.schemaVersion)}`)
+  }
+  const rootVersion = (JSON.parse(readPackaged('package.json').toString('utf8')) as { version?: string }).version
+  if (closure.desktopVersion !== rootVersion) {
+    throw new Error(`dsh-plugin-desktop: Profile closure manifest desktopVersion ${String(closure.desktopVersion)} is stale against the packaged ${String(rootVersion)}`)
+  }
+  const dshVersion = (JSON.parse(readPackaged('node_modules/@deepseek-ai/dsh/package.json').toString('utf8')) as { version?: string }).version
+  if (closure.dshVersion !== dshVersion || closure.packages?.['@deepseek-ai/dsh'] !== dshVersion) {
+    throw new Error(`dsh-plugin-desktop: Profile closure manifest pins @deepseek-ai/dsh ${String(closure.dshVersion)} but the archive carries ${String(dshVersion)}`)
+  }
+}
+
 /** Verify the AA version and built entry sealed into the actual installation payload. */
 export function verifyPackagedAgentsAnywhere(
   context: PackagedRuntimeContext,
@@ -1067,10 +1099,12 @@ export async function afterPack(
   verifyAa: typeof verifyPackagedAgentsAnywhere = verifyPackagedAgentsAnywhere,
   smokeNative: PackagedElectronSmoke = smokePackagedFsExtRuntime,
   hydrateMac: (context: PackagedRuntimeContext) => void = hydratePackagedMacRuntimeForContext,
+  verifyClosure: typeof verifyProfileClosureArtifact = verifyProfileClosureArtifact,
 ): Promise<void> {
   hydrateMac(context)
   const summary = verify(context)
   verifyAa(context)
+  verifyClosure(context)
   report(summary)
   smokeNative(context)
 }

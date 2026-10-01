@@ -141,7 +141,7 @@
     }
   },
   "scripts": {
-    "build": "corepack pnpm run generate:brand && node ../scripts/build-finance-ui.mjs && node scripts/clean.mjs && tsdown && vite build --config vite.native-ui.config.ts && tsc -p tsconfig.json --emitDeclarationOnly && tsc -p tsconfig.client.json --emitDeclarationOnly",
+    "build": "corepack pnpm run generate:brand && node ../scripts/build-finance-ui.mjs && node scripts/clean.mjs && tsdown && vite build --config vite.native-ui.config.ts && tsc -p tsconfig.json --emitDeclarationOnly && tsc -p tsconfig.client.json --emitDeclarationOnly && node scripts/generate-profile-closure.mjs",
     "generate:brand": "node scripts/generate-brand-assets.mjs && node scripts/generate-lockup.ts && node scripts/generate-client-brand-module.mjs && node scripts/generate-product-identity.mjs && node scripts/generate-mac-app-icon.mjs && node scripts/generate-tray-icons.mjs && node scripts/generate-windows-app-icon.mjs",
     "verify:brand": "node scripts/verify-brand-sync.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit && tsc -p tsconfig.native-ui.json --noEmit && tsc -p tsconfig.tests.json --noEmit && tsc -p tsconfig.tests.client.json --noEmit",
@@ -153,7 +153,7 @@
     "test:plugin-surfaces-ui": "node tests/browser/yootun-access.browser.mjs && node tests/browser/deliverables.visual.mjs && node tests/browser/plugin-console.visual.mjs && node tests/browser/plugin-console-modal.browser.mjs && node tests/browser/plugin-console-management.browser.mjs",
     "test:search-locks-ui": "node tests/browser/yootun-search-locks.visual.mjs",
     "test:theme-actions-ui": "node tests/browser/yootun-theme-actions.visual.mjs",
-    "verify:closure": "node --test scripts/runtime-closure.spec.mjs && node scripts/verify-runtime-closure.mjs",
+    "verify:closure": "node --test scripts/runtime-closure.spec.mjs && node scripts/verify-runtime-closure.mjs && node scripts/generate-profile-closure.mjs --check",
     "verify:cli": "node scripts/verify-cli-runtime.mjs",
     "verify:loader": "node scripts/verify-loader-boot.mjs",
     "verify:sensteed-clients": "node --test scripts/sensteed-client-runtime.spec.mjs && node scripts/verify-sensteed-client-runtime.mjs",
