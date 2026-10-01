@@ -40,7 +40,7 @@ const RESERVED_ROW_IDS = new Set([
 const OWN_ROW_IDS = new Set([
   'dofe-managed', 'personal-knowledge-files', 'dofe-sensteed-finance',
   'personal-knowledge-management', 'openmontage-guidance', 'dofe-opencli',
-  'dofe-product-routes',
+  'dofe-product-routes', 'sensteed-quit-inspection', 'sensteed-update-policy',
 ])
 
 const patchPath = resolve(root, 'dsh-sensteed-product/cordis.patch.yml')

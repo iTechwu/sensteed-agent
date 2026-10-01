@@ -26,3 +26,5 @@
       name: '@dofe/dsh-sensteed-product/dofe-opencli'
     - id: dofe-product-routes
       name: '@dofe/dsh-sensteed-product/routes'
+    - id: sensteed-quit-inspection
+      name: '@dofe/dsh-sensteed-product/quit-inspection'
