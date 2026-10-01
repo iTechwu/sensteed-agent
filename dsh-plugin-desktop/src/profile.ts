@@ -502,8 +502,16 @@ export interface PreparedDesktopProfile {
   aaFailure?: string
   /** Internal boot diagnostic when the requested provider was disabled. */
   marketFailure?: string
-  /** Whether packaged pnpm must rebuild a legacy Profile dependency layout. */
+  /**
+   * Transitional alias for `dependencyState.status === 'repair-required'`.
+   *
+   * Kept while the boot path migrates from "migrate now, fail loud" to
+   * "defer repair, keep booting"; Unit 4 of the zero-pnpm program consumes
+   * the classified form.
+   */
   requiresDependencyMigration: boolean
+  /** Classified Profile dependency metadata state for this generation. */
+  dependencyState: ProfileDependencyClassification
 }
 
 /** Optional observations emitted before profile preparation can fail. */
@@ -651,17 +659,39 @@ function compatiblePnpmPackageManager(value: unknown): boolean {
   return match !== null && Number(match[1]) >= 10
 }
 
-/** Detect pnpm state that cannot satisfy the current hoisted Profile contract. */
-function profileDependencyMigrationRequired(
+/** One repairable drift class of the Profile dependency metadata. */
+export type ProfileDependencyRepairReason = 'modules-metadata' | 'lockfile-settings'
+
+/** Classified Profile dependency metadata state for one startup generation. */
+export interface ProfileDependencyClassification {
+  /** Whether this generation may boot without touching Profile dependencies. */
+  readonly status: 'compatible' | 'repair-required'
+  /** Drift classes present in the Profile; empty when compatible. */
+  readonly reasons: readonly ProfileDependencyRepairReason[]
+  /**
+   * Whether the composed workspace template drifted from the on-disk file.
+   *
+   * Informational only: the physical hoisted tree's validity is guaranteed
+   * independently by `.modules.yaml` (`nodeLinker: hoisted`), so workspace
+   * drift alone no longer schedules a migration (it would only resync the
+   * template file, which `reconcileProfilePnpmWorkspace` already did).
+   */
+  readonly workspaceDrift: boolean
+}
+
+/** Classify one Profile's dependency metadata without spawning pnpm. */
+export function classifyProfileDependencyState(
   profileDir: string,
   workspaceChanged: boolean,
   platform: NodeJS.Platform,
-): boolean {
+): ProfileDependencyClassification {
   const manifest = readProfileManifest(BIN_NAME, profileDir)
   const hasDependencies = Object.keys(manifest.dependencies ?? {}).length > 0
   const modulesDir = join(profileDir, 'node_modules')
   const hasModules = existsSync(modulesDir)
-  if (!hasDependencies && !hasModules) return false
+  if (!hasDependencies && !hasModules) {
+    return { status: 'compatible', reasons: [], workspaceDrift: workspaceChanged }
+  }
 
   let modulesCompatible = false
   const modulesStatePath = join(modulesDir, '.modules.yaml')
@@ -688,7 +718,18 @@ function profileDependencyMigrationRequired(
       // A controlled non-frozen install owns lockfile reconciliation below.
     }
   }
-  return workspaceChanged || !modulesCompatible || !lockfileCompatible
+
+  const reasons: ProfileDependencyRepairReason[] = []
+  if (!modulesCompatible) reasons.push('modules-metadata')
+  if (!lockfileCompatible) reasons.push('lockfile-settings')
+  // `DSH_DESKTOP_LEGACY_MIGRATION=1` restores the pre-decoupling behavior where
+  // a workspace template drift alone scheduled the boot-time migration; the
+  // switch exists so a shipping regression can be rolled back without a rebuild.
+  const legacyWorkspaceTrigger = process.env.DSH_DESKTOP_LEGACY_MIGRATION === '1'
+  const repairRequired = legacyWorkspaceTrigger
+    ? workspaceChanged || reasons.length > 0
+    : reasons.length > 0
+  return { status: repairRequired ? 'repair-required' : 'compatible', reasons, workspaceDrift: workspaceChanged }
 }
 
 interface RecoveryFilteredProfile {
@@ -1087,7 +1128,8 @@ export function prepareDesktopProfile(
     ? ensureDesktopProfile(home)
     : resolveProfileDir(profileName, home)
   const workspaceChanged = reconcileProfilePnpmWorkspace(profileDir)
-  const requiresDependencyMigration = profileDependencyMigrationRequired(profileDir, workspaceChanged, platform)
+  const dependencyState = classifyProfileDependencyState(profileDir, workspaceChanged, platform)
+  const requiresDependencyMigration = dependencyState.status === 'repair-required'
   // `plugin-management` remains the community market's user-facing scope.
   // Recovery mode no longer reads or writes an independent disable policy:
   // package removal goes through the provider-neutral `dsh plugin remove`.
@@ -1472,6 +1514,7 @@ export function prepareDesktopProfile(
     ...(aaFailure === undefined ? {} : { aaFailure }),
     market: desktopMarketSnapshotWithEffective(marketSelection, effectiveMarket),
     requiresDependencyMigration,
+    dependencyState,
     ...(marketFailure === undefined ? {} : { marketFailure }),
   }
 }

@@ -313,6 +313,84 @@ virtualStoreDirMaxLength: 60
     expect(prepared.requiresDependencyMigration).toBe(false)
   })
 
+  it('classifies workspace-only drift as compatible while recording the drift', () => {
+    const home = temporaryHome()
+    const dir = ensureDesktopProfile(home)
+    const modulesDir = join(dir, 'node_modules')
+    mkdirSync(modulesDir, { recursive: true })
+    writeFileSync(join(dir, 'pnpm-workspace.yaml'), `packages:
+  - .
+
+nodeLinker: hoisted
+autoInstallPeers: true
+customSetting: preserved
+`)
+    writeFileSync(join(modulesDir, '.modules.yaml'), `layoutVersion: 5
+nodeLinker: hoisted
+packageManager: pnpm@11.7.0
+virtualStoreDirMaxLength: 120
+`)
+
+    const prepared = prepareDesktopProfile(undefined, home, 'darwin')
+
+    expect(prepared.requiresDependencyMigration).toBe(false)
+    expect(prepared.dependencyState).toEqual({
+      status: 'compatible', reasons: [], workspaceDrift: true,
+    })
+    expect(readFileSync(join(dir, 'pnpm-workspace.yaml'), 'utf8')).toContain('customSetting: preserved')
+  })
+
+  it('reports the drifted metadata class without scheduling a boot migration', () => {
+    const home = temporaryHome()
+    const dir = ensureDesktopProfile(home)
+    const modulesDir = join(dir, 'node_modules')
+    mkdirSync(modulesDir, { recursive: true })
+    writeFileSync(join(dir, 'pnpm-lock.yaml'), `lockfileVersion: '9.0'
+settings:
+  autoInstallPeers: true
+`)
+    writeFileSync(join(modulesDir, '.modules.yaml'), `layoutVersion: 5
+nodeLinker: hoisted
+packageManager: pnpm@9.12.0
+virtualStoreDirMaxLength: 120
+`)
+
+    const prepared = prepareDesktopProfile(undefined, home, 'darwin')
+
+    expect(prepared.requiresDependencyMigration).toBe(true)
+    expect(prepared.dependencyState.status).toBe('repair-required')
+    expect([...prepared.dependencyState.reasons]).toEqual(['modules-metadata', 'lockfile-settings'])
+    expect(prepared.dependencyState.workspaceDrift).toBe(false)
+  })
+
+  it('restores the workspace-only migration trigger under the legacy escape switch', () => {
+    const home = temporaryHome()
+    const dir = ensureDesktopProfile(home)
+    const modulesDir = join(dir, 'node_modules')
+    mkdirSync(modulesDir, { recursive: true })
+    writeFileSync(join(dir, 'pnpm-workspace.yaml'), `packages:
+  - .
+
+nodeLinker: hoisted
+autoInstallPeers: true
+`)
+    writeFileSync(join(modulesDir, '.modules.yaml'), `layoutVersion: 5
+nodeLinker: hoisted
+packageManager: pnpm@11.7.0
+virtualStoreDirMaxLength: 120
+`)
+
+    process.env.DSH_DESKTOP_LEGACY_MIGRATION = '1'
+    try {
+      const prepared = prepareDesktopProfile(undefined, home, 'darwin')
+      expect(prepared.requiresDependencyMigration).toBe(true)
+      expect(prepared.dependencyState.status).toBe('repair-required')
+      expect([...prepared.dependencyState.reasons]).toEqual([])
+    } finally {
+      delete process.env.DSH_DESKTOP_LEGACY_MIGRATION
+    }
+  })
+
   it('rejects malformed persistent bundle metadata', () => {
     const home = temporaryHome()
     const dir = ensureDesktopProfile(home)
