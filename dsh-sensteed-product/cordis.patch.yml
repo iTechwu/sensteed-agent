@@ -24,3 +24,5 @@
         stalledOutcomeThreshold: 3
     - id: dofe-opencli
       name: '@dofe/dsh-sensteed-product/dofe-opencli'
+    - id: dofe-product-routes
+      name: '@dofe/dsh-sensteed-product/routes'

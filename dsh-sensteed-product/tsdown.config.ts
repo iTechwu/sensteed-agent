@@ -34,6 +34,7 @@ export default defineConfig([
       'dofe-auth-audit': 'src/dofe-auth-audit.ts',
       'dofe-access-route': 'src/dofe-access-route.ts',
       'dofe-auth-service': 'src/dofe-auth-service.ts',
+      routes: 'src/routes.ts',
     },
     outDir: 'lib',
     format: 'esm',

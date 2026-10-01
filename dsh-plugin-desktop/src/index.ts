@@ -6,7 +6,6 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-app-boot'
 import type {} from '@deepseek-ai/dsh-cmdline'
 import type {} from '@deepseek-ai/dsh-credentials'
-import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-client-connection'
 import type {} from '@deepseek-ai/dsh-session-persistence'
@@ -15,20 +14,6 @@ import {
   handleRendererBootRequest,
   RENDERER_BOOT_REPORT_PATH,
 } from './renderer-boot.ts'
-import {
-  DOFE_ACCESS_MODELS_PATH,
-  DOFE_ACCESS_VALIDATE_PATH,
-  handleDofeAccessValidationRequest,
-  handleDofeModelCatalogRequest,
-} from '@dofe/dsh-sensteed-product/dofe-access-route'
-import { DOFE_AUTH_PATHS, handleDofeAuthRequest } from '@dofe/dsh-sensteed-product/dofe-auth-route'
-import type {} from '@dofe/dsh-sensteed-product/dofe-managed'
-import { watchDofeAuthAudit } from '@dofe/dsh-sensteed-product/dofe-auth-audit'
-import { BRAND_VARIANT } from './generated-product-identity.ts'
-import { YootunAuditModelsClient } from '@dofe/dsh-sensteed-product/yootun-audit-models-client'
-import { handleYootunAuditRequest, YOOTUN_AUDIT_PATH } from '@dofe/dsh-sensteed-product/yootun-audit-route'
-import { YootunAuditService } from '@dofe/dsh-sensteed-product/yootun-audit-service'
-import { YootunAuditStore } from '@dofe/dsh-sensteed-product/yootun-audit-store'
 import {
   DESKTOP_DIRECTORY_PICKER_PATH,
   DESKTOP_DIRECTORY_VALIDATOR_PATH,
@@ -99,7 +84,7 @@ export const name = 'desktop-shell'
 
 /** Services required before the shell can register its renderer generation. */
 /** Services required by the desktop shell; `desktopRuntime` is probed, not required. */
-export const inject = ['webServer', 'webRuntime', 'appExit', 'settings', 'connection', 'tools', 'credentials', ...(BRAND_VARIANT === 'sensteed' ? ['dofeAuth'] : [])]
+export const inject = ['webServer', 'webRuntime', 'appExit', 'settings', 'connection', 'tools', 'credentials']
 
 /**
  * Standard settings namespace shared by tray and configuration surfaces, the
@@ -113,8 +98,6 @@ export {
   DesktopShellConfig as Config,
   type DesktopSettings,
 } from './settings-bridge.ts'
-
-const MODELS_API_KEY_REF = credentialRef('MODELS_API_KEY')
 
 /** Apply the official Connection trust and browser-auth fence before a private Desktop route. */
 function rejectDesktopRequest(
@@ -207,55 +190,6 @@ export function apply(ctx: Context, config: DesktopShellConfig): void {
   }
   const settings = createDesktopSettingsPort(ctx, config, runtime.platform)
   const rendererOrigin = `http://127.0.0.1:${String(ctx.webServer.port)}`
-  if (BRAND_VARIANT === 'sensteed') {
-    const dofeAuth = ctx.dofeAuth
-    for (const path of DOFE_AUTH_PATHS) {
-      ctx.effect(
-        () => ctx.webServer.register({
-          kind: 'exact',
-          path,
-          handler: (req, res) => {
-            if (rejectDesktopRequest(ctx, req, res)) return
-            return handleDofeAuthRequest(path, req, res, rendererOrigin, dofeAuth)
-          },
-        }),
-        `dsh-plugin-desktop: private Sensteed auth route ${path}`,
-      )
-    }
-  }
-  const dshHomePath = ctx.get('dshHomePath')
-  if (dshHomePath === undefined) {
-    throw new Error('dsh-plugin-desktop: dshHomePath is required for the audit outbox')
-  }
-  const audit = new YootunAuditService({
-    store: new YootunAuditStore(dshHomePath('storages', 'yootun-audit')),
-    remote: new YootunAuditModelsClient(),
-    resolveApiKey: async () => (await ctx.credentials.resolve(MODELS_API_KEY_REF))?.value,
-    enabled: resolved.auditSyncEnabled,
-    logger: ctx.logger,
-  })
-  ctx.provide('sensteedAudit', audit)
-  if (BRAND_VARIANT === 'sensteed') {
-    ctx.effect(() => watchDofeAuthAudit(ctx.dofeAuth, audit), 'dsh-plugin-desktop: SSO audit binding')
-  }
-  ctx.effect(() => {
-    void audit.start()
-    return () => { audit.dispose() }
-  }, 'dsh-plugin-desktop: yootun audit service lifetime')
-  ctx.on('credentials/reference-updated', (ref) => {
-    if (ref === 'MODELS_API_KEY') void audit.credentialUpdated()
-  })
-  ctx.effect(
-    () => ctx.webServer.register({
-      kind: 'exact',
-      path: YOOTUN_AUDIT_PATH,
-      handler: (req, res) => {
-        if (rejectDesktopRequest(ctx, req, res)) return
-        return handleYootunAuditRequest(req, res, rendererOrigin, audit)
-      },
-    }),
-    `dsh-plugin-desktop: private Yootun audit route ${YOOTUN_AUDIT_PATH}`,
-  )
   ctx.effect(
     () => ctx.webServer.register({
       kind: 'exact',
@@ -346,26 +280,6 @@ export function apply(ctx: Context, config: DesktopShellConfig): void {
     }),
     'dsh-plugin-desktop: renderer boot report route',
   )
-  const dofeAccessRoutes = [
-    [DOFE_ACCESS_MODELS_PATH, handleDofeModelCatalogRequest],
-    [DOFE_ACCESS_VALIDATE_PATH, handleDofeAccessValidationRequest],
-  ] as const
-  // Lets the catalog route honor { useStored: true } without the renderer ever seeing the key.
-  const resolveStoredModelsKey = async (): Promise<string | undefined> =>
-    (await ctx.credentials.resolve(MODELS_API_KEY_REF))?.value
-  for (const [path, handler] of dofeAccessRoutes) {
-    ctx.effect(
-      () => ctx.webServer.register({
-        kind: 'exact',
-        path,
-        handler: (req, res) => {
-          if (rejectDesktopRequest(ctx, req, res)) return
-          return handler(req, res, rendererOrigin, globalThis.fetch, resolveStoredModelsKey)
-        },
-      }),
-      `dsh-plugin-desktop: private DoFe access route ${path}`,
-    )
-  }
   if (runtime.platform === 'win32') {
     ctx.effect(
       () => ctx.webServer.register({

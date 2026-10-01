@@ -41,12 +41,6 @@ import type { DesktopRuntime, DesktopShellSpec } from '../src/runtime.ts'
 import type { DesktopPlatformLoginRequest, PlatformLoginAccount } from '../src/platform-login.ts'
 import { createDesktopBrowserAccess } from '../src/desktop-browser-access.ts'
 import { DESKTOP_LAN_HTTPS_CA_PATH, DesktopLanHttpsRuntime } from '../src/lan-https-runtime.ts'
-import {
-  DOFE_ACCESS_MODELS_PATH,
-  DOFE_ACCESS_VALIDATE_PATH,
-} from '@dofe/dsh-sensteed-product/dofe-access-route'
-import { DOFE_AUTH_PATHS } from '@dofe/dsh-sensteed-product/dofe-auth-route'
-import { YOOTUN_AUDIT_PATH } from '@dofe/dsh-sensteed-product/yootun-audit-route'
 import { RENDERER_BOOT_REPORT_PATH, type RendererBootReport } from '../src/renderer-boot-contract.ts'
 
 /** Loader entry id dsh 0.1.7-alpha.1 keys the Desktop shell's settings by. */
@@ -583,10 +577,6 @@ describe('desktop Host plugin', () => {
       RENDERER_BOOT_REPORT_PATH,
       DESKTOP_DIRECTORY_PICKER_PATH,
       DESKTOP_DIRECTORY_VALIDATOR_PATH,
-      ...DOFE_AUTH_PATHS,
-      DOFE_ACCESS_MODELS_PATH,
-      DOFE_ACCESS_VALIDATE_PATH,
-      YOOTUN_AUDIT_PATH,
     ].sort()
     const routes = harness.routes().filter(route => route.path !== DESKTOP_LAN_HTTPS_CA_PATH)
     expect(routes.map(route => route.path).sort()).toEqual(expectedPaths)
