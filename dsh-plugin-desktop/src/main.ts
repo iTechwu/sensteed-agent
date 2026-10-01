@@ -1658,6 +1658,9 @@ async function start(): Promise<void> {
     for (const failure of prepared.bundleFailures) {
       electronLogger.error(`${BIN_NAME}: skipping third-party bundle for this generation: ${maskSecrets(failure)}`)
     }
+    if (prepared.productFailure !== undefined) {
+      electronLogger.error(`${BIN_NAME}: launcher-owned product layer was disabled for this generation: ${maskSecrets(prepared.productFailure)}`)
+    }
     for (const violation of prepared.closureViolations) {
       electronLogger.error(`${BIN_NAME}: packaged dependency closure violation: ${maskSecrets(violation)}`)
     }

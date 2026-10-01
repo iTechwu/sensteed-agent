@@ -82,6 +82,7 @@ export { DESKTOP_PACKAGE_NAME } from './product-identity.ts'
 export const DESKTOP_PROFILE_ROOT = 'cordis.yml'
 
 const AA_PACKAGE_NAME = '@agents-anywhere/dsh-bridge-next'
+const PRODUCT_PACKAGE_NAME = '@dofe/dsh-sensteed-product'
 const AA_ROW_ID = 'agents-anywhere-bridge-next'
 const BIN_NAME = DESKTOP_PACKAGE_NAME
 const REQUIRED_BUNDLES = requiredWebBundles()
@@ -514,6 +515,8 @@ export interface PreparedDesktopProfile {
   requiresDependencyMigration: boolean
   /** Classified Profile dependency metadata state for this generation. */
   dependencyState: ProfileDependencyClassification
+  /** Failure detail when the launcher-owned product layer could not be resolved. */
+  productFailure?: string
   /** Third-party bundles skipped this generation with their failure detail. */
   bundleFailures: readonly string[]
   /** Frozen-closure disagreements detected without spawning pnpm; corruption triage only. */
@@ -742,6 +745,7 @@ interface RecoveryFilteredProfile {
   readonly profile: Profile
   readonly dshMarketFailure?: string
   readonly aaFailure?: string
+  readonly productFailure?: string
   readonly bundleFailures?: readonly string[]
 }
 
@@ -787,9 +791,15 @@ function loadRecoveryFilteredProfile(
     selectedBundles.push(DESKTOP_MARKET_IDENTITIES.dshMarket.packageName)
   }
   if (aaEnabled && !selectedBundles.includes(AA_PACKAGE_NAME)) selectedBundles.push(AA_PACKAGE_NAME)
+  // Launcher-owned product layer: appended last for every desktop generation,
+  // resolved from the install anchor, never persisted into the user bundle
+  // list and never disableable. An empty or failed layer degrades without
+  // failing the boot (the AA template, second instance).
+  if (!selectedBundles.includes(PRODUCT_PACKAGE_NAME)) selectedBundles.push(PRODUCT_PACKAGE_NAME)
   const layers: Profile['layers'] = []
   let aaFailure: string | undefined
   let dshMarketFailure: string | undefined
+  let productFailure: string | undefined
   const skippedBundles: SkippedBundle[] = []
   const bundleFailures: string[] = []
   const installPackageUrl = pathToFileURL(INSTALL_ANCHOR).href
@@ -797,7 +807,8 @@ function loadRecoveryFilteredProfile(
   for (const packageName of selectedBundles) {
     const isDshMarket = packageName === DESKTOP_MARKET_IDENTITIES.dshMarket.packageName
     const isAa = packageName === AA_PACKAGE_NAME
-    if (!isAa && !isDshMarket && desktopPluginBundleMutable(packageName) && disabledBundles.has(packageName)) continue
+    const isProduct = packageName === PRODUCT_PACKAGE_NAME
+    if (!isAa && !isDshMarket && !isProduct && desktopPluginBundleMutable(packageName) && disabledBundles.has(packageName)) continue
     try {
       const packageDir = resolveOverlayPackage(packageName, {
         installPackageUrl,
@@ -826,6 +837,7 @@ function loadRecoveryFilteredProfile(
       })
     } catch (cause) {
       if (isAa) aaFailure = marketFailureMessage(cause)
+      else if (isProduct) productFailure = marketFailureMessage(cause)
       else if (isDshMarket) dshMarketFailure = marketFailureMessage(cause)
       else {
         // Degrade like the AA provider above instead of failing the whole
@@ -850,6 +862,7 @@ function loadRecoveryFilteredProfile(
     },
     ...(dshMarketFailure === undefined ? {} : { dshMarketFailure }),
     ...(aaFailure === undefined ? {} : { aaFailure }),
+    ...(productFailure === undefined ? {} : { productFailure }),
     ...(bundleFailures.length === 0 ? {} : { bundleFailures }),
   }
 }
@@ -1536,6 +1549,7 @@ export function prepareDesktopProfile(
     settingsDocument,
     aaEnabled: aaPatches.length > 0,
     ...(aaFailure === undefined ? {} : { aaFailure }),
+    ...(loadedProfile.productFailure === undefined ? {} : { productFailure: loadedProfile.productFailure }),
     market: desktopMarketSnapshotWithEffective(marketSelection, effectiveMarket),
     requiresDependencyMigration,
     dependencyState,

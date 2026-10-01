@@ -1510,6 +1510,18 @@ describe('desktop profile composition and the recovery deselection ledger', () =
     }
   })
 
+  it('appends the launcher-owned product layer without persisting it', () => {
+    const home = temporaryHome()
+    const prepared = prepareDesktopProfile(undefined, home, 'darwin')
+
+    expect(prepared.productFailure).toBeUndefined()
+    expect(prepared.profile.layers.some(layer => layer.packageName === '@dofe/dsh-sensteed-product')).toBe(true)
+    const manifest = JSON.parse(readFileSync(join(ensureDesktopProfile(home), 'package.json'), 'utf8')) as {
+      dsh: { profile: { bundles: string[] } }
+    }
+    expect(manifest.dsh.profile.bundles).not.toContain('@dofe/dsh-sensteed-product')
+  })
+
   it('degrades a selected bundle with an unparseable patch instead of failing startup', async () => {
     const home = temporaryHome()
     const packageName = 'broken-plugin'

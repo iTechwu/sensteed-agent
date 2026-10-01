@@ -53,6 +53,8 @@ const IMMUTABLE_BUNDLES = new Set([
   // it as a launcher-owned bundle even though the brand no longer ships it.
   'dsh-plugin-desktop-beta',
   'dsh-community-market',
+  // The launcher-owned product layer is not user-toggleable.
+  '@dofe/dsh-sensteed-product',
 ])
 
 /** One direct bundle declared by the active profile. */
