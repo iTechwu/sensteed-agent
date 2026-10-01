@@ -12,7 +12,7 @@ describe('content platform Web UI allowlist', () => {
     expect(isContentPlatformNavigationAllowed(platform, 'http://example.com/')).toBe(false)
     expect(isContentPlatformNavigationAllowed(platform, `${url.slice(0, -1)}.evil.example/`)).toBe(false)
   })
-  it('never opens the website system channel in a login window', () => { expect(isContentPlatformNavigationAllowed('website', 'https://yootun.ixicai.cn/media')).toBe(false) })
+  it('never opens the website system channel in a login window', () => { expect(isContentPlatformNavigationAllowed('website', 'https://yootun.hozonauto.com/media')).toBe(false) })
 
   it('opens and closes a stable AgentRuntime browser session', async () => {
     const runner = vi.fn(async () => {})
