@@ -117,12 +117,12 @@ const main = readFileSync(new URL('src/main.ts', packageRoot), 'utf8')
 describe('published package surface', () => {
   it('runs all desktop editions and community market typechecks from the root command', () => {
     expect(workspaceManifest.scripts?.typecheck)
-      .toBe('pnpm --filter dsh-plugin-desktop typecheck && pnpm --filter dsh-community-market typecheck')
+      .toBe('pnpm --filter @dofe/dsh-sensteed-product typecheck && pnpm --filter dsh-plugin-desktop typecheck && pnpm --filter dsh-community-market typecheck')
   })
 
   it('runs all desktop editions and community market tests from the root command', () => {
     expect(workspaceManifest.scripts?.test)
-      .toBe('pnpm --filter dsh-plugin-desktop test && pnpm --filter dsh-community-market test')
+      .toBe('pnpm --filter @dofe/dsh-sensteed-product test && pnpm --filter dsh-plugin-desktop test && pnpm --filter dsh-community-market test')
   })
 
   it('rebuilds the sibling fork cleanly from the root command', () => {

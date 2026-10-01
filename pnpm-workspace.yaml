@@ -1,4 +1,5 @@
 packages:
+  - dsh-sensteed-product
   - dsh-plugin-desktop
   - dsh-community-fabric
   - dsh-community-market

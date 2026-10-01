@@ -1,0 +1,7 @@
+# The Sensteed product layer: SSO admission, the managed model key, model
+# routing, and business routes. Activation is launcher-owned on the Desktop
+# shell (appended bundle layer) and `dsh plugin --profile desktop add` on the
+# official shell; the rows themselves live in this self-declared patch so the
+# package composes identically in both shells. Populated by the staged
+# extraction from dsh-plugin-desktop.
+[]
