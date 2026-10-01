@@ -46,7 +46,7 @@ import {
   DOFE_ACCESS_VALIDATE_PATH,
 } from '../src/dofe-access-route.ts'
 import { DOFE_AUTH_PATHS } from '../src/dofe-auth-route.ts'
-import { YOOTUN_AUDIT_PATH } from '../src/yootun-audit-route.ts'
+import { YOOTUN_AUDIT_PATH } from '@dofe/dsh-sensteed-product/yootun-audit-route'
 import { RENDERER_BOOT_REPORT_PATH, type RendererBootReport } from '../src/renderer-boot-contract.ts'
 
 /** Loader entry id dsh 0.1.7-alpha.1 keys the Desktop shell's settings by. */

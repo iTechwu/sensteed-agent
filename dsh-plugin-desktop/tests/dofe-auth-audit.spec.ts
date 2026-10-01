@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest'
 import { watchDofeAuthAudit } from '../src/dofe-auth-audit.ts'
 import type { DofeAuthSnapshot } from '@dofe/dsh-sensteed-product/dofe-auth-contract'
-import { buildYootunAuditEvent } from '../src/yootun-audit-contract.ts'
+import { buildYootunAuditEvent } from '@dofe/dsh-sensteed-product/yootun-audit-contract'
 
 it('records login and provisioning without secrets, and records permission changes once', () => {
   let listener!: (snapshot: DofeAuthSnapshot) => void

@@ -25,10 +25,10 @@ import { DOFE_AUTH_PATHS, handleDofeAuthRequest } from './dofe-auth-route.ts'
 import type {} from './dofe-managed.ts'
 import { watchDofeAuthAudit } from './dofe-auth-audit.ts'
 import { BRAND_VARIANT } from './generated-product-identity.ts'
-import { YootunAuditModelsClient } from './yootun-audit-models-client.ts'
-import { handleYootunAuditRequest, YOOTUN_AUDIT_PATH } from './yootun-audit-route.ts'
-import { YootunAuditService } from './yootun-audit-service.ts'
-import { YootunAuditStore } from './yootun-audit-store.ts'
+import { YootunAuditModelsClient } from '@dofe/dsh-sensteed-product/yootun-audit-models-client'
+import { handleYootunAuditRequest, YOOTUN_AUDIT_PATH } from '@dofe/dsh-sensteed-product/yootun-audit-route'
+import { YootunAuditService } from '@dofe/dsh-sensteed-product/yootun-audit-service'
+import { YootunAuditStore } from '@dofe/dsh-sensteed-product/yootun-audit-store'
 import {
   DESKTOP_DIRECTORY_PICKER_PATH,
   DESKTOP_DIRECTORY_VALIDATOR_PATH,

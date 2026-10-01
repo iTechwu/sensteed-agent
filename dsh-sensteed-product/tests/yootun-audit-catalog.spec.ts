@@ -4,7 +4,9 @@ import { describe, expect, it } from 'vitest'
 import { YOOTUN_AUDIT_ACTIONS } from '../src/yootun-audit-contract.ts'
 
 const packageRoot = resolve(import.meta.dirname, '..')
+const shellPackageRoot = resolve(packageRoot, '../dsh-plugin-desktop')
 const desktopSourceRoot = join(packageRoot, 'src')
+const shellSourceRoot = join(shellPackageRoot, 'src')
 const dockerPluginRoot = resolve(packageRoot, '../../docker-helm.dofe.ai/plugins')
 
 function sourceFiles(root: string): string[] {
@@ -17,7 +19,7 @@ function sourceFiles(root: string): string[] {
 
 describe('Yootun audit action catalog', () => {
   it('registers every literal action code used by Desktop and docker collectors', () => {
-    const roots = [desktopSourceRoot, dockerPluginRoot]
+    const roots = [desktopSourceRoot, shellSourceRoot, dockerPluginRoot]
     const used = roots.flatMap(sourceFiles).flatMap((path) => {
       const source = readFileSync(path, 'utf8')
       return [...source.matchAll(/actionCode:\s*['"]([^'"]+)['"]/gu)]

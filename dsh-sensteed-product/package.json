@@ -14,7 +14,12 @@
     "./dofe-plugins": "./lib/dofe-plugins.js",
     "./finance-mcp": "./lib/finance-mcp.js",
     "./knowledge-routing": "./lib/knowledge-routing.js",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./yootun-audit-contract": "./lib/yootun-audit-contract.js",
+    "./yootun-audit-models-client": "./lib/yootun-audit-models-client.js",
+    "./yootun-audit-route": "./lib/yootun-audit-route.js",
+    "./yootun-audit-service": "./lib/yootun-audit-service.js",
+    "./yootun-audit-store": "./lib/yootun-audit-store.js"
   },
   "files": [
     "lib",
@@ -28,6 +33,7 @@
   "peerDependencies": {
     "@deepseek-ai/cordis": ">=4.0.0 <5",
     "@deepseek-ai/dsh": ">=0.2.0-rc.0 <1",
+    "@deepseek-ai/dsh-atomic-write": ">=0.2.0-rc.0 <1",
     "@deepseek-ai/dsh-mcp-client": ">=0.2.0-rc.0 <1"
   },
   "scripts": {
@@ -40,6 +46,7 @@
     "check": "corepack pnpm run verify:brand && corepack pnpm run build && corepack pnpm run typecheck && corepack pnpm run test"
   },
   "devDependencies": {
+    "@deepseek-ai/dsh-atomic-write": "workspace:*",
     "@deepseek-ai/dsh-mcp-client": "workspace:*",
     "@types/node": "^22.20.0",
     "sharp": "0.35.3",

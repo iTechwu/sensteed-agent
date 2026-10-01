@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { YOOTUN_AUDIT_ACTIONS } from '../src/yootun-audit-contract.ts'
 
 const packageRoot = resolve(import.meta.dirname, '..')
+const shellPackageRoot = resolve(packageRoot, '../dsh-plugin-desktop')
 const workspaceRoot = resolve(packageRoot, '..')
 const dockerPluginRoot = resolve(workspaceRoot, '../docker-helm.dofe.ai/plugins')
 
@@ -17,16 +18,16 @@ function sourceFiles(root: string): string[] {
 
 describe('Yootun audit release closure', () => {
   it('packages the audit client and removes the central approval surface', () => {
-    const manifest = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')) as {
+    const manifest = JSON.parse(readFileSync(join(shellPackageRoot, 'package.json'), 'utf8')) as {
       dependencies?: Record<string, string>
     }
-    const patch = readFileSync(join(packageRoot, 'cordis.patch.yml'), 'utf8')
+    const patch = readFileSync(join(shellPackageRoot, 'cordis.patch.yml'), 'utf8')
 
     expect(manifest.dependencies).not.toHaveProperty('@dofe/dsh-yootun-audit')
     expect(manifest.dependencies).not.toHaveProperty('@dofe/dsh-yootun-approvals')
     expect(patch).not.toContain("name: '@dofe/dsh-yootun-audit'")
     expect(patch).not.toContain('dsh-yootun-approvals')
-    expect(existsSync(join(packageRoot, 'src/yootun-approvals-route.ts'))).toBe(false)
+    expect(existsSync(join(shellPackageRoot, 'src/yootun-approvals-route.ts'))).toBe(false)
   })
 
   it('keeps every cataloged write collector connected to an owned host source', () => {

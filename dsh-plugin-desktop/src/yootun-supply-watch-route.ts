@@ -5,7 +5,7 @@ import { chmod, lstat, mkdir, readFile } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { dirname } from 'node:path'
 import { writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
-import { safeYootunAuditTargetId, type YootunAuditRecordInput, type YootunAuditRecorder } from './yootun-audit-contract.ts'
+import { safeYootunAuditTargetId, type YootunAuditRecordInput, type YootunAuditRecorder } from '@dofe/dsh-sensteed-product/yootun-audit-contract'
 import { sameYootunOrigin } from './yootun-route-security.ts'
 import { desktopPackageVersion } from './desktop-package-version.ts'
 

@@ -1,5 +1,5 @@
 import type { DofeAuthService } from './dofe-auth-service.ts'
-import type { YootunAuditRecorder, YootunAuditRecordInput } from './yootun-audit-contract.ts'
+import type { YootunAuditRecorder, YootunAuditRecordInput } from '@dofe/dsh-sensteed-product/yootun-audit-contract'
 import { desktopPackageVersion } from './desktop-package-version.ts'
 
 export function watchDofeAuthAudit(auth: DofeAuthService, audit: YootunAuditRecorder): () => void {
