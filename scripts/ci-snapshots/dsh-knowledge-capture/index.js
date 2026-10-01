@@ -1,8 +1,8 @@
-// Runtime Knowledge bridge for Yootun-Agent. Trusted identity is derived by
+// Runtime Knowledge bridge for Sensteed-Agent. Trusted identity is derived by
 // the public MCP gateway from MODELS_API_KEY; the desktop never declares a
 // tenant, user, space UUID, or private Knowledge endpoint.
 
-export const name = 'yootun-agent-knowledge-capture'
+export const name = 'sensteed-agent-knowledge-capture'
 export const inject = ['credentials', 'systemPrompt']
 
 export const KNOWLEDGE_MCP_URL = 'https://ai.hozonauto.com/mcp/knowledge'
@@ -198,8 +198,8 @@ export async function apply(ctx, overrides = {}) {
       SHUTDOWN_DEADLINE_MS,
     ),
   }
-  ctx.provide('yootunAgentCapture', handle)
-  ctx.provide('yootunAgentKnowledge', handle)
+  ctx.provide('sensteedAgentCapture', handle)
+  ctx.provide('sensteedAgentKnowledge', handle)
 
   ctx.effect(
     () => async () => { await handle.shutdown() },

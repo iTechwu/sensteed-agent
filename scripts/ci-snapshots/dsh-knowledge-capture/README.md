@@ -1,6 +1,6 @@
 # @dofe/dsh-knowledge-capture
 
-Yootun-Agent 的 Runtime Knowledge bridge。它监听 DSH 的真实 Session 事件，
+Sensteed-Agent 的 Runtime Knowledge bridge。它监听 DSH 的真实 Session 事件，
 通过 `https://ai.hozonauto.com/mcp/knowledge` 提交 `knowledge.session_checkpoint`，
 并在每次模型请求前获取 `knowledge.context_pack`。
 
@@ -10,9 +10,9 @@ Yootun-Agent 的 Runtime Knowledge bridge。它监听 DSH 的真实 Session 事�
 ## 接入面
 
 - 包名：`@dofe/dsh-knowledge-capture`
-- Cordis `name`：`yootun-agent-knowledge-capture`
+- Cordis `name`：`sensteed-agent-knowledge-capture`
 - Cordis `inject`：`['credentials', 'systemPrompt']`
-- 暴露到 `ctx.yootunAgentCapture` 与 `ctx.yootunAgentKnowledge`：
+- 暴露到 `ctx.sensteedAgentCapture` 与 `ctx.sensteedAgentKnowledge`：
   `{ sdkVersion, pendingCount(), droppedCount(), loadout(), contextPack(), flush(), shutdown() }`
 
 ## 运行时依赖

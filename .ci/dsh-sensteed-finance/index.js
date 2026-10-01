@@ -88,7 +88,10 @@ export function apply(ctx, overrides = {}) {
         return
       }
       const config = await resolveConfig(ctx)
-      if (!config.token || !config.tenantId) return sendJson(res, 401, { ok: false, error: '请先使用飞书登录，再打开财务管理。' })
+      if (!config.token || !config.tenantId) {
+        ctx.logger?.info?.(`sensteed finance: ${req.method} ${safePathname(req.url)} rejected — live Feishu session not bound (token/tenant missing)`)
+        return sendJson(res, 401, { ok: false, error: '请先使用飞书登录，再打开财务管理。' })
+      }
       const pathname = safePathname(req.url)
       const sub = pathname.slice(ROUTE_PREFIX.length) || '/'
       if (req.method === 'GET') return dispatchGet(fetchImpl, config, sub, req.url, res, ctx.logger)
@@ -429,15 +432,24 @@ async function financeApiCall(fetchImpl, config, toolName, args, observedAt, log
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     })
-    if (response.status === 401 || response.status === 403) return { ok: false, error: '飞书登录已失效或没有财务访问权限，请重新登录后重试。' }
-    if (!response.ok) return { ok: false, error: `upstream_http_${response.status}` }
+    if (response.status === 401 || response.status === 403) {
+      logger?.info?.(`sensteed finance: ${toolName} upstream ${response.status} — datasource rejected the live session`)
+      return { ok: false, error: '飞书登录已失效或没有财务访问权限，请重新登录后重试。' }
+    }
+    if (!response.ok) {
+      logger?.info?.(`sensteed finance: ${toolName} upstream http ${response.status}`)
+      return { ok: false, error: `upstream_http_${response.status}` }
+    }
     const payload = await response.json()
-    if (payload?.code !== undefined && payload.code !== 0) return { ok: false, error: payload.msg || '财务操作失败' }
+    if (payload?.code !== undefined && payload.code !== 0) {
+      logger?.info?.(`sensteed finance: ${toolName} datasource business code ${payload.code} msg ${payload.msg ?? '∅'} — data ${payload.data === undefined ? 'absent' : 'present'}`)
+      return { ok: false, error: payload.msg || '财务操作失败' }
+    }
     const data = payload?.data
     if (data === undefined) return { ok: false, error: 'empty_result' }
     return { ok: true, data, meta: { asOf: observedAt.toISOString() } }
   } catch (error) {
-    logger?.warn?.('sensteed finance: REST call %s failed', toolName)
+    logger?.info?.(`sensteed finance: REST call ${toolName} failed: ${String(error)}`)
     return { ok: false, error: error?.name === 'TimeoutError' ? 'upstream_timeout' : 'upstream_unreachable' }
   }
 }

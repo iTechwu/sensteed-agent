@@ -40,7 +40,7 @@ test('publishes a host-only MCP runtime bridge without the legacy SDK dependency
 
 test('uses only the public Knowledge MCP and MODELS_API_KEY trusted identity', async () => {
   const source = await readFile(new URL('index.js', root), 'utf8')
-  assert.match(source, /https:\/\/ai\.hozonauto\.com\/mcp\/knowledge/u)
+  assert.match(source, /https:\/\/ixicai\.cn\/mcp\/knowledge/u)
   assert.match(source, /resolve\('MODELS_API_KEY'\)/u)
   assert.doesNotMatch(source, /KNOWLEDGE_API_KEY|KNOWLEDGE_API_BASE_URL|knowledge\.dofe\.ai|tenantId|userId|172\.30\.30\.11|127\.0\.0\.1/u)
 })
@@ -70,7 +70,7 @@ test('submits DSH session checkpoints through MCP with server-resolved space key
     return mcpResponse({ accepted: true })
   })
   await harness.start()
-  assert.equal(harness.provided.get('yootunAgentCapture'), harness.provided.get('yootunAgentKnowledge'))
+  assert.equal(harness.provided.get('sensteedAgentCapture'), harness.provided.get('sensteedAgentKnowledge'))
   const session = { id: 'session-1' }
   harness.listeners.get('session/created')(session)
   harness.listeners.get('session/event')(session, event('user/message', 1, {
@@ -111,7 +111,7 @@ test('injects ContextPack evidence and blocks recall-to-capture pollution', asyn
     async () => ({ sections: [], contexts: [], tools: [], variables: {} }),
   )
   assert.equal(assembly.contexts.length, 1)
-  assert.deepEqual(harness.provided.get('yootunAgentKnowledge').contextPackStatus('session-2'), { status: 'injected' })
+  assert.deepEqual(harness.provided.get('sensteedAgentKnowledge').contextPackStatus('session-2'), { status: 'injected' })
   assert.match(assembly.contexts[0].text, /只使用已授权空间|已确认偏好/u)
   const blocked = captureSessionEvent(event('assistant/message', 3, {
     message: { role: 'assistant', content: [{ type: 'text', text: 'recalled 22222222-2222-4222-8222-222222222222' }] },
@@ -137,7 +137,7 @@ test('records unavailable ContextPack status without blocking the prompt', async
     async () => ({ sections: [], contexts: [], tools: [], variables: {} }),
   )
   assert.deepEqual(assembly.contexts, [])
-  assert.deepEqual(provided.get('yootunAgentKnowledge').contextPackStatus('session-no-key'), {
+  assert.deepEqual(provided.get('sensteedAgentKnowledge').contextPackStatus('session-no-key'), {
     status: 'unavailable', reason: 'model_api_key_unavailable',
   })
 })

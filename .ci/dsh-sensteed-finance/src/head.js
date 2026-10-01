@@ -34,7 +34,7 @@ const {
 
 const NS = 'dofe.sensteed-finance'
 const OVERLAY_ID = '@dofe/dsh-sensteed-finance'
-const OVERLAY_EVENT = 'dofe:yootun-overlay:open'
+const OVERLAY_EVENT = 'dofe:sensteed-overlay:open'
 const BASE = '/api/desktop/sensteed/finance'
 
 // 版块（tab）结构对齐 datasource 前端财务工作台 sections
