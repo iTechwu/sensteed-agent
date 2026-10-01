@@ -40,7 +40,7 @@ test('publishes a host-only MCP runtime bridge without the legacy SDK dependency
 
 test('uses only the public Knowledge MCP and MODELS_API_KEY trusted identity', async () => {
   const source = await readFile(new URL('index.js', root), 'utf8')
-  assert.match(source, /https:\/\/ixicai\.cn\/mcp\/knowledge/u)
+  assert.match(source, /https:\/\/ai\.hozonauto\.com\/mcp\/knowledge/u)
   assert.match(source, /resolve\('MODELS_API_KEY'\)/u)
   assert.doesNotMatch(source, /KNOWLEDGE_API_KEY|KNOWLEDGE_API_BASE_URL|knowledge\.dofe\.ai|tenantId|userId|172\.30\.30\.11|127\.0\.0\.1/u)
 })
