@@ -178,7 +178,8 @@ import {
   materializeProfile,
   ProfileMaterializationError,
 } from './profile-materializer.ts'
-import { scheduleDesktopProfileRepair } from './profile-repair.ts'
+import { runDesktopProfileRepair, scheduleDesktopProfileRepair } from './profile-repair.ts'
+import { ensureDesktopPnpmStoreDir } from './profile-store-dir.ts'
 import {
   formatRecoveryPluginRemoveFailure,
   removeRecoveryPlugin,
@@ -1290,6 +1291,10 @@ async function start(): Promise<void> {
               homeDir,
               profileDir: activeProfileDir,
               electronVersion,
+              storeDir: ensureDesktopPnpmStoreDir(homeDir),
+              // Restored checkpoints pin their lockfile, so the pinned store
+              // usually holds every tarball already; go online only on a miss.
+              offline: 'prefer',
             })
           } catch (cause) {
             const detail = maskSecrets(formatProfileMaterializationFailure(cause))
@@ -1304,6 +1309,18 @@ async function start(): Promise<void> {
             )
           }
         },
+        repairDependencies: async () => await runDesktopProfileRepair({
+          homeDir,
+          profileDir: activeProfileDir,
+          platform: process.platform,
+          lockDir: desktopUserDataDir,
+          appExecutable: process.execPath,
+          clearEnvironmentPath: pnpmRuntime.clearEnvironmentPath,
+          pnpmBinPath,
+          nodeBinDir: pnpmRuntime.nodeBinDir,
+          nodeShimPath: pnpmRuntime.nodeShimPath,
+          electronVersion,
+        }),
       })
     }
     if (recoveryModeRequested) {
