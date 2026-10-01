@@ -143,6 +143,13 @@ export async function bootDesktopHost(options: DesktopHostOptions, runtime: Desk
             homeDir,
             statePath: pluginManagementStatePath,
             installAnchor: desktopInstallAnchor(),
+            mandatoryGate: () => {
+              try {
+                return (hostCtx as { sensteedMandatoryUpdatePolicy?: { snapshot(): { phase: 'none' | 'notice' | 'blocking'; minVersion?: string } } }).sensteedMandatoryUpdatePolicy?.snapshot()
+              } catch {
+                return undefined
+              }
+            },
           })
         }
         if (logSink !== undefined) {

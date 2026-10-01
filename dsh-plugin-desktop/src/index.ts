@@ -22,6 +22,8 @@ import {
   handleDesktopDirectoryPickerRequest,
   handleDesktopDirectoryValidationRequest,
 } from './directory-picker-route.ts'
+import { rejectDesktopMandatoryUpdate } from './desktop-mandatory-gate.ts'
+import type {} from '@dofe/dsh-sensteed-product/update-policy'
 import {
   DESKTOP_DIAGNOSTICS_EXPORT_PATH,
   DESKTOP_DEVELOPER_TOOLS_TOGGLE_PATH,
@@ -251,6 +253,9 @@ export function apply(ctx: Context, config: DesktopShellConfig): void {
           path,
           handler: (req, res) => {
             if (rejectDesktopRequest(ctx, req, res)) return
+            // Mandatory update phases refuse profile/plugin mutations; reads,
+            // restart and diagnostics stay reachable so the user is never trapped.
+            if (rejectDesktopMandatoryUpdate(ctx, req, res, 'zh')) return
             return handler(
               req,
               res,

@@ -27,6 +27,15 @@ interface PolicyLauncherRuntime {
   notify?(options: { title: string; body: string }): void
 }
 
+/** Host-side policy surface probed by the shell's mandatory update gate. */
+export interface SensteedMandatoryUpdatePolicy {
+  snapshot(): { phase: 'none' | 'notice' | 'blocking'; minVersion?: string }
+}
+
+declare module '@deepseek-ai/cordis' {
+  interface Context { sensteedMandatoryUpdatePolicy: SensteedMandatoryUpdatePolicy }
+}
+
 export const name = 'dofe-product-update-policy'
 export const inject = []
 
@@ -84,6 +93,9 @@ export async function apply(ctx: Context): Promise<void> {
     syncSurfaces()
   }
 
+  ctx.provide('sensteedMandatoryUpdatePolicy', {
+    snapshot: () => ({ phase: snapshot.phase, minVersion: snapshot.minVersion }),
+  })
   const client = new DesktopMandatoryUpdatePolicyClient({
     endpoint: BRAND_UPDATE_SERVICE.endpoint,
     currentVersion: productPackageVersion(),

@@ -180,6 +180,7 @@ import {
 } from './profile-materializer.ts'
 import { runDesktopProfileRepair, scheduleDesktopProfileRepair } from './profile-repair.ts'
 import { createDesktopQuitGate, type DesktopQuitInspectionResult } from './quit-gate.ts'
+import { getCachedMandatoryPolicy, readCachedMandatoryPolicyFromState } from './mandatory-policy-cache.ts'
 import type {} from '@dofe/dsh-sensteed-product/quit-inspection'
 import { ensureDesktopPnpmStoreDir } from './profile-store-dir.ts'
 import {
@@ -1275,6 +1276,23 @@ async function start(): Promise<void> {
           generationId,
         }),
         uninstallPlugin: async packageName => {
+          // Mandatory update gate: the launcher cache (this run) or the
+          // persisted snapshot (a Host report from a previous run) refuses
+          // plugin removal while a notice/blocking phase is active.
+          const live = getCachedMandatoryPolicy()
+          const persisted = live === undefined
+            ? readCachedMandatoryPolicyFromState(runtime.updates.statePath)
+            : undefined
+          const policy = live ?? persisted
+          if (policy !== undefined && (policy.phase === 'notice' || policy.phase === 'blocking')) {
+            throw new DesktopStartupRecoveryControllerError(
+              'operation-failed',
+              policy.phase === 'blocking'
+                ? `Update to ${policy.minVersion ?? ''} is required before changing Desktop bundles.`
+                : `Update to ${policy.minVersion ?? ''} is recommended; bundle changes are unavailable.`,
+              { operationStage: 'plugin-change' },
+            )
+          }
           try {
             await removeRecoveryPlugin({
               appExecutable: process.execPath,

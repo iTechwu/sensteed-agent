@@ -140,6 +140,7 @@ export type DesktopPluginsErrorCode =
   | 'already-active'
   | 'preview-expired'
   | 'persistence-failed'
+  | 'mandatory-update'
 
 /** Error whose code is safe for a trusted Host integration to branch on. */
 export class DesktopPluginsError extends Error {
@@ -172,6 +173,8 @@ interface DesktopPluginPreviewRecord {
 export interface DesktopPluginsBootstrap {
   /** Active profile name for this generation. */
   readonly profileName: string
+  /** Probed mandatory update gate; when absent the product layer is absent and nothing blocks. */
+  readonly mandatoryGate?: () => { phase: 'none' | 'notice' | 'blocking'; minVersion?: string } | undefined
   /** Harness home containing the active profile. */
   readonly homeDir: string
   /** Desktop-private state file outside the user's profile manifests. */
@@ -889,6 +892,7 @@ export class DesktopPluginsService extends Service implements DesktopPlugins {
 
   previewDisable(bundleId: string): DesktopPluginDisablePreview {
     this.assertActive()
+    this.assertMandatoryUpdate()
     if (!BUNDLE_ID_PATTERN.test(bundleId)) throw this.invalidTarget()
     const target = this.list().find(item => item.bundleId === bundleId)
     if (target === undefined) throw this.invalidTarget()
@@ -910,6 +914,7 @@ export class DesktopPluginsService extends Service implements DesktopPlugins {
   executeDisable(previewId: string): Promise<DesktopPluginDisableResult> {
     try {
       this.assertActive()
+      this.assertMandatoryUpdate()
       if (!DISABLE_PREVIEW_ID_PATTERN.test(previewId)) return Promise.reject(this.expiredPreview())
       if (this.operation !== undefined) {
         return Promise.reject(new DesktopPluginsError('persistence-failed', 'Another Desktop plugin change is already running.'))
@@ -935,6 +940,7 @@ export class DesktopPluginsService extends Service implements DesktopPlugins {
 
   previewEnable(bundleId: string): DesktopPluginEnablePreview {
     this.assertActive()
+    this.assertMandatoryUpdate()
     if (!BUNDLE_ID_PATTERN.test(bundleId)) throw this.invalidTarget()
     const target = this.list().find(item => item.bundleId === bundleId)
     if (target === undefined) throw this.invalidTarget()
@@ -956,6 +962,7 @@ export class DesktopPluginsService extends Service implements DesktopPlugins {
   executeEnable(previewId: string): Promise<DesktopPluginEnableResult> {
     try {
       this.assertActive()
+      this.assertMandatoryUpdate()
       if (!ENABLE_PREVIEW_ID_PATTERN.test(previewId)) return Promise.reject(this.expiredPreview())
       if (this.operation !== undefined) {
         return Promise.reject(new DesktopPluginsError('persistence-failed', 'Another Desktop plugin change is already running.'))
@@ -1083,6 +1090,18 @@ export class DesktopPluginsService extends Service implements DesktopPlugins {
 
   private assertActive(): void {
     if (this.disposed) throw new Error(`${BIN_NAME}: desktopPlugins service disposed`)
+  }
+
+  /** Refuse bundle mutations while a mandatory update phase is active. */
+  private assertMandatoryUpdate(): void {
+    const snapshot = this.bootstrap.mandatoryGate?.()
+    if (snapshot === undefined) return
+    const phase = snapshot.phase
+    if (phase !== 'notice' && phase !== 'blocking') return
+    const minVersion = snapshot.minVersion ?? ''
+    throw new DesktopPluginsError('mandatory-update', phase === 'blocking'
+      ? `Update to ${minVersion} is required before changing Desktop bundles.`
+      : `Update to ${minVersion} is recommended; bundle changes are unavailable.`)
   }
 }
 

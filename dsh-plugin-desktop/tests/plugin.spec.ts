@@ -241,6 +241,7 @@ function createHarness(
     mountScheduled: async () => {},
     show: () => {},
     notifyAttention: () => {},
+    reportMandatoryUpdatePolicy: () => {},
     registerTrayItem: () => ({ refresh: () => {}, dispose: () => {} }),
     openTerminal: () => {},
     reloadRenderer: () => {},
