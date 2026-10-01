@@ -59,10 +59,17 @@ export function parseDesktopMandatoryDirective(value: unknown): DesktopMandatory
       if (typeof input !== 'string' || input.length === 0 || input.length > max) return undefined
       return input
     }
+    // 任一提供的字段越界即整条拒绝：半截 notice 不是运营者写下的策略。
     const title = bounded(raw.title, MAX_NOTICE_TITLE)
     const detail = bounded(raw.detail, MAX_NOTICE_DETAIL)
     const zh = bounded(raw.zh, MAX_NOTICE_LOCALE)
     const en = bounded(raw.en, MAX_NOTICE_LOCALE)
+    if ((raw.title !== undefined && title === undefined)
+      || (raw.detail !== undefined && detail === undefined)
+      || (raw.zh !== undefined && zh === undefined)
+      || (raw.en !== undefined && en === undefined)) {
+      return undefined
+    }
     notice = {
       ...(title === undefined ? {} : { title }),
       ...(detail === undefined ? {} : { detail }),

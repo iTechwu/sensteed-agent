@@ -35,6 +35,16 @@ let host: DesktopStartupGenerationHost | undefined
 let inspectServices = () => ({ aaRuntime: false, aaOnboarding: false })
 // Set once the generation mounts and the product layer's quit inspection row is live.
 let inspectQuit: (() => Promise<{ activeTasks: boolean; scheduledTasks: boolean }>) | undefined
+let downloadMandatoryLatest: (() => Promise<void>) | undefined
+rpc.handle('mandatoryUpdateDownload', async () => {
+  if (downloadMandatoryLatest === undefined) return { available: false }
+  try {
+    await downloadMandatoryLatest()
+    return { available: true }
+  } catch (cause) {
+    return { available: false, error: cause instanceof Error ? cause.message : String(cause) }
+  }
+})
 rpc.handle('quitInspection', async () => {
   if (inspectQuit === undefined) return { available: false }
   try {
@@ -90,10 +100,13 @@ rpc.handle('boot', async args => {
       hostCtx => {
         host = hostCtx
         const injectable = hostCtx as unknown as {
-          inject(names: readonly string[], wire: (scope: { sensteedQuitInspection: { inspect(): Promise<{ activeTasks: boolean; scheduledTasks: boolean }> } }) => void): void
+          inject(names: readonly string[], wire: (scope: Record<string, never>) => void): void
         }
         injectable.inject(['sensteedQuitInspection'], scope => {
-          inspectQuit = async () => await scope.sensteedQuitInspection.inspect()
+          inspectQuit = async () => await (scope as never as { sensteedQuitInspection: { inspect(): Promise<{ activeTasks: boolean; scheduledTasks: boolean }> } }).sensteedQuitInspection.inspect()
+        })
+        injectable.inject(['sensteedMandatoryUpdatePolicy'], scope => {
+          downloadMandatoryLatest = async () => await (scope as never as { sensteedMandatoryUpdatePolicy: { downloadLatest(): Promise<void> } }).sensteedMandatoryUpdatePolicy.downloadLatest()
         })
       }, code => { void rpc.call('quit', [code]).catch(() => {}) })
     if (stopping) { await host?.fiber.dispose(); throw new Error('DSH Host stopped during startup') }

@@ -20,6 +20,8 @@ export interface IsolatedHostOptions {
   requestQuit(code: number): void
   /** Receive the Host-side quit inspection probe once the generation mounts (undefined when absent). */
   registerQuitInspection(impl: (() => Promise<DesktopQuitInspectionAnswer>) | undefined): void
+  /** Receive the Host-side download trigger for the mandatory target release. */
+  registerMandatoryDownload(impl: (() => Promise<void>) | undefined): void
   onFailure(error: Error, exit: IsolatedHostExit): void
 }
 
@@ -78,6 +80,15 @@ export async function startIsolatedDesktopHost(options: IsolatedHostOptions): Pr
   }, 120_000)
   const releaseNative = bindNativeRuntime(rpc, options.runtime)
   rpc.handle('certificate', () => options.prepareCertificate())
+  options.registerMandatoryDownload?.(async () => await Promise.race([
+    rpc.call<{ available: boolean; error?: string }>('mandatoryUpdateDownload', [], undefined, 120_000),
+    new Promise<never>((_, reject) => {
+      const timer = setTimeout(() => reject(new Error('mandatory download timed out')), 120_000)
+      timer.unref?.()
+    }),
+  ]).then(answer => {
+    if (answer.available !== true) throw new Error(answer.error ?? 'mandatory download is unavailable')
+  }))
   options.registerQuitInspection?.(async () => await Promise.race([
     rpc.call<DesktopQuitInspectionAnswer>('quitInspection', [], undefined, QUIT_INSPECTION_DEADLINE_MS),
     new Promise<never>((_, reject) => {

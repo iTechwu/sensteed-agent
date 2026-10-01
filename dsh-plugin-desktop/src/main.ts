@@ -181,6 +181,7 @@ import {
 import { runDesktopProfileRepair, scheduleDesktopProfileRepair } from './profile-repair.ts'
 import { createDesktopQuitGate, type DesktopQuitInspectionResult } from './quit-gate.ts'
 import { getCachedMandatoryPolicy, readCachedMandatoryPolicyFromState } from './mandatory-policy-cache.ts'
+import { mandatoryBlockingDialogCopy, shouldPromptMandatoryBlocking } from './mandatory-update-dialog.ts'
 import type {} from '@dofe/dsh-sensteed-product/quit-inspection'
 import { ensureDesktopPnpmStoreDir } from './profile-store-dir.ts'
 import {
@@ -670,6 +671,8 @@ async function start(): Promise<void> {
   )
   const rawRequestQuit = (code: number): void => { void shutdown.request(code) }
   let quitInspectionProbe: (() => Promise<DesktopQuitInspectionResult>) | undefined
+  let mandatoryDownloadProbe: (() => Promise<void>) | undefined
+  let mandatoryLastPromptAt = 0
   const quitGate = createDesktopQuitGate({
     enabled: process.env.DSH_DESKTOP_QUIT_GATE !== '0',
     locale: () => app.getLocale(),
@@ -697,6 +700,30 @@ async function start(): Promise<void> {
   removeShutdownRequests = installShutdownRequests(process, app, (code, source) => {
     requestQuit(code, source === 'before-quit' ? undefined : source)
   })
+
+  // Blocking-phase reminder: a single-flight native dialog on a 30-minute
+  // cooldown, watching the Host-reported cache. Quitting is never blocked —
+  // the next launch re-enters the same phase and re-prompts.
+  const mandatoryDialogTimer = setInterval(() => {
+    const policy = getCachedMandatoryPolicy()
+    if (!shouldPromptMandatoryBlocking({ policy, now: Date.now(), lastPromptAt: mandatoryLastPromptAt })) return
+    mandatoryLastPromptAt = Date.now()
+    const blockingPolicy = policy!
+    const copy = mandatoryBlockingDialogCopy(app.getLocale(), blockingPolicy.minVersion)
+    void dialog.showMessageBox({
+      type: 'warning',
+      buttons: [copy.cancel, copy.confirm],
+      defaultId: 1, cancelId: 0,
+      title: copy.title, message: copy.message,
+      ...(copy.detail === undefined ? {} : { detail: copy.detail }),
+    }).then(({ response }) => {
+      if (response !== 1) return
+      void mandatoryDownloadProbe?.().catch(cause => {
+        electronLogger.error(`${BIN_NAME}: mandatory update download failed: ${cause instanceof Error ? cause.message : String(cause)}`)
+      })
+    })
+  }, 60_000)
+  mandatoryDialogTimer.unref?.()
 
   const openStartupRecoveryWindow = async (
     failureDetail: string,
@@ -1772,6 +1799,9 @@ async function start(): Promise<void> {
           quitInspectionProbe = impl === undefined
             ? undefined
             : async () => ({ source: 'ready' as const, ...(await impl()) })
+        },
+        registerMandatoryDownload: impl => {
+          mandatoryDownloadProbe = impl ?? undefined
         },
         onFailure: (error, exit) => {
           electronLogger.error(formatUnexpectedHostExit(error, exit))

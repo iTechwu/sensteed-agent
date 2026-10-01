@@ -15,7 +15,7 @@ import {
 /** Narrow launcher surface this row consumes (probed, never required). */
 interface PolicyLauncherRuntime {
   readonly platform: NodeJS.Platform
-  readonly updates?: { readonly statePath?: string }
+  readonly updates?: { readonly statePath?: string; downloadAndOpen(version: string, signal?: AbortSignal): Promise<void> }
   reportMandatoryUpdatePolicy(policy: DesktopMandatoryUpdateSnapshot | null): void
   registerTrayItem(item: {
     group: string
@@ -30,6 +30,8 @@ interface PolicyLauncherRuntime {
 /** Host-side policy surface probed by the shell's mandatory update gate. */
 export interface SensteedMandatoryUpdatePolicy {
   snapshot(): { phase: 'none' | 'notice' | 'blocking'; minVersion?: string }
+  /** Download the mandatory target release through the Host's own update adapter. */
+  downloadLatest(): Promise<void>
 }
 
 declare module '@deepseek-ai/cordis' {
@@ -95,6 +97,12 @@ export async function apply(ctx: Context): Promise<void> {
 
   ctx.provide('sensteedMandatoryUpdatePolicy', {
     snapshot: () => ({ phase: snapshot.phase, minVersion: snapshot.minVersion }),
+    downloadLatest: async () => {
+      if (snapshot.minVersion === undefined) throw new Error('@dofe/dsh-sensteed-product: no mandatory target version to download')
+      const updates = runtime.updates
+      if (updates?.downloadAndOpen === undefined) throw new Error('@dofe/dsh-sensteed-product: launcher update adapter is unavailable')
+      await updates.downloadAndOpen(snapshot.minVersion, undefined)
+    },
   })
   const client = new DesktopMandatoryUpdatePolicyClient({
     endpoint: BRAND_UPDATE_SERVICE.endpoint,
