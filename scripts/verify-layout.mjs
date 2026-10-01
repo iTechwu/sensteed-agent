@@ -28,7 +28,7 @@ if (upstreamPackage.packageManager !== workspace.packageManager) {
   fail('the sibling checkout must pin the same pnpm release as the product workspace')
 }
 const workspaceFile = readFileSync(resolve(root, 'pnpm-workspace.yaml'), 'utf8')
-for (const entry of ['dsh-plugin-desktop', 'dsh-community-fabric', 'dsh-community-market', 'deepseek-harness/packages/**']) {
+for (const entry of ['dsh-sensteed-product', 'dsh-plugin-desktop', 'dsh-community-fabric', 'dsh-community-market', 'deepseek-harness/packages/**']) {
   if (!workspaceFile.includes(`- ${entry}`)) fail(`pnpm-workspace.yaml must include ${entry}`)
 }
 // 反 vendored 回归:仓库不再内嵌上游 tarball、不再重写 dsh 依赖解析。
