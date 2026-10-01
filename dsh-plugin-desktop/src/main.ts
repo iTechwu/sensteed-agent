@@ -178,6 +178,7 @@ import {
   materializeProfile,
   ProfileMaterializationError,
 } from './profile-materializer.ts'
+import { scheduleDesktopProfileRepair } from './profile-repair.ts'
 import {
   formatRecoveryPluginRemoveFailure,
   removeRecoveryPlugin,
@@ -1572,36 +1573,66 @@ async function start(): Promise<void> {
       : undefined
     const releaseDshRuntime = generation.own(() => { dshRuntime?.dispose() })
     if (prepared.requiresDependencyMigration) {
-      electronLogger.error(`${BIN_NAME}: migrating legacy Profile dependency layout with packaged pnpm`)
-      try {
-        await materializeProfile({
+      if (process.env.DSH_DESKTOP_LEGACY_MIGRATION === '1') {
+        electronLogger.error(`${BIN_NAME}: migrating legacy Profile dependency layout with packaged pnpm`)
+        try {
+          await materializeProfile({
+            appExecutable: process.execPath,
+            clearEnvironmentPath: pnpmRuntime.clearEnvironmentPath,
+            pnpmBinPath,
+            nodeBinDir: pnpmRuntime.nodeBinDir,
+            nodeShimPath: pnpmRuntime.nodeShimPath,
+            homeDir,
+            profileDir: prepared.profile.dir,
+            electronVersion,
+            updateLockfile: true,
+          })
+          prepared = prepareDesktopProfile(
+            process.env.DSH_TELEMETRY_DISABLED,
+            homeDir,
+            process.platform,
+            activeProfileName,
+            pluginManagementStatePath,
+            marketSelection,
+            preparationHooks,
+          )
+          if (prepared.requiresDependencyMigration) {
+            throw new Error(`${BIN_NAME}: packaged pnpm did not produce compatible Profile dependency metadata`)
+          }
+        } catch (migrationCause) {
+          const detail = migrationCause instanceof ProfileMaterializationError
+            ? migrationCause.result?.stderr || migrationCause.message
+            : migrationCause instanceof Error ? migrationCause.message : String(migrationCause)
+          throw new Error(`${BIN_NAME}: Profile dependency migration failed: ${maskSecrets(detail)}`)
+        }
+      } else {
+        // Boot resolution never depended on the migration: prepareDesktopProfile
+        // already composed every bundle above, and the metadata only matters to
+        // later pnpm operations. Repair after the Host had a fair chance to
+        // start instead of blocking first paint on a network-sensitive install.
+        electronLogger.info(
+          `${BIN_NAME}: Profile dependency metadata needs repair (${prepared.dependencyState.reasons.join(', ')}); deferring repair until after startup`,
+        )
+        const repairSchedule = scheduleDesktopProfileRepair({
+          homeDir,
+          profileDir: prepared.profile.dir,
+          platform: process.platform,
+          lockDir: desktopUserDataDir,
           appExecutable: process.execPath,
           clearEnvironmentPath: pnpmRuntime.clearEnvironmentPath,
           pnpmBinPath,
           nodeBinDir: pnpmRuntime.nodeBinDir,
           nodeShimPath: pnpmRuntime.nodeShimPath,
-          homeDir,
-          profileDir: prepared.profile.dir,
           electronVersion,
-          updateLockfile: true,
+        }, {
+          onOutcome: outcome => {
+            electronLogger.info(`${BIN_NAME}: deferred Profile dependency repair finished: ${outcome}`)
+          },
+          onFailure: cause => {
+            electronLogger.error(`${BIN_NAME}: deferred Profile dependency repair failed: ${maskSecrets(cause instanceof Error ? cause.message : String(cause))}`)
+          },
         })
-        prepared = prepareDesktopProfile(
-          process.env.DSH_TELEMETRY_DISABLED,
-          homeDir,
-          process.platform,
-          activeProfileName,
-          pluginManagementStatePath,
-          marketSelection,
-          preparationHooks,
-        )
-        if (prepared.requiresDependencyMigration) {
-          throw new Error(`${BIN_NAME}: packaged pnpm did not produce compatible Profile dependency metadata`)
-        }
-      } catch (migrationCause) {
-        const detail = migrationCause instanceof ProfileMaterializationError
-          ? migrationCause.result?.stderr || migrationCause.message
-          : migrationCause instanceof Error ? migrationCause.message : String(migrationCause)
-        throw new Error(`${BIN_NAME}: Profile dependency migration failed: ${maskSecrets(detail)}`)
+        generation.own(() => { repairSchedule.dispose() })
       }
     }
     if (prepared.aaFailure !== undefined) {
