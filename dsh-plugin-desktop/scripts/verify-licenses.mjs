@@ -32,6 +32,8 @@ const ALLOWED_LICENSES = new Set([
   'Unlicense',
   'MPL-2.0',
   'CC0-1.0',
+  // type-fest (0.2.0 dependency tree): either accepted license applies.
+  '(MIT OR CC0-1.0)',
   'Zlib',
   'Python-2.0',
 ])
