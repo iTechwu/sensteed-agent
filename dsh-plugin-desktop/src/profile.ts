@@ -27,10 +27,12 @@ import {
   writeProfileManifest,
   type Profile,
   type ProfileManifest,
+  type SkippedBundle,
 } from '@deepseek-ai/dsh-app-boot'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { isMap, isPair, isScalar, parseAllDocuments, parseDocument, type Pair, type YAMLMap } from 'yaml'
 import { findOverlayPackage, resolveOverlayPackage } from './package-overlay.ts'
+import { readDesktopProfileClosure, verifyDesktopProfileClosure } from './profile-closure.ts'
 import { DESKTOP_DEFAULT_WEB_PORT } from './desktop-port.ts'
 import { dshProductVersion } from './dsh-product-version.ts'
 import {
@@ -512,6 +514,10 @@ export interface PreparedDesktopProfile {
   requiresDependencyMigration: boolean
   /** Classified Profile dependency metadata state for this generation. */
   dependencyState: ProfileDependencyClassification
+  /** Third-party bundles skipped this generation with their failure detail. */
+  bundleFailures: readonly string[]
+  /** Frozen-closure disagreements detected without spawning pnpm; corruption triage only. */
+  closureViolations: readonly string[]
 }
 
 /** Optional observations emitted before profile preparation can fail. */
@@ -736,6 +742,7 @@ interface RecoveryFilteredProfile {
   readonly profile: Profile
   readonly dshMarketFailure?: string
   readonly aaFailure?: string
+  readonly bundleFailures?: readonly string[]
 }
 
 /** Render one provider failure without leaking an arbitrary thrown object into public state. */
@@ -783,6 +790,8 @@ function loadRecoveryFilteredProfile(
   const layers: Profile['layers'] = []
   let aaFailure: string | undefined
   let dshMarketFailure: string | undefined
+  const skippedBundles: SkippedBundle[] = []
+  const bundleFailures: string[] = []
   const installPackageUrl = pathToFileURL(INSTALL_ANCHOR).href
   const profilePackageUrl = pathToFileURL(join(profileDir, 'package.json')).href
   for (const packageName of selectedBundles) {
@@ -818,7 +827,15 @@ function loadRecoveryFilteredProfile(
     } catch (cause) {
       if (isAa) aaFailure = marketFailureMessage(cause)
       else if (isDshMarket) dshMarketFailure = marketFailureMessage(cause)
-      else throw cause
+      else {
+        // Degrade like the AA provider above instead of failing the whole
+        // generation: the Loader skips the listed bundle and the recovery
+        // surface reports it, matching the zero-pnpm startup contract that a
+        // broken third-party bundle must never require a boot-time install.
+        const reason = marketFailureMessage(cause)
+        skippedBundles.push({ packageName, reason })
+        bundleFailures.push(`${packageName}: ${reason}`)
+      }
     }
   }
   const patchPath = join(profileDir, PROFILE_PATCH_FILENAME)
@@ -829,10 +846,11 @@ function loadRecoveryFilteredProfile(
       layers,
       patchPath,
       patches: existsSync(patchPath) ? loadOverlayPatches(BIN_NAME, patchPath) : [],
-      skippedBundles: [],
+      skippedBundles,
     },
     ...(dshMarketFailure === undefined ? {} : { dshMarketFailure }),
     ...(aaFailure === undefined ? {} : { aaFailure }),
+    ...(bundleFailures.length === 0 ? {} : { bundleFailures }),
   }
 }
 
@@ -1486,6 +1504,12 @@ export function prepareDesktopProfile(
   // off -- is now derived by `resolveDesktopConfig` in `settings-bridge.ts`,
   // which is where the plugin already owns that rule on the write path.
   patches.push({ id: 'desktop-shell', disabled: false })
+  // Boot-time closure triage never installs: a sealed-tree disagreement is a
+  // corruption signal for the recovery surface, not a pnpm job.
+  const preparedClosure = readDesktopProfileClosure()
+  const closureViolations = preparedClosure === undefined
+    ? []
+    : verifyDesktopProfileClosure(preparedClosure)
   return {
     homeDir: home,
     reloadOptions: {
@@ -1515,6 +1539,8 @@ export function prepareDesktopProfile(
     market: desktopMarketSnapshotWithEffective(marketSelection, effectiveMarket),
     requiresDependencyMigration,
     dependencyState,
+    bundleFailures: Object.freeze([...(loadedProfile.bundleFailures ?? [])]),
+    closureViolations: Object.freeze(closureViolations),
     ...(marketFailure === undefined ? {} : { marketFailure }),
   }
 }

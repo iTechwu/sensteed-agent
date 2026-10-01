@@ -1638,6 +1638,12 @@ async function start(): Promise<void> {
     if (prepared.aaFailure !== undefined) {
       electronLogger.error(`${BIN_NAME}: requested AA bundle was disabled for this generation: ${maskSecrets(prepared.aaFailure)}`)
     }
+    for (const failure of prepared.bundleFailures) {
+      electronLogger.error(`${BIN_NAME}: skipping third-party bundle for this generation: ${maskSecrets(failure)}`)
+    }
+    for (const violation of prepared.closureViolations) {
+      electronLogger.error(`${BIN_NAME}: packaged dependency closure violation: ${maskSecrets(violation)}`)
+    }
     if (prepared.marketFailure !== undefined) {
       electronLogger.error(
         `${BIN_NAME}: requested Market provider ${prepared.market.requested} was disabled for this generation: ${prepared.marketFailure}`,

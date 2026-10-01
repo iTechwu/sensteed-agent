@@ -363,8 +363,7 @@ virtualStoreDirMaxLength: 120
     expect(prepared.dependencyState.workspaceDrift).toBe(false)
   })
 
-  it('restores the workspace-only migration trigger under the legacy escape switch', () => {
-    const home = temporaryHome()
+  it('restores the workspace-only migration trigger under the legacy escape switch', () => {    const home = temporaryHome()
     const dir = ensureDesktopProfile(home)
     const modulesDir = join(dir, 'node_modules')
     mkdirSync(modulesDir, { recursive: true })
@@ -1511,20 +1510,23 @@ describe('desktop profile composition and the recovery deselection ledger', () =
     }
   })
 
-  it('lets a deselected bundle with an unparseable patch stop breaking startup', async () => {
+  it('degrades a selected bundle with an unparseable patch instead of failing startup', async () => {
     const home = temporaryHome()
     const packageName = 'broken-plugin'
     installBundle(home, packageName, 'not: [valid yaml')
     declareBundle(home, packageName)
-    expect(() => prepareDesktopProfile(undefined, home, 'darwin')).toThrow()
+    const degraded = prepareDesktopProfile(undefined, home, 'darwin')
+    expect(degraded.bundleFailures).toHaveLength(1)
+    expect(degraded.bundleFailures[0]).toContain(packageName)
+    expect(composeEntries([degraded.patches])).not.toContainEqual(expect.objectContaining({
+      name: `${packageName}/host`,
+    }))
+    expect(degraded.profile.layers.some(layer => layer.packageName === packageName)).toBe(false)
 
     await setDesktopProfileBundleSelected(selectionBootstrap(home), packageName, false)
 
-    const prepared = prepareDesktopProfile(undefined, home, 'darwin')
-    expect(composeEntries([prepared.patches])).not.toContainEqual(expect.objectContaining({
-      name: `${packageName}/host`,
-    }))
-    expect(prepared.profile.layers.some(layer => layer.packageName === packageName)).toBe(false)
+    const deselected = prepareDesktopProfile(undefined, home, 'darwin')
+    expect(deselected.bundleFailures).toEqual([])
     // Nothing was deleted: the declared dependency and the files both survive.
     const manifest = JSON.parse(readFileSync(join(ensureDesktopProfile(home), 'package.json'), 'utf8')) as {
       dependencies: Record<string, string>
@@ -1533,14 +1535,16 @@ describe('desktop profile composition and the recovery deselection ledger', () =
     expect(existsSync(join(home, 'profiles', 'desktop', 'node_modules', packageName, 'package.json'))).toBe(true)
   })
 
-  it('lets a deselected bundle whose package directory has no manifest stop breaking startup', async () => {
+  it('degrades a selected bundle whose package directory has no manifest instead of failing startup', async () => {
     const home = temporaryHome()
     const packageName = 'half-written-plugin'
     mkdirSync(join(home, 'profiles', 'desktop', 'node_modules', packageName), { recursive: true })
     declareBundle(home, packageName)
-    expect(() => prepareDesktopProfile(undefined, home, 'darwin')).toThrow()
+    const degraded = prepareDesktopProfile(undefined, home, 'darwin')
+    expect(degraded.bundleFailures[0]).toContain(packageName)
 
     await setDesktopProfileBundleSelected(selectionBootstrap(home), packageName, false)
-    expect(() => prepareDesktopProfile(undefined, home, 'darwin')).not.toThrow()
+    const deselected = prepareDesktopProfile(undefined, home, 'darwin')
+    expect(deselected.bundleFailures).toEqual([])
   })
 })
