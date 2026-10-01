@@ -11,9 +11,15 @@ import { DesktopLanHttpsRuntime } from './lan-https-runtime.ts'
 import type { DesktopStartupGenerationHost } from './startup-generation.ts'
 import { disableAsarArchiveView } from './asar-archive-policy.ts'
 import { DESKTOP_PACKAGE_NAME } from './product-identity.ts'
+import { dshProductVersion } from './dsh-product-version.ts'
 
 // The Host lists and reads user workspaces; see asar-archive-policy.ts.
 disableAsarArchiveView(import.meta.url)
+
+// dsh 0.2.0's web bundle reads the client version from this variable in the
+// product-telemetry and product-analytics rows. The supervisor may inject a
+// packaged value; otherwise the running DSH runtime version is the honest one.
+process.env.DSH_CLIENT_VERSION ??= dshProductVersion()
 
 const parentPort = process.parentPort
 if (!parentPort) throw new Error('DSH Host must be started by the Desktop supervisor')

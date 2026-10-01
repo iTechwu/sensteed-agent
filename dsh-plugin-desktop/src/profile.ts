@@ -32,6 +32,7 @@ import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { isMap, isPair, isScalar, parseAllDocuments, parseDocument, type Pair, type YAMLMap } from 'yaml'
 import { findOverlayPackage, resolveOverlayPackage } from './package-overlay.ts'
 import { DESKTOP_DEFAULT_WEB_PORT } from './desktop-port.ts'
+import { dshProductVersion } from './dsh-product-version.ts'
 import {
   desktopBrowserAccessEnabled,
   desktopNetworkExposureForBrowserAccess,
@@ -1076,6 +1077,11 @@ export function prepareDesktopProfile(
   marketSelection: DesktopMarketSnapshot = DEFAULT_DESKTOP_MARKET_SNAPSHOT,
   hooks: DesktopProfilePreparationHooks = {},
 ): PreparedDesktopProfile {
+  // dsh 0.2.0's web bundle reads the client version from this variable while
+  // composing the product-telemetry and product-analytics rows. A supervisor
+  // may inject a packaged value; otherwise the running DSH runtime version is
+  // the honest one.
+  process.env.DSH_CLIENT_VERSION ??= dshProductVersion()
   const lanAddresses = preparedLanAddresses(hooks.lanAddresses)
   const profileDir = profileName === DESKTOP_PROFILE_NAME
     ? ensureDesktopProfile(home)

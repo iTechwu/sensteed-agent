@@ -1534,9 +1534,15 @@ importers:
       '@deepseek-ai/dsh-client-modules':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/client/modules
+      '@deepseek-ai/dsh-client-product-analytics':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/client/product-analytics
       '@deepseek-ai/dsh-client-resources':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/client/resources
+      '@deepseek-ai/dsh-client-shortcuts':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/client/shortcuts
       '@deepseek-ai/dsh-client-store':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/client/store
@@ -1639,6 +1645,9 @@ importers:
       '@deepseek-ai/dsh-client-ui-settings-plugins':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/client/ui-settings-plugins
+      '@deepseek-ai/dsh-client-ui-settings-session-log':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/client/ui-settings-session-log
       '@deepseek-ai/dsh-client-ui-settings-shell':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/client/ui-settings-shell
@@ -1648,6 +1657,9 @@ importers:
       '@deepseek-ai/dsh-client-ui-settings-web-search':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/client/ui-settings-web-search
+      '@deepseek-ai/dsh-client-ui-shortcuts':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/client/ui-shortcuts
       '@deepseek-ai/dsh-client-ui-sidebar':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/client/ui-sidebar
@@ -1891,6 +1903,9 @@ importers:
       '@deepseek-ai/dsh-llm-deepseek':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/llm/llm-deepseek
+      '@deepseek-ai/dsh-llm-deepseek-account':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/llm/llm-deepseek-account
       '@deepseek-ai/dsh-llm-deepseek-api-key':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/llm/llm-deepseek-api-key
