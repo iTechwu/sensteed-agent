@@ -141,7 +141,9 @@ export function verifyMacSmoke(
     const includesUv = MACOS_UNIVERSAL_PACKAGED_ENTRIES
       .filter(entry => entry.path.endsWith('/bin/uv'))
       .some(entry => options.exists(join(unpackedRoot, entry.path)))
-    for (const entry of selectMacUniversalPackagedEntries(includesUv)) {
+    const packagedSlices = new Set(options.executableSlices ?? macSmokeExecutableSlices('universal'))
+    for (const entry of selectMacUniversalPackagedEntries(includesUv)
+      .filter(candidate => packagedSlices.has(candidate.arch))) {
       const nativePath = join(unpackedRoot, entry.path)
       if (!options.exists(nativePath)) {
         throw new Error(`universal application is missing ${nativePath}`)

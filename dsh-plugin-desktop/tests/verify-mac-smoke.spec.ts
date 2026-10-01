@@ -162,6 +162,10 @@ describe('macOS DMG smoke artifact verification', () => {
       .filter(call => call.command === 'lipo' && call.args[0] === value.executable)
       .map(call => call.args)
     expect(executableChecks).toEqual([[value.executable, '-verify_arch', 'arm64']])
+    const nativeChecks = harness.calls
+      .filter(call => call.command === 'lipo' && call.args[0] !== value.executable)
+      .map(call => call.args)
+    expect(nativeChecks.every(args => args[2] === 'arm64')).toBe(true)
   })
 
   it('rejects the mount when no DMG is present', () => {
