@@ -7,7 +7,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { DofeAccessSection, installDofeAccessGate, installDofeAccessStyles } from './DofeAccessSection.tsx'
 import { registerDofePluginItems } from './DofePluginItems.tsx'
 import { DOFE_ACCESS_COPY } from './dofe-access.ts'
-import { DOFE_ACCESS_SETTINGS_NAMESPACE, type DofeAccessSettings } from '@dofe/dsh-sensteed-product/dofe-plugins'
+import { DOFE_ACCESS_SETTINGS_NAMESPACE, type DofeAccessSettings } from '../dofe-plugins.ts'
 
 export function applyDofeAccess(ctx: Context): void {
   ctx.effect(() => ctx.locale.register('dofe.access', DOFE_ACCESS_COPY), 'desktop: access dictionaries')

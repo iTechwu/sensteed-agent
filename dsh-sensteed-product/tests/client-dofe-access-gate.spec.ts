@@ -221,7 +221,7 @@ describe('mandatory DoFe access gate', () => {
     expect(source).toContain("value: protocol === 'responses' ? 'dofe-responses' : protocol === 'messages' ? 'dofe-messages' : 'dofe-chat'")
     expect(source).not.toContain("settingsApi.mutate('llm-deepseek'")
     expect(source).toContain('DOFE_ANTHROPIC_BASE_URL')
-    expect(source).not.toContain("'https://ixicai.cn/anthropic'")
+    expect(source).not.toContain("'https://ai.hozonauto.com/api/anthropic'")
   })
 
   it('renders the protocol picker as a radiogroup above the merged model row', async () => {

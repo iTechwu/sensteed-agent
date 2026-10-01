@@ -46,7 +46,7 @@ const failures = []
 const desktopStyles = await readFile(new URL('../dsh-plugin-desktop/src/client/styles.ts', import.meta.url), 'utf8')
 const desktopSettingsStyles = await readFile(new URL('../dsh-plugin-desktop/src/client/desktop-settings-styles.ts', import.meta.url), 'utf8')
 const desktopExtendedStyles = await readFile(new URL('../dsh-plugin-desktop/src/client/extended-styles.ts', import.meta.url), 'utf8')
-const dofeAccessSource = await readFile(new URL('../dsh-plugin-desktop/src/client/DofeAccessSection.tsx', import.meta.url), 'utf8')
+const dofeAccessSource = await readFile(new URL('../dsh-sensteed-product/src/client/DofeAccessSection.tsx', import.meta.url), 'utf8')
 const desktopSettingsApiSource = await readFile(new URL('../dsh-plugin-desktop/src/client/desktop-settings-api.ts', import.meta.url), 'utf8')
 const bootHealthSource = await readFile(new URL('../dsh-plugin-desktop/src/client/boot-health.ts', import.meta.url), 'utf8')
 const dofeManagedSource = await readFile(new URL('../dsh-sensteed-product/src/dofe-managed.ts', import.meta.url), 'utf8')
@@ -56,6 +56,7 @@ const deliverablesStyles = await readFile(new URL('../deepseek-harness/packages/
 const capabilityMatrix = await readFile(new URL('../docs/superpowers/specs/2026-09-09-mcp-api-capability-matrix.md', import.meta.url), 'utf8')
 const localRouteSources = await Promise.all([
   readSourceTree(new URL('../dsh-plugin-desktop/src/', import.meta.url), ['.ts', '.tsx']),
+  readSourceTree(new URL('../dsh-sensteed-product/src/', import.meta.url), ['.ts', '.tsx']),
   readSourceTree(ciRoot, ['.js']),
 ])
 const locallyHostedApiPaths = new Set(localRouteSources.flat(2).flatMap(source =>

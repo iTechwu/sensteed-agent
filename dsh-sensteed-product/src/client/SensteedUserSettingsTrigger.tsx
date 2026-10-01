@@ -2,7 +2,7 @@ import { useMemo, useSyncExternalStore } from 'react'
 import { DofeUserAvatar } from './DofeUserAvatar.tsx'
 import type { InjectFace, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
-import type { DofeAccessSettings } from '@dofe/dsh-sensteed-product/dofe-plugins'
+import type { DofeAccessSettings } from '../dofe-plugins.ts'
 import { dofeAccessSettingsStore } from './DofeAccessSection.tsx'
 
 type Props = PropsRuntime<'settings.trigger'> & InjectFace<{ settingsScope: ConfigForm<DofeAccessSettings> }>

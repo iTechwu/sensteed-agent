@@ -76,7 +76,9 @@ function createBrowserHarness(pluginId) {
 
   const noopComponent = () => null
   const React = {
+    createContext(value) { return { Provider: noopComponent, Consumer: noopComponent } },
     createElement(type, props, ...children) { return { type, props: { ...props, children } } },
+    forwardRef(fn) { return { render: fn } },
     useEffect() {},
     useMemo(factory) { return factory() },
     useReducer(_reducer, initial) { return [initial, () => {}] },
@@ -87,6 +89,7 @@ function createBrowserHarness(pluginId) {
   const primitives = new Proxy({}, { get: () => noopComponent })
   const require = (name) => {
     if (name === 'react') return React
+    if (name === 'react/jsx-runtime') return { jsx: noopComponent, jsxs: noopComponent, Fragment: 'Fragment' }
     if (name === 'react-dom/client') {
       return { createRoot: () => ({ render() {}, unmount() {} }) }
     }
@@ -125,6 +128,7 @@ function createBrowserHarness(pluginId) {
       },
     },
     settingsScope: { bind: () => access },
+    configForms: { get: () => access },
     slots: {
       inject(name, callback) {
         try {

@@ -12,7 +12,6 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { applyAdvancedShell } from './advanced-shell.ts'
-import { applyDofeAccess } from './register-dofe-access.ts'
 import { applyDesktopBrand } from './brand.tsx'
 import { startRendererBootReporter } from './boot-health.ts'
 import { dismissBootSplashWhenSurfacesReady } from './boot-splash-dismiss.ts'
@@ -142,10 +141,6 @@ export function apply(ctx: ClientContext): void {
       : `required desktop surfaces are unavailable: ${missing.join(', ')}`
   }
   applyDesktopBrand(ctx)
-  // Loader-focused tests and compatibility probes may provide only the client
-  // presentation services. The real client always supplies `remote` via the
-  // injection contract, so defer the access surface until that service exists.
-  if (ctx.remote !== undefined) applyDofeAccess(ctx)
   ctx.effect(
     () => provideDesktopWindow(ctx, desktopWindowService(environment)),
     'dsh-plugin-desktop: native window geometry service',
