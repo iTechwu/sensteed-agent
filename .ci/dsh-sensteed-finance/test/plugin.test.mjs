@@ -124,6 +124,18 @@ test('GET routes call the public Datasource REST API', async () => {
   assert.equal(missing.status, 404)
 })
 
+test('accepts the public Datasource REST success envelope with code 200', async () => {
+  const { routes } = await loadHost({ fetch: async () => jsonResponse({
+    code: 200,
+    msg: 'ok',
+    data: { list: [] },
+  }) })
+  const result = await invokeRoute(routes.get(BASE), 'GET', BASE + '/context')
+  assert.equal(result.status, 200)
+  assert.equal(result.body.ok, true)
+  assert.deepEqual(result.body.data, { orgs: [], departments: [] })
+})
+
 test('write routes map to REST resources with path ids', async () => {
   const calls = []
   const { routes } = await loadHost({ fetch: async (url, init) => { calls.push({ url: String(url), init, body: init.body ? JSON.parse(init.body) : undefined }); return mcpJson({ created: { id: 'row-1' } }) } })

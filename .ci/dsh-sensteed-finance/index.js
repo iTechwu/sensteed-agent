@@ -441,7 +441,7 @@ async function financeApiCall(fetchImpl, config, toolName, args, observedAt, log
       return { ok: false, error: `upstream_http_${response.status}` }
     }
     const payload = await response.json()
-    if (payload?.code !== undefined && payload.code !== 0) {
+    if (payload?.code !== undefined && !isSuccessfulDatasourceCode(payload.code)) {
       logger?.info?.(`sensteed finance: ${toolName} datasource business code ${payload.code} msg ${payload.msg ?? '∅'} — data ${payload.data === undefined ? 'absent' : 'present'}`)
       return { ok: false, error: payload.msg || '财务操作失败' }
     }
@@ -452,6 +452,10 @@ async function financeApiCall(fetchImpl, config, toolName, args, observedAt, log
     logger?.info?.(`sensteed finance: REST call ${toolName} failed: ${String(error)}`)
     return { ok: false, error: error?.name === 'TimeoutError' ? 'upstream_timeout' : 'upstream_unreachable' }
   }
+}
+
+function isSuccessfulDatasourceCode(code) {
+  return code === 0 || code === 200 || code === '0' || code === '200'
 }
 
 function stripControlFields(value = {}) {
