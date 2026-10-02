@@ -2422,6 +2422,12 @@ importers:
       chokidar:
         specifier: ^4.0.3
         version: 4.0.3
+      cloudflared:
+        specifier: 0.7.3
+        version: 0.7.3
+      cpu-features:
+        specifier: 0.0.10
+        version: 0.0.10
       dsh-better-sidebar:
         specifier: 0.15.2
         version: 0.15.2(9b3a758132d3bc267846fc87e8bf8bd6)
@@ -2467,6 +2473,9 @@ importers:
       sonner:
         specifier: ^2.0.8
         version: 2.0.8(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      ssh2:
+        specifier: 1.17.0
+        version: 1.17.0
       yaml:
         specifier: ^2.9.0
         version: 2.9.0

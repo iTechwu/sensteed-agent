@@ -502,6 +502,8 @@
     "dsh-better-sidebar": "0.15.2",
     "dsh-community-market": "0.1.0-dev.0",
     "dshmarket": "1.39.0",
+    "cloudflared": "0.7.3",
+    "cpu-features": "0.0.10",
     "fs-ext": "2.1.1",
     "koffi": "3.1.5",
     "node-addon-require-builtin": "^0.1.6",
@@ -514,6 +516,7 @@
     "selfsigned": "5.5.0",
     "semver": "^7.8.5",
     "sonner": "^2.0.8",
+    "ssh2": "1.17.0",
     "yaml": "^2.9.0"
   },
   "peerDependencies": {

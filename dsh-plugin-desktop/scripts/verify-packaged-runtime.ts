@@ -74,6 +74,10 @@ function packageVersion(packageRoot: string): string {
 
 const DSH_RUNTIME_VERSION = packageVersion(DSH_PACKAGE_ROOT)
 const PNPM_RUNTIME_VERSION = packageVersion(PNPM_PACKAGE_ROOT)
+const ELECTRON_ABI = readFileSync(join(resolveRuntimePackageRoot('electron'), 'abi_version'), 'utf8').trim()
+if (!/^\d+$/u.test(ELECTRON_ABI)) {
+  throw new Error(`dsh-plugin-desktop: invalid Electron ABI ${JSON.stringify(ELECTRON_ABI)}`)
+}
 
 /** Maximum physical file count accepted beside ASAR after smart unpack. */
 export const MAX_UNPACKED_RUNTIME_FILES = 3_000
@@ -262,8 +266,8 @@ export const REQUIRED_POSIX_FS_EXT_ENTRIES = {
     arm64: FS_EXT_RELATIVE_PATH,
   },
   linux: {
-    x64: 'node_modules/fs-ext/prebuilds/linux-x64/electron.abi148.node',
-    arm64: 'node_modules/fs-ext/prebuilds/linux-arm64/electron.abi148.node',
+    x64: `node_modules/fs-ext/prebuilds/linux-x64/electron.abi${ELECTRON_ABI}.node`,
+    arm64: `node_modules/fs-ext/prebuilds/linux-arm64/electron.abi${ELECTRON_ABI}.node`,
   },
 } as const
 
