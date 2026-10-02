@@ -1405,6 +1405,9 @@ importers:
 
   dsh-plugin-desktop:
     dependencies:
+      '@agents-anywhere/dsh-bridge-next':
+        specifier: 2.0.2
+        version: 2.0.2(@deepseek-ai/cordis@deepseek-harness+vendor+cordis)(@deepseek-ai/dsh-typert-protocol@deepseek-harness+packages+typert+protocol)(@deepseek-ai/schemastery@deepseek-harness+vendor+schemastery)(react@18.3.1)
       '@babel/code-frame':
         specifier: ^7.29.0
         version: 7.29.7

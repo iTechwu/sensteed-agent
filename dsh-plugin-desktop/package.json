@@ -502,6 +502,7 @@
     "dsh-better-sidebar": "0.15.2",
     "dsh-community-market": "0.1.0-dev.0",
     "dshmarket": "1.39.0",
+    "@agents-anywhere/dsh-bridge-next": "2.0.2",
     "cloudflared": "0.7.3",
     "cpu-features": "0.0.10",
     "fs-ext": "2.1.1",
