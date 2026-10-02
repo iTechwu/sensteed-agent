@@ -872,6 +872,7 @@ describe('published package surface', () => {
       'build/tray-iconTemplate.png',
       'build/tray-iconTemplate@2x.png',
       'node_modules/fs-ext/**',
+      'node_modules/@agents-anywhere/dsh-bridge-next/lib/bundled-connector/**',
       'node_modules/node-addon-require-builtin/**',
       'node_modules/node-addon-require-builtin-darwin-arm64/**',
       'node_modules/node-addon-require-builtin-darwin-x64/**',
