@@ -1002,6 +1002,7 @@ describe('published package surface', () => {
     }))
     expect(builderConfig?.mac?.x64ArchFiles).toContain('lightningcss-darwin-*')
     expect(builderConfig?.mac?.x64ArchFiles).toContain('@deepseek-ai/node-addon-system-darwin-*')
+    expect(builderConfig?.mac?.x64ArchFiles).toContain('@dataiku/uv-darwin-*')
     expect(builderConfig?.files).toContain('!node_modules/node-pty/build/**')
     expect(manifest.devDependencies?.['@electron/asar']).toBe('3.4.1')
   })
