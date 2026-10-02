@@ -601,6 +601,16 @@ function packageArch(arch: MacUniversalArch): 'arm64' | 'x64' {
   return arch === 'x86_64' ? 'x64' : arch
 }
 
+function resolveInstalledOptionalPackage(desktopRoot: string, packageName: string): string {
+  const direct = join(resolve(desktopRoot), 'node_modules', packageName)
+  if (existsSync(direct)) return direct
+  const workspaceStore = join(resolve(desktopRoot), '..', 'node_modules', '.pnpm')
+  const encoded = packageName.replace('/', '+')
+  const storeEntry = readdirSync(workspaceStore).find(name => name.startsWith(`${encoded}@`))
+  if (storeEntry === undefined) return direct
+  return join(workspaceStore, storeEntry, 'node_modules', packageName)
+}
+
 function copyPackage(source: string, target: string): void {
   if (!existsSync(source)) return
   let existingFiles: string[] | undefined
@@ -761,6 +771,12 @@ export function hydratePackagedMacRuntime(
       )
     }
   }
+
+  for (const entry of MACOS_UNIVERSAL_NATIVE_ENTRIES) {
+    if (!options.arches.includes(entry.arch) || !entry.path.endsWith('/bin/uv') && !entry.path.endsWith('/spawn-helper')) continue
+    const target = join(unpackedRoot, entry.path)
+    if (existsSync(target)) chmodSync(target, 0o755)
+  }
 }
 
 /**
@@ -795,6 +811,14 @@ export function prepareInstalledMacUniversalRuntime(desktopRoot: string): void {
   buildMacSystemRuntime({ desktopRoot, arches: ['arm64', 'x64'] })
   const aaManifest = join(resolve(desktopRoot), 'node_modules/@agents-anywhere/dsh-bridge-next/package.json')
   const entries = selectMacUniversalNativeEntries(existsSync(aaManifest))
+  const root = resolve(desktopRoot)
+  const resolveEntry = (path: string): string => {
+    if (path.includes('/@dataiku/uv-darwin-')) {
+      const packageName = path.slice(path.indexOf('node_modules/') + 'node_modules/'.length, path.indexOf('/bin/uv'))
+      return join(resolveInstalledOptionalPackage(desktopRoot, packageName), 'bin/uv')
+    }
+    return path.startsWith(`${root}/`) ? path : join(root, path)
+  }
   prepareMacUniversalRuntime({
     desktopRoot,
     entries,
@@ -804,8 +828,8 @@ export function prepareInstalledMacUniversalRuntime(desktopRoot: string): void {
           return existsSync(join(installedMacSystemPackage(desktopRoot, arch), 'bin/system.node'))
         }
       }
-      return existsSync(path)
+      return existsSync(resolveEntry(path))
     },
-    chmod: chmodSync,
+    chmod: (path, mode) => chmodSync(resolveEntry(path), mode),
   })
 }
