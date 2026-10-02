@@ -73,7 +73,7 @@ function BudgetView({ ctx, t }) {
   }
 
   const activeCount = ['expenseType', 'departmentId', 'versionId', 'month'].filter(key => filters[key]).length + (filters.unassigned ? 1 : 0)
-  const filterBar = h('div', { className: 'sf-filters' },
+  const filterBar = h('div', { className: 'sf-filters sf-budget-filters' },
     h(Select, { value: filters.expenseType, onChange: value => { setPage(1); setFilters(f => ({ ...f, expenseType: value })) }, options: EXPENSE_TYPES, placeholder: t('expenseType') }),
     h(Select, { value: filters.departmentId, onChange: value => { setPage(1); setFilters(f => ({ ...f, departmentId: value })) }, options: (departments || []).map(d => [d.id, d.name]), placeholder: t('department') }),
     h(Select, { value: filters.month, onChange: value => { setPage(1); setFilters(f => ({ ...f, month: value })) }, options: Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1} 月`]), placeholder: t('monthCol') }),
