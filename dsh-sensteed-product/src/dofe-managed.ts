@@ -184,7 +184,10 @@ export async function apply(ctx: Context): Promise<void> {
     order: 4,
     text: `DoFe 托管能力：模型请求统一使用 Models API；${KNOWLEDGE_ROUTING_PROMPT} 空间由服务端根据 tenant/team/user 权限解析；商业工具、单张图片、5–10 秒单镜头短视频或复杂视频使用已加载的 mcp__tools-*、mcp__media__ 与 mcp__openmontage__ 工具（脚本/多镜头/复刻/字幕/配音用 mcp__openmontage__，单镜头直连用 mcp__media__）。启动引导只收集一次 model_api_key，之后不要要求用户再次提供。`,
   })
-  let clients: { dispose(): void | Promise<void> }[] = []
+  let routeClients: { dispose(): void | Promise<void> }[] = []
+  let financeClient: { dispose(): void | Promise<void> } | undefined
+  let routeSignature: string | undefined
+  let financeSignature: string | undefined
   let activeKey: string | undefined
   let tray: { refresh(): void; dispose(): void } | undefined
   let reload: Promise<void> = Promise.resolve()
@@ -202,31 +205,51 @@ export async function apply(ctx: Context): Promise<void> {
     })
   })
 
-  const reconcile = async (): Promise<void> => {
+  const enabledPlugins = (accessSettings: DofeAccessSettings): Set<DofePluginId> => {
+    const enabled = new Set(normalizeDofePluginIds(accessSettings.enabledPlugins, BRAND_VARIANT))
+    if (BRAND_VARIANT === 'sensteed') {
+      for (const plugin of enabled) {
+        if (!accessSettings.entitlements?.plugins.includes(plugin)) enabled.delete(plugin)
+      }
+    }
+    return enabled
+  }
+
+  const accessReady = (accessSettings: DofeAccessSettings): boolean => accessSettings.setupComplete
+    && accessSettings.validationVersion === DOFE_ACCESS_VALIDATION_VERSION
+    && accessSettings.authMode === 'feishu'
+    && Boolean(accessSettings.identity?.ssoSub)
+
+  const reconcileRoutes = async (): Promise<void> => {
     const resolved = await ctx.credentials.resolve(MODELS_API_KEY_REF)
     const next = resolved?.value
     const accessSettings = access.get()
-    activeKey = undefined
-    const old = clients
-    clients = []
+    const enabled = enabledPlugins(accessSettings)
+    const ready = Boolean(next) && accessReady(accessSettings)
+    const nextSignature = ready
+      ? JSON.stringify({
+          key: next,
+          identity: accessSettings.identity?.ssoSub,
+          enabled: [...enabled].sort(),
+        })
+      : `inactive:${accessSettings.authMode}:${accessSettings.identity?.ssoSub ?? ''}`
+
+    activeKey = ready && enabled.has('openmontage') ? next : undefined
+    tray?.refresh()
+    if (routeSignature === nextSignature) return
+
+    const old = routeClients
+    routeClients = []
+    routeSignature = undefined
     await Promise.all(old.map(client => client.dispose()))
-    if (!next || !accessSettings.setupComplete
-      || accessSettings.validationVersion !== DOFE_ACCESS_VALIDATION_VERSION
-      || accessSettings.authMode !== 'feishu' || !accessSettings.identity?.ssoSub) {
+    if (!ready || !next) {
+      routeSignature = nextSignature
       tray?.refresh()
       return
     }
 
     const created: { dispose(): void | Promise<void> }[] = []
     try {
-      const enabled = new Set(normalizeDofePluginIds(accessSettings.enabledPlugins, BRAND_VARIANT))
-      if (BRAND_VARIANT === 'sensteed') {
-        for (const plugin of enabled) {
-          if (!accessSettings.entitlements?.plugins.includes(plugin)) enabled.delete(plugin)
-        }
-      }
-      activeKey = enabled.has('openmontage') ? next : undefined
-      tray?.refresh()
       for (const route of ROUTES) {
         if (route.plugin !== undefined && !enabled.has(route.plugin)) continue
         const config: McpConfig = {
@@ -240,11 +263,8 @@ export async function apply(ctx: Context): Promise<void> {
         }
         created.push(await ctx.plugin(McpClient, config))
       }
-      const financeSession = financeAuth?.getDatasourceSession()
-      if (BRAND_VARIANT === 'sensteed' && financeSession) {
-        created.push(await ctx.plugin(McpClient, financeMcpConfig(next, financeSession.accessToken)))
-      }
-      clients = created
+      routeClients = created
+      routeSignature = nextSignature
     } catch (error) {
       await Promise.all(created.map(client => client.dispose()))
       ctx.logger.error('dofe-managed: failed to activate one or more MCP clients')
@@ -254,24 +274,63 @@ export async function apply(ctx: Context): Promise<void> {
     }
   }
 
-  const schedule = (): void => {
-    reload = reload.then(reconcile, reconcile)
+  const reconcileFinance = async (): Promise<void> => {
+    const resolved = await ctx.credentials.resolve(MODELS_API_KEY_REF)
+    const next = resolved?.value
+    const accessSettings = access.get()
+    const session = financeAuth?.getDatasourceSession()
+    const ready = BRAND_VARIANT === 'sensteed' && Boolean(next) && accessReady(accessSettings) && session !== undefined
+    const nextSignature = ready ? `${next}\0${session!.accessToken}` : undefined
+    if (financeSignature === nextSignature) return
+
+    const old = financeClient
+    financeClient = undefined
+    financeSignature = undefined
+    if (old !== undefined) await old.dispose()
+    if (!ready || !next || session === undefined) return
+
+    try {
+      financeClient = await ctx.plugin(McpClient, financeMcpConfig(next, session.accessToken))
+      financeSignature = nextSignature
+    } catch (error) {
+      ctx.logger.error('dofe-managed: failed to activate the finance MCP client')
+      void error
+    }
+  }
+
+  const scheduleFinance = (): void => {
+    reload = reload.then(reconcileFinance, reconcileFinance)
+  }
+
+  const scheduleAll = (): void => {
+    reload = reload.then(async () => {
+      await reconcileRoutes()
+      await reconcileFinance()
+    }, async () => {
+      await reconcileRoutes()
+      await reconcileFinance()
+    })
   }
 
   let observingFinance = false
-  if (financeAuth) ctx.effect(() => financeAuth.watchBinding(() => { if (observingFinance) schedule() }), 'dofe-managed: finance SSO renewal')
+  if (financeAuth) ctx.effect(() => financeAuth.watchBinding(() => { if (observingFinance) scheduleFinance() }), 'dofe-managed: finance SSO renewal')
   observingFinance = true
-  schedule()
+  scheduleAll()
   ctx.on('credentials/reference-updated', ref => {
-    if (ref === MODELS_API_KEY) schedule()
+    if (ref === MODELS_API_KEY) scheduleAll()
   })
-  access.watch(() => schedule())
+  access.watch(() => scheduleAll())
   ctx.effect(() => () => {
     tray?.dispose()
     tray = undefined
-    const current = clients
-    clients = []
-    void Promise.all(current.map(client => client.dispose()))
+    const currentRoutes = routeClients
+    routeClients = []
+    const currentFinance = financeClient
+    financeClient = undefined
+    void Promise.all([
+      ...currentRoutes.map(client => client.dispose()),
+      ...(currentFinance === undefined ? [] : [currentFinance.dispose()]),
+    ])
   }, 'dofe-managed: dispose MCP clients')
   await reload
 }

@@ -68,6 +68,10 @@ describe('dofe-managed MCP runtime', () => {
     })
     expect(harness.clients[0]?.config).not.toHaveProperty('plugin', 'opencli')
     expect(harness.clients[0]?.config).not.toHaveProperty('serverName', 'knowledge')
+
+    const accessWatcher = harness.access.watch.mock.calls[0]?.[0] as (() => void) | undefined
+    accessWatcher?.()
+    await vi.waitFor(() => expect(harness.ctx.plugin).toHaveBeenCalledTimes(1))
   })
 
   it('disposes partial clients after activation failure without logging the managed key', async () => {
