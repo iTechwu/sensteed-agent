@@ -65,7 +65,8 @@ describe('Sensteed startup authorization', () => {
         key: 'model-key', user: { ssoSub: 'user-1', name: 'User' },
         tenant: { tenantId: 'tenant', ssoTeamId: 'team', tenantSlug: 'sensteed' },
         entitlements: { plugins: ['media'], allowedProtocols: ['messages'] },
-      })).mockResolvedValueOnce(json({ sub: 'user-1', name: 'User', picture: 'https://user.hozonauto.com/avatar/user-1.png' })))
+      })).mockResolvedValueOnce(json({ sub: 'user-1', name: 'User', picture: 'https://user.hozonauto.com/avatar/user-1.png' }))
+      .mockResolvedValueOnce(json({ code: 0, data: { allowed: true } })))
     await apply(h.ctx as never)
     expect(h.getSettings().setupComplete).toBe(true)
     expect(h.getSettings().enabledPlugins).toEqual(['media'])
@@ -76,6 +77,23 @@ describe('Sensteed startup authorization', () => {
     }))
     expect(h.tray.enabled()).toBe(false)
     expect(h.ctx.desktopRuntime.openExternal).not.toHaveBeenCalled()
+    await h.dispose()
+  })
+
+  it('does not start finance MCP when Datasource denies workspace access', async () => {
+    const h = harness()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(json(discovery))
+      .mockResolvedValueOnce(json({ access_token: 'access-new', refresh_token: 'refresh-new' }))
+      .mockResolvedValueOnce(json({
+        key: 'model-key', user: { ssoSub: 'user-1', name: 'User' },
+        tenant: { tenantId: 'tenant', ssoTeamId: 'team', tenantSlug: 'sensteed' },
+        entitlements: { plugins: ['media'], allowedProtocols: ['messages'] },
+      }))
+      .mockResolvedValueOnce(json({ sub: 'user-1', name: 'User' }))
+      .mockResolvedValueOnce(json({ code: 0, data: { allowed: false } })))
+    await apply(h.ctx as never)
+    expect(h.ctx.plugin).toHaveBeenCalledTimes(1)
+    expect(h.ctx.plugin).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ serverName: 'finance' }))
     await h.dispose()
   })
 
@@ -122,6 +140,7 @@ it.each([true, false])('preserves setup completion (%s) while refreshing profile
     if (url.endsWith('openid-configuration')) return json(discovery)
     if (url.endsWith('/token')) return json({ access_token: 'new-access', refresh_token: 'new-refresh' })
     if (url.endsWith('/userinfo')) return profileUnavailable ? json({}, 503) : json({ sub: 'user-1', name: `Name ${revision}`, picture: revision ? null : 'https://example.com/avatar.png' })
+    if (url.endsWith('/workspace-access')) return json({ code: 0, data: { allowed: true } })
     return json({
       key: 'model-key', user: { ssoSub: 'user-1', name: 'Stale name' },
       tenant: { tenantId: 'tenant', ssoTeamId: 'team', tenantSlug: 'sensteed' },

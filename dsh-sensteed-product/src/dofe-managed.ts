@@ -75,6 +75,7 @@ export const MODELS_API_KEY = 'MODELS_API_KEY'
 const MODELS_API_KEY_REF = credentialRef(MODELS_API_KEY)
 const McpClient = { name: mcpClientName, inject: mcpClientInject, apply: applyMcpClient }
 export const DOFE_MCP_BASE_URL = 'https://ai.hozonauto.com/mcp'
+const DATASOURCE_FINANCE_WORKSPACE_ACCESS_URL = 'https://ds.hozonauto.com/api/finance/permissions/workspace-access'
 
 type ManagedMcpRoute = {
   /** Omitted for required platform capabilities that were already always-on. */
@@ -188,6 +189,7 @@ export async function apply(ctx: Context): Promise<void> {
   let financeClient: { dispose(): void | Promise<void> } | undefined
   let routeSignature: string | undefined
   let financeSignature: string | undefined
+  let financeAccessCache: { token: string; allowed: boolean; expiresAt: number } | undefined
   let activeKey: string | undefined
   let tray: { refresh(): void; dispose(): void } | undefined
   let reload: Promise<void> = Promise.resolve()
@@ -279,8 +281,35 @@ export async function apply(ctx: Context): Promise<void> {
     const next = resolved?.value
     const accessSettings = access.get()
     const session = financeAuth?.getDatasourceSession()
-    const ready = BRAND_VARIANT === 'sensteed' && Boolean(next) && accessReady(accessSettings) && session !== undefined
-    const nextSignature = ready ? `${next}\0${session!.accessToken}` : undefined
+    const baseReady = BRAND_VARIANT === 'sensteed' && Boolean(next) && accessReady(accessSettings) && session !== undefined
+    let financeAllowed = false
+    if (baseReady && session !== undefined) {
+      if (financeAccessCache?.token === session.accessToken && financeAccessCache.expiresAt > Date.now()) {
+        financeAllowed = financeAccessCache.allowed
+      } else {
+        try {
+          const response = await globalThis.fetch(DATASOURCE_FINANCE_WORKSPACE_ACCESS_URL, {
+            method: 'GET',
+            headers: {
+              Accept: 'application/json',
+              Authorization: `Bearer ${session.accessToken}`,
+              'X-Company-Code': BRAND_TENANT,
+            },
+            redirect: 'error',
+            signal: AbortSignal.timeout(30_000),
+          })
+          const payload = await response.json().catch(() => null) as { data?: { allowed?: boolean } } | null
+          financeAllowed = response.ok && payload?.data?.allowed === true
+          financeAccessCache = { token: session.accessToken, allowed: financeAllowed, expiresAt: Date.now() + 5000 }
+        } catch {
+          financeAccessCache = { token: session.accessToken, allowed: false, expiresAt: Date.now() + 1000 }
+        }
+      }
+    }
+    const ready = baseReady && financeAllowed
+    const nextSignature = ready
+      ? `${next}\0${session!.accessToken}`
+      : session === undefined ? undefined : `finance-denied:${accessSettings.identity?.ssoSub ?? ''}`
     if (financeSignature === nextSignature) return
 
     const old = financeClient
