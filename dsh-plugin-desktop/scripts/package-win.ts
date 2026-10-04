@@ -1,41 +1,34 @@
 /** Build an unsigned Windows x64 artifact on a native Windows host. */
 
 import { spawnSync } from 'node:child_process'
-import { cpSync, lstatSync, realpathSync, rmSync } from 'node:fs'
+import { realpathSync, rmSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { basename, dirname, join, resolve } from 'node:path'
+import { dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { prepareFsExtForElectron } from './prepare-fs-ext.ts'
 import { electronBuilderEnvironment } from './electron-builder-environment.ts'
 
 /**
- * Replace the AA bridge junction with a physical copy before packing. The CI
- * Windows runner resolves the dependency tree through the junction but drops
- * the linked package from the archive, so the packaged-runtime verifier fails
- * on a missing package.json. The published tarball also carries a residual
- * nested `node_modules/.bin` with dangling bin links, which the archive walker
- * must never see; the copy applies the same ignore rule as the CI snapshot
- * sync. A real directory at the canonical dependency path packs through every
- * collection path.
+ * Remove the published tarball's residual nested `node_modules/.bin` from the
+ * AA bridge's installed copy in place. The dangling bin links make the Windows
+ * archive walker silently drop the whole package while the dependency tree
+ * itself resolves fine, so the packaged-runtime verifier then fails on a
+ * missing package.json. Pruning only the nested directory keeps the pnpm
+ * junction and the sibling-store resolution of `@dataiku/uv` intact.
  */
-export function materializeBridgeDependency(
+export function pruneBridgeDependencyResidue(
   desktopRoot: string,
   linkPath = 'node_modules/@agents-anywhere/dsh-bridge-next',
 ): void {
   const link = join(desktopRoot, linkPath)
-  let stat
+  let real
   try {
-    stat = lstatSync(link)
+    real = realpathSync(join(link, 'node_modules'))
   } catch {
     return
   }
-  if (!stat.isSymbolicLink()) return
-  const real = realpathSync(link)
-  rmSync(link, { recursive: true, force: true })
-  cpSync(real, link, {
-    recursive: true,
-    filter: source => basename(source) !== 'node_modules',
-  })
+  if (!real.includes(`${join('node_modules', '.pnpm')}${sep}`)) return
+  rmSync(real, { recursive: true, force: true })
 }
 
 const WINDOWS_SIGNING_KEYS = [
@@ -209,7 +202,7 @@ export function packageWindowsArtifact(
     options.log('Skipping the Windows package preflight; the package gate already passed.')
   }
   options.prepareRuntime()
-  materializeBridgeDependency(options.desktopRoot)
+  pruneBridgeDependencyResidue(options.desktopRoot)
   options.run(
     options.commandShell,
     [
