@@ -8,6 +8,7 @@ const preinstalledPlugins = [
   'dsh-opencli',
   'dsh-plugin-console',
   'dsh-sensteed-finance',
+  'dsh-sensteed-knowledge',
   'dsh-sensteed-supplier-intelligence',
   'dsh-soup',
   'dsh-tools-mcp',

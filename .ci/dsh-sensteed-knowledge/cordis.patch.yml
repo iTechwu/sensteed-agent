@@ -1,0 +1,4 @@
+# Sensteed enterprise knowledge, Memory, and graph MCP route.
+- insert:
+    - id: sensteed-knowledge-tools
+      name: '@dofe/dsh-sensteed-knowledge'
