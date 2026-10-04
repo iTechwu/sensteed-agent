@@ -881,6 +881,8 @@ describe('published package surface', () => {
     expect(builderConfig?.mac?.signIgnore).toEqual(['\\.(?:pak|dat|wasm)$'])
     expect(builderConfig?.win?.icon).toBe('build/app-icon.ico')
     expect(builderConfig?.win?.files).toEqual([
+      'node_modules/@agents-anywhere/dsh-bridge-next/**',
+      '!node_modules/@agents-anywhere/dsh-bridge-next/node_modules/**',
       '!node_modules/@img/sharp-darwin*/**',
       '!node_modules/@img/sharp-libvips-darwin*/**',
       '!node_modules/@img/sharp-win32-arm64*/**',
