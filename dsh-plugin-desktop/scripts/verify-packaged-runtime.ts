@@ -1069,7 +1069,9 @@ export function diagnoseArchiveScope(
   readHeader: ArchiveHeaderReader = getRawHeader,
 ): string {
   try {
-    const { files } = indexPackagedAsarHeader(readHeader(archivePath).header)
+    const rawHeader = readHeader(archivePath).header as { files?: Record<string, unknown> }
+    const rawRootKeys = Object.keys(rawHeader.files ?? {})
+    const { files } = indexPackagedAsarHeader(rawHeader)
     const prefix = `/${packagePath}`
     const scope = [...files].filter(path => path === prefix || path.startsWith(`${prefix}/`))
     if (scope.length > 0) {
@@ -1083,7 +1085,8 @@ export function diagnoseArchiveScope(
         ? `${segments[2]}/${segments[3] ?? ''}`
         : segments[2] ?? '')
     }
-    return `archive holds ${files.size} entries total, none under ${prefix}; packaged top-level packages: ${[...packageNames].sort().slice(0, 25).join(', ')}`
+    const rawNodeModules = rawRootKeys.filter(key => key.replaceAll('\\', '/').startsWith('node_modules')).length
+    return `archive holds ${files.size} entries total, none under ${prefix}; raw root keys: ${rawRootKeys.length} (node_modules-prefixed: ${rawNodeModules}, sample: ${rawRootKeys.slice(0, 8).map(key => JSON.stringify(key)).join(', ')}); packaged top-level packages: ${[...packageNames].sort().slice(0, 25).join(', ')}`
   } catch (diagnosticCause) {
     return `archive scope scan itself failed: ${diagnosticCause instanceof Error ? diagnosticCause.message : String(diagnosticCause)}`
   }
