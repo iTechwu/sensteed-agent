@@ -188,6 +188,24 @@ jobs:
           CI: 'false'
           npm_config_minimum_release_age: '0'
         run: pnpm --filter dsh-plugin-desktop check:win-package
+      - name: Probe installed AA bridge layout
+        shell: pwsh
+        run: |
+          node -e "
+            const fs = require('node:fs')
+            const path = require('node:path')
+            const p = 'dsh-plugin-desktop/node_modules/@agents-anywhere/dsh-bridge-next'
+            const st = fs.lstatSync(p)
+            const real = fs.realpathSync(p)
+            const storeRoot = path.dirname(path.dirname(real))
+            console.log('isLink:', st.isSymbolicLink())
+            console.log('realpath:', real)
+            console.log('package.json:', fs.existsSync(p + '/package.json'))
+            console.log('entries:', fs.readdirSync(p).sort().join(','))
+            console.log('storeRoot:', storeRoot)
+            console.log('store @dataiku/uv:', fs.existsSync(path.join(storeRoot, '@dataiku', 'uv', 'package.json')))
+            console.log('app-level @dataiku:', fs.existsSync('dsh-plugin-desktop/node_modules/@dataiku/uv/package.json'))
+          "
       - name: Build Windows installer
         env:
           CI: 'false'

@@ -1078,11 +1078,12 @@ export function diagnoseArchiveScope(
     const packageNames = new Set<string>()
     for (const path of [...files].filter(path => path.startsWith('/node_modules/'))) {
       const segments = path.split('/')
-      packageNames.add(segments[3]?.startsWith('@') === true
-        ? `${segments[3]}/${segments[4] ?? ''}`
-        : segments[3] ?? '')
+      // /node_modules/@scope/name/... vs /node_modules/name/...
+      packageNames.add(segments[2]?.startsWith('@') === true
+        ? `${segments[2]}/${segments[3] ?? ''}`
+        : segments[2] ?? '')
     }
-    return `archive holds no ${prefix} entries; packaged top-level packages: ${[...packageNames].sort().slice(0, 25).join(', ')}`
+    return `archive holds ${files.size} entries total, none under ${prefix}; packaged top-level packages: ${[...packageNames].sort().slice(0, 25).join(', ')}`
   } catch (diagnosticCause) {
     return `archive scope scan itself failed: ${diagnosticCause instanceof Error ? diagnosticCause.message : String(diagnosticCause)}`
   }
