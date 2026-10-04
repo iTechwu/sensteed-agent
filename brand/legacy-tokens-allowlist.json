@@ -11,6 +11,7 @@
     ".agents/notes/implemented/architecture/2026-08-15-desktop-release-discovery-and-terminal.zh.md": 1,
     ".ci/brand/defaults.json": 4,
     ".ci/dsh-opencli/index.test.mjs": 6,
+    ".ci/dsh-sensteed-knowledge/package.json": 1,
     "PRIVACY.zh.md": 6,
     "brand/README.md": 3,
     "docs/0905/opz/README.md": 2,
