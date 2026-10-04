@@ -406,8 +406,10 @@ for (const name of clientPlugins) {
   const sameOriginCount = (source.match(/credentials:\s*['"]same-origin['"]/g) || []).length
   const rejectRedirectCount = (source.match(/redirect:\s*['"]error['"]/g) || []).length
   // Count the shared bounded-timeout wiring itself: a bare `signal:` also
-  // appears on host RPC options, which are not fetches.
-  const boundedFetchCount = (source.match(/signal:\s*AbortSignal\.timeout\(REQUEST_TIMEOUT_MS\)/g) || []).length
+  // appears on host RPC options, which are not fetches. An AbortSignal.any
+  // composition that keeps a caller cancellation signal next to the shared
+  // timeout satisfies the same policy.
+  const boundedFetchCount = (source.match(/signal:\s*AbortSignal\.(?:any\(\[[^\]]*?)?timeout\(REQUEST_TIMEOUT_MS\)/g) || []).length
   const hasDynamicStatus = /aria-live/.test(source) || /role:\s*[^}\n]*['"](?:status|alert)['"]/.test(source)
   const hasAsyncUiState = /set(?:Loading|Busy)\(/.test(source)
   const exposesAsyncUiState = /aria-busy/.test(source)
