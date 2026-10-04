@@ -1,6 +1,6 @@
 // 片段 5/7 视图：总览（对齐前端 overview-section：5 KPI + 月度趋势 + 主体执行 + 收支达成 + 预警 TOP5）
 
-function OverviewView({ brief, t, onDrill, orgId }) {
+function OverviewView({ brief, t, onDrill, orgId, workQueue }) {
   if (!brief) return h(EmptyState, null, t('empty'))
   const data = brief.data || brief
   const overview = data.overview || {}
@@ -22,10 +22,36 @@ function OverviewView({ brief, t, onDrill, orgId }) {
     paid: finite(point.paidAmount),
   }))
   const openAlerts = (data.openAlerts || alertsSummary.top || []).slice(0, 5)
+  const workItems = workQueue?.state === 'loading' ? null : [
+    {
+      id: 'filing', icon: 'plan', tone: 'blue', label: t('pendingFiling'), hint: t('pendingFilingHint'), value: (workQueue?.tasks?.list || []).filter(item => item.status !== 'CLOSED').length, target: 'entry',
+    },
+    {
+      id: 'quality', icon: 'database', tone: 'amber', label: t('pendingQuality'), hint: t('pendingQualityHint'), value: (workQueue?.quality?.issues || []).reduce((sum, item) => sum + (finite(item.count) ?? 0), 0), target: 'datacenter',
+    },
+    {
+      id: 'alerts', icon: 'warning', tone: 'rose', label: t('pendingAlerts'), hint: t('pendingAlertsHint'), value: workQueue?.alerts?.total ?? alertsSummary.total ?? 0, target: 'alerts',
+    },
+  ]
+  const workbench = h('section', { className: 'sf-workbench', 'aria-labelledby': 'sf-workbench-title' },
+    h('div', { className: 'sf-workbench-head' },
+      h('div', null,
+        h('h2', { id: 'sf-workbench-title' }, t('workbenchTitle')),
+        h('p', null, t('workbenchHint'))),
+      workQueue?.state === 'partial' ? h('span', { className: 'sf-workbench-status' }, t('loadPartial')) : null),
+    workItems
+      ? h('div', { className: 'sf-work-items' }, ...workItems.map(item => h('button', {
+        type: 'button', key: item.id, className: `sf-work-item is-${item.tone}`, onClick: () => onDrill(item.target),
+      },
+        h('span', { className: 'sf-work-icon' }, h(Glyph, { name: item.icon, size: 15 })),
+        h('span', { className: 'sf-work-copy' }, h('strong', null, item.label), h('small', null, item.hint)),
+        h('b', null, item.value))))
+      : h('div', { className: 'sf-work-items is-loading', role: 'status' }, ...[1, 2, 3].map(index => h('div', { key: index, className: 'sf-work-skeleton' }))))
   return h('div', { className: 'sf-view' },
     h('div', { className: 'sf-scopebar' },
       h('span', null, `${orgId ? t('scopeOrg') : t('scopeAll')} · ${data.year ?? ''} ${t('scopeYear')} · ${t('unitNote')}`),
       h('span', null, `${t('kpiExecRate')} =（${t('kpiPrSubmitted')}+${t('kpiPrEstimated')}）/${t('kpiBudget')}`)),
+    workbench,
     h('div', { className: 'sf-kpis' },
       h(KpiCard, { icon: 'data', label: t('kpiBudget'), value: yuan(m.budgetAmount), onClick: () => onDrill('budget') }),
       h(KpiCard, { icon: 'plan', label: t('kpiPrSubmitted'), value: yuan(m.prSubmittedAmount), hint: `${t('kpiExecRate')} ${ratio(exec, 1) ?? '—'}`, onClick: () => onDrill('budget', { view: 'ledger' }) }),

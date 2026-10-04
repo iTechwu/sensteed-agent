@@ -3,7 +3,7 @@
 const FINANCE_ROLES = ['DEPT_FILLER', 'DEPT_LEADER', 'DEPT_COLLABORATOR', 'BOSS', 'FINANCE_STAFF', 'FINANCE_OWNER', 'MANAGEMENT']
 
 function EntryView({ ctx, t }) {
-  const { year, orgs, revision } = ctx
+  const { year, orgs, departments, revision } = ctx
   const [section, setSection] = useState('filing')
   const [tasks, setTasks] = useState(null)
   const [assignments, setAssignments] = useState(null)
@@ -24,7 +24,8 @@ function EntryView({ ctx, t }) {
       await post(path, payload)
       setNotice(doneMessage ?? t('submitted'))
       setReloadTick(value => value + 1)
-    } catch (error) { setNotice(`${t('opFailed')}: ${error.message}`) } finally { setBusy(false) }
+      return true
+    } catch (error) { setNotice(`${t('opFailed')}: ${error.message}`); return false } finally { setBusy(false) }
   }
 
   useEffect(() => { setNotice(null) }, [revision])
@@ -59,13 +60,13 @@ function EntryView({ ctx, t }) {
       h(MembersCard, { members, busy, t, act, onDialog: setDialog })) : null,
 
     // 录入面板常开内嵌（对齐前端 FinanceEntryPanel）
-    h(EntryPanel, { year, orgs, t, act }),
+    h(EntryPanel, { year, orgs, departments, t, act }),
 
-    dialog?.kind === 'createTask' ? h(CreateTaskDialog, { year, busy, t, onClose: () => setDialog(null), act }) : null,
+    dialog?.kind === 'createTask' ? h(CreateTaskDialog, { year, departments, busy, t, onClose: () => setDialog(null), act }) : null,
     dialog?.kind === 'assignment' ? h(AssignmentDialog, { assignment: dialog.assignment, busy, t, onClose: () => setDialog(null), act }) : null,
     dialog?.kind === 'reason' ? h(ReasonDialog, { title: dialog.title, required: dialog.required, t, onClose: () => setDialog(null), onSubmit: reason => { setDialog(null); return dialog.run(reason) } }) : null,
     dialog?.kind === 'mapUser' ? h(MapUserDialog, { contact: dialog.contact, t, onClose: () => setDialog(null), act }) : null,
-    dialog?.kind === 'employment' ? h(EmploymentDialog, { t, onClose: () => setDialog(null), act }) : null,
+    dialog?.kind === 'employment' ? h(EmploymentDialog, { contacts: contacts?.list ?? [], departments, t, onClose: () => setDialog(null), act }) : null,
   )
 }
 
@@ -92,23 +93,74 @@ function FilingSection({ tasks, busy, t, act, onDialog }) {
 
 const isOverdue = task => task.status !== 'CLOSED' && task.dueAt && new Date(task.dueAt) < new Date()
 
-function CreateTaskDialog({ year, busy, t, onClose, act }) {
+function CreateTaskDialog({ year, departments, busy, t, onClose, act }) {
   const [title, setTitle] = useState('')
-  const [type, setType] = useState('BUDGET')
+  const [type, setType] = useState('PAYMENT_PLAN')
+  const [month, setMonth] = useState(String(new Date().getMonth() + 1))
+  const [versionId, setVersionId] = useState('')
+  const [versions, setVersions] = useState(null)
+  const [selectedDepartmentIds, setSelectedDepartmentIds] = useState((departments || []).map(department => department.id))
   const [dueAt, setDueAt] = useState('')
-  const submit = () => {
-    if (!title.trim() || !dueAt) return
-    act('/filing-tasks', { title: title.trim(), type, year: Number(year), dueAt: new Date(`${dueAt}T23:59:59`).toISOString() })
-    onClose()
+  const [instructions, setInstructions] = useState('')
+  const [ownerName, setOwnerName] = useState('')
+  const [reviewerName, setReviewerName] = useState('')
+  const [allowModify, setAllowModify] = useState(true)
+  const [freezeCurrentMonth, setFreezeCurrentMonth] = useState(true)
+  const [startAsDraft, setStartAsDraft] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    api(`/budget-versions?year=${year}`).then(value => {
+      if (!cancelled) setVersions((value.data?.list || []).filter(version => version.status !== 'LOCKED'))
+    }).catch(() => { if (!cancelled) setVersions([]) })
+    return () => { cancelled = true }
+  }, [year])
+  const months = Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1}月`])
+  const canSubmit = title.trim() && dueAt && selectedDepartmentIds.length && (type !== 'BUDGET' || versionId) && (type !== 'PAYMENT_PLAN' || month)
+  const submit = async () => {
+    if (!canSubmit) return
+    const created = await act('/filing-tasks', {
+      title: title.trim(), type, year: Number(year), dueAt: new Date(dueAt).toISOString(),
+      ...(type === 'PAYMENT_PLAN' ? { month: Number(month) } : { versionId }),
+      departments: selectedDepartmentIds.map(departmentId => ({ departmentId })),
+      ...(instructions.trim() ? { instructions: instructions.trim() } : {}),
+      ...(ownerName.trim() ? { ownerName: ownerName.trim() } : {}),
+      ...(reviewerName.trim() ? { reviewerName: reviewerName.trim() } : {}),
+      allowModify, freezeCurrentMonth, startAsDraft,
+    })
+    if (created) onClose()
   }
   return h(Dialog, { title: t('createTask'), onClose, footer: [
     h(GhostButton, { key: 'cancel', onClick: onClose }, t('cancel')),
-    h(PrimaryButton, { key: 'ok', disabled: !title.trim() || !dueAt, busy, onClick: submit }, t('submit')),
+    h(PrimaryButton, { key: 'ok', disabled: !canSubmit, busy, onClick: submit }, t(startAsDraft ? 'taskStartDraft' : 'taskPublish')),
   ] },
     h('div', { className: 'sf-stack' },
       h(FormRow, { label: t('taskTitle') }, h(Field, { value: title, onChange: setTitle, maxLength: 150 })),
-      h(FormRow, { label: t('taskType') }, h(Select, { value: type, onChange: setType, options: [['BUDGET', 'typeBudget'], ['PAYMENT_PLAN', 'typePlan']] })),
-      h(FormRow, { label: t('taskDue') }, h(Field, { type: 'date', value: dueAt, onChange: setDueAt }))))
+      h(FormRow, { label: t('taskType') }, h(Select, { value: type, onChange: setType, options: [['PAYMENT_PLAN', t('typePlan')], ['BUDGET', t('typeBudget')]] })),
+      type === 'PAYMENT_PLAN'
+        ? h(FormRow, { label: t('taskMonth') }, h(Select, { value: month, onChange: setMonth, options: months, placeholder: t('taskMonth') }))
+        : h(FormRow, { label: t('version') }, h(SearchSelect, { value: versionId, onChange: setVersionId, options: (versions || []).map(version => [version.id, version.name]), placeholder: t('version'), disabled: !versions?.length })),
+      type === 'BUDGET' && versions && !versions.length ? h('p', { className: 'sf-note' }, `${t('empty')} · ${t('version')}`) : null,
+      h('div', { className: 'sf-inline-form' },
+        h('div', { className: 'sf-row-between' }, h('strong', null, `${t('taskDepartments')}（${selectedDepartmentIds.length}/${departments?.length || 0}）`),
+          h('div', { className: 'sf-row' },
+            h(LinkButton, { onClick: () => setSelectedDepartmentIds((departments || []).map(department => department.id)) }, t('selectAll')),
+            h(LinkButton, { onClick: () => setSelectedDepartmentIds([]) }, t('clearFilters')))),
+        h(MultiSearchSelect, {
+          value: selectedDepartmentIds,
+          onChange: setSelectedDepartmentIds,
+          options: (departments || []).map(department => [department.id, department.name]),
+          placeholder: t('department'),
+          disabled: !departments?.length,
+        }),
+        !departments?.length ? h('p', { className: 'sf-note' }, `${t('empty')} · ${t('department')}`) : null),
+      h(FormRow, { label: t('taskDue') }, h(Field, { type: 'datetime-local', value: dueAt, onChange: setDueAt })),
+      h(FormRow, { label: t('taskInstructions') }, h(Field, { value: instructions, onChange: setInstructions, maxLength: 500 })),
+      h(FormRow, { label: t('taskOwner') }, h(Field, { value: ownerName, onChange: setOwnerName, maxLength: 100 })),
+      h(FormRow, { label: t('taskReviewer') }, h(Field, { value: reviewerName, onChange: setReviewerName, maxLength: 100 })),
+      h('div', { className: 'sf-task-options' },
+        h('label', null, h('input', { type: 'checkbox', checked: allowModify, onChange: event => setAllowModify(event.target.checked) }), t('taskAllowModify')),
+        h('label', null, h('input', { type: 'checkbox', checked: freezeCurrentMonth, onChange: event => setFreezeCurrentMonth(event.target.checked) }), t('taskFreezeMonth')),
+        h('label', null, h('input', { type: 'checkbox', checked: startAsDraft, onChange: event => setStartAsDraft(event.target.checked) }), t('taskStartDraft')))))
 }
 
 // ---- 我的填报（部门） ----
@@ -135,6 +187,7 @@ function MyFilingSection({ assignments, busy, t, act, onDialog, onReopen }) {
 /** 部门行编辑器：月份/说明/金额多行 + 暂存/提交；复核定稿在弹窗内完成，重开走外层 ReasonDialog */
 function AssignmentDialog({ assignment, busy, t, onClose, act }) {
   const [rows, setRows] = useState((assignment.rows ?? []).map(row => ({ ...row })))
+  const months = Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1}月`])
   const updateRow = (index, patch) => setRows(current => current.map((row, i) => (i === index ? { ...row, ...patch } : row)))
   const payloadRows = () => rows
     .filter(row => finite(row.plannedAmount) !== null && Number(row.plannedAmount) > 0)
@@ -151,7 +204,7 @@ function AssignmentDialog({ assignment, busy, t, onClose, act }) {
         h(LinkButton, { onClick: () => setRows(current => [...current, { month: '', description: '', plannedAmount: '' }]) }, h(Glyph, { name: 'plus', size: 12 }), t('addRow'))),
       ...rows.map((row, index) => h('div', { key: index, className: 'sf-inline-form' },
         h('div', { className: 'sf-filters' },
-          h(FormRow, { label: t('monthCol') }, h(Field, { type: 'number', min: 1, max: 12, value: row.month ?? '', onChange: value => updateRow(index, { month: value }) })),
+          h(FormRow, { label: t('monthCol') }, h(Select, { value: String(row.month ?? ''), onChange: value => updateRow(index, { month: value }), options: months, placeholder: t('monthCol') })),
           h(FormRow, { label: t('description') }, h(Field, { value: row.description ?? '', onChange: value => updateRow(index, { description: value }), maxLength: 500 })),
           h(FormRow, { label: t('planned') }, h(Field, { type: 'number', min: '0.01', step: '0.01', value: row.plannedAmount ?? '', onChange: value => updateRow(index, { plannedAmount: value }) })),
           h(LinkButton, { onClick: () => setRows(current => current.filter((_, i) => i !== index)) }, h(Glyph, { name: 'trash', size: 13 }))))),
@@ -212,7 +265,7 @@ function EmploymentCard({ employments, busy, t, act, onDialog }) {
   }))
 }
 
-function EmploymentDialog({ t, onClose, act }) {
+function EmploymentDialog({ contacts, departments, t, onClose, act }) {
   const [systemUserId, setSystemUserId] = useState('')
   const [departmentId, setDepartmentId] = useState('')
   const [startDate, setStartDate] = useState('')
@@ -226,8 +279,8 @@ function EmploymentDialog({ t, onClose, act }) {
     h(PrimaryButton, { key: 'ok', disabled: !systemUserId.trim() || !departmentId || !startDate, onClick: submit }, t('submit')),
   ] },
     h('div', { className: 'sf-stack' },
-      h(FormRow, { label: t('empUser') }, h(Field, { value: systemUserId, onChange: setSystemUserId })),
-      h(FormRow, { label: t('empDept') }, h(Field, { value: departmentId, onChange: setDepartmentId, placeholder: 'departmentId (uuid)' })),
+      h(FormRow, { label: t('empUser') }, h(SearchSelect, { value: systemUserId, onChange: setSystemUserId, options: contacts.filter(contact => contact.systemUserId).map(contact => [contact.systemUserId, contact.name || contact.systemUserId]), placeholder: t('empUser') })),
+      h(FormRow, { label: t('empDept') }, h(SearchSelect, { value: departmentId, onChange: setDepartmentId, options: (departments || []).map(department => [department.id, department.name]), placeholder: t('empDept') })),
       h(FormRow, { label: t('empStart') }, h(Field, { type: 'date', value: startDate, onChange: setStartDate }))))
 }
 
@@ -248,24 +301,60 @@ function MembersCard({ members, busy, t, act, onDialog }) {
       { label: t('enabledCol'), render: row => h(Pill, { tone: row.enabled ? 'green' : 'muted' }, row.enabled ? '✓' : '—') },
       { label: t('actions'), render: row => h(LinkButton, { onClick: () => act(`/members/${row.id}/remove`, {}) }, t('removeMember')) },
     ],
-    rows, empty: members?.forbidden ? t('unknown') : t('empty'), rowKey: 'id',
+    rows, empty: members?.forbidden ? t('unknown') : t('empty'), rowKey: 'id', tableId: 'finance-members',
   }))
 }
 
 // ---- 录入面板（4 类型；排款月份必填对齐后端校验） ----
 
-function EntryPanel({ year, orgs, t, act }) {
+function EntryPanel({ year, orgs, departments, t, act }) {
   const [kind, setKind] = useState('payment')
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState(null)
+  const [history, setHistory] = useState({ paymentPlans: [], payees: [], costItems: [], items: [], payers: [], incomeTypes: [] })
+  const [historyLoaded, setHistoryLoaded] = useState(false)
+  const [historyError, setHistoryError] = useState(false)
   const orgOptions = (orgs || []).map(org => [org.id, org.name])
+  const departmentOptions = (departments || []).map(department => [department.id, department.name])
   const years = yearOptions()
+  const months = Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1}月`])
+
+  useEffect(() => {
+    let cancelled = false
+    setHistoryLoaded(false)
+    setHistoryError(false)
+    Promise.all([
+      api(`/payment-plans?year=${year}&limit=100`),
+      api(`/revenue-plans?year=${year}&limit=100`),
+    ]).then(([payments, revenues]) => {
+      if (cancelled) return
+      const paymentRows = payments?.data?.list || []
+      const revenueRows = revenues?.data?.list || []
+      const unique = values => [...new Set(values.filter(value => typeof value === 'string' && value.trim()))].sort((a, b) => a.localeCompare(b, 'zh-CN'))
+      setHistory({
+        paymentPlans: paymentRows
+          .filter(row => row.id)
+          .map(row => [row.id, [row.description || row.planType || '付款计划', row.orgName, row.planMonth ? `${row.planMonth}月` : null, row.id.slice(0, 8)].filter(Boolean).join(' · ')]),
+        payees: unique(paymentRows.map(row => row.payeeName)),
+        costItems: unique(paymentRows.map(row => row.costItemName)),
+        items: unique(revenueRows.map(row => row.itemName)),
+        payers: unique(revenueRows.map(row => row.payerName)),
+        incomeTypes: unique(revenueRows.map(row => row.incomeTypeName)),
+      })
+      setHistoryLoaded(true)
+    }).catch(() => { if (!cancelled) setHistoryError(true) })
+    return () => { cancelled = true }
+  }, [year])
 
   const submit = async event => {
     event.preventDefault()
     const form = new FormData(event.currentTarget)
     const num = key => Number(form.get(key))
     const text = key => { const value = String(form.get(key) || '').trim(); return value || undefined }
+    const textChoice = key => {
+      const choice = text(`${key}Choice`)
+      return choice === '__custom__' ? text(`${key}Custom`) : choice
+    }
     setBusy(true); setNotice(null)
     try {
       let path, payload
@@ -275,18 +364,19 @@ function EntryPanel({ year, orgs, t, act }) {
         const planMonth = text('planMonth')
         if (!planMonth) { setNotice(`${t('opFailed')}: ${t('planMonthRequired')}`); setBusy(false); return }
         payload.planMonth = num('planMonth')
-        if (text('payeeName')) payload.payeeName = text('payeeName')
-        if (text('costItemName')) payload.costItemName = text('costItemName')
+        if (textChoice('payeeName')) payload.payeeName = textChoice('payeeName')
+        if (textChoice('costItemName')) payload.costItemName = textChoice('costItemName')
       } else if (kind === 'revenue') {
         path = '/revenue-plans'
-        payload = { orgId: text('orgId'), year: num('year'), itemName: text('itemName'), plannedAmount: num('plannedAmount') }
+        payload = { orgId: text('orgId'), year: num('year'), itemName: textChoice('itemName'), plannedAmount: num('plannedAmount') }
         if (text('month')) payload.month = num('month')
-        if (text('payerName')) payload.payerName = text('payerName')
+        if (textChoice('payerName')) payload.payerName = textChoice('payerName')
+        if (textChoice('incomeTypeName')) payload.incomeTypeName = textChoice('incomeTypeName')
       } else if (kind === 'budget') {
         path = '/budget-lines'
         payload = { orgId: text('orgId'), year: num('year'), expenseType: text('expenseType'), budgetAmount: num('budgetAmount') }
         if (text('month')) payload.month = num('month')
-        if (text('departmentName')) payload.departmentName = text('departmentName')
+        if (text('departmentId')) payload.departmentId = text('departmentId')
         if (text('costItemName')) payload.costItemName = text('costItemName')
         if (text('note')) payload.note = text('note')
       } else {
@@ -307,29 +397,31 @@ function EntryPanel({ year, orgs, t, act }) {
       h(PillTabs, { tabs: [['payment', 'entryPaymentPlan'], ['revenue', 'entryRevenuePlan'], ['budget', 'entryBudgetLine'], ['backfill', 'entryBackfill']], value: kind, onChange: setKind, t }),
       h('div', { className: 'sf-form' },
         kind !== 'backfill' ? [
-          h(FormRow, { key: 'org', label: t('org') }, h(Select, { name: 'orgId', required: true, options: orgOptions, placeholder: t('org') })),
+          h(FormRow, { key: 'org', label: t('org') }, h(SearchSelect, { name: 'orgId', required: true, options: orgOptions, placeholder: t('org') })),
           h(FormRow, { key: 'year', label: t('year') }, h(Select, { name: 'year', required: true, options: years, placeholder: t('year') })),
         ] : [
-          h(FormRow, { key: 'plan', label: t('selectPlan') }, h(Field, { name: 'planId', required: true, placeholder: 'payment plan id (uuid)' })),
+          h(FormRow, { key: 'plan', label: t('selectPlan') }, h(SearchSelect, { name: 'planId', required: true, options: history.paymentPlans, placeholder: t('selectPlan') })),
+          historyError ? h('p', { key: 'plan-error', className: 'sf-note sf-neg' }, `${t('opFailed')}: ${t('selectPlan')}`) : null,
+          historyLoaded && !history.paymentPlans.length ? h('p', { key: 'plan-empty', className: 'sf-note' }, `${t('empty')} · ${t('entryPaymentPlan')}`) : null,
         ],
         kind === 'payment' ? [
           h(FormRow, { key: 'pt', label: t('planType') }, h(Select, { name: 'planType', required: true, options: PLAN_TYPES })),
           h(FormRow, { key: 'pd', label: t('description') }, h(Field, { name: 'description', required: true, maxLength: 500 })),
-          h(FormRow, { key: 'pm', label: `${t('planMonth')} *` }, h(Field, { name: 'planMonth', type: 'number', min: 1, max: 12, required: true })),
-          h(FormRow, { key: 'py', label: t('payee') }, h(Field, { name: 'payeeName', maxLength: 200 })),
-          h(FormRow, { key: 'pc', label: t('costItem') }, h(Field, { name: 'costItemName', maxLength: 100 })),
+          h(FormRow, { key: 'pm', label: `${t('planMonth')} *` }, h(Select, { name: 'planMonth', required: true, options: months, placeholder: t('planMonth') })),
+          h(FormRow, { key: 'py', label: t('payee') }, h(CustomizableTextSelect, { name: 'payeeName', options: history.payees, placeholder: t('payee') })),
+          h(FormRow, { key: 'pc', label: t('costItem') }, h(CustomizableTextSelect, { name: 'costItemName', options: history.costItems, placeholder: t('costItem') })),
           h(FormRow, { key: 'pa', label: `${t('planned')}（${t('unitYuan')}）` }, h(Field, { name: 'plannedAmount', type: 'number', min: 0.01, step: '0.01', required: true })),
         ] : kind === 'revenue' ? [
-          h(FormRow, { key: 'ri', label: t('itemName') }, h(Field, { name: 'itemName', required: true, maxLength: 200 })),
-          h(FormRow, { key: 'rm', label: t('month') }, h(Field, { name: 'month', type: 'number', min: 1, max: 12 })),
-          h(FormRow, { key: 'rp', label: t('payer') }, h(Field, { name: 'payerName', maxLength: 200 })),
-          h(FormRow, { key: 'rt', label: t('incomeType') }, h(Field, { name: 'incomeTypeName', maxLength: 100 })),
+          h(FormRow, { key: 'ri', label: t('itemName') }, h(CustomizableTextSelect, { name: 'itemName', options: history.items, placeholder: t('itemName'), required: true })),
+          h(FormRow, { key: 'rm', label: t('month') }, h(Select, { name: 'month', options: months, placeholder: t('month') })),
+          h(FormRow, { key: 'rp', label: t('payer') }, h(CustomizableTextSelect, { name: 'payerName', options: history.payers, placeholder: t('payer') })),
+          h(FormRow, { key: 'rt', label: t('incomeType') }, h(CustomizableTextSelect, { name: 'incomeTypeName', options: history.incomeTypes, placeholder: t('incomeType') })),
           h(FormRow, { key: 'ra', label: `${t('planned')}（${t('unitYuan')}）` }, h(Field, { name: 'plannedAmount', type: 'number', min: 0.01, step: '0.01', required: true })),
         ] : kind === 'budget' ? [
           h(FormRow, { key: 'be', label: t('expenseType') }, h(Select, { name: 'expenseType', required: true, options: EXPENSE_TYPES })),
-          h(FormRow, { key: 'bm', label: t('month') }, h(Field, { name: 'month', type: 'number', min: 1, max: 12 })),
-          h(FormRow, { key: 'bd', label: t('department') }, h(Field, { name: 'departmentName', maxLength: 100 })),
-          h(FormRow, { key: 'bc', label: t('costItem') }, h(Field, { name: 'costItemName', maxLength: 100 })),
+          h(FormRow, { key: 'bm', label: t('month') }, h(Select, { name: 'month', options: months, placeholder: t('month') })),
+          h(FormRow, { key: 'bd', label: t('department') }, h(SearchSelect, { name: 'departmentId', options: departmentOptions, placeholder: t('department') })),
+          h(FormRow, { key: 'bc', label: t('costItem') }, h(CustomizableTextSelect, { name: 'costItemName', options: history.costItems, placeholder: t('costItem') })),
           h(FormRow, { key: 'ba', label: `${t('kpiBudget')}（${t('unitYuan')}）` }, h(Field, { name: 'budgetAmount', type: 'number', min: 0.01, step: '0.01', required: true })),
           h(FormRow, { key: 'bn', label: t('note') }, h(Field, { name: 'note', maxLength: 500 })),
         ] : [

@@ -62,24 +62,104 @@ function Progress({ value, tone }) {
 }
 
 /**
- * 表格：数字列右对齐 + tabular-nums；行 border-b + hover；可选 sticky 首列、行点击。
- * columns: { label, key?, render?(row), num?, stickyLeft?, width? }
+ * BI 式表格：支持字段显隐、表头排序、行 hover 与行点击。
+ * columns: { label, key?, sortKey?, sortValue?, render?(row), num?, stickyLeft?, width? }
  */
-function Table({ columns, rows, empty, onRowClick, rowKey, minColumns }) {
-  if (!rows?.length) return h('div', { className: 'sf-empty' }, empty)
-  return h('div', { className: 'sf-table-scroll' }, h('table', { className: 'sf-table', style: minColumns ? { minWidth: minColumns } : undefined },
-    h('thead', null, h('tr', null, ...columns.map((col, index) => h('th', {
-      key: index, className: `${col.num ? 'sf-num' : ''}${col.stickyLeft ? ' sf-sticky-col' : ''}`,
-      style: col.width ? { width: col.width } : undefined,
-    }, col.label)))),
-    h('tbody', null, ...rows.map((row, rowIndex) => h('tr', {
-      key: rowKey ? row[rowKey] ?? rowIndex : rowIndex,
-      className: onRowClick ? 'is-clickable' : '',
-      onClick: onRowClick ? () => onRowClick(row) : undefined,
-    }, ...columns.map((col, colIndex) => h('td', {
-      key: colIndex,
-      className: `${col.num ? 'sf-num' : ''}${col.stickyLeft ? ' sf-sticky-col' : ''}`,
-    }, col.render ? col.render(row, rowIndex) : row[col.key] ?? '—')))))))
+function Table({ columns, rows, empty, onRowClick, rowKey, minColumns, tableId }) {
+  const storageKey = `dofe-finance-table:${tableId || columns.map(col => col.key || col.label).join('|')}`
+  const columnIds = columns.map((col, index) => col.key || `column-${index}`)
+  const columnSignature = columnIds.join('|')
+  const [visibleIds, setVisibleIds] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(storageKey) || 'null')
+      return Array.isArray(saved) && saved.length ? saved.filter(id => columnIds.includes(id)) : columnIds
+    } catch { return columnIds }
+  })
+  const sortStorageKey = `${storageKey}:sort`
+  const [sort, setSort] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(sortStorageKey) || 'null')
+      return saved && typeof saved.id === 'string' && (saved.direction === 'asc' || saved.direction === 'desc') ? saved : null
+    } catch { return null }
+  })
+  useEffect(() => {
+    setVisibleIds(current => {
+      const next = current.filter(id => columnIds.includes(id))
+      return next.length ? next : columnIds
+    })
+  }, [storageKey, columnSignature])
+  useEffect(() => {
+    try { localStorage.setItem(storageKey, JSON.stringify(visibleIds)) } catch {}
+  }, [storageKey, visibleIds])
+  useEffect(() => {
+    try {
+      if (sort) localStorage.setItem(sortStorageKey, JSON.stringify(sort))
+      else localStorage.removeItem(sortStorageKey)
+    } catch {}
+  }, [sortStorageKey, sort])
+
+  const visibleColumns = columns
+    .map((column, index) => ({ column, id: column.key || `column-${index}` }))
+    .filter(({ id }) => visibleIds.includes(id))
+  const activeSort = sort && columns.some((col, index) =>
+    (col.key || `column-${index}`) === sort.id && col.sortable !== false && (col.sortKey || col.sortValue || col.key))
+    ? sort
+    : null
+  const sortedRows = useMemo(() => {
+    if (!activeSort) return rows || []
+    const column = columns.find((col, index) => (col.key || `column-${index}`) === activeSort.id)
+    if (!column) return rows || []
+    const read = row => column.sortValue ? column.sortValue(row) : row[column.sortKey || column.key]
+    return [...(rows || [])].sort((left, right) => {
+      const leftValue = read(left)
+      const rightValue = read(right)
+      if (leftValue == null && rightValue == null) return 0
+      if (leftValue == null) return 1
+      if (rightValue == null) return -1
+      const leftNumber = Number(leftValue)
+      const rightNumber = Number(rightValue)
+      const result = Number.isFinite(leftNumber) && Number.isFinite(rightNumber)
+        ? leftNumber - rightNumber
+        : String(leftValue).localeCompare(String(rightValue), 'zh-CN', { numeric: true, sensitivity: 'base' })
+      return activeSort.direction === 'desc' ? -result : result
+    })
+  }, [columns, rows, activeSort])
+
+  const toggleSort = id => setSort(current => current?.id === id
+    ? { id, direction: current.direction === 'asc' ? 'desc' : 'asc' }
+    : { id, direction: 'asc' })
+  const fieldMenu = h('details', { className: 'sf-table-fields' },
+    h('summary', { className: 'sf-table-tool' }, h(Glyph, { name: 'data', size: 13 }), '字段'),
+    h('div', { className: 'sf-table-fields-menu' },
+      h('strong', null, `显示字段（${visibleIds.length}/${columns.length}）`),
+      h('span', { className: 'sf-table-fields-hint' }, '至少保留 1 个字段'),
+      ...columns.map((col, index) => {
+        const id = col.key || `column-${index}`
+        const checked = visibleIds.includes(id)
+        return h('label', { key: id, className: 'sf-table-field-option' },
+          h('input', {
+            type: 'checkbox', checked,
+            disabled: checked && visibleIds.length === 1,
+            onChange: () => setVisibleIds(current => checked ? current.filter(value => value !== id) : [...current, id]),
+          }), h('span', null, col.label))
+      }),
+      h('button', { type: 'button', className: 'sf-link-button', onClick: () => setVisibleIds(columnIds) }, '恢复全部字段')))
+  const headerCells = visibleColumns.map(({ column: col, id }) => {
+    const sortable = col.sortable !== false && (col.sortKey || col.sortValue || col.key)
+    const header = sortable
+      ? h('button', { type: 'button', className: `sf-table-sort-button${activeSort?.id === id ? ' is-active' : ''}`, 'aria-label': `按${col.label}排序${activeSort?.id === id ? (activeSort.direction === 'asc' ? '，当前升序' : '，当前降序') : ''}`, onClick: () => toggleSort(id) }, col.label, h(Glyph, { name: activeSort?.id === id && activeSort.direction === 'desc' ? 'down' : 'up', size: 11 }))
+      : col.label
+    return h('th', { key: id, 'aria-sort': activeSort?.id === id ? (activeSort.direction === 'asc' ? 'ascending' : 'descending') : (sortable ? 'none' : undefined), className: `${col.num ? 'sf-num' : ''}${col.stickyLeft ? ' sf-sticky-col' : ''}`, style: col.width ? { width: col.width } : undefined }, header)
+  })
+  const bodyRows = sortedRows.map((row, rowIndex) => {
+    const cells = visibleColumns.map(({ column: col, id }) => h('td', { key: id, className: `${col.num ? 'sf-num' : ''}${col.stickyLeft ? ' sf-sticky-col' : ''}` }, col.render ? col.render(row, rowIndex) : row[col.key] ?? '—'))
+    return h('tr', { key: rowKey ? row[rowKey] ?? rowIndex : rowIndex, className: onRowClick ? 'is-clickable' : '', onClick: onRowClick ? () => onRowClick(row) : undefined }, ...cells)
+  })
+  return h('div', { className: 'sf-table-wrap' },
+    h('div', { className: 'sf-table-toolbar' }, fieldMenu, activeSort ? h('span', { className: 'sf-table-sort-note' }, `当前页已按${columns.find((col, index) => (col.key || `column-${index}`) === activeSort.id)?.label || ''}${activeSort.direction === 'asc' ? '升序' : '降序'}`) : h('span', { className: 'sf-table-sort-note' }, '点击表头可排序'), activeSort ? h('button', { type: 'button', className: 'sf-link-button', onClick: () => setSort(null) }, '清除排序') : null),
+    !rows?.length ? h('div', { className: 'sf-empty' }, empty) : h('div', { className: 'sf-table-scroll' }, h('table', { className: 'sf-table', style: minColumns ? { minWidth: minColumns } : undefined },
+      h('thead', null, h('tr', null, ...headerCells)),
+      h('tbody', null, ...bodyRows))))
 }
 
 /** 分页器：上一页/下一页 + 第 x 页（对齐前端 finance-pager） */
@@ -112,10 +192,153 @@ function Textarea(props) {
   return h('textarea', { ...rest, value: value ?? '', onChange: event => onChange(event.target.value) })
 }
 
-function Select({ value, onChange, options, placeholder, disabled }) {
-  return h('select', { value: value ?? '', onChange: event => onChange(event.target.value), disabled },
+function Select({ value, onChange, options, placeholder, disabled, ...rest }) {
+  const props = { ...rest, disabled, onChange: event => onChange?.(event.target.value) }
+  if (value !== undefined) props.value = value
+  return h('select', props,
     placeholder ? h('option', { value: '' }, placeholder) : null,
     ...options.map(([id, label]) => h('option', { key: id, value: id }, label)))
+}
+
+function SearchSelect({ value, onChange, options = [], placeholder, disabled, allowCustom = false, customLabel = '使用当前输入值', ...rest }) {
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+  const [selection, setSelection] = useState(value ?? '')
+  const rootRef = useRef(null)
+  const inputRef = useRef(null)
+  const chosen = value === undefined ? selection : value
+  const selectedLabel = options.find(([id]) => id === chosen)?.[1] ?? (allowCustom && chosen ? String(chosen) : '')
+  const displayValue = query || selectedLabel
+  const normalizedQuery = query.trim().toLocaleLowerCase()
+  const filteredOptions = options.filter(([, label]) => !normalizedQuery || String(label).toLocaleLowerCase().includes(normalizedQuery))
+  const exactMatch = options.find(([, label]) => String(label) === query)
+  const menuId = `sf-search-menu-${String(rest.name || placeholder).replace(/[^a-z0-9_-]/gi, '-')}`
+
+  useEffect(() => {
+    const handleOutsidePointerDown = event => {
+      if (!rootRef.current?.contains(event.target)) setOpen(false)
+    }
+    document.addEventListener('pointerdown', handleOutsidePointerDown)
+    return () => document.removeEventListener('pointerdown', handleOutsidePointerDown)
+  }, [])
+
+  const selectOption = (id, label) => {
+    setSelection(id)
+    setQuery(String(label))
+    setOpen(false)
+    onChange?.(id)
+    inputRef.current?.setCustomValidity('')
+  }
+
+  const selectCustom = () => {
+    const next = query.trim()
+    if (!next) return
+    setSelection(next)
+    setQuery(next)
+    setOpen(false)
+    onChange?.(next)
+    inputRef.current?.setCustomValidity('')
+  }
+
+  const clearSelection = () => {
+    setSelection('')
+    setQuery('')
+    setOpen(false)
+    onChange?.('')
+    inputRef.current?.setCustomValidity('')
+  }
+
+  return h('div', { ref: rootRef, className: 'sf-search-select' },
+    h('div', { className: 'sf-search-input-wrap' },
+      h('input', { ...rest, ref: inputRef, name: undefined, type: 'search', value: displayValue, disabled, 'aria-label': `搜索${placeholder}`, placeholder: `搜索${placeholder}`, 'aria-expanded': open, 'aria-controls': menuId, 'aria-invalid': Boolean(query && !exactMatch && chosen !== query), onFocus: () => {
+        setOpen(true)
+        if (selectedLabel) {
+          setQuery('')
+          requestAnimationFrame(() => inputRef.current?.select())
+        }
+      }, onKeyDown: event => {
+        if (event.key === 'Escape') {
+          setOpen(false)
+          event.currentTarget.blur()
+        } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+          setOpen(true)
+          event.preventDefault()
+          requestAnimationFrame(() => {
+            const optionsInMenu = rootRef.current?.querySelectorAll('.sf-search-option')
+            const option = event.key === 'ArrowUp' ? optionsInMenu?.[optionsInMenu.length - 1] : optionsInMenu?.[0]
+            option?.focus()
+          })
+        }
+      }, onChange: event => {
+        const next = event.target.value
+        setQuery(next)
+        setOpen(true)
+        const exact = options.find(([, label]) => String(label) === next)
+        event.target.setCustomValidity(next && !exact ? '请选择列表中的选项，或确认自定义值' : '')
+        if (exact) { setSelection(exact[0]); onChange?.(exact[0]); setQuery(String(exact[1])) }
+        else { setSelection(''); onChange?.('') }
+      }}),
+      chosen && !disabled ? h('button', { type: 'button', className: 'sf-search-clear', onClick: clearSelection, 'aria-label': `清除${placeholder}` }, '×') : null),
+    h('div', { className: 'sf-search-menu', id: menuId, role: 'listbox', hidden: !open },
+      filteredOptions.length ? filteredOptions.map(([id, label]) => h('button', {
+        key: id, type: 'button', role: 'option', 'aria-selected': String(id) === String(chosen), className: 'sf-search-option' + (String(id) === String(chosen) ? ' is-selected' : ''),
+        onMouseDown: event => event.preventDefault(), onClick: () => selectOption(id, label),
+      }, h('span', null, label), String(id) === String(chosen) ? h(Glyph, { name: 'check', size: 13 }) : null)) : h('p', { className: 'sf-search-empty' }, '没有匹配的选项'),
+      allowCustom && query.trim() && !exactMatch ? h('button', {
+        type: 'button', className: 'sf-search-custom', onMouseDown: event => event.preventDefault(), onClick: selectCustom,
+      }, customLabel, `“${query.trim()}”`) : null),
+    h('input', { type: 'hidden', name: rest.name, value: chosen }))
+}
+
+function MultiSearchSelect({ value = [], onChange, options = [], placeholder = '选项', disabled }) {
+  const [query, setQuery] = useState('')
+  const selectedIds = new Set(value)
+  const normalizedQuery = query.trim().toLocaleLowerCase()
+  const filteredOptions = options.filter(([id, label]) => {
+    if (!normalizedQuery) return true
+    return String(label).toLocaleLowerCase().includes(normalizedQuery) || String(id).toLocaleLowerCase().includes(normalizedQuery)
+  })
+  const selectedOptions = options.filter(([id]) => selectedIds.has(id))
+  const toggle = id => {
+    const next = selectedIds.has(id)
+      ? value.filter(current => current !== id)
+      : [...value, id]
+    onChange?.(next)
+  }
+  return h('div', { className: 'sf-multi-search-select' },
+    h('div', { className: 'sf-multi-search-input' },
+      h('input', {
+        type: 'search', value: query, disabled,
+        placeholder: '搜索' + placeholder,
+        'aria-label': '搜索' + placeholder,
+        onChange: event => setQuery(event.target.value),
+      }),
+      query ? h('button', { type: 'button', className: 'sf-multi-clear', disabled, onClick: () => setQuery(''), 'aria-label': '清除搜索' }, '×') : null),
+    h('div', { className: 'sf-multi-summary', 'aria-live': 'polite' },
+      h('span', null, '已选 ' + selectedOptions.length + ' / ' + options.length),
+      selectedOptions.slice(0, 6).map(([id, label]) => h('button', {
+        key: id, type: 'button', className: 'sf-multi-chip', disabled,
+        onClick: () => toggle(id), 'aria-label': '移除' + label,
+      }, label, ' ×')),
+      selectedOptions.length > 6 ? h('span', { className: 'sf-multi-more' }, '另有 ' + (selectedOptions.length - 6) + ' 个') : null),
+    h('div', { className: 'sf-multi-options', role: 'listbox', 'aria-multiselectable': true, 'aria-label': placeholder },
+      filteredOptions.length ? filteredOptions.map(([id, label]) => h('button', {
+        key: id, type: 'button', role: 'option', 'aria-selected': selectedIds.has(id),
+        className: 'sf-multi-option' + (selectedIds.has(id) ? ' is-selected' : ''), disabled,
+        onClick: () => toggle(id),
+      }, h('span', { className: 'sf-multi-check', 'aria-hidden': true }, selectedIds.has(id) ? '✓' : ''), h('span', null, label)))
+        : h('p', { className: 'sf-note' }, '没有匹配的部门')))
+}
+
+function CustomizableTextSelect({ name, options = [], placeholder, required }) {
+  const customValue = '__custom__'
+  const [value, setValue] = useState('')
+  return h('div', { className: 'sf-custom-select' },
+    h('select', { name: `${name}Choice`, value, required, onChange: event => setValue(event.target.value) },
+      h('option', { value: '' }, placeholder),
+      ...options.map(option => h('option', { key: option, value: option }, option)),
+      h('option', { value: customValue }, '自定义值…')),
+    value === customValue ? h(Field, { name: `${name}Custom`, required, placeholder: '仅本次记录使用' }) : null)
 }
 
 function Switch({ checked, onChange, label }) {

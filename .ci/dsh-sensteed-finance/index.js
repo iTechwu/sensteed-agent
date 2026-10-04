@@ -9,6 +9,7 @@ const ROUTE_PREFIX = '/api/desktop/sensteed/finance'
 // 财务页面是直连服务型插件：Datasource REST API 负责 SSO、租户和操作者校验。
 // MCP 仅能经 ai.hozonauto.com/mcp 公共网关访问；财务页面的 REST 请求使用 Datasource 公共 API。
 const DEFAULT_DATASOURCE_API_BASE_URL = 'https://ds.hozonauto.com/api'
+const FINANCE_WORKSPACE_ACCESS_PATH = '/finance/permissions/workspace-access'
 const REQUEST_TIMEOUT_MS = 30000
 const MAX_BODY_BYTES = 32 * 1024
 
@@ -29,6 +30,25 @@ export function apply(ctx, overrides = {}) {
   if (overrides.registerHostRoute === false) return undefined
   const fetchImpl = overrides.fetch || globalThis.fetch
   const now = overrides.now || (() => new Date())
+  let accessCache
+
+  const resolveWorkspaceAccess = async config => {
+    const cacheKey = `${config.token}\0${config.tenantId}`
+    if (accessCache?.key === cacheKey && accessCache.expiresAt > Date.now()) return accessCache.allowed
+    try {
+      const response = await timedFetch(fetchImpl, `${resolveDatasourceApiBaseUrl()}${FINANCE_WORKSPACE_ACCESS_PATH}`, {
+        method: 'GET',
+        headers: { Accept: 'application/json', Authorization: `Bearer ${config.token}` },
+      })
+      const payload = await response.json().catch(() => null)
+      const allowed = response.ok && payload?.data?.allowed === true
+      accessCache = { key: cacheKey, allowed, expiresAt: Date.now() + 5000 }
+      return allowed
+    } catch {
+      accessCache = { key: cacheKey, allowed: false, expiresAt: Date.now() + 1000 }
+      return false
+    }
+  }
 
   const disposers = []
 
@@ -43,6 +63,9 @@ export function apply(ctx, overrides = {}) {
         const config = await resolveConfig(ctx)
         if (!config.tenantId) {
           return { ok: false, error: '请先使用飞书登录，再打开财务管理。' }
+        }
+        if (!(await resolveWorkspaceAccess(config))) {
+          return { ok: false, error: '当前账号没有财务团队权限，无法使用财务管理。' }
         }
         const orgs = await financeApiCall(fetchImpl, config, 'finance_get_orgs', {}, now(), ctx.logger)
         if (!orgs.ok) return orgs
@@ -94,6 +117,12 @@ export function apply(ctx, overrides = {}) {
       }
       const pathname = safePathname(req.url)
       const sub = pathname.slice(ROUTE_PREFIX.length) || '/'
+      const allowed = await resolveWorkspaceAccess(config)
+      if (sub === '/access') return sendJson(res, 200, { ok: true, allowed })
+      if (!allowed) {
+        ctx.logger?.info?.(`sensteed finance: ${req.method} ${sub} rejected — finance workspace access denied`)
+        return sendJson(res, 403, { ok: false, error: '当前账号没有财务团队权限，无法使用财务管理。' })
+      }
       if (req.method === 'GET') return dispatchGet(fetchImpl, config, sub, req.url, res, ctx.logger)
       if (req.method === 'POST') return dispatchPost(fetchImpl, config, sub, req, res, ctx.logger)
       res.writeHead(405, { Allow: 'GET, POST', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' })
@@ -434,7 +463,9 @@ async function financeApiCall(fetchImpl, config, toolName, args, observedAt, log
     })
     if (response.status === 401 || response.status === 403) {
       logger?.info?.(`sensteed finance: ${toolName} upstream ${response.status} — datasource rejected the live session`)
-      return { ok: false, error: '飞书登录已失效或没有财务访问权限，请重新登录后重试。' }
+      return { ok: false, error: response.status === 401
+        ? '飞书登录已失效，请重新登录后重试。'
+        : '当前账号没有此项财务操作权限，请联系财务负责人确认授权。' }
     }
     if (!response.ok) {
       logger?.info?.(`sensteed finance: ${toolName} upstream http ${response.status}`)

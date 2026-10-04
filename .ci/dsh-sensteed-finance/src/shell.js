@@ -26,6 +26,7 @@ function Dashboard({ t }) {
   const [operator, setOperator] = useState(null) // 登录身份（审计可见性；写操作由宿主自动注入）
   const [brief, setBrief] = useState(null) // 总览/经营共用的全景快照
   const [briefState, setBriefState] = useState('loading')
+  const [workQueue, setWorkQueue] = useState(null)
   const shellRef = useRef(null)
   // 同步请求锁：brief 取数在途时丢弃重复刷新，避免 revision 连击叠加请求
   const loadingRef = useRef(false)
@@ -57,6 +58,27 @@ function Dashboard({ t }) {
     return () => { cancelled = true; loadingRef.current = false }
   }, [opened, tab, year, orgId, revision])
 
+  useEffect(() => {
+    if (!opened || tab !== 'overview') return undefined
+    let cancelled = false
+    setWorkQueue({ state: 'loading' })
+    const requests = [
+      api(`/filing-tasks?year=${year}&status=OPEN&limit=100`),
+      api('/quality'),
+      api(`/alerts-summary?year=${year}${orgId ? `&orgId=${orgId}` : ''}`),
+    ]
+    Promise.allSettled(requests).then(results => {
+      if (cancelled) return
+      const [tasksResult, qualityResult, alertsResult] = results
+      const tasks = tasksResult.status === 'fulfilled' ? (tasksResult.value.data ?? {}) : null
+      const quality = qualityResult.status === 'fulfilled' ? (qualityResult.value.quality ?? {}) : null
+      const alerts = alertsResult.status === 'fulfilled' ? (alertsResult.value.data ?? {}) : null
+      const failed = results.filter(result => result.status === 'rejected').length
+      setWorkQueue({ state: failed === results.length ? 'error' : failed ? 'partial' : 'ready', tasks, quality, alerts })
+    })
+    return () => { cancelled = true }
+  }, [opened, tab, year, orgId, revision])
+
   const refresh = () => { if (loadingRef.current) return; setRevision(value => value + 1) }
   useEffect(() => {
     if (!opened) return undefined
@@ -80,7 +102,7 @@ function Dashboard({ t }) {
     : (tab === 'overview' || tab === 'operations') && briefState === 'error' && !brief
       ? h('div', { className: 'sf-fatal', role: 'alert' }, h(Glyph, { name: 'warning' }), h('strong', null, t('loadError')), h(GhostButton, { onClick: refresh }, t('retry')))
       : h(React.Fragment, null,
-        tab === 'overview' ? h(OverviewView, { key: `ov-${year}-${orgId}-${revision}`, ...briefProps }) : null,
+        tab === 'overview' ? h(OverviewView, { key: `ov-${year}-${orgId}-${revision}`, ...briefProps, workQueue }) : null,
         tab === 'operations' ? h(OperationsView, { key: `op-${year}-${orgId}-${revision}`, ...briefProps }) : null,
         tab === 'budget' ? h(BudgetView, { ctx, t }) : null,
         tab === 'cash' ? h(CashView, { ctx, t, onDrill }) : null,
@@ -91,6 +113,9 @@ function Dashboard({ t }) {
 
   return h('div', { className: 'sf-overlay sf-root', role: 'dialog', 'aria-modal': true, 'aria-labelledby': 'sf-title' },
     h('main', { className: 'sf-shell', 'aria-labelledby': 'sf-title', ref: shellRef, tabIndex: -1 },
+      h('div', { className: 'sf-sidebar-brand' },
+        h('span', { className: 'sf-sidebar-brand-mark' }, h(Glyph, { name: 'data', size: 18 })),
+        h('div', null, h('strong', null, '有谦财务数据中心'), h('small', null, 'Finance Data Hub'))),
       h('header', { className: 'sf-header' },
         h('div', { className: 'sf-header-main' },
           h('p', { className: 'sf-eyebrow' }, t('eyebrow')),
@@ -98,7 +123,7 @@ function Dashboard({ t }) {
           h('p', { className: 'sf-desc' }, operator ? `${t('operatorAs')} ${operator} · ${t(SECTION_META[tab]?.[1] ?? 'subtitle')}` : t(SECTION_META[tab]?.[1] ?? 'subtitle'))),
         h('div', { className: 'sf-header-side' },
           h('label', { className: 'sf-filter' }, h('span', null, t('year')), h(Select, { value: year, onChange: value => { setYear(value); setDrillParams(null) }, options: yearOptions() })),
-          h('label', { className: 'sf-filter' }, h('span', null, t('org')), h(Select, { value: orgId, onChange: value => { setOrgId(value); setDrillParams(null) }, options: orgs.map(org => [org.id, org.name]), placeholder: t('allOrgs') })),
+          h('label', { className: 'sf-filter' }, h('span', null, t('org')), h(SearchSelect, { value: orgId, onChange: value => { setOrgId(value); setDrillParams(null) }, options: orgs.map(org => [org.id, org.name]), placeholder: t('allOrgs') })),
           h('div', { className: 'sf-header-buttons' },
             h(Tooltip, { label: t('refresh') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('refresh'), onClick: refresh }, h(IconRefreshOutlineRegular, { size: 16 }))),
             h(Tooltip, { label: t('close') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('close'), onClick: closeOverlay }, h(IconCloseOutlineRegular, { size: 16 })))))),
@@ -108,6 +133,8 @@ function Dashboard({ t }) {
 }
 
 function Button({ wide, t }) {
+  const allowed = useFinanceWorkspaceAccess()
+  if (allowed !== true) return null
   return h(Tooltip, { label: t('open'), disabled: wide }, h('button', { type: 'button', className: `sf-button${wide ? ' sf-wide' : ''}`, 'aria-label': t('open'), onClick: openOverlay }, h(IconGaugeOutlineRegular, { size: wide ? 14 : 18 }), wide ? h('span', null, t('open')) : null))
 }
 
@@ -125,11 +152,20 @@ function apply(ctx) {
       const current = sessions.list.getSnapshot().ids.find(id => sessions.retainInfo(id).getSnapshot().retainedBy.mainView > 0)
       const id = current ?? await sessions.create()
       navigation.openSession(id)
+      const scoped = sessions.scope(id)
+      if (scoped) {
+        const conversation = scoped.get('conversation')
+        if (!conversation) throw new Error('conversation_service_unavailable')
+        await conversation.send(prompt)
+        return
+      }
       await sessions.using(id, { source: 'controllerOperation' }, async reference => {
         await reference.ready
         const scoped = sessions.scope(id)
         if (!scoped) throw new Error('session_unavailable')
-        await scoped.conversation.send(prompt)
+        const conversation = scoped.get('conversation')
+        if (!conversation) throw new Error('conversation_service_unavailable')
+        await conversation.send(prompt)
       })
     } })
     return () => { delete globalThis.__sensteed_finance_conversation }
@@ -140,6 +176,25 @@ function apply(ctx) {
 }
 
 function Overlay({ t }) {
+  const allowed = useFinanceWorkspaceAccess()
   const visible = useSyncExternalStore(subscribe, snapshot, snapshot)
-  return visible ? h(Dashboard, { t }) : null
+  return allowed === true && visible ? h(Dashboard, { t }) : null
+}
+
+function useFinanceWorkspaceAccess() {
+  const [allowed, setAllowed] = useState(null)
+  useEffect(() => {
+    let cancelled = false
+    void fetch(`${BASE}/access`, {
+      credentials: 'same-origin',
+      redirect: 'error',
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    })
+      .then(response => response.json().catch(() => null).then(body => ({ response, body })))
+      .then(({ response, body }) => { if (!cancelled) setAllowed(response.ok && body?.allowed === true) })
+      .catch(() => { if (!cancelled) setAllowed(false) })
+    return () => { cancelled = true }
+  }, [])
+  return allowed
 }

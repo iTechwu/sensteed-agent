@@ -69,15 +69,16 @@ function BudgetView({ ctx, t }) {
       await post(path, payload)
       setNotice(doneMessage ?? t('submitted'))
       setReloadTick(value => value + 1)
-    } catch (error) { setNotice(`${t('opFailed')}: ${error.message}`) } finally { setBusy(false) }
+      return true
+    } catch (error) { setNotice(`${t('opFailed')}: ${error.message}`); return false } finally { setBusy(false) }
   }
 
   const activeCount = ['expenseType', 'departmentId', 'versionId', 'month'].filter(key => filters[key]).length + (filters.unassigned ? 1 : 0)
   const filterBar = h('div', { className: 'sf-filters sf-budget-filters' },
     h(Select, { value: filters.expenseType, onChange: value => { setPage(1); setFilters(f => ({ ...f, expenseType: value })) }, options: EXPENSE_TYPES, placeholder: t('expenseType') }),
-    h(Select, { value: filters.departmentId, onChange: value => { setPage(1); setFilters(f => ({ ...f, departmentId: value })) }, options: (departments || []).map(d => [d.id, d.name]), placeholder: t('department') }),
+    h(SearchSelect, { value: filters.departmentId, onChange: value => { setPage(1); setFilters(f => ({ ...f, departmentId: value })) }, options: (departments || []).map(d => [d.id, d.name]), placeholder: t('department') }),
     h(Select, { value: filters.month, onChange: value => { setPage(1); setFilters(f => ({ ...f, month: value })) }, options: Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1} 月`]), placeholder: t('monthCol') }),
-    view === 'matrix' || view === 'lines' ? h(Select, { value: filters.versionId, onChange: value => { setPage(1); setFilters(f => ({ ...f, versionId: value })) }, options: (versions?.list || []).map(v => [v.id, `${v.name}${v.isPrimary ? '（主）' : ''}`]), placeholder: t('version') }) : null,
+    view === 'matrix' || view === 'lines' ? h(SearchSelect, { value: filters.versionId, onChange: value => { setPage(1); setFilters(f => ({ ...f, versionId: value })) }, options: (versions?.list || []).map(v => [v.id, `${v.name}${v.isPrimary ? '（主）' : ''}${v.lineCount != null ? ` · ${v.lineCount} 行` : ''}${v.budgetTotal != null ? ` · ${wan(v.budgetTotal)}` : ''}`]), placeholder: t('version') }) : null,
     view === 'matrix' || view === 'lines' ? h('label', { className: 'sf-row', style: { gap: 6, fontSize: 12, color: 'var(--sf-ink2)' } },
       h('input', { type: 'checkbox', checked: filters.unassigned, onChange: event => { setPage(1); setFilters(f => ({ ...f, unassigned: event.target.checked })) } }), t('unassigned')) : null,
     activeCount > 0 ? h(LinkButton, { onClick: () => { setPage(1); setFilters({ expenseType: '', departmentId: '', versionId: '', month: '', unassigned: false }) } }, `${t('clearFilters')} (${activeCount})`) : null)
@@ -110,7 +111,7 @@ function BudgetView({ ctx, t }) {
 
     dialog?.kind === 'saveView' ? h(SaveViewDialog, { view, filters, t, onClose: () => setDialog(null), onSaved: value => setSavedViews(value) }) : null,
     dialog?.kind === 'lineDetail' ? h(LineDetailDialog, { line: dialog.line, t, onClose: () => setDialog(null) }) : null,
-    dialog?.kind === 'adjCreate' ? h(AdjustCreateDialog, { year, orgs, lines: budget?.lines?.list || [], t, onClose: () => setDialog(null), act }) : null,
+    dialog?.kind === 'adjCreate' ? h(AdjustCreateDialog, { year, orgs, departments, lines: budget?.lines?.list || [], busy, t, onClose: () => setDialog(null), act }) : null,
     dialog?.kind === 'reason' ? h(ReasonDialog, { title: dialog.title, required: dialog.required, t, onClose: () => setDialog(null), onSubmit: reason => { setDialog(null); return dialog.run(reason) } }) : null,
     dialog?.kind === 'adjDetail' ? h(AdjustDetailDialog, { id: dialog.id, t, onClose: () => setDialog(null) }) : null,
     dialog?.kind === 'allocPick' ? h(AllocPickDialog, { entry: dialog.entry, availability, t, onClose: () => setDialog(null), act }) : null,
@@ -358,7 +359,7 @@ function AdjustmentsView({ page, onPage, t, busy, revision, reloadTick, act, onD
 }
 
 /** 发起调整 Dialog：类型 + 原因 + 多行明细（调拨守恒校验） */
-function AdjustCreateDialog({ year, orgs, lines, t, onClose, act }) {
+function AdjustCreateDialog({ year, orgs, departments, lines, busy, t, onClose, act }) {
   const [type, setType] = useState('NEW_BUDGET')
   const [reason, setReason] = useState('')
   const [rows, setRows] = useState([
@@ -366,28 +367,33 @@ function AdjustCreateDialog({ year, orgs, lines, t, onClose, act }) {
     { side: 'OUT', amount: '', budgetLineId: '' },
   ])
   const isTransfer = type === 'TRANSFER_SAME_DEPT' || type === 'TRANSFER_CROSS_DEPT'
-  const sumIn = rows.filter(row => row.side === 'IN').reduce((acc, row) => acc + (finite(row.amount) ?? 0), 0)
-  const sumOut = rows.filter(row => row.side === 'OUT').reduce((acc, row) => acc + (finite(row.amount) ?? 0), 0)
+  const sumIn = rows.filter(row => row.side === 'IN').reduce((acc, row) => acc + Math.round((finite(row.amount) ?? 0) * 100), 0)
+  const sumOut = rows.filter(row => row.side === 'OUT').reduce((acc, row) => acc + Math.round((finite(row.amount) ?? 0) * 100), 0)
   const guardBad = isTransfer && sumIn !== sumOut
   const updateRow = (index, patch) => setRows(current => current.map((row, i) => (i === index ? { ...row, ...patch } : row)))
-  const submit = () => {
+  const canSubmit = reason.trim() && rows.some(row => finite(row.amount) !== null && Number(row.amount) > 0)
+    && rows.filter(row => finite(row.amount) !== null && Number(row.amount) > 0).every(row => row.side !== 'OUT' || row.budgetLineId)
+    && !guardBad
+  const submit = async () => {
     const payloadLines = rows
       .filter(row => finite(row.amount) !== null && Number(row.amount) > 0)
       .map(row => ({
         side: row.side,
         amount: Number(row.amount),
         ...(row.budgetLineId ? { budgetLineId: row.budgetLineId } : {}),
-        ...(row.targetOrgId ? { targetOrgId: row.targetOrgId } : {}),
-        ...(row.targetDepartmentId ? { targetDepartmentId: row.targetDepartmentId } : {}),
-        ...(row.targetMonth ? { targetMonth: Number(row.targetMonth) } : {}),
+        ...(!row.budgetLineId && row.side === 'IN' ? {
+          ...(row.targetOrgId ? { targetOrgId: row.targetOrgId } : {}),
+          ...(row.targetDepartmentId ? { targetDepartmentId: row.targetDepartmentId } : {}),
+        ...(Number(row.targetMonth) > 0 ? { targetMonth: Number(row.targetMonth) } : {}),
+          targetYear: Number(year),
+        } : {}),
       }))
-    if (!reason.trim() || !payloadLines.length) return
-    act('/budget-adjustments', { type, year: Number(year), reason: reason.trim(), lines: payloadLines })
-    onClose()
+    if (!canSubmit || !payloadLines.length) return
+    if (await act('/budget-adjustments', { type, year: Number(year), reason: reason.trim(), lines: payloadLines })) onClose()
   }
   return h(Dialog, { title: t('adjCreate'), width: 'lg', onClose, footer: [
     h(GhostButton, { key: 'cancel', onClick: onClose }, t('cancel')),
-    h(PrimaryButton, { key: 'ok', disabled: guardBad || !reason.trim(), onClick: submit }, t('submit')),
+    h(PrimaryButton, { key: 'ok', disabled: busy || !canSubmit, busy, onClick: submit }, t('submit')),
   ] },
     h('div', { className: 'sf-stack' },
       h('div', { className: 'sf-filters' },
@@ -402,12 +408,12 @@ function AdjustCreateDialog({ year, orgs, lines, t, onClose, act }) {
           h('div', { className: 'sf-filters' },
             h(PillTabs, { tabs: [['IN', 'lineIn'], ['OUT', 'lineOut']], value: row.side, onChange: value => updateRow(index, { side: value }), t }),
             h(FormRow, { label: t('adjAmount') }, h(Field, { type: 'number', min: '0.01', step: '0.01', value: row.amount, onChange: value => updateRow(index, { amount: value }) })),
-            h(FormRow, { label: t('adjLineBudget') }, h(Select, { value: row.budgetLineId, onChange: value => updateRow(index, { budgetLineId: value }), options: lines.map(line => [line.id, lineLabel(line)]), placeholder: row.side === 'OUT' ? t('required') : t('dash') })),
-            row.side === 'IN' ? h(FormRow, { label: t('adjTargetOrg') }, h(Select, { value: row.targetOrgId, onChange: value => updateRow(index, { targetOrgId: value }), options: (orgs || []).map(org => [org.id, org.name]), placeholder: t('org') })) : null,
-            row.side === 'IN' ? h(FormRow, { label: t('adjTargetDept') }, h(Field, { value: row.targetDepartmentId, onChange: value => updateRow(index, { targetDepartmentId: value }) })) : null,
-            row.side === 'IN' ? h(FormRow, { label: t('adjTargetMonth') }, h(Field, { type: 'number', min: 1, max: 12, value: row.targetMonth, onChange: value => updateRow(index, { targetMonth: value }) })) : null,
+          h(FormRow, { label: t('adjLineBudget') }, h(Select, { value: row.budgetLineId || (row.side === 'IN' ? '__new__' : ''), onChange: value => updateRow(index, { budgetLineId: value === '__new__' ? '' : value }), options: [...(row.side === 'IN' ? [['__new__', '新建预算行']] : []), ...lines.map(line => [line.id, lineLabel(line)])], placeholder: row.side === 'OUT' ? t('required') : t('adjLineBudget') })),
+          row.side === 'IN' && !row.budgetLineId ? h(FormRow, { label: t('adjTargetOrg') }, h(SearchSelect, { value: row.targetOrgId, onChange: value => updateRow(index, { targetOrgId: value }), options: (orgs || []).map(org => [org.id, org.name]), placeholder: t('org') })) : null,
+          row.side === 'IN' && !row.budgetLineId ? h(FormRow, { label: t('adjTargetDept') }, h(SearchSelect, { value: row.targetDepartmentId, onChange: value => updateRow(index, { targetDepartmentId: value }), options: (departments || []).map(department => [department.id, department.name]), placeholder: t('department') })) : null,
+          row.side === 'IN' && !row.budgetLineId ? h(FormRow, { label: t('adjTargetMonth') }, h(Select, { value: row.targetMonth, onChange: value => updateRow(index, { targetMonth: value }), options: [...Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1} 月`]), ['0', '全年']], placeholder: t('adjTargetMonth') })) : null,
             h(LinkButton, { onClick: () => setRows(current => current.filter((_, i) => i !== index)) }, h(Glyph, { name: 'trash', size: 13 })))),
-        isTransfer ? h(Notice, { tone: guardBad ? 'rose' : null }, guardBad ? `${t('adjGuardBad')}（IN ${wan(sumIn)} ≠ OUT ${wan(sumOut)}）` : `${t('adjGuard')}：IN ${wan(sumIn)} = OUT ${wan(sumOut)}`) : null))))
+        isTransfer ? h(Notice, { tone: guardBad ? 'rose' : null }, guardBad ? `${t('adjGuardBad')}（IN ${wan(sumIn / 100)} ≠ OUT ${wan(sumOut / 100)}）` : `${t('adjGuard')}：IN ${wan(sumIn / 100)} = OUT ${wan(sumOut / 100)}`) : null))))
 }
 
 function AdjustDetailDialog({ id, t, onClose }) {
@@ -498,7 +504,7 @@ function AllocPickDialog({ entry, availability, t, onClose, act }) {
   ] },
     h('div', { className: 'sf-stack' },
       h('p', { className: 'sf-note' }, `${entry.title ?? ''} · ${wan(entry.amount) ?? '—'} ${t('unitYuan')}`),
-      h(FormRow, { label: t('pickLine') }, h(Select, { value: lineId, onChange: setLineId, options: lines.map(line => [line.budgetLineId ?? line.id, `${lineLabel(line)} · ${t('available')} ${wan(line.available) ?? '—'}`]), placeholder: t('pickLine') }))))
+      h(FormRow, { label: t('pickLine') }, h(SearchSelect, { value: lineId, onChange: setLineId, options: lines.map(line => [line.budgetLineId ?? line.id, `${lineLabel(line)} · ${t('available')} ${wan(line.available) ?? '—'}`]), placeholder: t('pickLine') }))))
 }
 
 // ---- 版本管理（版本表自取数；递延规则卡独立拉取） ----

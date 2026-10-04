@@ -20,7 +20,7 @@ function AlertsView({ ctx, t, onDrill }) {
   const [detail, setDetail] = useState(null)
 
   const load = () => {
-    api('/alerts-summary').then(value => setSummary(value.data ?? {})).catch(() => setSummary({}))
+    api(`/alerts-summary?year=${year}${orgId ? `&orgId=${orgId}` : ''}`).then(value => setSummary(value.data ?? {})).catch(() => setSummary({}))
     api('/alert-rules').then(value => setRules(value.data ?? { list: [], activeVersion: null })).catch(() => setRules({ list: [], activeVersion: null }))
     fetchRows()
   }

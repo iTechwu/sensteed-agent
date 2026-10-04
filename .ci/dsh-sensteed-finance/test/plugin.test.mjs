@@ -22,6 +22,13 @@ async function loadHost(overrides = {}) {
   const tools = new Map()
   const sections = []
   const { apply } = await import('../index.js')
+  const upstreamFetch = overrides.fetch || globalThis.fetch
+  const fetch = async (url, init) => {
+    const response = await upstreamFetch(url, init)
+    if (!new URL(url).pathname.endsWith('/permissions/workspace-access')) return response
+    const body = await response.clone().json().catch(() => null)
+    return body?.data?.allowed === undefined ? mcpJson({ allowed: true }) : response
+  }
   // 凭据桩：默认仅这三个引用有存储值；overrides.credentialRefs 提供时整体替换（模拟引用缺省场景）
   const credentialRefs = new Map(Object.entries(overrides.credentialRefs ?? {
     DATASOURCE_INTERNAL_API_SECRET: 'cred-secret',
@@ -37,7 +44,7 @@ async function loadHost(overrides = {}) {
     systemPrompt: { section(value) { sections.push(value); return () => {} } },
     settings: overrides.settings,
     dofeAuth: overrides.dofeAuth ?? { getDatasourceSession: () => ({ accessToken: 'feishu-test-token', tenantId: 'tenant-1', operator: 'op-1' }) },
-  }, overrides)
+  }, { ...overrides, fetch })
   return { routes, tools, sections }
 }
 
@@ -113,7 +120,7 @@ test('GET routes call the public Datasource REST API', async () => {
   assert.equal(brief.body.data.year, 2026)
   assert.ok(calls.some(item => item.url.startsWith('https://ds.hozonauto.com/api/finance/')), 'uses public Datasource REST origin')
   assert.ok(calls.every(item => !item.url.includes('/mcp')), 'no direct MCP endpoint remains')
-  assert.equal(calls[0].init.headers.authorization, 'Bearer feishu-test-token', 'REST uses the live Feishu session')
+  assert.equal(calls.find(item => !item.url.endsWith('/permissions/workspace-access')).init.headers.authorization, 'Bearer feishu-test-token', 'REST uses the live Feishu session')
 
   const quality = await invokeRoute(route, 'GET', BASE + '/quality')
   assert.equal(quality.status, 200)
@@ -122,6 +129,20 @@ test('GET routes call the public Datasource REST API', async () => {
 
   const missing = await invokeRoute(route, 'GET', BASE + '/nope')
   assert.equal(missing.status, 404)
+})
+
+test('checks workspace access before proxying finance data', async () => {
+  const calls = []
+  const { routes } = await loadHost({ fetch: async (url, init) => {
+    calls.push(String(url))
+    if (String(url).endsWith('/permissions/workspace-access')) return mcpJson({ allowed: false })
+    return mcpJson({ list: [] })
+  } })
+  const result = await invokeRoute(routes.get(BASE), 'GET', BASE + '/overview')
+  assert.equal(result.status, 403)
+  assert.equal(result.body.ok, false)
+  assert.equal(calls.length, 1)
+  assert.match(calls[0], /permissions\/workspace-access/u)
 })
 
 test('accepts the public Datasource REST success envelope with code 200', async () => {
@@ -142,19 +163,20 @@ test('write routes map to REST resources with path ids', async () => {
   const route = routes.get(BASE)
   const created = await invokeRoute(route, 'POST', BASE + '/payment-plans', { orgId: 'org-1', planType: 'PURCHASE', year: 2026, description: '测试', plannedAmount: 100 })
   assert.equal(created.status, 200)
-  assert.match(calls[0].url, /\/api\/finance\/payment-plans/u)
-  assert.equal(calls[0].init.method, 'POST')
-  assert.equal(calls[0].body.tenantId, undefined)
-  assert.equal(calls[0].body.operator, undefined)
+  const businessCalls = () => calls.filter(item => !item.url.endsWith('/permissions/workspace-access'))
+  assert.match(businessCalls()[0].url, /\/api\/finance\/payment-plans/u)
+  assert.equal(businessCalls()[0].init.method, 'POST')
+  assert.equal(businessCalls()[0].body.tenantId, undefined)
+  assert.equal(businessCalls()[0].body.operator, undefined)
 
   const patched = await invokeRoute(route, 'POST', BASE + '/revenue-plans/row-9/actuals', { actualAmount: 50 })
   assert.equal(patched.status, 200)
-  assert.match(calls[1].url, /\/api\/finance\/revenue-plans\/row-9\/actuals/u)
-  assert.equal(calls[1].init.method, 'PATCH')
+  assert.match(businessCalls()[1].url, /\/api\/finance\/revenue-plans\/row-9\/actuals/u)
+  assert.equal(businessCalls()[1].init.method, 'PATCH')
 
   const rung = await invokeRoute(route, 'POST', BASE + '/alerts/run', { year: 2026 })
   assert.equal(rung.status, 200)
-  assert.match(calls[2].url, /\/api\/finance\/alerts\/run/u)
+  assert.match(businessCalls()[2].url, /\/api\/finance\/alerts\/run/u)
 
   const bad = await invokeRoute(route, 'POST', BASE + '/nope', {})
   assert.equal(bad.status, 404)
@@ -301,6 +323,22 @@ test('context normalizes organizations and departments for the selectors', async
   assert.equal(result.body.data.departments[0].id, 'dept-1')
 })
 
+test('distinguishes expired login from denied finance permissions', async () => {
+  for (const status of [401, 403]) {
+    const { tools } = await loadHost({ fetch: async url =>
+      String(url).endsWith('/permissions/workspace-access')
+        ? mcpJson({ allowed: true })
+        : new Response('', { status }) })
+    const result = await tools.get('sensteed_finance_bootstrap').execute()
+    assert.equal(result.ok, false)
+    if (status === 401) assert.match(result.error, /登录已失效.*重新登录/u)
+    else {
+      assert.match(result.error, /操作权限.*财务负责人/u)
+      assert.doesNotMatch(result.error, /重新登录/u)
+    }
+  }
+})
+
 test('REST business errors are failures, not successful writes', async () => {
   for (const data of [{ error: 'forbidden', hint: '没有操作权限' }, { error: 'budget_exceeded' }]) {
     const { routes } = await loadHost({ fetch: async () => jsonResponse({ code: 1, msg: data.hint || data.error }, 200) })
@@ -323,7 +361,7 @@ test('scope changes replace group totals with the selected organization', async 
   assert.equal(result.body.data.overview.selectedOrg, 'org-1')
   assert.equal(result.body.data.budget.selectedOrg, 'org-1')
   assert.equal(result.body.data.cash.selectedOrg, 'org-1')
-  assert.equal(calls.length, 10)
+  assert.equal(calls.filter(path => !path.endsWith('/permissions/workspace-access')).length, 10)
 })
 
 test('keeps the secret out of URLs and never fabricates upstream data', async () => {
@@ -332,7 +370,7 @@ test('keeps the secret out of URLs and never fabricates upstream data', async ()
   const response = await invokeRoute(route, 'GET', BASE + '/brief')
   assert.equal(response.status, 502)
   assert.equal(response.body.ok, false)
-  assert.match(response.body.error, /飞书登录/)
+  assert.match(response.body.error, /财务操作权限/)
   const source = await readFile(new URL('index.js', root), 'utf8')
   assert.doesNotMatch(source, /api_key|MODELS_API_KEY/u)
 })
@@ -344,10 +382,78 @@ test('MCP registration is owned by the desktop login lifecycle without machine s
 
 test('client source wires sidebar entry, overlay, tabs, and analysis entries', async () => {
   const source = await readClientSource()
-  for (const token of ['sidebar.footer.action', 'shell.overlay', 'sf-overlay', 'ANALYSIS_ENTRIES', '/brief', 'backfillActual', 'runDone', 'analysis_forecast', 'PillTabs', 'BudgetView', 'sf-pilltabs']) {
+  for (const token of ['sidebar.footer.action', 'shell.overlay', 'sf-overlay', 'ANALYSIS_ENTRIES', '/brief', 'backfillActual', 'runDone', 'analysis_forecast', 'PillTabs', 'BudgetView', 'sf-pilltabs', 'sf-table-fields', 'sf-table-sort-button', 'sf-sidebar-brand', 'CustomizableTextSelect', 'MultiSearchSelect', 'textChoice', '新建预算行', 'targetYear', 'adjTargetMonth']) {
     assert.match(source, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'u'))
   }
+  assert.match(source, /if \(await act\('\/budget-adjustments',[\s\S]*?\)\) onClose\(\)/u)
+  assert.doesNotMatch(source, /sf-task-departments/u, 'department assignment must use the searchable multi-select')
   assert.doesNotMatch(source, /fetch\(`https?:\/\//u, 'client must only call same-origin routes')
+})
+
+test('search selectors use the shared accessible popup instead of browser datalist', async () => {
+  const source = await readClientSource()
+  assert.match(source, /function SearchSelect\(/u)
+  assert.match(source, /className: 'sf-search-menu'/u)
+  assert.match(source, /'aria-controls': menuId/u)
+  assert.doesNotMatch(source, /h\('datalist'/u)
+  assert.match(source, /className: 'sf-search-clear'/u)
+})
+
+test('table keeps column identities after hiding fields and offers settings when empty', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8')
+  const element = (type, props, ...children) => ({ type, props: props || {}, children })
+  const storage = { getItem: () => JSON.stringify(['column-1', 'column-2']), setItem() {} }
+  const table = new Function('h', 'useState', 'useEffect', 'useMemo', 'localStorage', `${source}\nreturn Table`)(
+    element,
+    initial => [typeof initial === 'function' ? initial() : initial, () => {}],
+    () => {},
+    compute => compute(),
+    storage,
+  )
+  const columns = [{ label: 'A', sortKey: 'a' }, { label: 'B', sortKey: 'b' }, { label: 'C', sortKey: 'c' }]
+  const descendants = node => [node, ...(node?.children || []).flatMap(child => child && typeof child === 'object' ? descendants(child) : [])]
+  const filled = descendants(table({ columns, rows: [{ a: 1, b: 2, c: 3 }], empty: '暂无数据' }))
+  assert.deepEqual(filled.filter(node => node?.type === 'th').map(node => node.props.key), ['column-1', 'column-2'])
+  const empty = descendants(table({ columns, rows: [], empty: '暂无数据' }))
+  assert.ok(empty.some(node => node?.type === 'summary' && node.props.className === 'sf-table-tool'))
+  assert.ok(empty.some(node => node?.props?.className === 'sf-empty'))
+})
+
+test('filing task dialog submits the same dimensions and keeps failures open', async () => {
+  const components = await readFile(new URL('src/components.js', root), 'utf8')
+  const entry = await readFile(new URL('src/views/entry.js', root), 'utf8')
+  const element = (type, props, ...children) => ({ type, props: props || {}, children })
+  const createDialog = values => {
+    let index = 0
+    return new Function('h', 'useState', 'useEffect', `${components}\n${entry}\nreturn CreateTaskDialog`)(
+      element,
+      initial => [index in values ? values[index++] : (index++, initial), () => {}],
+      () => {},
+    )
+  }
+  const values = ['十月资金填报', 'PAYMENT_PLAN', '10', '', null, ['dept-1'], '2026-10-10T12:00', '填写说明', '负责人', '审核人', true, false, true]
+  let closed = false
+  let payload
+  const dialog = createDialog(values)({
+    year: 2026, departments: [{ id: 'dept-1', name: '部门一' }], busy: false, t: key => key,
+    onClose: () => { closed = true }, act: async (_path, body) => { payload = body; return false },
+  })
+  await dialog.props.footer[1].props.onClick()
+  assert.equal(closed, false)
+  assert.equal(payload.month, 10)
+  assert.deepEqual(payload.departments, [{ departmentId: 'dept-1' }])
+  assert.equal(payload.instructions, '填写说明')
+  assert.equal(payload.freezeCurrentMonth, false)
+  assert.equal(payload.startAsDraft, true)
+
+  const budget = createDialog(['年度预算', 'BUDGET', '10', 'version-1', [{ id: 'version-1', name: '预算版本' }], ['dept-1'], '2026-10-10T12:00'])({
+    year: 2026, departments: [{ id: 'dept-1', name: '部门一' }], busy: false, t: key => key,
+    onClose: () => { closed = true }, act: async (_path, body) => { payload = body; return true },
+  })
+  await budget.props.footer[1].props.onClick()
+  assert.equal(closed, true)
+  assert.equal(payload.versionId, 'version-1')
+  assert.equal(payload.month, undefined)
 })
 
 test('clicking the sidebar button renders the dashboard without render-time reference errors', async () => {
@@ -372,7 +478,7 @@ test('clicking the sidebar button renders the dashboard without render-time refe
   const reactStub = {
     createElement,
     Fragment: 'Fragment',
-    useState: initial => [typeof initial === 'function' ? initial() : initial, () => {}],
+    useState: initial => [initial === null ? true : (typeof initial === 'function' ? initial() : initial), () => {}],
     useRef: initial => ({ current: initial }),
     useEffect: () => {},
     useSyncExternalStore: (_subscribe, getSnapshot) => getSnapshot(),
@@ -429,7 +535,7 @@ test('clicking the sidebar button renders the dashboard without render-time refe
 test('client field names match the finance contract schemas', async () => {
   const source = await readClientSource()
   // 契约字段回归：FinanceMetric/trend 扁平 *Amount、BudgetSummary {list,totals}、PaymentPlan remainingAmount
-  for (const token of ['budgetAmount', 'prSubmittedAmount', 'paidAmount', 'summary?.list', 'summary?.totals', 'remainingAmount', 'data?.list']) {
+  for (const token of ['budgetAmount', 'prSubmittedAmount', 'paidAmount', 'summary?.list', 'summary?.totals', 'remainingAmount', 'data?.list', "name: 'departmentId'", "name: 'planMonth'"]) {
     assert.match(source, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'u'), token)
   }
   // `.rows ||` 已不再陈旧：版本 diff 契约（BudgetVersionDiffResponse.rows）合法使用该字段
