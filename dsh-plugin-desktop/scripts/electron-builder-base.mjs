@@ -119,6 +119,11 @@ export const ELECTRON_BUILDER_BASE = Object.freeze({
       'node_modules/node-addon-require-builtin-win32-arm64/**',
     ],
     files: [
+      // The AA bridge junction is dropped from the archive by the Windows
+      // dependency-tree copy; force it in through the top-level link and keep
+      // the published tarball's residual nested node_modules out.
+      'node_modules/@agents-anywhere/dsh-bridge-next/**',
+      '!node_modules/@agents-anywhere/dsh-bridge-next/node_modules/**',
       '!node_modules/@img/sharp-darwin*/**',
       '!node_modules/@img/sharp-libvips-darwin*/**',
       '!node_modules/@img/sharp-win32-arm64*/**',

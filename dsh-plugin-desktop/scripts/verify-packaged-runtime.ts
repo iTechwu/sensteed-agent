@@ -1057,6 +1057,37 @@ export function verifyProfileClosureArtifact(
   }
 }
 
+/**
+ * Describe the archive scope around the AA bridge for missing-payload errors:
+ * the subtree under /node_modules/@agents-anywhere plus a sample of the
+ * packaged top-level packages, so a runner-side archive omission is visible
+ * without re-running the build under a debugger.
+ */
+export function diagnoseArchiveScope(
+  archivePath: string,
+  packagePath: string,
+  readHeader: ArchiveHeaderReader = getRawHeader,
+): string {
+  try {
+    const { files } = indexPackagedAsarHeader(readHeader(archivePath).header)
+    const prefix = `/${packagePath}`
+    const scope = [...files].filter(path => path === prefix || path.startsWith(`${prefix}/`))
+    if (scope.length > 0) {
+      return `archive holds ${scope.length} ${prefix} entries: ${scope.slice(0, 20).join(', ')}`
+    }
+    const packageNames = new Set<string>()
+    for (const path of [...files].filter(path => path.startsWith('/node_modules/'))) {
+      const segments = path.split('/')
+      packageNames.add(segments[3]?.startsWith('@') === true
+        ? `${segments[3]}/${segments[4] ?? ''}`
+        : segments[3] ?? '')
+    }
+    return `archive holds no ${prefix} entries; packaged top-level packages: ${[...packageNames].sort().slice(0, 25).join(', ')}`
+  } catch (diagnosticCause) {
+    return `archive scope scan itself failed: ${diagnosticCause instanceof Error ? diagnosticCause.message : String(diagnosticCause)}`
+  }
+}
+
 /** Verify the AA version and built entry sealed into the actual installation payload. */
 export function verifyPackagedAgentsAnywhere(
   context: PackagedRuntimeContext,
@@ -1080,7 +1111,18 @@ export function verifyPackagedAgentsAnywhere(
       accessSync(join(root, entry.path), constants.X_OK)
     }
   }
-  const actual = JSON.parse(readPackaged(`${packagePath}/package.json`).toString()) as { version: string }
+  let actual: { version: string }
+  try {
+    actual = JSON.parse(readPackaged(`${packagePath}/package.json`).toString()) as { version: string }
+  } catch (cause) {
+    if (usesAsarLayout(context)) {
+      throw new Error(
+        `Packaged AA bridge payload is missing: ${diagnoseArchiveScope(resolvePackagedAsarPath(context), packagePath)}`,
+        { cause },
+      )
+    }
+    throw cause
+  }
   if (expected.version !== actual.version) {
     throw new Error(`Packaged AA version mismatch: expected ${expected.version}, received ${actual.version}`)
   }
