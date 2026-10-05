@@ -1092,6 +1092,29 @@ export function diagnoseArchiveScope(
     const agentsEntry = nodeModulesEntry?.files?.['@agents-anywhere'] as
       | { files?: Record<string, unknown>; unpacked?: boolean }
       | undefined
+    const bridgeEntry = agentsEntry?.files?.['dsh-bridge-next'] as unknown
+    const bridgeShape = bridgeEntry === undefined
+      ? 'absent'
+      : JSON.stringify(bridgeEntry).slice(0, 300)
+    // Independent raw-walk leaf count under node_modules, deliberately not
+    // going through indexPackagedAsarHeader so a walker quirk cannot mask
+    // what the header itself holds.
+    let rawLeafCount = 0
+    const rawLeafSamples: string[] = []
+    const countRaw = (value: unknown, path: string): void => {
+      if (rawLeafCount > 4096) return
+      if (value === null || typeof value !== 'object') return
+      const entry = value as Record<string, unknown>
+      if ('files' in entry && entry.files !== null && typeof entry.files === 'object') {
+        for (const [name, child] of Object.entries(entry.files as Record<string, unknown>)) {
+          countRaw(child, `${path}/${name}`)
+        }
+        return
+      }
+      rawLeafCount += 1
+      if (rawLeafSamples.length < 5) rawLeafSamples.push(path)
+    }
+    countRaw(nodeModulesEntry, '/node_modules')
     const nodeModulesShape = nodeModulesEntry === undefined
       ? 'absent'
       : nodeModulesEntry.link !== undefined
@@ -1099,7 +1122,7 @@ export function diagnoseArchiveScope(
         : nodeModulesEntry.files === undefined
           ? `leaf(size=${String(nodeModulesEntry.size)}, unpacked=${String(nodeModulesEntry.unpacked)})`
           : `dir with ${Object.keys(nodeModulesEntry.files).length} children: ${Object.keys(nodeModulesEntry.files).slice(0, 6).map(key => JSON.stringify(key)).join(', ')}; @agents-anywhere: ${agentsEntry === undefined ? 'absent' : `unpacked=${String(agentsEntry.unpacked)} files=${agentsEntry.files === undefined ? 'none' : Object.keys(agentsEntry.files).length} sample=${Object.keys(agentsEntry.files ?? {}).slice(0, 3).map(key => JSON.stringify(key)).join(', ')}`}`
-    return `archive holds ${files.size} entries total, none under ${prefix}; raw root keys: ${rawRootKeys.length} (node_modules-prefixed: ${rawNodeModules}, sample: ${rawRootKeys.slice(0, 8).map(key => JSON.stringify(key)).join(', ')}); node_modules entry shape: ${nodeModulesShape}; packaged top-level packages: ${[...packageNames].sort().slice(0, 25).join(', ')}`
+    return `archive holds ${files.size} entries total, none under ${prefix}; raw node_modules leaf count: ${rawLeafCount}, samples: ${rawLeafSamples.join(', ') || '(none)'}; bridge entry: ${bridgeShape}; raw root keys: ${rawRootKeys.length} (node_modules-prefixed: ${rawNodeModules}, sample: ${rawRootKeys.slice(0, 8).map(key => JSON.stringify(key)).join(', ')}); node_modules entry shape: ${nodeModulesShape}; packaged top-level packages: ${[...packageNames].sort().slice(0, 25).join(', ')}`
   } catch (diagnosticCause) {
     return `archive scope scan itself failed: ${diagnosticCause instanceof Error ? diagnosticCause.message : String(diagnosticCause)}`
   }
