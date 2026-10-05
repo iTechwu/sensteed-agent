@@ -63,6 +63,7 @@ describe('desktop renderer boot health', () => {
   })
 
   it('rejects a settled loader when required desktop surfaces are missing', async () => {
+    vi.useFakeTimers()
     const loader = {
       await: vi.fn(async () => {}),
       * entries() {
@@ -70,14 +71,37 @@ describe('desktop renderer boot health', () => {
       },
     }
 
-    await expect(rendererBootReport(
+    const report = rendererBootReport(
       loader,
       () => 'required desktop surfaces are unavailable: main:conversation, sidebar.workspaces',
-    )).resolves.toEqual({
+      0,
+    )
+    await vi.runAllTimersAsync()
+
+    await expect(report).resolves.toEqual({
       status: 'failed',
       plugins: [],
       error: 'required desktop surfaces are unavailable: main:conversation, sidebar.workspaces',
     })
+  })
+
+  it('waits for required desktop surfaces that settle after the Loader', async () => {
+    vi.useFakeTimers()
+    let missing = true
+    const loader = {
+      await: vi.fn(async () => {}),
+      * entries() {
+        yield { options: { name: 'dsh-plugin-desktop' }, fiber: { state: 2 } }
+      },
+    }
+
+    const report = rendererBootReport(loader, () => {
+      return missing ? 'required desktop surfaces are unavailable: main:conversation' : undefined
+    })
+    setTimeout(() => { missing = false }, 50)
+    await vi.advanceTimersByTimeAsync(100)
+
+    await expect(report).resolves.toEqual({ status: 'healthy' })
   })
 
   it('posts the terminal boot report to the same-origin desktop Host', async () => {
