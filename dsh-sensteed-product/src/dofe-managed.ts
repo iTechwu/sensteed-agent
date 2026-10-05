@@ -20,7 +20,7 @@ import { DofeAuthService } from './dofe-auth-service.ts'
 import { financeMcpConfig } from './finance-mcp.ts'
 
 declare module '@deepseek-ai/cordis' {
-  interface Context { dofeAuth: DofeAuthService }
+  interface Context { dofeAuth: DofeAuthService; dofeAccess: () => DofeAccessGate }
 }
 
 export const name = 'dofe-managed'
@@ -75,6 +75,11 @@ export const MODELS_API_KEY = 'MODELS_API_KEY'
 const MODELS_API_KEY_REF = credentialRef(MODELS_API_KEY)
 const McpClient = { name: mcpClientName, inject: mcpClientInject, apply: applyMcpClient }
 export const DOFE_MCP_BASE_URL = 'https://ai.hozonauto.com/mcp'
+
+export interface DofeAccessGate {
+  readonly ready: boolean
+  readonly entitlements?: DofeAccessSettings['entitlements']
+}
 const DATASOURCE_FINANCE_WORKSPACE_ACCESS_URL = 'https://ds.hozonauto.com/api/finance/permissions/workspace-access'
 
 type ManagedMcpRoute = {
@@ -127,6 +132,17 @@ export async function apply(ctx: Context): Promise<void> {
       },
     },
   )
+  ctx.provide('dofeAccess', () => {
+    const current = access.get()
+    const granted = current.entitlements?.plugins.includes('knowledge') === true
+    return {
+      ready: current.setupComplete && current.validationVersion === DOFE_ACCESS_VALIDATION_VERSION && current.authMode === 'feishu' && Boolean(current.identity?.ssoSub),
+      entitlements: current.entitlements === undefined ? undefined : {
+        ...current.entitlements,
+        knowledge: granted ? { plugin: 'knowledge', permissionVersion: 1, accesses: ['read', 'write'] } : undefined,
+      },
+    }
+  })
   let financeAuth: DofeAuthService | undefined
   if (BRAND_VARIANT === 'sensteed') {
     const auth = new DofeAuthService(

@@ -74,6 +74,33 @@ describe('dofe-managed MCP runtime', () => {
     await vi.waitFor(() => expect(harness.ctx.plugin).toHaveBeenCalledTimes(1))
   })
 
+  it('publishes the shared Knowledge and Memory permission gate from live access settings', async () => {
+    const settings: DofeAccessSettings = {
+      setupComplete: true,
+      validationVersion: DOFE_ACCESS_VALIDATION_VERSION,
+      enabledPlugins: ['knowledge'],
+      modelId: 'deepseek-chat',
+      protocol: 'chat-completions',
+      authMode: 'feishu',
+      identity: { ssoSub: 'test-user', name: 'Test User' },
+      entitlements: { plugins: ['knowledge'], defaultModel: 'deepseek-chat', allowedProtocols: ['chat-completions'] },
+    }
+    const harness = createHarness(settings)
+
+    await apply(harness.ctx as never)
+
+    const provideCall = harness.ctx.provide.mock.calls.find(([name]) => name === 'dofeAccess')
+    const getGate = provideCall?.[1] as (() => { ready: boolean; entitlements?: { plugins: string[]; knowledge?: { permissionVersion: number; accesses: string[] } } }) | undefined
+    expect(getGate).toBeDefined()
+    expect(getGate?.()).toMatchObject({
+      ready: true,
+      entitlements: { plugins: ['knowledge'], knowledge: { permissionVersion: 1, accesses: ['read', 'write'] } },
+    })
+
+    settings.setupComplete = false
+    expect(getGate?.().ready).toBe(false)
+  })
+
   it('disposes partial clients after activation failure without logging the managed key', async () => {
     const harness = createHarness({
       setupComplete: true,
