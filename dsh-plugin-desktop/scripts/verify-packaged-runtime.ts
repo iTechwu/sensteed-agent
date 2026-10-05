@@ -1029,6 +1029,32 @@ export function reportUnpackedRuntime(summary: UnpackedRuntimeSummary): void {
 }
 
 /**
+ * Wrap one archived-read strategy with the offset fallback: @electron/asar's
+ * extractFile can miss entries its own raw header plainly holds (observed on
+ * the Windows runner), so callers never trust a single read path.
+ */
+export function withOffsetFallback(
+  context: PackagedRuntimeContext,
+  readPackaged: (path: string) => Buffer,
+): (path: string) => Buffer {
+  return (path: string): Buffer => {
+    try {
+      return readPackaged(path)
+    } catch (cause) {
+      if (!usesAsarLayout(context)) throw cause
+      try {
+        return readArchivedFileByOffset(resolvePackagedAsarPath(context), path)
+      } catch (offsetCause) {
+        throw new Error(
+          `packaged payload is missing from the archive: ${diagnoseArchiveScope(resolvePackagedAsarPath(context), path)}`,
+          { cause: offsetCause },
+        )
+      }
+    }
+  }
+}
+
+/**
  * Verify the frozen Profile closure manifest sealed into the payload matches
  * the packaged identity: same schema, same desktop version, and the pinned
  * `@deepseek-ai/dsh` version equals the tree actually inside the archive.
@@ -1039,6 +1065,7 @@ export function verifyProfileClosureArtifact(
     ? extractFile(resolvePackagedAsarPath(context), path)
     : readFileSync(join(resolvePackagedApplicationRoot(context), path)),
 ): void {
+  const readPackagedOrOffset = withOffsetFallback(context, readPackaged)
   let closure: { schemaVersion?: number; desktopVersion?: string; dshVersion?: string; packages?: Record<string, string> }
   try {
     closure = JSON.parse(readPackaged('lib/profile-closure.json').toString('utf8'))
@@ -1054,7 +1081,7 @@ export function verifyProfileClosureArtifact(
   if (closure.desktopVersion !== rootVersion) {
     throw new Error(`dsh-plugin-desktop: Profile closure manifest desktopVersion ${String(closure.desktopVersion)} is stale against the packaged ${String(rootVersion)}`)
   }
-  const dshVersion = (JSON.parse(readPackaged('node_modules/@deepseek-ai/dsh/package.json').toString('utf8')) as { version?: string }).version
+  const dshVersion = (JSON.parse(readPackagedOrOffset('node_modules/@deepseek-ai/dsh/package.json').toString('utf8')) as { version?: string }).version
   if (closure.dshVersion !== dshVersion || closure.packages?.['@deepseek-ai/dsh'] !== dshVersion) {
     throw new Error(`dsh-plugin-desktop: Profile closure manifest pins @deepseek-ai/dsh ${String(closure.dshVersion)} but the archive carries ${String(dshVersion)}`)
   }
@@ -1192,24 +1219,7 @@ export function verifyPackagedAgentsAnywhere(
       accessSync(join(root, entry.path), constants.X_OK)
     }
   }
-  // @electron/asar's extractFile can miss entries its own raw header plainly
-  // holds (observed on the Windows runner), so every archived read falls back
-  // to the offset reader before declaring the payload missing.
-  const readPackagedOrOffset = (path: string): Buffer => {
-    try {
-      return readPackaged(path)
-    } catch (cause) {
-      if (!usesAsarLayout(context)) throw cause
-      try {
-        return readArchivedFileByOffset(resolvePackagedAsarPath(context), path)
-      } catch (offsetCause) {
-        throw new Error(
-          `Packaged AA bridge payload is missing: ${diagnoseArchiveScope(resolvePackagedAsarPath(context), path)}`,
-          { cause: offsetCause },
-        )
-      }
-    }
-  }
+  const readPackagedOrOffset = withOffsetFallback(context, readPackaged)
   const actual = JSON.parse(readPackagedOrOffset(`${packagePath}/package.json`).toString()) as { version: string }
   if (expected.version !== actual.version) {
     throw new Error(`Packaged AA version mismatch: expected ${expected.version}, received ${actual.version}`)
