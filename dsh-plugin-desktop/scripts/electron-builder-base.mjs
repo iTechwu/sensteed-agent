@@ -18,6 +18,7 @@ export const ELECTRON_BUILDER_BASE = Object.freeze({
     checksums: {
       'electron-v44.0.0-darwin-arm64.zip': '076d79742986e1b100b69ebecc691cb07368045e54c9087cef631b8622b76a80',
       'electron-v44.0.0-darwin-x64.zip': '28429e700ad68d9624aaa90b6543ffe891a48c14121fd904cd294e5edcee63ff',
+      'electron-v44.0.0-linux-x64.zip': 'd65286d812719f2b4c1a1b806a80f288a1058c89c7b058dae1e03ab25e499446',
       'electron-v44.0.0-win32-x64.zip': 'e61aa3bcea8152bc0730abd015e47c032d778a0ef10e2a1c78ba3c4ea47942f9',
     },
   },
