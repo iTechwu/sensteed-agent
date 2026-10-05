@@ -236,9 +236,10 @@ export function packageWindowsArtifact(
       CSC_IDENTITY_AUTO_DISCOVERY: 'false',
       // Traverse the installed tree directly: package-manager graph collection can
       // stall on the large linked workspace and pnpm v11 drops deduplicated links.
+      // Keep the real pnpm identity: disguising the runner as npm makes the
+      // archive file-set take the npm-layout path, which silently emits
+      // node_modules as directory skeletons without any file payload.
       DSH_ELECTRON_BUILDER_TRAVERSAL_ONLY: '1',
-      npm_config_user_agent: 'npm',
-      npm_execpath: '',
     }),
   )
   options.run(
