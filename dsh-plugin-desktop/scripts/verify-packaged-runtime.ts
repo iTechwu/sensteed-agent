@@ -4,11 +4,14 @@ import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import {
   accessSync,
+  closeSync,
   constants,
   existsSync,
   lstatSync,
   mkdtempSync,
+  openSync,
   readFileSync,
+  readSync,
   readdirSync,
   rmSync,
 } from 'node:fs'
@@ -1128,6 +1131,44 @@ export function diagnoseArchiveScope(
   }
 }
 
+/**
+ * Read one archived file by walking the raw header ourselves and seeking to
+ * the recorded offset. @electron/asar's own `extractFile` was observed to
+ * miss entries that the very same raw header plainly holds on the Windows
+ * runner, so the verification must not depend on its path resolution.
+ */
+export function readArchivedFileByOffset(archivePath: string, archivePath2: string): Buffer {
+  const rawHeader = getRawHeader(archivePath).header as {
+    files?: Record<string, unknown>
+  }
+  let node: unknown = rawHeader
+  for (const segment of archivePath2.split('/').filter(Boolean)) {
+    if (node === null || typeof node !== 'object') {
+      throw new Error(`archived path segment missing: ${segment} in ${archivePath2}`)
+    }
+    const files = (node as { files?: Record<string, unknown> }).files
+    if (files === undefined || !(segment in files)) {
+      throw new Error(`archived path segment missing: ${segment} in ${archivePath2}`)
+    }
+    node = files[segment]
+  }
+  const entry = node as { size?: number; offset?: string }
+  if (typeof entry.size !== 'number' || typeof entry.offset !== 'string') {
+    throw new Error(`archived path is not a packed file: ${archivePath2}`)
+  }
+  const sizes = Buffer.alloc(8)
+  const fd = openSync(archivePath, 'r')
+  try {
+    readSync(fd, sizes, 0, 8, 0)
+    const headerSize = sizes.readUInt32LE(4)
+    const content = Buffer.alloc(entry.size)
+    readSync(fd, content, 0, entry.size, 8 + headerSize + Number(entry.offset))
+    return content
+  } finally {
+    closeSync(fd)
+  }
+}
+
 /** Verify the AA version and built entry sealed into the actual installation payload. */
 export function verifyPackagedAgentsAnywhere(
   context: PackagedRuntimeContext,
@@ -1151,24 +1192,31 @@ export function verifyPackagedAgentsAnywhere(
       accessSync(join(root, entry.path), constants.X_OK)
     }
   }
-  let actual: { version: string }
-  try {
-    actual = JSON.parse(readPackaged(`${packagePath}/package.json`).toString()) as { version: string }
-  } catch (cause) {
-    if (usesAsarLayout(context)) {
-      throw new Error(
-        `Packaged AA bridge payload is missing: ${diagnoseArchiveScope(resolvePackagedAsarPath(context), packagePath)}`,
-        { cause },
-      )
+  // @electron/asar's extractFile can miss entries its own raw header plainly
+  // holds (observed on the Windows runner), so every archived read falls back
+  // to the offset reader before declaring the payload missing.
+  const readPackagedOrOffset = (path: string): Buffer => {
+    try {
+      return readPackaged(path)
+    } catch (cause) {
+      if (!usesAsarLayout(context)) throw cause
+      try {
+        return readArchivedFileByOffset(resolvePackagedAsarPath(context), path)
+      } catch (offsetCause) {
+        throw new Error(
+          `Packaged AA bridge payload is missing: ${diagnoseArchiveScope(resolvePackagedAsarPath(context), path)}`,
+          { cause: offsetCause },
+        )
+      }
     }
-    throw cause
   }
+  const actual = JSON.parse(readPackagedOrOffset(`${packagePath}/package.json`).toString()) as { version: string }
   if (expected.version !== actual.version) {
     throw new Error(`Packaged AA version mismatch: expected ${expected.version}, received ${actual.version}`)
   }
   const digest = (bytes: Buffer): string => createHash('sha256').update(bytes).digest('hex')
   if (digest(readInstalled(join(desktopRoot, packagePath, 'lib/index.js')))
-    !== digest(readPackaged(`${packagePath}/lib/index.js`))) {
+    !== digest(readPackagedOrOffset(`${packagePath}/lib/index.js`))) {
     throw new Error('Packaged AA entry differs from the prepared release dependency')
   }
 }
