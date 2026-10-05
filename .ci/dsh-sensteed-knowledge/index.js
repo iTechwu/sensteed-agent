@@ -1,5 +1,11 @@
 const MCP_URL = 'https://ai.hozonauto.com/mcp/knowledge'
 const REQUEST_TIMEOUT_MS = 30000
+const KNOWLEDGE_PERMISSION_VERSION = 1
+const KNOWLEDGE_PLUGIN_ID = 'knowledge'
+const KNOWLEDGE_READ_TOOLS = new Set(['knowledge.search', 'knowledge.recall', 'knowledge.capabilities', 'knowledge.overview', 'knowledge.graph', 'knowledge.loadout', 'knowledge.context_pack', 'knowledge.explain_trace', 'knowledge.entity_assertions', 'knowledge.relation_assertions', 'knowledge.entity_merges', 'knowledge.provenance_lineage'])
+const KNOWLEDGE_WRITE_TOOLS = new Set(['knowledge.remember', 'knowledge.confirm_memory', 'knowledge.forget', 'knowledge.session_checkpoint', 'knowledge.promote', 'knowledge.ingest_file'])
+const KNOWLEDGE_CONSOLE_READ_TOOLS = new Set(['knowledge.spaces', 'knowledge.sources', 'knowledge.memories', 'knowledge.recall_traces', 'knowledge.session_handoffs', 'knowledge.memory_feedbacks', 'knowledge.memory_conflicts', 'knowledge.capability_catalog', 'knowledge.environment_facts', 'knowledge.skills', 'knowledge.acl_grants', 'knowledge.principals', 'knowledge.entity_merges', 'knowledge.ontologies'])
+const KNOWLEDGE_CONSOLE_WRITE_TOOLS = new Set(['knowledge.create_space', 'knowledge.create_source', 'knowledge.create_ontology_version', 'knowledge.publish_ontology', 'knowledge.export_ontology', 'knowledge.import_ontology', 'knowledge.grant_acl', 'knowledge.grant_document_principal', 'knowledge.rebuild_graph'])
 
 const TOOL_OUTPUT = {
   schema: {
@@ -128,6 +134,28 @@ const TOOL_INPUT_SCHEMAS = {
     canonicalEntityId: UUID, sourceEntityId: UUID,
   }),
   knowledge_provenance_lineage: OBJECT({ entityId: UUID, maxDepth: INTEGER(1, 20) }, ['entityId']),
+  'knowledge.spaces': OBJECT({ page: INTEGER(1), limit: INTEGER(1, 200) }),
+  'knowledge.sources': OBJECT({ page: INTEGER(1), limit: INTEGER(1, 200) }),
+  'knowledge.memories': OBJECT({ page: INTEGER(1), limit: INTEGER(1, 200) }),
+  'knowledge.recall_traces': OBJECT({ page: INTEGER(1), limit: INTEGER(1, 100) }),
+  'knowledge.session_handoffs': OBJECT({ page: INTEGER(1), limit: INTEGER(1, 100) }),
+  'knowledge.memory_feedbacks': OBJECT({ page: INTEGER(1), limit: INTEGER(1, 100) }),
+  'knowledge.memory_conflicts': OBJECT({ page: INTEGER(1), limit: INTEGER(1, 100) }),
+  'knowledge.capability_catalog': OBJECT({ page: INTEGER(1), limit: INTEGER(1, 100) }),
+  'knowledge.environment_facts': OBJECT({ page: INTEGER(1), limit: INTEGER(1, 100) }),
+  'knowledge.skills': OBJECT({ page: INTEGER(1), limit: INTEGER(1, 100) }),
+  'knowledge.acl_grants': OBJECT({ page: INTEGER(1), limit: INTEGER(1, 100) }),
+  'knowledge.principals': OBJECT({ page: INTEGER(1), limit: INTEGER(1, 100) }),
+  'knowledge.ontologies': OBJECT({ page: INTEGER(1), limit: INTEGER(1, 100) }),
+  'knowledge.create_space': OBJECT({ name: STRING(280), description: STRING(2000) }, ['name']),
+  'knowledge.create_source': OBJECT({ name: STRING(280), type: STRING(80), config: OBJECT() }, ['name', 'type']),
+  'knowledge.create_ontology_version': OBJECT({ version: STRING(120), classes: ARRAY(STRING(120), 200), predicates: ARRAY(STRING(120), 200), constraints: ARRAY(OBJECT(), 200), alignments: ARRAY(OBJECT(), 200) }, ['version', 'classes', 'predicates']),
+  'knowledge.publish_ontology': OBJECT({ ontologyId: UUID, targetStatus: ENUM(['WARNING', 'ENFORCE', 'RETIRED']) }, ['ontologyId', 'targetStatus']),
+  'knowledge.export_ontology': OBJECT({ ontologyId: UUID }, ['ontologyId']),
+  'knowledge.import_ontology': OBJECT({ jsonLd: STRING(1000000) }, ['jsonLd']),
+  'knowledge.grant_acl': OBJECT({ principalId: UUID, resourceType: STRING(80), resourceId: UUID, actions: ARRAY(STRING(80), 20) }, ['principalId', 'resourceType', 'resourceId', 'actions']),
+  'knowledge.grant_document_principal': OBJECT({ documentId: UUID, principalId: UUID, actions: ARRAY(STRING(80), 20) }, ['documentId', 'principalId', 'actions']),
+  'knowledge.rebuild_graph': OBJECT({ reason: STRING(500) }, ['reason']),
 }
 
 const TOOL_DEFINITIONS = {
@@ -149,6 +177,28 @@ const TOOL_DEFINITIONS = {
   knowledge_relation_assertions: ['knowledge.relation_assertions', 'Read ACL-scoped canonical relation assertions.'],
   knowledge_entity_merges: ['knowledge.entity_merges', 'Read entity merge decisions and provenance.'],
   knowledge_provenance_lineage: ['knowledge.provenance_lineage', 'Read bounded provenance lineage for an entity.'],
+  knowledge_spaces: ['knowledge.spaces', 'List authorized Knowledge spaces.'],
+  knowledge_sources: ['knowledge.sources', 'List Knowledge ingestion sources.'],
+  knowledge_memories: ['knowledge.memories', 'List ACL-scoped Memory records.'],
+  knowledge_recall_traces: ['knowledge.recall_traces', 'List bounded recall traces.'],
+  knowledge_session_handoffs: ['knowledge.session_handoffs', 'List session handoffs.'],
+  knowledge_memory_feedbacks: ['knowledge.memory_feedbacks', 'List Memory feedback.'],
+  knowledge_memory_conflicts: ['knowledge.memory_conflicts', 'List Memory conflicts.'],
+  knowledge_capability_catalog: ['knowledge.capability_catalog', 'List capability catalog entries.'],
+  knowledge_environment_facts: ['knowledge.environment_facts', 'List environment facts.'],
+  knowledge_skills: ['knowledge.skills', 'List Memory skills.'],
+  knowledge_acl_grants: ['knowledge.acl_grants', 'List ACL grants.'],
+  knowledge_principals: ['knowledge.principals', 'List Knowledge principals.'],
+  knowledge_ontologies: ['knowledge.ontologies', 'List tenant ontology versions.'],
+  knowledge_create_space: ['knowledge.create_space', 'Create a Knowledge space.'],
+  knowledge_create_source: ['knowledge.create_source', 'Create a Knowledge source.'],
+  knowledge_create_ontology_version: ['knowledge.create_ontology_version', 'Create a draft ontology version.'],
+  knowledge_publish_ontology: ['knowledge.publish_ontology', 'Publish or retire an ontology version.'],
+  knowledge_export_ontology: ['knowledge.export_ontology', 'Export an ontology JSON-LD projection.'],
+  knowledge_import_ontology: ['knowledge.import_ontology', 'Import a bounded ontology JSON-LD projection.'],
+  knowledge_grant_acl: ['knowledge.grant_acl', 'Grant an ACL permission.'],
+  knowledge_grant_document_principal: ['knowledge.grant_document_principal', 'Grant document access to a principal.'],
+  knowledge_rebuild_graph: ['knowledge.rebuild_graph', 'Request a Knowledge graph rebuild.'],
 }
 const TOOL_NAMES_BY_REMOTE = Object.fromEntries(Object.entries(TOOL_DEFINITIONS).map(([name, [remoteName]]) => [remoteName, name]))
 
@@ -166,6 +216,10 @@ const KNOWLEDGE_ROUTING_PROMPT = [
 export function apply(ctx, overrides = {}) {
   const fetchImpl = overrides.fetch || globalThis.fetch
   const disposers = []
+  const accessState = () => {
+    const access = typeof ctx.get === 'function' ? ctx.get('dofeAccess') : ctx.dofeAccess
+    return typeof access === 'function' ? access() : access
+  }
   for (const [name, [remoteName, description]] of Object.entries(TOOL_DEFINITIONS)) {
     const dispose = ctx.tools.register({
       name,
@@ -179,6 +233,8 @@ export function apply(ctx, overrides = {}) {
         if (violations.length > 0) return { ok: false, error: 'invalid_tool_arguments', details: violations }
         const credential = await resolveModelsKey(ctx)
         if (!credential) return { ok: false, error: 'model_api_key_unavailable' }
+        const permission = resolveKnowledgePermission(remoteName, accessState())
+        if (!permission.allowed) return { ok: false, error: permission.reason }
         return executeKnowledge(ctx, fetchImpl, credential, remoteName, args?.input || {}, 'agent_tool', exec?.signal)
       },
     })
@@ -198,11 +254,20 @@ export function apply(ctx, overrides = {}) {
       async handler(req, res) {
         const credential = await resolveModelsKey(ctx)
         if (req.method === 'GET') {
-          const contract = await loadKnowledgeContract(fetchImpl, credential)
+          const permission = resolveKnowledgePermission('knowledge.overview', accessState())
+          const contract = permission.allowed
+            ? await loadKnowledgeContract(fetchImpl, credential)
+            : { status: 'forbidden', reason: permission.reason }
           sendJson(res, 200, {
-            status: credential ? 'ready' : 'unavailable',
+            status: credential && permission.allowed ? 'ready' : credential ? 'degraded' : 'unavailable',
             mcp: { route: MCP_URL, auth: credential ? 'credential-store' : 'missing' },
-            capabilities: Object.keys(TOOL_DEFINITIONS),
+            permissionVersion: KNOWLEDGE_PERMISSION_VERSION,
+            permissions: permission,
+            capabilities: { tools: Object.keys(TOOL_DEFINITIONS).map(name => {
+              const remoteName = TOOL_DEFINITIONS[name][0]
+              const capability = resolveKnowledgePermission(remoteName, accessState())
+              return { name, remoteName, access: accessClass(remoteName), allowed: capability.allowed }
+            }) },
             templates: overrides.brand?.tenant === 'sensteed' ? [{ id: 'tenant.all', spaceKey: 'tenant.all', name: '山子高科', description: '山子高科企业知识空间；访问范围由服务端授权决定', entities: ['山子高科'] }] : COMPANY_TEMPLATES,
             contract,
             // Preserve the 0.1 management-page envelope while sourcing it from MCP.
@@ -227,6 +292,11 @@ export function apply(ctx, overrides = {}) {
           sendJson(res, 400, { status: 'error', reason: 'unsupported_action' })
           return
         }
+        const permission = resolveKnowledgePermission(action, accessState())
+        if (!permission.allowed) {
+          sendJson(res, 403, { status: 'forbidden', reason: permission.reason, permissionVersion: KNOWLEDGE_PERMISSION_VERSION })
+          return
+        }
         const violations = validateToolArguments(TOOL_NAMES_BY_REMOTE[action], { input: body.input || {} })
         if (violations.length > 0) {
           sendJson(res, 400, { status: 'error', reason: 'invalid_tool_arguments', details: violations })
@@ -239,6 +309,29 @@ export function apply(ctx, overrides = {}) {
   }
 
   return () => disposers.reverse().forEach(dispose => dispose?.())
+}
+
+function accessClass(tool) {
+  return KNOWLEDGE_WRITE_TOOLS.has(tool) || KNOWLEDGE_CONSOLE_WRITE_TOOLS.has(tool) ? 'write' : KNOWLEDGE_READ_TOOLS.has(tool) || KNOWLEDGE_CONSOLE_READ_TOOLS.has(tool) ? 'read' : 'unknown'
+}
+
+function resolveKnowledgePermission(tool, access) {
+  const entitlements = access?.entitlements
+  const pluginGranted = entitlements?.plugins?.includes?.(KNOWLEDGE_PLUGIN_ID) === true
+  const knowledgeEntitlement = entitlements?.knowledge
+  const permissionVersion = knowledgeEntitlement?.permissionVersion
+  const declaredAccess = Array.isArray(knowledgeEntitlement?.accesses) ? knowledgeEntitlement.accesses : undefined
+  const ready = access?.ready === true
+  const requiredAccess = accessClass(tool)
+  const allowed = ready && pluginGranted && permissionVersion === KNOWLEDGE_PERMISSION_VERSION && declaredAccess?.includes(requiredAccess) === true && requiredAccess !== 'unknown'
+  return {
+    allowed,
+    ready,
+    plugin: KNOWLEDGE_PLUGIN_ID,
+    access: requiredAccess,
+    permissionVersion,
+    reason: !ready ? 'knowledge_access_gate_required' : !pluginGranted ? 'knowledge_plugin_not_entitled' : permissionVersion !== KNOWLEDGE_PERMISSION_VERSION ? 'knowledge_permission_contract_unsupported' : declaredAccess?.includes(requiredAccess) !== true ? 'knowledge_capability_not_declared' : requiredAccess === 'unknown' ? 'knowledge_capability_not_declared' : undefined,
+  }
 }
 
 function validateToolArguments(name, args) {
@@ -508,4 +601,4 @@ function sendJson(res, status, body) {
   res.end(payload)
 }
 
-export { ACTIONS, COMPANY_TEMPLATES, MCP_URL, parseMcpMessage }
+export { ACTIONS, COMPANY_TEMPLATES, KNOWLEDGE_PERMISSION_VERSION, MCP_URL, parseMcpMessage, resolveKnowledgePermission }

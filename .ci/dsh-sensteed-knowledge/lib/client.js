@@ -107,6 +107,35 @@ window.__ModuleLoader__.load({
         retryOverview: "统计暂不可用，但路由与模板仍可用",
         noContent: "没有可展示内容",
         entities: "实体",
+        ontologyTab: "Ontology 管理",
+        assertionsTab: "实体与关系断言",
+        lineageTab: "溯源与合并",
+        knowledgeTab: "Knowledge 管理",
+        memoryManageTab: "Memory 管理",
+        consoleTab: "知识运营",
+        manage: "治理能力",
+        capabilityRead: "读取",
+        capabilityWrite: "写入",
+        capabilityUnavailable: "未授权",
+        noCapability: "当前身份未被授予此能力",
+        loadingCapability: "正在读取治理数据…",
+        ingestTitle: "导入 Knowledge",
+        memoryCaptureTitle: "创建 Memory 候选",
+        promoteTitle: "提升为 Knowledge",
+        content: "内容",
+        titleField: "标题",
+        fileUrl: "文件 URL",
+        sourceMemoryIds: "Memory ID（逗号分隔）",
+        reason: "原因",
+        submit: "提交",
+        ingest: "导入",
+        promote: "提升",
+        remember: "创建候选",
+        missingWriteCapability: "当前身份未被授予写入能力",
+        consoleTitle: "知识运营控制台",
+        consoleHint: "能力与数据均受当前企业身份 ACL 约束",
+        reloadData: "读取",
+        rebuildGraph: "重建知识图谱",
       },
       en: {
         open: "Enterprise knowledge",
@@ -186,6 +215,35 @@ window.__ModuleLoader__.load({
         retryOverview: "Stats unavailable; route and templates remain available",
         noContent: "Nothing to show",
         entities: "Entities",
+        ontologyTab: "Ontology",
+        assertionsTab: "Assertions",
+        lineageTab: "Lineage & merges",
+        knowledgeTab: "Knowledge management",
+        memoryManageTab: "Memory management",
+        consoleTab: "Knowledge operations",
+        manage: "Governance capabilities",
+        capabilityRead: "Read",
+        capabilityWrite: "Write",
+        capabilityUnavailable: "Not entitled",
+        noCapability: "This capability is not granted to the current identity",
+        loadingCapability: "Loading governance data…",
+        ingestTitle: "Ingest Knowledge",
+        memoryCaptureTitle: "Create Memory candidate",
+        promoteTitle: "Promote to Knowledge",
+        content: "Content",
+        titleField: "Title",
+        fileUrl: "File URL",
+        sourceMemoryIds: "Memory IDs (comma separated)",
+        reason: "Reason",
+        submit: "Submit",
+        ingest: "Ingest",
+        promote: "Promote",
+        remember: "Create candidate",
+        missingWriteCapability: "Write access is not granted to this identity",
+        consoleTitle: "Knowledge operations console",
+        consoleHint: "Capabilities and data are constrained by the current enterprise ACL",
+        reloadData: "Load",
+        rebuildGraph: "Rebuild graph",
       },
     };
     let opened = false;
@@ -1013,10 +1071,90 @@ window.__ModuleLoader__.load({
               ),
       );
     }
+    function capabilityMap(data) {
+      const values = data?.capabilities?.tools || data?.capabilities || [];
+      return new Map((Array.isArray(values) ? values : []).map(item => [item.remoteName || item.name, item.allowed === false ? "unknown" : item.access || "unknown"]));
+    }
+    function Management({ data, t, tab, busy, result, onLoad, onWrite }) {
+      const [content, setContent] = useState("");
+      const [title, setTitle] = useState("");
+      const [fileUrl, setFileUrl] = useState("");
+      const [sourceMemoryIds, setSourceMemoryIds] = useState("");
+      const [reason, setReason] = useState("");
+      const [entityId, setEntityId] = useState("");
+      const capabilities = data?.capabilities || {};
+      const rows = Array.isArray(capabilities.tools) ? capabilities.tools : [];
+      const write = (tool, input) => onWrite?.(tool, input);
+      const allowed = new Set(tab === "ontology"
+        ? ["knowledge.entity_assertions"]
+        : tab === "assertions"
+          ? ["knowledge.relation_assertions"]
+          : ["knowledge.entity_merges", "knowledge.provenance_lineage"]);
+      const items = rows.filter(item => allowed.has(item.remoteName || item.name)).slice(0, 100);
+      const tool = tab === "ontology" ? "entity_assertions" : tab === "assertions" ? "relation_assertions" : "provenance_lineage";
+      const managementTools = tab === "lineage" ? ["entity_merges", "provenance_lineage"] : [tool];
+      const payload = result?.structuredContent || result?.data || result;
+      const records = Array.isArray(payload?.items) ? payload.items : Array.isArray(payload?.list) ? payload.list : [];
+      if (tab === "console") return h("div", { className: "yk-page" },
+        h("section", { className: "yk-panel" },
+          h(Title, { title: t("consoleTitle") }),
+          h("p", { className: "yk-muted" }, t("consoleHint")),
+          h("div", { className: "yk-management-console" }, [
+            ["spaces", "知识空间"], ["sources", "内容接入"], ["memories", "Memory"], ["recall_traces", "召回追踪"],
+            ["session_handoffs", "会话交接"], ["memory_feedbacks", "Memory 反馈"], ["memory_conflicts", "Memory 冲突"],
+            ["capability_catalog", "能力目录"], ["environment_facts", "环境事实"], ["skills", "技能"],
+            ["acl_grants", "资源授权"], ["principals", "主体"], ["ontologies", "Ontology"],
+          ].map(([tool, label]) => h("button", { type: "button", className: "yk-management-card", key: tool, disabled: busy || !capabilityMap(data).has(`knowledge.${tool}`), onClick: () => onLoad(tool) }, h("strong", null, label), h("span", null, capabilityMap(data).has(`knowledge.${tool}`) ? t("reloadData") : t("capabilityUnavailable"))))),
+          h("button", { type: "button", className: "yk-primary", disabled: busy || !capabilityMap(data).has("knowledge.rebuild_graph"), onClick: () => onWrite("rebuild_graph", { reason: "desktop-console" }) }, busy ? t("loadingCapability") : t("rebuildGraph")),
+          records.length ? h("div", { className: "yk-management-records" }, records.slice(0, 100).map((item, index) => h("pre", { key: item.id || index }, JSON.stringify(item, null, 2)))) : null,
+        ),
+      );
+      if (tab === "knowledge") return h("div", { className: "yk-page" },
+        h("section", { className: "yk-panel" },
+          h(Title, { title: t("ingestTitle") }),
+          h("textarea", { className: "yk-management-input", value: content, placeholder: t("content"), onInput: event => setContent(event.currentTarget.value), rows: 7 }),
+          h("input", { className: "yk-management-input", value: title, placeholder: t("titleField"), onInput: event => setTitle(event.currentTarget.value) }),
+          h("input", { className: "yk-management-input", value: fileUrl, placeholder: t("fileUrl"), onInput: event => setFileUrl(event.currentTarget.value) }),
+          h("button", { type: "button", className: "yk-primary", disabled: busy || !content.trim() || !fileUrl.trim() || !capabilityMap(data).has("knowledge.ingest_file"), onClick: () => write("ingest_file", { text: content.trim(), fileUrl: fileUrl.trim(), title: title.trim() || undefined }) }, busy ? t("loadingCapability") : t("ingest")),
+          !capabilityMap(data).has("knowledge.ingest_file") ? h("p", { className: "yk-muted" }, t("missingWriteCapability")) : null,
+        ),
+        h("section", { className: "yk-panel" },
+          h(Title, { title: t("promoteTitle") }),
+          h("input", { className: "yk-management-input", value: sourceMemoryIds, placeholder: t("sourceMemoryIds"), onInput: event => setSourceMemoryIds(event.currentTarget.value) }),
+          h("input", { className: "yk-management-input", value: title, placeholder: t("titleField"), onInput: event => setTitle(event.currentTarget.value) }),
+          h("input", { className: "yk-management-input", value: reason, placeholder: t("reason"), onInput: event => setReason(event.currentTarget.value) }),
+          h("button", { type: "button", className: "yk-primary", disabled: busy || !sourceMemoryIds.trim() || !title.trim() || !reason.trim() || !capabilityMap(data).has("knowledge.promote"), onClick: () => write("promote", { sourceMemoryIds: sourceMemoryIds.split(",").map(value => value.trim()).filter(Boolean), targetSpaceKey: "tenant.all", title: title.trim(), classification: "INTERNAL", reason: reason.trim() }) }, busy ? t("loadingCapability") : t("promote")),
+        ),
+      );
+      if (tab === "memoryManage") return h("div", { className: "yk-page" },
+        h("section", { className: "yk-panel" },
+          h(Title, { title: t("memoryCaptureTitle") }),
+          h("textarea", { className: "yk-management-input", value: content, placeholder: t("content"), onInput: event => setContent(event.currentTarget.value), rows: 7 }),
+          h("input", { className: "yk-management-input", value: reason, placeholder: t("reason"), onInput: event => setReason(event.currentTarget.value) }),
+          h("button", { type: "button", className: "yk-primary", disabled: busy || !content.trim() || !capabilityMap(data).has("knowledge.remember"), onClick: () => write("remember", { content: content.trim(), captureReason: reason.trim() || "user-created" }) }, busy ? t("loadingCapability") : t("remember")),
+          !capabilityMap(data).has("knowledge.remember") ? h("p", { className: "yk-muted" }, t("missingWriteCapability")) : null,
+        ),
+      );
+      return h("div", { className: "yk-page" },
+        h("section", { className: "yk-panel" },
+          h(Title, { title: t(tab === "ontology" ? "ontologyTab" : tab === "assertions" ? "assertionsTab" : "lineageTab") }),
+          h("p", { className: "yk-muted" }, items.length ? `${items.length} ${t("manage")}` : t("noCapability")),
+          tab === "lineage" ? h("input", { className: "yk-management-input", value: entityId, placeholder: "Entity ID", onInput: event => setEntityId(event.currentTarget.value) }) : null,
+          h("div", { className: "yk-management-list" }, items.map(item => h("div", { className: "yk-management-row", key: item.name || item.remoteName },
+            h("strong", null, item.name || item.remoteName),
+            h("span", null, item.allowed === false ? t("capabilityUnavailable") : item.access === "write" ? t("capabilityWrite") : item.access === "read" ? t("capabilityRead") : t("capabilityUnavailable")),
+          ))),
+          records.length ? h("div", { className: "yk-management-records" }, records.slice(0, 100).map((item, index) => h("pre", { key: item.id || index }, JSON.stringify(item, null, 2)))) : null,
+          h("div", { className: "yk-management-actions" }, managementTools.map(item => h("button", { type: "button", className: "yk-primary", key: item, disabled: busy || !capabilityMap(data).has(`knowledge.${item}`) || (item === "provenance_lineage" && !entityId.trim()), onClick: () => onLoad(item, item === "provenance_lineage" ? { entityId: entityId.trim(), maxDepth: 5 } : { page: 1, limit: 100 }) }, busy ? t("loadingCapability") : t("refresh")))),
+        ),
+      );
+    }
     function Overlay({ t }) {
       const visible = useSyncExternalStore(subscribe, snapshot, snapshot);
       const shellRef = useRef(null);
       const [tab, setTab] = useState("overview");
+      const [managementResult, setManagementResult] = useState(null);
+      const [managementBusy, setManagementBusy] = useState(false);
       const [revision, setRevision] = useState(0);
       const [data, setData] = useState(null);
       const [error, setError] = useState(false);
@@ -1089,6 +1227,33 @@ window.__ModuleLoader__.load({
         loadingRef.current = true;
         setLoading(true);
         setRevision((value) => value + 1);
+      };
+      const loadManagement = async (tool, input = { page: 1, limit: 100 }) => {
+        if (managementBusy) return;
+        setManagementBusy(true);
+        setActionError(false);
+        try {
+          const response = await mutate({ action: tool, input });
+          setManagementResult(response.result || response);
+        } catch (cause) {
+          setActionError(cause);
+        } finally {
+          setManagementBusy(false);
+        }
+      };
+      const runManagementAction = async (tool, input) => {
+        if (managementBusy) return;
+        setManagementBusy(true);
+        setActionError(false);
+        try {
+          const response = await mutate({ action: tool, input });
+          setManagementResult(response.result || response);
+          await reload();
+        } catch (cause) {
+          setActionError(cause);
+        } finally {
+          setManagementBusy(false);
+        }
       };
       const runGraph = async (value) => {
         const query = String(value || graphQuery).trim();
@@ -1246,6 +1411,8 @@ window.__ModuleLoader__.load({
           onTemplate: chooseTemplate,
           onOpenMemory: openMemory,
         });
+      else if (["console", "knowledge", "memoryManage", "ontology", "assertions", "lineage"].includes(tab))
+        body = h(Management, { data: current, t, tab, busy: managementBusy, result: managementResult, onLoad: loadManagement, onWrite: runManagementAction });
       else
         body = h(Overview, {
           data: current,
@@ -1328,7 +1495,13 @@ window.__ModuleLoader__.load({
             [
               ["overview", t("overview")],
               ["memories", t("memoriesTab")],
+              ["memoryManage", t("memoryManageTab")],
+              ["knowledge", t("knowledgeTab")],
+              ["console", t("consoleTab")],
               ["graph", t("graphTab")],
+              ["ontology", t("ontologyTab")],
+              ["assertions", t("assertionsTab")],
+              ["lineage", t("lineageTab")],
             ].map(([id, label]) =>
               h(
                 "button",
@@ -1379,6 +1552,7 @@ window.__ModuleLoader__.load({
     const themeRefinementCss = `.yk-metric,.yk-record,.yk-memory-row{border-color:var(--dsw-alias-border-l1)!important}.yk-bar-track{background:var(--dsw-alias-bg-layer-2)!important}.yk-record-icon,.yk-template b,.yk-node-detail{background:var(--dsw-alias-bg-layer-2)!important;color:var(--dsw-alias-brand-primary)!important}.yk-template em{color:var(--dsw-alias-brand-primary)!important}.yk-chip{background:var(--dsw-alias-bg-layer-2)!important;border-color:var(--dsw-alias-border-l1)!important;color:var(--dsw-alias-label-primary)!important}.yk-row-actions .yk-quiet,.yk-error button{border-color:var(--dsw-alias-border-l1)!important;background:var(--dsw-alias-bg-layer-1)!important;color:var(--dsw-alias-label-secondary)!important}.yk-node-detail small,.yk-node-detail-empty{color:var(--dsw-alias-label-secondary)!important}.yk-source-ready i{background:var(--dsw-alias-state-success-primary)!important}.yk-source-degraded i,.yk-source-unavailable i{background:var(--dsw-alias-state-warn-primary)!important}.yk-source-error i{background:var(--dsw-alias-state-error-primary)!important}.yk-source-queued i{background:var(--dsw-alias-brand-primary)!important}.yk-spinner{border-color:var(--dsw-alias-border-l2)!important;border-top-color:var(--dsw-alias-brand-primary)!important}.yk-metric:before,.yk-metric-blue:before{background:var(--dsw-alias-brand-primary)!important}.yk-metric-teal:before,.yk-bar-processing{background:var(--dsw-alias-state-success-primary)!important}.yk-metric-violet:before,.yk-bar-queued{background:var(--dsw-alias-label-tertiary)!important}.yk-metric-amber:before{background:var(--dsw-alias-state-warn-primary)!important}.yk-bar-failed{background:var(--dsw-alias-state-error-primary)!important}.yk-edge{stroke:var(--dsw-alias-border-l2)!important}.yk-node circle{fill:color-mix(in srgb,var(--dsw-alias-brand-primary) 12%,var(--dsw-alias-bg-layer-1))!important;stroke:var(--dsw-alias-brand-primary)!important}.yk-node:nth-of-type(4n) circle{fill:color-mix(in srgb,var(--dsw-alias-state-success-primary) 12%,var(--dsw-alias-bg-layer-1))!important;stroke:var(--dsw-alias-state-success-primary)!important}.yk-node:nth-of-type(4n+1) circle{fill:color-mix(in srgb,var(--dsw-alias-state-warn-primary) 12%,var(--dsw-alias-bg-layer-1))!important;stroke:var(--dsw-alias-state-warn-primary)!important}.yk-node.is-selected circle{fill:var(--dsw-alias-bg-layer-1)!important;stroke:var(--dsw-alias-brand-primary)!important}.yk-node text{fill:var(--dsw-alias-label-secondary)!important}.yk-node.is-selected text{fill:var(--dsw-alias-label-primary)!important}`;
     // Keep long node identities inside the detail card; the graph canvas owns its own scrolling.
     const contentLayoutCss = `.yk-page,.yk-graph-panel,.yk-graph-wrap,.yk-node-detail{min-width:0}.yk-graph-panel,.yk-graph-wrap{grid-template-columns:minmax(0,1fr)}.yk-node-detail{overflow-wrap:anywhere}`;
+    const managementCss = `.yk-management-list{display:grid;gap:8px}.yk-management-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--dsw-alias-border-l1);border-radius:7px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font-size:12px}.yk-management-row span{color:var(--dsw-alias-label-secondary);font-size:11px}.yk-management-records{display:grid;gap:8px;max-height:420px;overflow:auto}.yk-management-records pre{margin:0;padding:10px;border:1px solid var(--dsw-alias-border-l1);border-radius:7px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-secondary);font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere}.yk-management-input{box-sizing:border-box;width:100%;padding:9px 10px;border:1px solid var(--dsw-alias-border-l1);border-radius:7px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;resize:vertical}.yk-management-actions{display:flex;flex-wrap:wrap;gap:8px}.yk-management-console{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.yk-management-card{display:grid;gap:4px;padding:12px;border:1px solid var(--dsw-alias-border-l1);border-radius:7px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);text-align:left;cursor:pointer}.yk-management-card span{color:var(--dsw-alias-label-secondary);font-size:11px}.yk-management-card:disabled{cursor:not-allowed;opacity:.45}@media(max-width:720px){.yk-management-console{grid-template-columns:repeat(2,minmax(0,1fr))}}`;
     function apply(ctx) {
       ctx.effect(
         () => ctx.locale.register(NS, copy),
@@ -1391,7 +1565,7 @@ window.__ModuleLoader__.load({
       ctx.effect(() => {
         const style = document.createElement("style");
         style.dataset.plugin = "@dofe/dsh-sensteed-knowledge";
-        style.textContent = css + stateCss + themeCss + themeRefinementCss + contentLayoutCss;
+        style.textContent = css + stateCss + themeCss + themeRefinementCss + contentLayoutCss + managementCss;
         document.head.appendChild(style);
         return () => style.remove();
       }, "dofe-sensteed-knowledge: styles");

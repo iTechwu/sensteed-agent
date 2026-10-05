@@ -4,14 +4,30 @@ import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import vm from 'node:vm'
-import { ACTIONS, COMPANY_TEMPLATES, MCP_URL, apply } from '../index.js'
+import { ACTIONS, COMPANY_TEMPLATES, KNOWLEDGE_PERMISSION_VERSION, MCP_URL, apply as applyKnowledge, resolveKnowledgePermission } from '../index.js'
 
 const root = new URL('../', import.meta.url)
+const readyAccess = { ready: true, entitlements: { plugins: ['knowledge'], knowledge: { plugin: 'knowledge', permissionVersion: KNOWLEDGE_PERMISSION_VERSION, accesses: ['read', 'write'] } } }
+const apply = (ctx, overrides) => applyKnowledge({ dofeAccess: readyAccess, ...ctx }, overrides)
 
 test('normalizes partial knowledge sources to the degraded warning state', async () => {
   const source = await readFile(new URL('src/client.js', root), 'utf8')
   assert.match(source, /"partial", "warning", "error"/u)
   assert.match(source, /value === "partial" \|\| value === "warning" \? "degraded"/u)
+})
+
+test('aligns Memory and Knowledge permissions with the shared access gate', async () => {
+  assert.equal(resolveKnowledgePermission('knowledge.recall', readyAccess).allowed, true)
+  assert.equal(resolveKnowledgePermission('knowledge.remember', readyAccess).allowed, true)
+  assert.equal(resolveKnowledgePermission('knowledge.remember', { ...readyAccess, ready: false }).reason, 'knowledge_access_gate_required')
+  assert.equal(resolveKnowledgePermission('knowledge.search', { ready: true, entitlements: { plugins: [] } }).reason, 'knowledge_plugin_not_entitled')
+  assert.equal(resolveKnowledgePermission('knowledge.remember', { ready: true, entitlements: { plugins: ['knowledge'], knowledge: { permissionVersion: KNOWLEDGE_PERMISSION_VERSION, accesses: ['read'] } } }).reason, 'knowledge_capability_not_declared')
+})
+
+test('exposes full Knowledge, Memory, Ontology, and graph management surfaces in the client', async () => {
+  const source = await readFile(new URL('src/client.js', root), 'utf8')
+  for (const token of ['knowledgeTab', 'memoryManageTab', 'consoleTab', 'yk-management-console', 'ingest_file', 'fileUrl', 'knowledge.promote', 'knowledge.remember', 'knowledge.entity_assertions', 'knowledge.relation_assertions', 'knowledge.entity_merges', 'knowledge.provenance_lineage', 'memoryCaptureTitle', 'ingestTitle', 'promoteTitle', 'entityId']) assert.match(source, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'u'))
+  assert.match(source, /style\.textContent = css \+ stateCss \+ themeCss \+ themeRefinementCss \+ contentLayoutCss \+ managementCss/u)
 })
 
 async function loadClientTestApi() {
@@ -57,6 +73,22 @@ test('exposes governed knowledge, Memory, and graph tools without direct endpoin
     description: '哪吒默认企业知识空间；公司、项目、会员与服务资料统一归档，所有哪吒成员可读',
     entities: ['哪吒', '长沙哪吒汽车销售服务有限公司', '汽车科技文创园', '会员与5S服务'],
   }])
+})
+
+test('covers the public Knowledge console contract without bypassing the MCP gateway', async () => {
+  const source = await readFile(new URL('index.js', root), 'utf8')
+  for (const token of [
+    'knowledge_spaces', 'knowledge_sources', 'knowledge_memories', 'knowledge_recall_traces',
+    'knowledge_session_handoffs', 'knowledge_memory_feedbacks', 'knowledge_memory_conflicts',
+    'knowledge_capability_catalog', 'knowledge_environment_facts', 'knowledge_skills',
+    'knowledge_acl_grants', 'knowledge_principals', 'knowledge_ontologies',
+    'knowledge_create_space', 'knowledge_create_source', 'knowledge_create_ontology_version',
+    'knowledge_publish_ontology', 'knowledge_export_ontology', 'knowledge_import_ontology',
+    'knowledge_grant_acl', 'knowledge_grant_document_principal', 'knowledge_rebuild_graph',
+  ]) assert.match(source, new RegExp(token, 'u'))
+  assert.match(source, /const KNOWLEDGE_CONSOLE_READ_TOOLS/u)
+  assert.match(source, /const KNOWLEDGE_CONSOLE_WRITE_TOOLS/u)
+  assert.match(source, /accessClass\(remoteName\)/u)
 })
 
 test('publishes an explicit Knowledge versus Web routing contract', async () => {
@@ -144,6 +176,21 @@ test('rejects invalid management actions before contacting the gateway', async (
   assert.equal(response.status, 400)
   assert.equal(response.body.reason, 'invalid_tool_arguments')
   assert.equal(calls, 0)
+})
+
+test('blocks management actions when the shared access gate is not ready', async () => {
+  let route
+  applyKnowledge({
+    dofeAccess: { ready: false, entitlements: readyAccess.entitlements },
+    credentials: { async resolve() { return { value: 'test-key' } } },
+    tools: { register() { return () => {} } },
+    systemPrompt: { section() { return () => {} } },
+    webServer: { register(value) { route = value; return () => {} } },
+  }, { fetch: async () => new Response('{}', { status: 200 }) })
+  const response = await invoke(route, 'POST', { action: 'remember', input: { content: 'blocked' } })
+  assert.equal(response.status, 403)
+  assert.equal(response.body.reason, 'knowledge_access_gate_required')
+  assert.equal(response.body.permissionVersion, KNOWLEDGE_PERMISSION_VERSION)
 })
 
 test('exposes explicit memory confirmation through the authenticated knowledge MCP route', async () => {
@@ -400,6 +447,8 @@ test('GET overview reads overview and capabilities through the public MCP contra
   assert.equal(response.body.mcp.auth, 'credential-store')
   assert.equal(response.body.templates.length, 1)
   assert.equal(response.body.contract.status, 'ready')
+  assert.equal(response.body.permissions.allowed, true)
+  assert.equal(response.body.capabilities.tools.find(item => item.remoteName === 'knowledge.remember').allowed, true)
   assert.deepEqual(response.body.overview.data, {
     spaces: 4, documents: 58, memories: 121, pendingImports: 2,
     recentDocuments: [{ id: 'd-1', title: '会员政策', content: '', status: '', type: '', scope: '', sourceType: '', updatedAt: '2026-09-01T00:00:00Z' }],
@@ -408,6 +457,22 @@ test('GET overview reads overview and capabilities through the public MCP contra
   assert.equal(requests.length, 2)
   assert.ok(requests.every(request => request.url === MCP_URL))
   assert.ok(requests.every(request => request.init.headers.Authorization === 'Bearer test-key'))
+})
+
+test('GET overview marks every capability unavailable when the shared access gate is closed', async () => {
+  let route
+  applyKnowledge({
+    dofeAccess: { ready: false, entitlements: readyAccess.entitlements },
+    credentials: { async resolve() { return { value: 'test-key', source: 'memory' } } },
+    tools: { register() { return () => {} } },
+    systemPrompt: { section() { return () => {} } },
+    webServer: { register(value) { route = value; return () => {} } },
+  })
+  const response = await invoke(route, 'GET')
+  assert.equal(response.status, 200)
+  assert.equal(response.body.status, 'degraded')
+  assert.equal(response.body.permissions.allowed, false)
+  assert.ok(response.body.capabilities.tools.every(item => item.allowed === false))
 })
 
 test('GET overview failure stays isolated from route facts and templates', async () => {
