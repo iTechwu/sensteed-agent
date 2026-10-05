@@ -67,15 +67,15 @@ function fixture(mutateStaged = false): { options: WindowsNsisAbBuildOptions, ca
   const outputRoot = join(desktopRoot, 'dist', 'nsis-ab', 'test')
   const electronBuilderRoot = join(workspaceRoot, 'dependencies', 'electron-builder')
   const appBuilderLibRoot = join(workspaceRoot, 'dependencies', 'app-builder-lib')
-  const appBuilderPatch = join(workspaceRoot, 'patches', 'app-builder-lib@26.15.7.patch')
+  const appBuilderPatch = join(workspaceRoot, 'patches', 'app-builder-lib@26.17.0.patch')
   mkdirSync(desktopRoot, { recursive: true })
   writeFileSync(join(desktopRoot, 'package.json'), '{"version":"9.8.7"}\n')
   mkdirSync(electronBuilderRoot, { recursive: true })
   mkdirSync(join(appBuilderLibRoot, 'templates', 'nsis', 'include'), { recursive: true })
   mkdirSync(join(workspaceRoot, 'patches'), { recursive: true })
-  writeFileSync(join(electronBuilderRoot, 'package.json'), '{"version":"26.15.7"}\n')
+  writeFileSync(join(electronBuilderRoot, 'package.json'), '{"version":"26.17.0"}\n')
   writeFileSync(join(electronBuilderRoot, 'cli.js'), '')
-  writeFileSync(join(appBuilderLibRoot, 'package.json'), '{"version":"26.15.7"}\n')
+  writeFileSync(join(appBuilderLibRoot, 'package.json'), '{"version":"26.17.0"}\n')
   writeFileSync(
     join(appBuilderLibRoot, 'templates', 'nsis', 'include', 'extractAppPackage.nsh'),
     '# favors install speed over atomic replacement\n',
@@ -272,7 +272,7 @@ describe('Windows NSIS A/B packaging', () => {
       '--reverse',
       '--unsafe-paths',
       '--include=templates/nsis/include/extractAppPackage.nsh',
-      fileURLToPath(new URL('../../patches/app-builder-lib@26.15.7.patch', import.meta.url)),
+      fileURLToPath(new URL('../../patches/app-builder-lib@26.17.0.patch', import.meta.url)),
     ], {
       env: {
         ...process.env,

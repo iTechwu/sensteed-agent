@@ -1086,7 +1086,17 @@ export function diagnoseArchiveScope(
         : segments[2] ?? '')
     }
     const rawNodeModules = rawRootKeys.filter(key => key.replaceAll('\\', '/').startsWith('node_modules')).length
-    return `archive holds ${files.size} entries total, none under ${prefix}; raw root keys: ${rawRootKeys.length} (node_modules-prefixed: ${rawNodeModules}, sample: ${rawRootKeys.slice(0, 8).map(key => JSON.stringify(key)).join(', ')}); packaged top-level packages: ${[...packageNames].sort().slice(0, 25).join(', ')}`
+    const nodeModulesEntry = rawHeader.files?.['node_modules'] as
+      | { files?: Record<string, unknown>; link?: string; size?: number; unpacked?: boolean }
+      | undefined
+    const nodeModulesShape = nodeModulesEntry === undefined
+      ? 'absent'
+      : nodeModulesEntry.link !== undefined
+        ? `link -> ${JSON.stringify(nodeModulesEntry.link)}`
+        : nodeModulesEntry.files === undefined
+          ? `leaf(size=${String(nodeModulesEntry.size)}, unpacked=${String(nodeModulesEntry.unpacked)})`
+          : `dir with ${Object.keys(nodeModulesEntry.files).length} children: ${Object.keys(nodeModulesEntry.files).slice(0, 6).map(key => JSON.stringify(key)).join(', ')}`
+    return `archive holds ${files.size} entries total, none under ${prefix}; raw root keys: ${rawRootKeys.length} (node_modules-prefixed: ${rawNodeModules}, sample: ${rawRootKeys.slice(0, 8).map(key => JSON.stringify(key)).join(', ')}); node_modules entry shape: ${nodeModulesShape}; packaged top-level packages: ${[...packageNames].sort().slice(0, 25).join(', ')}`
   } catch (diagnosticCause) {
     return `archive scope scan itself failed: ${diagnosticCause instanceof Error ? diagnosticCause.message : String(diagnosticCause)}`
   }
