@@ -18,7 +18,7 @@ function portListeners(port: string | number): string {
   return out.trim() === '' ? `(nothing listening on ${String(port)})` : out.trim()
 }
 
-it.each(['disabled', 'missing', 'installed'] as const)('boots a separate Web Host with client plugins (AA provider: %s)', async aaProvider => {
+it.each(['disabled', 'installed'] as const)('boots a separate Web Host with client plugins (AA provider: %s)', async aaProvider => {
   const aaRequested = aaProvider !== 'disabled'
   const aaEnabled = aaProvider === 'installed'
   const home = mkdtempSync(join(tmpdir(), 'dsh-isolated-host-'))
@@ -47,9 +47,11 @@ it.each(['disabled', 'missing', 'installed'] as const)('boots a separate Web Hos
       writeFileSync(join(provider, 'index.js'), 'export function apply(ctx) { ctx.provide("agentsAnywhereRuntime", {}); ctx.provide("agentsAnywhereOnboarding", {}) }\n')
     }
     const prepared = prepareDesktopProfile('1', home, 'win32', undefined, undefined, undefined, { aaEnabled: aaRequested })
+    // AA ships as a bundled hard dependency at the install anchor since
+    // 7f0565472c, so a request without a profile fixture still resolves the
+    // layer there — a providerless boot is no longer reachable from here.
     expect(prepared.aaEnabled).toBe(aaEnabled)
-    if (aaProvider === 'missing') expect(prepared.aaFailure).toBeTruthy()
-    else expect(prepared.aaFailure).toBeUndefined()
+    expect(prepared.aaFailure).toBeUndefined()
     // dsh 0.1.7 imports the home settings document during every first boot and
     // reconciles profile patches, which restarts the Web server with the
     // command-line port winning over the composed row. The row default and the
