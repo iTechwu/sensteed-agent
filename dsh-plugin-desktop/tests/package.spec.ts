@@ -171,7 +171,10 @@ describe('published package surface', () => {
       .toBe('node scripts/build-dofe-ui.mjs')
     expect(dofeUiBuild).not.toContain("'dsh-yootun-audit'")
     expect(manifest.scripts?.['test:audit-ui']).toBe('node tests/browser/yootun-audit.visual.mjs')
-    expect(ciWorkflow.match(/node scripts\/prepare-dofe-ui\.mjs/g)).toHaveLength(4)
+    // check、desktop-windows、desktop-linux、desktop-macos、
+    // upstream-command-windows 五个 job 各自在打包/冒烟前物化 sibling
+    // 插件快照，一处都不能少。
+    expect(ciWorkflow.match(/node scripts\/prepare-dofe-ui\.mjs/g)).toHaveLength(5)
   })
 
   it('keeps CI fallback snapshots for every preinstalled plugin', () => {
