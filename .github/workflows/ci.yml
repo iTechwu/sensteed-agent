@@ -211,7 +211,22 @@ jobs:
           CI: 'false'
           npm_config_minimum_release_age: '0'
           DSH_PACKAGE_CHECK_ALREADY_RAN: '1'
+          DEBUG: 'electron-builder,electron-builder:*'
         run: pnpm --filter dsh-plugin-desktop dist:win
+      - name: Inspect packaged output on failure
+        if: failure()
+        shell: pwsh
+        run: |
+          $res = "dsh-plugin-desktop/dist/win-unpacked/resources"
+          if (Test-Path "$res/app.asar") {
+            "app.asar bytes: $((Get-Item "$res/app.asar").Length)"
+          } else { "no app.asar" }
+          $un = "$res/app.asar.unpacked/node_modules"
+          if (Test-Path $un) {
+            "unpacked node_modules files: $((Get-ChildItem $un -Recurse -File | Measure-Object).Count)"
+          } else { "no unpacked node_modules" }
+          $bridge = "$res/app.asar.unpacked/node_modules/@agents-anywhere/dsh-bridge-next"
+          if (Test-Path "$bridge/package.json") { "bridge package.json: present physically" } else { "bridge package.json: absent physically" }
       - name: Build Windows portable archive
         env:
           CI: 'false'
