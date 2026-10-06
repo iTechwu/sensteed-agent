@@ -188,6 +188,10 @@ jobs:
           CI: 'false'
           npm_config_minimum_release_age: '0'
         run: pnpm --filter dsh-plugin-desktop check:win-package
+      - name: Install headless Chromium
+        run: pnpm --dir ../deepseek-harness/apps/web exec playwright install chromium
+      - name: Verify Windows renderer startup
+        run: pnpm --filter dsh-plugin-desktop verify:renderer
       - name: Probe installed AA bridge layout
         shell: pwsh
         run: |

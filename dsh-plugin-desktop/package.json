@@ -142,6 +142,7 @@
     "verify:loader": "node scripts/verify-loader-boot.mjs",
     "verify:sensteed-clients": "node --test scripts/sensteed-client-runtime.spec.mjs && node scripts/verify-sensteed-client-runtime.mjs",
     "verify:profile": "node scripts/verify-profile-boot.mjs",
+    "verify:renderer": "node scripts/verify-profile-boot.mjs --renderer --compatibility && node scripts/verify-profile-boot.mjs --renderer",
     "verify:licenses": "node --test scripts/license-file.spec.mjs && node scripts/verify-licenses.mjs",
     "verify:operations": "node --test scripts/operation-reliability.spec.mjs && node scripts/verify-operation-reliability.mjs",
     "verify:notices": "node scripts/verify-licenses.mjs --notices THIRD_PARTY_NOTICES.md",

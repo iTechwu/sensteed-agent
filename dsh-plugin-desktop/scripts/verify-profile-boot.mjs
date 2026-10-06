@@ -6,7 +6,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, write
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { boot, composeEntries, resolveProfileDir } from '@deepseek-ai/dsh-app-boot'
+import { boot, composeEntries, createRuntimeResolution, PluginPackages, resolveProfileDir } from '@deepseek-ai/dsh-app-boot'
 import { provideCmdline } from '@deepseek-ai/dsh-cmdline'
 import {
   createLaunchEnvironmentSnapshot,
@@ -17,6 +17,7 @@ import { installDesktopPnpmRuntime } from '../lib/desktop-runtime-environment.js
 import { installProfilePackageResolver } from '../lib/module-resolution.js'
 import { healDesktopProfileModuleFallback, prepareDesktopProfile } from '../lib/profile.js'
 import { DesktopProfileService } from '../lib/profile-service.js'
+import { verifyProfileRenderer } from './verify-profile-renderer.mjs'
 
 const BIN_NAME = 'dsh-plugin-desktop-profile-smoke'
 const HOST_SERVICE_PLUGIN_NAME = 'sensteed-agent-host-services-smoke-plugin'
@@ -45,6 +46,10 @@ const LAN_HTTPS = Object.freeze({
   async stop() { return LAN_HTTPS_SNAPSHOT },
 })
 const home = mkdtempSync(join(tmpdir(), 'sensteed-agent-profile-'))
+process.env.DSH_HOME = home
+const mode = process.argv.includes('--compatibility') ? 'compatibility' : 'advanced'
+const verifyRenderer = process.argv.includes('--renderer')
+let rendererReport
 let ctx
 let releasePackageResolver
 let pnpmRuntime
@@ -55,7 +60,7 @@ const trayItems = []
 try {
   writeFileSync(join(home, 'settings.yaml'), [
     'sensteed-agent:',
-    '  mode: advanced',
+    `  mode: ${mode}`,
     'agent-presets:',
     '  default: minimal',
     '',
@@ -69,7 +74,7 @@ try {
     '# User layer: overrides the base-bundle desktop-shell row in place.',
     '- id: desktop-shell',
     '  config:',
-    '    mode: advanced',
+    `    mode: ${mode}`,
     '',
   ].join('\n'))
   const aaRequested = process.env.DSH_VERIFY_AA === '1'
@@ -175,13 +180,19 @@ try {
     setLocalePreference(preference) { runtime.locale = preference ?? 'en' },
     setThemeSource(source) { nativeThemeSource = source },
     async requestRestart() {},
+    reportRendererBoot(report) { rendererReport = report },
     prepareToQuit() {},
   }
+  const resolution = await createRuntimeResolution({
+    installAnchor: fileURLToPath(new URL('../package.json', import.meta.url)),
+    profile: prepared.profile,
+  })
   ctx = await boot(
     BIN_NAME,
     prepared.rootConfig,
     patches,
     async (host) => {
+      await host.plugin(PluginPackages, { resolution })
       // dsh 0.1.7 gates the base-bundle rows (settings, config-editor, hmr, …)
       // on `profileContext`, which only a profile launcher provides. The smoke
       // IS a profile launcher: supply the same launcher facts the production
@@ -306,11 +317,12 @@ try {
     throw new Error(`assembled Windows browse picker listed ${listing.path} instead of ${home}`)
   }
 
-  const expectedUrl = `http://127.0.0.1:${String(ctx.webServer.port)}/?sensteed-agent-mode=advanced&sensteed-agent-platform=win32&sensteed-agent-version=2.0.0&sensteed-agent-material=off&sensteed-agent-mica=1`
+  const titlebar = mode === 'compatibility' ? '&sensteed-agent-titlebar-inset=36' : ''
+  const expectedUrl = `http://127.0.0.1:${String(ctx.webServer.port)}/?sensteed-agent-mode=${mode}&sensteed-agent-platform=win32&sensteed-agent-version=2.0.0&sensteed-agent-material=off${titlebar}&sensteed-agent-mica=1`
   if (mountedSpec?.url !== expectedUrl) {
     throw new Error(`desktop plugin produced an unexpected renderer URL: ${String(mountedSpec?.url)}`)
   }
-  if (mountedSpec?.mode !== 'advanced') {
+  if (mountedSpec?.mode !== mode) {
     throw new Error(`desktop plugin produced an unexpected shell mode: ${String(mountedSpec?.mode)}`)
   }
   if (mountedSpec?.rendererAccessHeader !== BROWSER_ACCESS.rendererHeader) {
@@ -322,8 +334,8 @@ try {
   // 0.1.7 keys live settings by Loader entry id; the legacy 'sensteed-agent'
   // section name only exists in the harness-home document before the import.
   const desktopSettings = ctx.settings.get('desktop-shell')
-  if (desktopSettings?.mode !== 'advanced') {
-    throw new Error('assembled Host settings are missing the advanced desktop-shell mode')
+  if (desktopSettings?.mode !== mode) {
+    throw new Error(`assembled Host settings are missing the ${mode} desktop-shell mode`)
   }
   if (!trayItems.some(item => item.label() === 'Check for Updates…')) {
     throw new Error('assembled desktop profile is missing the update tray command')
@@ -425,15 +437,22 @@ try {
   ]) {
     if (!ids.has(id)) {
       throw new Error(
-        `assembled advanced Web graph is missing ${id}; received ${[...ids].sort().join(', ')}`,
+        `assembled ${mode} Web graph is missing ${id}; received ${[...ids].sort().join(', ')}`,
       )
     }
   }
   for (const id of [
-    '@deepseek-ai/dsh-client-ui-layout',
+    ...(mode === 'advanced' ? ['@deepseek-ai/dsh-client-ui-layout'] : []),
     '@deepseek-ai/dsh-client-ui-directory-picker-native',
   ]) {
-    if (ids.has(id)) throw new Error(`assembled advanced Web graph unexpectedly includes ${id}`)
+    if (ids.has(id)) throw new Error(`assembled ${mode} Web graph unexpectedly includes ${id}`)
+  }
+
+  if (mode === 'compatibility') assert.ok(ids.has('@deepseek-ai/dsh-client-ui-layout'))
+  if (verifyRenderer) {
+    await verifyProfileRenderer({ url: expectedUrl, cookie, rendererHeader: BROWSER_ACCESS.rendererHeader })
+    assert.deepEqual(rendererReport, { status: 'healthy' })
+    console.log(`Windows ${mode} renderer mounted both required surfaces and reported healthy`)
   }
   // Exercise onboarding through the real Settings -> ConfigEditor -> Desktop
   // composition path. UI mocks cannot detect launcher overlays erasing a save.
