@@ -97,6 +97,10 @@ export const ALLOWED_SMART_UNPACK_PACKAGE_ROOTS = [
   'node_modules/@deepseek-ai/dsh-app-boot',
   'node_modules/@deepseek-ai/dsh-fs-local',
   'node_modules/@deepseek-ai/dsh',
+  // 0.2.1-alpha.1 的 HMR 随 native manifest 携带不可 asar 化文件,electron-builder
+  // 对其整包 smart-unpack;libreoffice-kit 本体同理(平台变体前缀已有独立条目)。
+  'node_modules/@deepseek-ai/dsh-hmr',
+  'node_modules/@deepseek-ai/libreoffice-kit',
   'node_modules/@deepseek-ai/dsh-host-directory-picker-native',
   'node_modules/@deepseek-ai/dsh-sandbox-windows-acl',
   'node_modules/@deepseek-ai/dsh-session-persistence-jsonl',

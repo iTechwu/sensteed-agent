@@ -29,6 +29,12 @@ allowBuilds:
 
 linkWorkspacePackages: true
 
+# CI 的 Windows runner 以 junction 承载 deepseek-harness,pnpm 11 默认的
+# run 前依赖校验会把 junction 展开出的 fork importer 误判为 lockfile 漂移,
+# 触发自动 frozen install 并以 OUTDATED_LOCKFILE 失败。各 job 均已显式
+# install,这里关闭 run 前自动校验。
+verifyDepsBeforeRun: false
+
 overrides:
   app-builder-lib>@electron/get: 5.1.0
 
