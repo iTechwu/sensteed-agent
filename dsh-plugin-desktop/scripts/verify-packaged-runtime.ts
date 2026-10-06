@@ -900,8 +900,16 @@ export function verifySelectiveUnpackedRuntime(
       || file.path.startsWith('node_modules/@agents-anywhere/dsh-bridge-next/lib/bundled-connector/') ? [] : [root]
   }))].sort()
   if (unexpectedPackageRoots.length > 0) {
+    // 逐文件列出违规根下的条目,错位类失败(如 linux 的 sharp 文件落进声明包根)
+    // 直接给出证据路径,避免按字节数盲猜。
+    const offendingEntries = normalizedFiles
+      .map(file => file.path)
+      .filter(entry => unexpectedPackageRoots.some(root => entry === root || entry.startsWith(`${root}/`)))
+      .sort()
+      .slice(0, 40)
     throw new Error(
-      `dsh-plugin-desktop: unpacked runtime at ${unpackedRoot} contains non-allowlisted package roots: ${unexpectedPackageRoots.join(', ')}; inventory: ${inventory}`,
+      `dsh-plugin-desktop: unpacked runtime at ${unpackedRoot} contains non-allowlisted package roots: `
+      + `${unexpectedPackageRoots.join(', ')}; entries: ${offendingEntries.join(', ')}; inventory: ${inventory}`,
     )
   }
   const pnpm = summary.groups.find(group => group.root === 'node_modules/pnpm')
