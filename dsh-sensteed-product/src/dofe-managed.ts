@@ -79,6 +79,7 @@ export const DOFE_MCP_BASE_URL = 'https://ai.hozonauto.com/mcp'
 export interface DofeAccessGate {
   readonly ready: boolean
   readonly entitlements?: DofeAccessSettings['entitlements']
+  readonly enabledPlugins?: readonly DofePluginId[]
 }
 const DATASOURCE_FINANCE_WORKSPACE_ACCESS_URL = 'https://ds.hozonauto.com/api/finance/permissions/workspace-access'
 
@@ -137,6 +138,8 @@ export async function apply(ctx: Context): Promise<void> {
     const granted = current.entitlements?.plugins.includes('knowledge') === true
     return {
       ready: current.setupComplete && current.validationVersion === DOFE_ACCESS_VALIDATION_VERSION && current.authMode === 'feishu' && Boolean(current.identity?.ssoSub),
+      enabledPlugins: normalizeDofePluginIds(current.enabledPlugins, BRAND_VARIANT)
+        .filter(plugin => current.entitlements?.plugins.includes(plugin)),
       entitlements: current.entitlements === undefined ? undefined : {
         ...current.entitlements,
         knowledge: granted ? { plugin: 'knowledge', permissionVersion: 1, accesses: ['read', 'write'] } : undefined,

@@ -90,10 +90,11 @@ describe('dofe-managed MCP runtime', () => {
     await apply(harness.ctx as never)
 
     const provideCall = harness.ctx.provide.mock.calls.find(([name]) => name === 'dofeAccess')
-    const getGate = provideCall?.[1] as (() => { ready: boolean; entitlements?: { plugins: string[]; knowledge?: { permissionVersion: number; accesses: string[] } } }) | undefined
+    const getGate = provideCall?.[1] as (() => { ready: boolean; enabledPlugins?: readonly string[]; entitlements?: { plugins: string[]; knowledge?: { permissionVersion: number; accesses: string[] } } }) | undefined
     expect(getGate).toBeDefined()
     expect(getGate?.()).toMatchObject({
       ready: true,
+      enabledPlugins: ['knowledge'],
       entitlements: { plugins: ['knowledge'], knowledge: { permissionVersion: 1, accesses: ['read', 'write'] } },
     })
 
