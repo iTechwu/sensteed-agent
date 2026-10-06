@@ -4,8 +4,10 @@ import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import {
   accessSync,
+  chmodSync,
   closeSync,
   constants,
+  copyFileSync,
   existsSync,
   lstatSync,
   mkdtempSync,
@@ -205,6 +207,46 @@ export function hydratePackagedMacRuntimeForContext(context: PackagedRuntimeCont
   hydrateInstalledMacCpuFeaturesRuntime(desktopRoot, unpackedRoot, context.arch)
   hydrateInstalledMacFsExtRuntime(desktopRoot, unpackedRoot, context.arch)
   disablePackagedMacSshCryptoRuntime(unpackedRoot)
+}
+
+/**
+ * Replace the packaged host-Node fs-ext binding with the prepared Electron-ABI binary.
+ *
+ * fs-ext 2.1.1 requires `build/Release/fs_ext.node` directly and does not discover
+ * prebuilds, while `prepare-fs-ext` stages the Electron-ABI build only under `prebuilds/`.
+ * Linux packaging therefore must swap the binding in place before the runtime smoke loads
+ * it — the same replacement the darwin path performs through its hydration hook.
+ */
+export function hydratePackagedLinuxFsExtRuntimeForContext(
+  context: PackagedRuntimeContext,
+  sourceFsExtRoot: string = resolveRuntimePackageRoot('fs-ext'),
+): void {
+  if (context.electronPlatformName !== 'linux') return
+  const arch = context.arch === 1 ? 'x64' : context.arch === 3 ? 'arm64' : undefined
+  if (arch === undefined) {
+    throw new Error(`dsh-plugin-desktop: unsupported Linux package architecture ${String(context.arch)}`)
+  }
+  const source = join(
+    sourceFsExtRoot,
+    'prebuilds',
+    `linux-${arch}`,
+    `electron.abi${ELECTRON_ABI}.node`,
+  )
+  if (!existsSync(source)) {
+    throw new Error(
+      `dsh-plugin-desktop: prepared Electron-ABI fs-ext is missing at ${source}; `
+      + 'run prepare-fs-ext before packaging',
+    )
+  }
+  const target = join(
+    resolvePackagedUnpackedRoot(context),
+    'node_modules/fs-ext/build/Release/fs_ext.node',
+  )
+  if (!existsSync(target)) {
+    throw new Error(`dsh-plugin-desktop: packaged fs-ext binding is missing at ${target}`)
+  }
+  copyFileSync(source, target)
+  chmodSync(target, 0o755)
 }
 
 /** Stable non-desktop archive entries required by the packaged runtime. */
@@ -1256,8 +1298,10 @@ export async function afterPack(
   smokeNative: PackagedElectronSmoke = smokePackagedFsExtRuntime,
   hydrateMac: (context: PackagedRuntimeContext) => void = hydratePackagedMacRuntimeForContext,
   verifyClosure: typeof verifyProfileClosureArtifact = verifyProfileClosureArtifact,
+  hydrateLinux: (context: PackagedRuntimeContext) => void = hydratePackagedLinuxFsExtRuntimeForContext,
 ): Promise<void> {
   hydrateMac(context)
+  hydrateLinux(context)
   const summary = verify(context)
   verifyAa(context)
   verifyClosure(context)

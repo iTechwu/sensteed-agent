@@ -4,10 +4,11 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, relative } from 'node:path'
+import { dirname, join, relative } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { describe, expect, it, vi } from 'vitest'
 import {
@@ -16,6 +17,7 @@ import {
   afterPack,
   formatUnpackedRuntimeSummary,
   FORBIDDEN_UNPACKED_RUNTIME_ENTRIES,
+  hydratePackagedLinuxFsExtRuntimeForContext,
   hydratePackagedMacRuntimeForContext,
   indexPackagedAsarHeader,
   listDesktopRuntimeEntries,
@@ -434,6 +436,72 @@ describe('packaged desktop runtime verification', () => {
 
     expect(() => smokePackagedFsExtRuntime(context('/build', process.platform), run))
       .toThrow('packaged fs-ext native ABI smoke failed')
+  })
+
+  it('hydrates the packaged fs-ext binding with the prepared Electron ABI on Linux', () => {
+    const workRoot = mkdtempSync(join(tmpdir(), 'dsh-linux-fs-ext-'))
+    try {
+      const runtimeContext = context(workRoot, 'linux', 1)
+      const preparedName = REQUIRED_POSIX_FS_EXT_ENTRIES.linux.x64.split('/').at(-1) as string
+      const sourceRoot = join(workRoot, 'installed-fs-ext')
+      const source = join(sourceRoot, 'prebuilds', 'linux-x64', preparedName)
+      mkdirSync(dirname(source), { recursive: true })
+      writeFileSync(source, 'electron-abi')
+      const target = join(
+        resolvePackagedUnpackedRoot(runtimeContext),
+        'node_modules/fs-ext/build/Release/fs_ext.node',
+      )
+      mkdirSync(dirname(target), { recursive: true })
+      writeFileSync(target, 'host-node-abi')
+
+      hydratePackagedLinuxFsExtRuntimeForContext(runtimeContext, sourceRoot)
+
+      expect(readFileSync(target, 'utf8')).toBe('electron-abi')
+      expect(statSync(target).mode & 0o755).toBe(0o755)
+    } finally {
+      rmSync(workRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('requires the prepared Electron-ABI fs-ext before Linux packaging', () => {
+    const workRoot = mkdtempSync(join(tmpdir(), 'dsh-linux-fs-ext-'))
+    try {
+      const runtimeContext = context(workRoot, 'linux', 1)
+      const sourceRoot = join(workRoot, 'installed-fs-ext')
+      mkdirSync(sourceRoot, { recursive: true })
+
+      expect(() => hydratePackagedLinuxFsExtRuntimeForContext(runtimeContext, sourceRoot))
+        .toThrow('prepared Electron-ABI fs-ext is missing')
+    } finally {
+      rmSync(workRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects a Linux package without a packaged fs-ext binding to hydrate', () => {
+    const workRoot = mkdtempSync(join(tmpdir(), 'dsh-linux-fs-ext-'))
+    try {
+      const runtimeContext = context(workRoot, 'linux', 1)
+      const preparedName = REQUIRED_POSIX_FS_EXT_ENTRIES.linux.x64.split('/').at(-1) as string
+      const sourceRoot = join(workRoot, 'installed-fs-ext')
+      mkdirSync(dirname(join(sourceRoot, 'prebuilds', 'linux-x64', preparedName)), { recursive: true })
+      writeFileSync(join(sourceRoot, 'prebuilds', 'linux-x64', preparedName), 'electron-abi')
+
+      expect(() => hydratePackagedLinuxFsExtRuntimeForContext(runtimeContext, sourceRoot))
+        .toThrow('packaged fs-ext binding is missing')
+    } finally {
+      rmSync(workRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects unsupported Linux package architectures before hydration', () => {
+    expect(() => hydratePackagedLinuxFsExtRuntimeForContext(context('/build', 'linux', 0)))
+      .toThrow('unsupported Linux package architecture 0')
+  })
+
+  it('leaves non-Linux packaging untouched by the Linux fs-ext hydration', () => {
+    expect(() => hydratePackagedLinuxFsExtRuntimeForContext(
+      context('/definitely-missing-build', 'darwin'),
+    )).not.toThrow()
   })
 
   it('tracks ripgrep and the ConPTY native surface required on Windows', () => {
