@@ -52,15 +52,17 @@ export async function rendererBootReport(
   } finally {
     if (timeout !== undefined) clearTimeout(timeout)
   }
-  const plugins = [...loader.entries()]
-    .filter(entry => entry.fiber !== undefined && entry.fiber.state !== ACTIVE_FIBER_STATE)
+  const inactivePlugins = (): string[] => [...loader.entries()]
+    .filter(entry => entry.fiber?.state !== ACTIVE_FIBER_STATE)
     .map(entry => entry.options.name)
+  let plugins = inactivePlugins()
   if (error === undefined && surfaceReadiness !== undefined) {
     const started = Date.now()
     while (true) {
       error = surfaceReadiness()
-      if (error === undefined || Date.now() - started >= surfaceReadinessGraceMs) break
+      if ((error === undefined && plugins.length === 0) || Date.now() - started >= surfaceReadinessGraceMs) break
       await new Promise<void>(resolve => setTimeout(resolve, SURFACE_READINESS_POLL_MS))
+      plugins = inactivePlugins()
     }
   }
   return error === undefined && plugins.length === 0
