@@ -42,10 +42,31 @@ index 56194e32d222602e78db13793b9d4af568154a1a..df8dad61349d0db20188404ddf8e1533
          if (memoKey != null) {
              this.locateMemo.set(memoKey, promise);
 diff --git a/out/util/appFileCopier.js b/out/util/appFileCopier.js
-index aa2e321e45762850e83971e13c3865b90521a0dd..795730a8d27e7198e6db7c5046b67bd221498337 100644
+index aa2e321e45762850e83971e13c3865b90521a0dd..93628cb8ef9b40c6a4cccbf788e498f8fd45b9a3 100644
 --- a/out/util/appFileCopier.js
 +++ b/out/util/appFileCopier.js
-@@ -307,7 +307,9 @@ async function collectNodeModulesWithLogging(platformPackager) {
+@@ -155,8 +155,20 @@ async function computeNodeModuleFileSets(platformPackager, mainMatcher) {
+     const result = new Array();
+     let index = 0;
+     const NODE_MODULES = "node_modules";
++    // pnpm's virtual store is physical: the same package directory is reached once per
++    // declaring branch, while the nested npm-style destinations below would archive the
++    // same files twice (a hoisted copy plus a stray copy under the declaring package's
++    // root). Deduplicate on the resolved source directory and keep the first, hoisted
++    // destination; real duplicate installations keep distinct physical paths and are
++    // unaffected.
++    const seenSources = new Set();
+     const collectNodeModules = async (dep, destination) => {
+         const source = dep.dir;
++        if (seenSources.has(source)) {
++            builder_util_1.log.debug({ dep: dep.name, from: builder_util_1.log.filePath(source), duplicateOf: builder_util_1.log.filePath(destination) }, "skipping physically duplicated module");
++            return;
++        }
++        seenSources.add(source);
+         const matcher = new fileMatcher_1.FileMatcher(source, destination, mainMatcher.macroExpander, mainMatcher.patterns);
+         const copier = new NodeModuleCopyHelper_1.NodeModuleCopyHelper(matcher, platformPackager.info);
+         const files = await copier.collectNodeModules(dep, nodeModuleExcludedExts, path.relative(mainMatcher.to, destination));
+@@ -307,7 +319,9 @@ async function collectNodeModulesWithLogging(platformPackager) {
      const packager = platformPackager.info;
      const { tempDirManager, appDir, projectDir } = packager;
      const searchDirectories = Array.from(new Set([appDir, projectDir, await packager.getWorkspaceRoot()])).filter((it) => (0, builder_util_1.isEmptyOrSpaces)(it) === false);
