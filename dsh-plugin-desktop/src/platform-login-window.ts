@@ -47,8 +47,17 @@ export function classifyPlatformLoginRequest(value: string, resourceType: string
   }
   if (['about:', 'data:', 'blob:'].includes(url.protocol)) return resourceType === 'mainFrame' ? 'cancel' : 'allow'
   if (url.username !== '' || url.password !== '') return 'cancel'
-  if (hostOrigin !== undefined && url.origin === hostOrigin) {
-    return resourceType === 'mainFrame' && url.pathname === CALLBACK_PATH ? 'callback' : 'cancel'
+  if (hostOrigin !== undefined) {
+    let host: URL
+    try {
+      host = new URL(hostOrigin)
+    } catch {
+      return 'cancel'
+    }
+    const sameHost = url.origin === host.origin
+      || url.protocol === host.protocol && url.port === host.port
+        && LOOPBACK_HOSTS.has(url.hostname) && LOOPBACK_HOSTS.has(host.hostname)
+    if (sameHost) return resourceType === 'mainFrame' && url.pathname === CALLBACK_PATH ? 'callback' : 'cancel'
   }
   // Loopback and plaintext traffic never belongs to the Platform; refusing it keeps the page from probing local services.
   if (LOOPBACK_HOSTS.has(url.hostname) || url.hostname.startsWith('127.')) return 'cancel'
