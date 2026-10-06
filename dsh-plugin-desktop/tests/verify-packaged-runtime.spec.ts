@@ -438,7 +438,9 @@ describe('packaged desktop runtime verification', () => {
       .toThrow('packaged fs-ext native ABI smoke failed')
   })
 
-  it('hydrates the packaged fs-ext binding with the prepared Electron ABI on Linux', () => {
+  // 水合只在 linux 打包路径执行;win32 的 statSync.mode 不含 Unix 权限位,
+  // 0o755 断言在 Windows gate 上恒假。
+  it.skipIf(process.platform === 'win32')('hydrates the packaged fs-ext binding with the prepared Electron ABI on Linux', () => {
     const workRoot = mkdtempSync(join(tmpdir(), 'dsh-linux-fs-ext-'))
     try {
       const runtimeContext = context(workRoot, 'linux', 1)
