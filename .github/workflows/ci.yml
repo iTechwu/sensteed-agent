@@ -225,7 +225,6 @@ jobs:
           CI: 'false'
           npm_config_minimum_release_age: '0'
           DSH_PACKAGE_CHECK_ALREADY_RAN: '1'
-          DEBUG: 'electron-builder,electron-builder:*'
         run: pnpm --filter dsh-plugin-desktop dist:win
       - name: Inspect packaged output on failure
         if: failure()
