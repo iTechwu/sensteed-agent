@@ -579,7 +579,12 @@ export function hydrateInstalledMacFsExtRuntime(
 
 /** Disable SSH2's Node/OpenSSL accelerator; Electron uses the built-in JS crypto fallback. */
 export function disablePackagedMacSshCryptoRuntime(unpackedRoot: string): void {
-  writeFileSync(join(resolve(unpackedRoot), SSH_CRYPTO_RELATIVE_PATH), '')
+  const target = join(resolve(unpackedRoot), SSH_CRYPTO_RELATIVE_PATH)
+  // The writer can drop the whole ssh2 unpacked subtree and a source tree
+  // without the accelerator build has nothing to truncate; an empty file at
+  // the canonical path is the disabled state either way.
+  mkdirSync(dirname(target), { recursive: true })
+  writeFileSync(target, '')
 }
 
 /** Generated host-architecture files that must never shadow the prebuilt pair. */
