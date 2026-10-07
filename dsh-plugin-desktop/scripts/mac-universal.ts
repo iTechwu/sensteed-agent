@@ -19,6 +19,7 @@ import {
 import { randomUUID } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
+import { fileURLToPath } from 'node:url'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { buildMacSystemRuntime, installedMacSystemPackage } from './mac-system-runtime.ts'
@@ -324,6 +325,23 @@ export function hydrateInstalledMacCloudflaredRuntime(
   unpackedRoot: string,
   electronBuilderArch: number | undefined,
 ): void {
+  const packagedTarget = join(resolve(unpackedRoot), CLOUDFLARED_RELATIVE_PATH)
+  if (!existsSync(packagedTarget)) {
+    // The electron-builder destination mapping can silently drop the unpacked
+    // cloudflared placeholder from thin packages (same writer family as the
+    // Windows skeleton omissions). Restore it from the installed dependency so
+    // hydration can proceed to swap the per-arch binary; a genuinely absent
+    // dependency still fails the install-anchor check below.
+    const installed = join(
+      resolve(dirname(fileURLToPath(import.meta.url)), '..', 'node_modules', 'cloudflared', 'bin', 'cloudflared'),
+    )
+    if (!existsSync(installed)) {
+      throw new Error(`packaged cloudflared is missing at ${packagedTarget} and the dependency ships no binary at ${installed}`)
+    }
+    mkdirSync(dirname(packagedTarget), { recursive: true })
+    copyBinaryContents(installed, packagedTarget)
+    chmodSync(packagedTarget, 0o755)
+  }
   hydratePackagedMacCloudflaredRuntime({
     unpackedRoot,
     electronBuilderArch,

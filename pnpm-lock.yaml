@@ -2754,6 +2754,9 @@ importers:
       '@deepseek-ai/node-addon-system-darwin-x64':
         specifier: 0.1.2
         version: link:../deepseek-harness/native/system/packages/darwin-x64
+      '@emnapi/runtime':
+        specifier: 1.11.3
+        version: 1.11.3
       '@img/sharp-darwin-arm64':
         specifier: 0.35.3
         version: 0.35.3
