@@ -225,6 +225,7 @@ jobs:
           CI: 'false'
           npm_config_minimum_release_age: '0'
           DSH_PACKAGE_CHECK_ALREADY_RAN: '1'
+          NODE_OPTIONS: '--max-old-space-size=6144'
         run: pnpm --filter dsh-plugin-desktop dist:win
       - name: Inspect packaged output on failure
         if: failure()
@@ -245,6 +246,7 @@ jobs:
           CI: 'false'
           npm_config_minimum_release_age: '0'
           DSH_PACKAGE_CHECK_ALREADY_RAN: '1'
+          NODE_OPTIONS: '--max-old-space-size=6144'
         run: pnpm --filter dsh-plugin-desktop dist:win-portable
       - name: Upload Windows applications
         uses: actions/upload-artifact@v7
@@ -314,6 +316,7 @@ jobs:
           CI: 'false'
           npm_config_minimum_release_age: '0'
           DSH_PACKAGE_CHECK_ALREADY_RAN: '1'
+          NODE_OPTIONS: '--max-old-space-size=6144'
         run: pnpm --filter dsh-plugin-desktop dist:linux
 
   desktop-macos:
@@ -377,6 +380,7 @@ jobs:
           CI: 'false'
           npm_config_minimum_release_age: '0'
           DSH_PACKAGE_CHECK_ALREADY_RAN: '1'
+          NODE_OPTIONS: '--max-old-space-size=6144'
         run: pnpm --filter dsh-plugin-desktop dist:mac-smoke
       - name: Upload macOS application
         uses: actions/upload-artifact@v7
