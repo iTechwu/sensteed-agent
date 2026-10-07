@@ -347,7 +347,10 @@ describe('packaged desktop runtime verification', () => {
         schemaVersion: 1,
         desktopVersion: '2.0.11-beta.18',
         dshVersion: '0.2.0-rc.2',
-        packages: { '@deepseek-ai/dsh': '0.2.0-rc.2' },
+        packages: {
+          '@deepseek-ai/dsh': '0.2.0-rc.2',
+          '@deepseek-ai/dsh-plugin-manager': '0.2.0-rc.2',
+        },
       }
       const consistent = (path: string): Buffer => {
         if (path === 'lib/profile-closure.json') return Buffer.from(JSON.stringify(closure))
@@ -355,6 +358,13 @@ describe('packaged desktop runtime verification', () => {
         return Buffer.from(JSON.stringify({ version: '0.2.0-rc.2' }))
       }
       expect(() => verifyProfileClosureArtifact(target, consistent)).not.toThrow()
+
+      expect(() => verifyProfileClosureArtifact(target, path => {
+        if (path === 'node_modules/@deepseek-ai/dsh-plugin-manager/package.json') {
+          throw Object.assign(new Error('missing'), { code: 'ENOENT' })
+        }
+        return consistent(path)
+      })).toThrow('Profile closure package @deepseek-ai/dsh-plugin-manager@0.2.0-rc.2 is missing')
 
       expect(() => verifyProfileClosureArtifact(target, () => {
         throw Object.assign(new Error('missing'), { code: 'ENOENT' })

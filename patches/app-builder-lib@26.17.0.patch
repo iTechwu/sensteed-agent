@@ -41,6 +41,12 @@ index 56194e32d222602e78db13793b9d4af568154a1a..df8dad61349d0db20188404ddf8e1533
          })();
          if (memoKey != null) {
              this.locateMemo.set(memoKey, promise);
+@@ -313,5 +313,2 @@ class PnpmNodeModulesCollector extends nodeModulesCollector_1.NodeModulesCollect
+         const visit = async (key, value) => {
+             var _a, _b;
+-            if (((_a = value === null || value === void 0 ? void 0 : value.dedupedDependenciesCount) !== null && _a !== void 0 ? _a : 0) > 0) {
+-                return;
+-            }
 diff --git a/out/util/appFileCopier.js b/out/util/appFileCopier.js
 --- a/out/util/appFileCopier.js
 +++ b/out/util/appFileCopier.js

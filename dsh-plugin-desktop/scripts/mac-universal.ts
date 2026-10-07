@@ -658,7 +658,11 @@ function findNestedKoffiPackages(nodeModulesRoot: string): string[] {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue
       const child = join(directory, entry.name)
-      if (entry.name === 'koffi' && directory.endsWith(`${sep}node_modules`)) {
+      if (
+        entry.name === 'koffi' &&
+        directory.endsWith(`${sep}node_modules`) &&
+        existsSync(join(child, 'package.json'))
+      ) {
         found.push(child)
         continue
       }

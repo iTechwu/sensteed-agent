@@ -7,6 +7,7 @@ import {
   chmodSync,
   closeSync,
   constants,
+  cpSync,
   copyFileSync,
   existsSync,
   lstatSync,
@@ -159,6 +160,36 @@ export const REQUIRED_DSH_CLI_RUNTIME_ENTRIES = Object.freeze(
 export const REQUIRED_AGENT_PRESET_RUNTIME_ENTRIES = [
   'node_modules/@deepseek-ai/dsh-web-app/presets/ptc.patch.yml',
 ] as const
+
+/** External packages imported by required desktop plugins but not reliably discovered through pnpm links. */
+export const REQUIRED_RUNTIME_PACKAGE_MANIFESTS = [
+  'node_modules/@opentelemetry/otlp-exporter-base/package.json',
+  'node_modules/@opentelemetry/otlp-transformer/package.json',
+  'node_modules/@opentelemetry/resources/package.json',
+  'node_modules/@opentelemetry/sdk-logs/package.json',
+  'node_modules/chokidar/package.json',
+  'node_modules/execa/package.json',
+  'node_modules/got/package.json',
+  'node_modules/turndown/package.json',
+] as const
+
+/** Materialize runtime packages that Electron Builder cannot copy through pnpm links. */
+export function hydrateRequiredRuntimePackages(context: PackagedRuntimeContext): void {
+  const desktopRoot = context.packager.projectDir ?? DESKTOP_PACKAGE_ROOT
+  const targetRoot = usesAsarLayout(context)
+    ? resolvePackagedUnpackedRoot(context)
+    : resolvePackagedApplicationRoot(context)
+  if (!existsSync(targetRoot)) return
+  for (const manifestPath of REQUIRED_RUNTIME_PACKAGE_MANIFESTS) {
+    const packagePath = manifestPath.slice(0, -'/package.json'.length)
+    const source = join(desktopRoot, packagePath)
+    const target = join(targetRoot, packagePath)
+    if (!existsSync(source)) {
+      throw new Error(`dsh-plugin-desktop: runtime package source is missing at ${source}`)
+    }
+    cpSync(source, target, { recursive: true, force: true, dereference: true })
+  }
+}
 
 /** AfterPack fields consumed without importing Electron Builder's incomplete declaration graph. */
 export interface PackagedRuntimeContext {
@@ -1120,6 +1151,17 @@ export function verifyProfileClosureArtifact(
     : readFileSync(join(resolvePackagedApplicationRoot(context), path)),
 ): void {
   const readPackagedOrOffset = withOffsetFallback(context, readPackaged)
+  const readPackagedRuntimeFile = (path: string): Buffer => {
+    try {
+      return readPackagedOrOffset(path)
+    } catch (cause) {
+      if (usesAsarLayout(context)) {
+        const unpackedPath = join(resolvePackagedUnpackedRoot(context), path)
+        if (existsSync(unpackedPath)) return readFileSync(unpackedPath)
+      }
+      throw cause
+    }
+  }
   let closure: { schemaVersion?: number; desktopVersion?: string; dshVersion?: string; packages?: Record<string, string> }
   try {
     closure = JSON.parse(readPackaged('lib/profile-closure.json').toString('utf8'))
@@ -1138,6 +1180,33 @@ export function verifyProfileClosureArtifact(
   const dshVersion = (JSON.parse(readPackagedOrOffset('node_modules/@deepseek-ai/dsh/package.json').toString('utf8')) as { version?: string }).version
   if (closure.dshVersion !== dshVersion || closure.packages?.['@deepseek-ai/dsh'] !== dshVersion) {
     throw new Error(`dsh-plugin-desktop: Profile closure manifest pins @deepseek-ai/dsh ${String(closure.dshVersion)} but the archive carries ${String(dshVersion)}`)
+  }
+  for (const [packageName, expectedVersion] of Object.entries(closure.packages ?? {})) {
+    if (packageName === '@deepseek-ai/dsh') continue
+    let actualVersion: unknown
+    try {
+      actualVersion = (JSON.parse(readPackagedRuntimeFile(`node_modules/${packageName}/package.json`).toString('utf8')) as { version?: unknown }).version
+    } catch (cause) {
+      throw new Error(
+        `dsh-plugin-desktop: Profile closure package ${packageName}@${expectedVersion} is missing from the archive`,
+        { cause },
+      )
+    }
+    if (actualVersion !== expectedVersion) {
+      throw new Error(
+        `dsh-plugin-desktop: Profile closure package ${packageName} resolves to ${String(actualVersion)} but the manifest pins ${expectedVersion}`,
+      )
+    }
+  }
+  for (const manifestPath of REQUIRED_RUNTIME_PACKAGE_MANIFESTS) {
+    try {
+      readPackagedRuntimeFile(manifestPath)
+    } catch (cause) {
+      throw new Error(
+        `dsh-plugin-desktop: required runtime package ${manifestPath} is missing from the archive`,
+        { cause },
+      )
+    }
   }
 }
 
@@ -1302,6 +1371,7 @@ export async function afterPack(
 ): Promise<void> {
   hydrateMac(context)
   hydrateLinux(context)
+  hydrateRequiredRuntimePackages(context)
   const summary = verify(context)
   verifyAa(context)
   verifyClosure(context)

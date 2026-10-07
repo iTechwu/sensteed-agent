@@ -271,6 +271,7 @@ describe('universal macOS native runtime preparation', () => {
       mkdirSync(installedKoffi, { recursive: true })
       mkdirSync(join(installedModules, '@deepseek-ai', 'consumer'), { recursive: true })
       mkdirSync(packagedKoffi, { recursive: true })
+      mkdirSync(join(packagedModules, 'koffi', 'node_modules'), { recursive: true })
       mkdirSync(installedKoffiNative, { recursive: true })
       mkdirSync(versionedKoffi, { recursive: true })
       mkdirSync(versionedKoffiNative, { recursive: true })
