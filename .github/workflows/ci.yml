@@ -99,7 +99,7 @@ jobs:
           upstream_dir="$GITHUB_WORKSPACE/../deepseek-harness"
           if command -v cygpath >/dev/null 2>&1; then upstream_dir="$(cygpath -u "$upstream_dir")"; fi
           mkdir -p "$upstream_dir"
-          curl --fail --location --retry 3 https://github.com/iTechwu/sensteed-harness/archive/5badb15009ae1756c3afe0ae0cef1faafc290ccc.tar.gz | tar -xz --strip-components=1 -C "$upstream_dir"
+          curl --fail --location --retry 3 https://github.com/iTechwu/sensteed-harness/archive/60a3b5b8a6bd1cbb44638fac99d6f303a1b9f08c.tar.gz | tar -xz --strip-components=1 -C "$upstream_dir"
           git -C "$upstream_dir" init --quiet
           git -C "$upstream_dir" -c user.name=CI -c user.email=ci@localhost commit --allow-empty --quiet -m "CI source archive"
           node scripts/upstream-workspace-link.mjs
@@ -162,7 +162,7 @@ jobs:
           upstream_dir="$GITHUB_WORKSPACE/../deepseek-harness"
           if command -v cygpath >/dev/null 2>&1; then upstream_dir="$(cygpath -u "$upstream_dir")"; fi
           mkdir -p "$upstream_dir"
-          curl --fail --location --retry 3 https://github.com/iTechwu/sensteed-harness/archive/5badb15009ae1756c3afe0ae0cef1faafc290ccc.tar.gz | tar -xz --strip-components=1 -C "$upstream_dir"
+          curl --fail --location --retry 3 https://github.com/iTechwu/sensteed-harness/archive/60a3b5b8a6bd1cbb44638fac99d6f303a1b9f08c.tar.gz | tar -xz --strip-components=1 -C "$upstream_dir"
           git -C "$upstream_dir" init --quiet
           git -C "$upstream_dir" -c user.name=CI -c user.email=ci@localhost commit --allow-empty --quiet -m "CI source archive"
           node scripts/upstream-workspace-link.mjs
@@ -270,7 +270,7 @@ jobs:
           upstream_dir="$GITHUB_WORKSPACE/../deepseek-harness"
           if command -v cygpath >/dev/null 2>&1; then upstream_dir="$(cygpath -u "$upstream_dir")"; fi
           mkdir -p "$upstream_dir"
-          curl --fail --location --retry 3 https://github.com/iTechwu/sensteed-harness/archive/5badb15009ae1756c3afe0ae0cef1faafc290ccc.tar.gz | tar -xz --strip-components=1 -C "$upstream_dir"
+          curl --fail --location --retry 3 https://github.com/iTechwu/sensteed-harness/archive/60a3b5b8a6bd1cbb44638fac99d6f303a1b9f08c.tar.gz | tar -xz --strip-components=1 -C "$upstream_dir"
           git -C "$upstream_dir" init --quiet
           git -C "$upstream_dir" -c user.name=CI -c user.email=ci@localhost commit --allow-empty --quiet -m "CI source archive"
           node scripts/upstream-workspace-link.mjs
@@ -333,7 +333,7 @@ jobs:
           upstream_dir="$GITHUB_WORKSPACE/../deepseek-harness"
           if command -v cygpath >/dev/null 2>&1; then upstream_dir="$(cygpath -u "$upstream_dir")"; fi
           mkdir -p "$upstream_dir"
-          curl --fail --location --retry 3 https://github.com/iTechwu/sensteed-harness/archive/5badb15009ae1756c3afe0ae0cef1faafc290ccc.tar.gz | tar -xz --strip-components=1 -C "$upstream_dir"
+          curl --fail --location --retry 3 https://github.com/iTechwu/sensteed-harness/archive/60a3b5b8a6bd1cbb44638fac99d6f303a1b9f08c.tar.gz | tar -xz --strip-components=1 -C "$upstream_dir"
           git -C "$upstream_dir" init --quiet
           git -C "$upstream_dir" -c user.name=CI -c user.email=ci@localhost commit --allow-empty --quiet -m "CI source archive"
           node scripts/upstream-workspace-link.mjs
@@ -396,7 +396,7 @@ jobs:
           upstream_dir="$GITHUB_WORKSPACE/../deepseek-harness"
           if command -v cygpath >/dev/null 2>&1; then upstream_dir="$(cygpath -u "$upstream_dir")"; fi
           mkdir -p "$upstream_dir"
-          curl --fail --location --retry 3 https://github.com/iTechwu/sensteed-harness/archive/5badb15009ae1756c3afe0ae0cef1faafc290ccc.tar.gz | tar -xz --strip-components=1 -C "$upstream_dir"
+          curl --fail --location --retry 3 https://github.com/iTechwu/sensteed-harness/archive/60a3b5b8a6bd1cbb44638fac99d6f303a1b9f08c.tar.gz | tar -xz --strip-components=1 -C "$upstream_dir"
           git -C "$upstream_dir" init --quiet
           git -C "$upstream_dir" -c user.name=CI -c user.email=ci@localhost commit --allow-empty --quiet -m "CI source archive"
           node scripts/upstream-workspace-link.mjs
