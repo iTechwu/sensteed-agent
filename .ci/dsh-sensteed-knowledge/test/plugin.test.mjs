@@ -7,7 +7,7 @@ import vm from 'node:vm'
 import { ACTIONS, COMPANY_TEMPLATES, KNOWLEDGE_PERMISSION_VERSION, MCP_URL, apply as applyKnowledge, resolveKnowledgePermission } from '../index.js'
 
 const root = new URL('../', import.meta.url)
-const readyAccess = { ready: true, entitlements: { plugins: ['knowledge'], knowledge: { plugin: 'knowledge', permissionVersion: KNOWLEDGE_PERMISSION_VERSION, accesses: ['read', 'write'] } } }
+const readyAccess = { ready: true, enabledPlugins: ['knowledge'], entitlements: { plugins: ['knowledge'], knowledge: { plugin: 'knowledge', permissionVersion: KNOWLEDGE_PERMISSION_VERSION, accesses: ['read', 'write'] } } }
 const apply = (ctx, overrides) => applyKnowledge({ dofeAccess: readyAccess, ...ctx }, overrides)
 
 test('normalizes partial knowledge sources to the degraded warning state', async () => {
@@ -22,11 +22,12 @@ test('aligns Memory and Knowledge permissions with the shared access gate', asyn
   assert.equal(resolveKnowledgePermission('knowledge.remember', { ...readyAccess, ready: false }).reason, 'knowledge_access_gate_required')
   assert.equal(resolveKnowledgePermission('knowledge.search', { ready: true, entitlements: { plugins: [] } }).reason, 'knowledge_plugin_not_entitled')
   assert.equal(resolveKnowledgePermission('knowledge.remember', { ready: true, entitlements: { plugins: ['knowledge'], knowledge: { permissionVersion: KNOWLEDGE_PERMISSION_VERSION, accesses: ['read'] } } }).reason, 'knowledge_capability_not_declared')
+  assert.equal(resolveKnowledgePermission('knowledge.recall', { ...readyAccess, enabledPlugins: [] }).reason, 'knowledge_plugin_disabled')
 })
 
 test('exposes full Knowledge, Memory, Ontology, and graph management surfaces in the client', async () => {
   const source = await readFile(new URL('src/client.js', root), 'utf8')
-  for (const token of ['knowledgeTab', 'memoryManageTab', 'consoleTab', 'yk-management-console', 'ingest_file', 'fileUrl', 'knowledge.promote', 'knowledge.remember', 'knowledge.entity_assertions', 'knowledge.relation_assertions', 'knowledge.entity_merges', 'knowledge.provenance_lineage', 'memoryCaptureTitle', 'ingestTitle', 'promoteTitle', 'entityId']) assert.match(source, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'u'))
+  for (const token of ['knowledgeTab', 'memoryManageTab', 'consoleTab', 'yk-management-console', 'ingest_file', 'fileUrl', 'knowledge.promote', 'knowledge.remember', 'knowledge.entity_assertions', 'knowledge.relation_assertions', 'knowledge.entity_merges', 'knowledge.provenance_lineage', 'knowledge.create_space', 'knowledge.create_source', 'knowledge.create_ontology_version', 'knowledge.publish_ontology', 'knowledge.export_ontology', 'knowledge.import_ontology', 'knowledge.grant_acl', 'knowledge.grant_document_principal', 'knowledge.rebuild_graph', 'memoryCaptureTitle', 'ingestTitle', 'promoteTitle', 'entityId', 'capabilityAllowed']) assert.match(source, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'u'))
   assert.match(source, /style\.textContent = css \+ stateCss \+ themeCss \+ themeRefinementCss \+ contentLayoutCss \+ managementCss/u)
 })
 
@@ -60,13 +61,20 @@ test('exposes governed knowledge, Memory, and graph tools without direct endpoin
   for (const token of ['knowledge_search', 'knowledge_recall', 'knowledge_remember', 'knowledge_confirm_memory', 'knowledge_forget', 'knowledge_session_checkpoint', 'knowledge_promote', 'knowledge_loadout', 'knowledge_context_pack', 'knowledge_explain_trace', 'knowledge_entity_assertions', 'knowledge_relation_assertions', 'knowledge_entity_merges', 'knowledge_provenance_lineage', 'credential-store', 'tenant.all']) assert.match(source, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'u'))
   assert.doesNotMatch(source, /127\.0\.0\.1|172\.30\.30\.11|knowledge\.local\.dofe\.ai|knowledge\.dofe\.ai/u)
   assert.match(source, /https:\/\/ai.hozonauto.com\/mcp\/knowledge/u)
-  assert.equal(Object.keys(ACTIONS).length, 18)
+  assert.equal(Object.keys(ACTIONS).length, 40)
   assert.deepEqual(new Set(Object.values(ACTIONS)), new Set([
     'knowledge.search', 'knowledge.recall', 'knowledge.remember', 'knowledge.confirm_memory',
     'knowledge.forget', 'knowledge.session_checkpoint', 'knowledge.promote', 'knowledge.capabilities',
     'knowledge.overview', 'knowledge.graph', 'knowledge.ingest_file', 'knowledge.loadout',
     'knowledge.context_pack', 'knowledge.explain_trace', 'knowledge.entity_assertions',
     'knowledge.relation_assertions', 'knowledge.entity_merges', 'knowledge.provenance_lineage',
+    'knowledge.spaces', 'knowledge.sources', 'knowledge.memories', 'knowledge.recall_traces',
+    'knowledge.session_handoffs', 'knowledge.memory_feedbacks', 'knowledge.memory_conflicts',
+    'knowledge.capability_catalog', 'knowledge.environment_facts', 'knowledge.skills',
+    'knowledge.acl_grants', 'knowledge.principals', 'knowledge.ontologies', 'knowledge.create_space',
+    'knowledge.create_source', 'knowledge.create_ontology_version', 'knowledge.publish_ontology',
+    'knowledge.export_ontology', 'knowledge.import_ontology', 'knowledge.grant_acl',
+    'knowledge.grant_document_principal', 'knowledge.rebuild_graph',
   ]))
   assert.deepEqual(COMPANY_TEMPLATES, [{
     id: 'tenant.all', spaceKey: 'tenant.all', name: '哪吒',
@@ -89,6 +97,24 @@ test('covers the public Knowledge console contract without bypassing the MCP gat
   assert.match(source, /const KNOWLEDGE_CONSOLE_READ_TOOLS/u)
   assert.match(source, /const KNOWLEDGE_CONSOLE_WRITE_TOOLS/u)
   assert.match(source, /accessClass\(remoteName\)/u)
+})
+
+test('exposes console actions through the same permission contract', async () => {
+  const registered = new Map()
+  apply({
+    credentials: { async resolve() { return { value: 'test-key' } } },
+    tools: { register(tool) { registered.set(tool.name, tool); return () => {} } },
+    systemPrompt: { section() { return () => {} } },
+  }, { fetch: async () => new Response('{}', { status: 200 }) })
+  for (const name of ['knowledge_spaces', 'knowledge_memory_feedbacks', 'knowledge_ontologies', 'knowledge_create_space', 'knowledge_publish_ontology', 'knowledge_rebuild_graph']) {
+    assert.ok(registered.has(name), name)
+  }
+  const read = registered.get('knowledge_spaces')
+  const write = registered.get('knowledge_create_space')
+  assert.equal((await read.execute({ input: { page: 1, limit: 10 } }, {})).error, undefined)
+  assert.equal((await write.execute({ input: { name: 'test' } }, {})).error, undefined)
+  const source = registered.get('knowledge_create_source')
+  assert.equal((await source.execute({ input: { name: 'docs', type: 's3', config: { bucket: 'knowledge' } } }, {})).error, undefined)
 })
 
 test('publishes an explicit Knowledge versus Web routing contract', async () => {

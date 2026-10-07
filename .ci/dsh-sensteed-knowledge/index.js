@@ -4,8 +4,17 @@ const KNOWLEDGE_PERMISSION_VERSION = 1
 const KNOWLEDGE_PLUGIN_ID = 'knowledge'
 const KNOWLEDGE_READ_TOOLS = new Set(['knowledge.search', 'knowledge.recall', 'knowledge.capabilities', 'knowledge.overview', 'knowledge.graph', 'knowledge.loadout', 'knowledge.context_pack', 'knowledge.explain_trace', 'knowledge.entity_assertions', 'knowledge.relation_assertions', 'knowledge.entity_merges', 'knowledge.provenance_lineage'])
 const KNOWLEDGE_WRITE_TOOLS = new Set(['knowledge.remember', 'knowledge.confirm_memory', 'knowledge.forget', 'knowledge.session_checkpoint', 'knowledge.promote', 'knowledge.ingest_file'])
-const KNOWLEDGE_CONSOLE_READ_TOOLS = new Set(['knowledge.spaces', 'knowledge.sources', 'knowledge.memories', 'knowledge.recall_traces', 'knowledge.session_handoffs', 'knowledge.memory_feedbacks', 'knowledge.memory_conflicts', 'knowledge.capability_catalog', 'knowledge.environment_facts', 'knowledge.skills', 'knowledge.acl_grants', 'knowledge.principals', 'knowledge.entity_merges', 'knowledge.ontologies'])
-const KNOWLEDGE_CONSOLE_WRITE_TOOLS = new Set(['knowledge.create_space', 'knowledge.create_source', 'knowledge.create_ontology_version', 'knowledge.publish_ontology', 'knowledge.export_ontology', 'knowledge.import_ontology', 'knowledge.grant_acl', 'knowledge.grant_document_principal', 'knowledge.rebuild_graph'])
+const KNOWLEDGE_CONSOLE_READ_TOOLS = new Set(['knowledge.spaces', 'knowledge.sources', 'knowledge.memories', 'knowledge.recall_traces', 'knowledge.session_handoffs', 'knowledge.memory_feedbacks', 'knowledge.memory_conflicts', 'knowledge.capability_catalog', 'knowledge.environment_facts', 'knowledge.skills', 'knowledge.acl_grants', 'knowledge.principals', 'knowledge.ontologies', 'knowledge.export_ontology'])
+const KNOWLEDGE_CONSOLE_WRITE_TOOLS = new Set(['knowledge.create_space', 'knowledge.create_source', 'knowledge.create_ontology_version', 'knowledge.publish_ontology', 'knowledge.import_ontology', 'knowledge.grant_acl', 'knowledge.grant_document_principal', 'knowledge.rebuild_graph'])
+const KNOWLEDGE_CONSOLE_ACTIONS = Object.freeze({
+  spaces: 'knowledge.spaces', sources: 'knowledge.sources', memories: 'knowledge.memories', recall_traces: 'knowledge.recall_traces',
+  session_handoffs: 'knowledge.session_handoffs', memory_feedbacks: 'knowledge.memory_feedbacks', memory_conflicts: 'knowledge.memory_conflicts',
+  capability_catalog: 'knowledge.capability_catalog', environment_facts: 'knowledge.environment_facts', skills: 'knowledge.skills',
+  acl_grants: 'knowledge.acl_grants', principals: 'knowledge.principals', ontologies: 'knowledge.ontologies',
+  create_space: 'knowledge.create_space', create_source: 'knowledge.create_source', create_ontology_version: 'knowledge.create_ontology_version',
+  publish_ontology: 'knowledge.publish_ontology', export_ontology: 'knowledge.export_ontology', import_ontology: 'knowledge.import_ontology',
+  grant_acl: 'knowledge.grant_acl', grant_document_principal: 'knowledge.grant_document_principal', rebuild_graph: 'knowledge.rebuild_graph',
+})
 
 const TOOL_OUTPUT = {
   schema: {
@@ -34,6 +43,7 @@ const OBJECT = (properties = {}, required = []) => ({
 })
 const ARRAY = (items, maxItems) => ({ type: 'array', items, ...(maxItems ? { maxItems } : {}) })
 const ENUM = enumValues => ({ type: 'string', enum: enumValues })
+const RECORD = { type: 'object', additionalProperties: true }
 const SPACE_KEY = { type: 'string', pattern: '^(tenant\\.(all|hr|admin)|user\\.(personal|agent_runtime)|team\\.[a-zA-Z0-9_.-]{1,160})$' }
 const MEMORY_TYPE = ENUM(['WORKING', 'EPISODIC', 'SEMANTIC', 'PROCEDURAL'])
 const MEMORY_SCOPE = ENUM(['SESSION', 'USER', 'TEAM', 'ENTERPRISE'])
@@ -148,8 +158,8 @@ const TOOL_INPUT_SCHEMAS = {
   'knowledge.principals': OBJECT({ page: INTEGER(1), limit: INTEGER(1, 100) }),
   'knowledge.ontologies': OBJECT({ page: INTEGER(1), limit: INTEGER(1, 100) }),
   'knowledge.create_space': OBJECT({ name: STRING(280), description: STRING(2000) }, ['name']),
-  'knowledge.create_source': OBJECT({ name: STRING(280), type: STRING(80), config: OBJECT() }, ['name', 'type']),
-  'knowledge.create_ontology_version': OBJECT({ version: STRING(120), classes: ARRAY(STRING(120), 200), predicates: ARRAY(STRING(120), 200), constraints: ARRAY(OBJECT(), 200), alignments: ARRAY(OBJECT(), 200) }, ['version', 'classes', 'predicates']),
+  'knowledge.create_source': OBJECT({ name: STRING(280), type: STRING(80), config: RECORD }, ['name', 'type']),
+  'knowledge.create_ontology_version': OBJECT({ version: STRING(120), classes: ARRAY(STRING(120), 200), predicates: ARRAY(STRING(120), 200), constraints: ARRAY(RECORD, 200), alignments: ARRAY(RECORD, 200) }, ['version', 'classes', 'predicates']),
   'knowledge.publish_ontology': OBJECT({ ontologyId: UUID, targetStatus: ENUM(['WARNING', 'ENFORCE', 'RETIRED']) }, ['ontologyId', 'targetStatus']),
   'knowledge.export_ontology': OBJECT({ ontologyId: UUID }, ['ontologyId']),
   'knowledge.import_ontology': OBJECT({ jsonLd: STRING(1000000) }, ['jsonLd']),
@@ -318,24 +328,28 @@ function accessClass(tool) {
 function resolveKnowledgePermission(tool, access) {
   const entitlements = access?.entitlements
   const pluginGranted = entitlements?.plugins?.includes?.(KNOWLEDGE_PLUGIN_ID) === true
+  const pluginEnabled = access?.enabledPlugins === undefined || access.enabledPlugins.includes?.(KNOWLEDGE_PLUGIN_ID) === true
   const knowledgeEntitlement = entitlements?.knowledge
   const permissionVersion = knowledgeEntitlement?.permissionVersion
   const declaredAccess = Array.isArray(knowledgeEntitlement?.accesses) ? knowledgeEntitlement.accesses : undefined
   const ready = access?.ready === true
   const requiredAccess = accessClass(tool)
-  const allowed = ready && pluginGranted && permissionVersion === KNOWLEDGE_PERMISSION_VERSION && declaredAccess?.includes(requiredAccess) === true && requiredAccess !== 'unknown'
+  const allowed = ready && pluginGranted && pluginEnabled && permissionVersion === KNOWLEDGE_PERMISSION_VERSION && declaredAccess?.includes(requiredAccess) === true && requiredAccess !== 'unknown'
   return {
     allowed,
     ready,
     plugin: KNOWLEDGE_PLUGIN_ID,
+    enabled: pluginEnabled,
     access: requiredAccess,
     permissionVersion,
-    reason: !ready ? 'knowledge_access_gate_required' : !pluginGranted ? 'knowledge_plugin_not_entitled' : permissionVersion !== KNOWLEDGE_PERMISSION_VERSION ? 'knowledge_permission_contract_unsupported' : declaredAccess?.includes(requiredAccess) !== true ? 'knowledge_capability_not_declared' : requiredAccess === 'unknown' ? 'knowledge_capability_not_declared' : undefined,
+    reason: !ready ? 'knowledge_access_gate_required' : !pluginGranted ? 'knowledge_plugin_not_entitled' : !pluginEnabled ? 'knowledge_plugin_disabled' : permissionVersion !== KNOWLEDGE_PERMISSION_VERSION ? 'knowledge_permission_contract_unsupported' : declaredAccess?.includes(requiredAccess) !== true ? 'knowledge_capability_not_declared' : requiredAccess === 'unknown' ? 'knowledge_capability_not_declared' : undefined,
   }
 }
 
 function validateToolArguments(name, args) {
-  const schema = OBJECT({ input: TOOL_INPUT_SCHEMAS[name] }, ['input'])
+  const inputSchema = TOOL_INPUT_SCHEMAS[name] || TOOL_INPUT_SCHEMAS[TOOL_DEFINITIONS[name]?.[0]]
+  if (!inputSchema) return [`arguments.input has no schema for ${name}`]
+  const schema = OBJECT({ input: inputSchema }, ['input'])
   return validateSchema(schema, args, 'arguments').slice(0, 8)
 }
 
@@ -411,6 +425,7 @@ const ACTIONS = {
   relation_assertions: 'knowledge.relation_assertions',
   entity_merges: 'knowledge.entity_merges',
   provenance_lineage: 'knowledge.provenance_lineage',
+  ...KNOWLEDGE_CONSOLE_ACTIONS,
 }
 
 const COMPANY_TEMPLATES = [
@@ -551,6 +566,14 @@ const KNOWLEDGE_AUDIT_ACTIONS = {
   'knowledge.ingest_file': ['knowledge.file.imported', 'create', 'knowledge_document', 'accepted'],
   'knowledge.session_checkpoint': ['knowledge.session.checkpointed', 'create', 'knowledge_session', 'accepted'],
   'knowledge.promote': ['knowledge.promotion.proposed', 'create', 'knowledge_promotion', 'proposed'],
+  'knowledge.create_space': ['knowledge.space.created', 'create', 'knowledge_space', 'created'],
+  'knowledge.create_source': ['knowledge.source.created', 'create', 'knowledge_source', 'created'],
+  'knowledge.create_ontology_version': ['knowledge.ontology.drafted', 'create', 'ontology_version', 'draft'],
+  'knowledge.publish_ontology': ['knowledge.ontology.published', 'update', 'ontology_version', 'published'],
+  'knowledge.import_ontology': ['knowledge.ontology.imported', 'create', 'ontology_version', 'imported'],
+  'knowledge.grant_acl': ['knowledge.acl.granted', 'create', 'acl_grant', 'granted'],
+  'knowledge.grant_document_principal': ['knowledge.document.access_granted', 'create', 'document_acl', 'granted'],
+  'knowledge.rebuild_graph': ['knowledge.graph.rebuild_requested', 'update', 'knowledge_graph', 'queued'],
 }
 
 async function executeKnowledge(ctx, fetchImpl, credential, tool, input, surface, signal) {

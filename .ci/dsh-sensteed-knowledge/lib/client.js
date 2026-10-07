@@ -136,6 +136,29 @@ window.__ModuleLoader__.load({
         consoleHint: "能力与数据均受当前企业身份 ACL 约束",
         reloadData: "读取",
         rebuildGraph: "重建知识图谱",
+        createSpace: "创建知识空间",
+        createSource: "创建接入源",
+        createOntology: "创建 Ontology 草稿",
+        publishOntology: "发布 Ontology",
+        exportOntology: "导出 Ontology",
+        importOntology: "导入 Ontology",
+        grantAcl: "授予资源权限",
+        grantDocument: "授予文档权限",
+        spaceDescription: "空间描述",
+        sourceName: "接入源名称",
+        sourceKind: "接入源类型",
+        sourceConfig: "接入配置 JSON",
+        ontologyVersion: "版本号",
+        ontologyClasses: "实体类型（逗号分隔）",
+        ontologyPredicates: "关系类型（逗号分隔）",
+        ontologyId: "Ontology ID",
+        ontologyStatus: "目标状态",
+        ontologyJsonLd: "JSON-LD",
+        principalId: "主体 ID",
+        resourceType: "资源类型",
+        resourceId: "资源 ID",
+        aclActions: "权限动作（逗号分隔）",
+        documentId: "文档 ID",
       },
       en: {
         open: "Enterprise knowledge",
@@ -244,6 +267,29 @@ window.__ModuleLoader__.load({
         consoleHint: "Capabilities and data are constrained by the current enterprise ACL",
         reloadData: "Load",
         rebuildGraph: "Rebuild graph",
+        createSpace: "Create space",
+        createSource: "Create source",
+        createOntology: "Create ontology draft",
+        publishOntology: "Publish ontology",
+        exportOntology: "Export ontology",
+        importOntology: "Import ontology",
+        grantAcl: "Grant resource ACL",
+        grantDocument: "Grant document ACL",
+        spaceDescription: "Space description",
+        sourceName: "Source name",
+        sourceKind: "Source type",
+        sourceConfig: "Source config JSON",
+        ontologyVersion: "Version",
+        ontologyClasses: "Entity classes (comma separated)",
+        ontologyPredicates: "Predicates (comma separated)",
+        ontologyId: "Ontology ID",
+        ontologyStatus: "Target status",
+        ontologyJsonLd: "JSON-LD",
+        principalId: "Principal ID",
+        resourceType: "Resource type",
+        resourceId: "Resource ID",
+        aclActions: "Actions (comma separated)",
+        documentId: "Document ID",
       },
     };
     let opened = false;
@@ -1075,6 +1121,28 @@ window.__ModuleLoader__.load({
       const values = data?.capabilities?.tools || data?.capabilities || [];
       return new Map((Array.isArray(values) ? values : []).map(item => [item.remoteName || item.name, item.allowed === false ? "unknown" : item.access || "unknown"]));
     }
+    function capabilityAllowed(data, remoteName, expectedAccess) {
+      const access = capabilityMap(data).get(remoteName);
+      return access !== undefined && access !== "unknown" && (!expectedAccess || access === expectedAccess);
+    }
+    function parseJsonObject(value) {
+      if (!value.trim()) return {};
+      try {
+        const parsed = JSON.parse(value);
+        return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+      } catch {
+        return {};
+      }
+    }
+    function parseJsonArray(value) {
+      if (!value.trim()) return [];
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
     function Management({ data, t, tab, busy, result, onLoad, onWrite }) {
       const [content, setContent] = useState("");
       const [title, setTitle] = useState("");
@@ -1082,6 +1150,22 @@ window.__ModuleLoader__.load({
       const [sourceMemoryIds, setSourceMemoryIds] = useState("");
       const [reason, setReason] = useState("");
       const [entityId, setEntityId] = useState("");
+      const [spaceDescription, setSpaceDescription] = useState("");
+      const [sourceType, setSourceType] = useState("");
+      const [sourceConfig, setSourceConfig] = useState("{}");
+      const [ontologyVersion, setOntologyVersion] = useState("");
+      const [ontologyClasses, setOntologyClasses] = useState("");
+      const [ontologyPredicates, setOntologyPredicates] = useState("");
+      const [ontologyConstraints, setOntologyConstraints] = useState("[]");
+      const [ontologyAlignments, setOntologyAlignments] = useState("[]");
+      const [ontologyId, setOntologyId] = useState("");
+      const [ontologyStatus, setOntologyStatus] = useState("WARNING");
+      const [ontologyJsonLd, setOntologyJsonLd] = useState("");
+      const [principalId, setPrincipalId] = useState("");
+      const [resourceType, setResourceType] = useState("");
+      const [resourceId, setResourceId] = useState("");
+      const [aclActions, setAclActions] = useState("");
+      const [documentId, setDocumentId] = useState("");
       const capabilities = data?.capabilities || {};
       const rows = Array.isArray(capabilities.tools) ? capabilities.tools : [];
       const write = (tool, input) => onWrite?.(tool, input);
@@ -1104,8 +1188,57 @@ window.__ModuleLoader__.load({
             ["session_handoffs", "会话交接"], ["memory_feedbacks", "Memory 反馈"], ["memory_conflicts", "Memory 冲突"],
             ["capability_catalog", "能力目录"], ["environment_facts", "环境事实"], ["skills", "技能"],
             ["acl_grants", "资源授权"], ["principals", "主体"], ["ontologies", "Ontology"],
-          ].map(([tool, label]) => h("button", { type: "button", className: "yk-management-card", key: tool, disabled: busy || !capabilityMap(data).has(`knowledge.${tool}`), onClick: () => onLoad(tool) }, h("strong", null, label), h("span", null, capabilityMap(data).has(`knowledge.${tool}`) ? t("reloadData") : t("capabilityUnavailable"))))),
-          h("button", { type: "button", className: "yk-primary", disabled: busy || !capabilityMap(data).has("knowledge.rebuild_graph"), onClick: () => onWrite("rebuild_graph", { reason: "desktop-console" }) }, busy ? t("loadingCapability") : t("rebuildGraph")),
+          ].map(([tool, label]) => h("button", { type: "button", className: "yk-management-card", key: tool, disabled: busy || !capabilityAllowed(data, `knowledge.${tool}`, "read"), onClick: () => onLoad(tool) }, h("strong", null, label), h("span", null, capabilityAllowed(data, `knowledge.${tool}`, "read") ? t("reloadData") : t("capabilityUnavailable"))))),
+          h("button", { type: "button", className: "yk-primary", disabled: busy || !capabilityAllowed(data, "knowledge.rebuild_graph", "write"), onClick: () => onWrite("rebuild_graph", { reason: "desktop-console" }) }, busy ? t("loadingCapability") : t("rebuildGraph")),
+          h("section", { className: "yk-management-form" },
+            h("strong", null, t("createSpace")),
+            h("input", { className: "yk-management-input", value: title, placeholder: t("titleField"), onInput: event => setTitle(event.currentTarget.value) }),
+            h("input", { className: "yk-management-input", value: spaceDescription, placeholder: t("spaceDescription"), onInput: event => setSpaceDescription(event.currentTarget.value) }),
+            h("button", { type: "button", className: "yk-primary", disabled: busy || !title.trim() || !capabilityAllowed(data, "knowledge.create_space", "write"), onClick: () => onWrite("create_space", { name: title.trim(), description: spaceDescription.trim() || undefined }) }, t("createSpace")),
+          ),
+          h("section", { className: "yk-management-form" },
+            h("strong", null, t("createSource")),
+            h("input", { className: "yk-management-input", value: title, placeholder: t("sourceName"), onInput: event => setTitle(event.currentTarget.value) }),
+            h("input", { className: "yk-management-input", value: sourceType, placeholder: t("sourceKind"), onInput: event => setSourceType(event.currentTarget.value) }),
+            h("textarea", { className: "yk-management-input", value: sourceConfig, placeholder: t("sourceConfig"), onInput: event => setSourceConfig(event.currentTarget.value), rows: 3 }),
+            h("button", { type: "button", className: "yk-primary", disabled: busy || !title.trim() || !sourceType.trim() || !capabilityAllowed(data, "knowledge.create_source", "write"), onClick: () => onWrite("create_source", { name: title.trim(), type: sourceType.trim(), config: parseJsonObject(sourceConfig) }) }, t("createSource")),
+          ),
+          h("section", { className: "yk-management-form" },
+            h("strong", null, t("createOntology")),
+            h("input", { className: "yk-management-input", value: ontologyVersion, placeholder: t("ontologyVersion"), onInput: event => setOntologyVersion(event.currentTarget.value) }),
+            h("input", { className: "yk-management-input", value: ontologyClasses, placeholder: t("ontologyClasses"), onInput: event => setOntologyClasses(event.currentTarget.value) }),
+            h("input", { className: "yk-management-input", value: ontologyPredicates, placeholder: t("ontologyPredicates"), onInput: event => setOntologyPredicates(event.currentTarget.value) }),
+            h("textarea", { className: "yk-management-input", value: ontologyConstraints, placeholder: "Constraints JSON array", onInput: event => setOntologyConstraints(event.currentTarget.value), rows: 2 }),
+            h("textarea", { className: "yk-management-input", value: ontologyAlignments, placeholder: "Alignments JSON array", onInput: event => setOntologyAlignments(event.currentTarget.value), rows: 2 }),
+            h("button", { type: "button", className: "yk-primary", disabled: busy || !ontologyVersion.trim() || !ontologyClasses.trim() || !ontologyPredicates.trim() || !capabilityAllowed(data, "knowledge.create_ontology_version", "write"), onClick: () => onWrite("create_ontology_version", { version: ontologyVersion.trim(), classes: ontologyClasses.split(",").map(value => value.trim()).filter(Boolean), predicates: ontologyPredicates.split(",").map(value => value.trim()).filter(Boolean), constraints: parseJsonArray(ontologyConstraints), alignments: parseJsonArray(ontologyAlignments) }) }, t("createOntology")),
+          ),
+          h("section", { className: "yk-management-form" },
+            h("strong", null, t("publishOntology")),
+            h("input", { className: "yk-management-input", value: ontologyId, placeholder: t("ontologyId"), onInput: event => setOntologyId(event.currentTarget.value) }),
+            h("select", { className: "yk-management-input", value: ontologyStatus, onChange: event => setOntologyStatus(event.currentTarget.value) }, ["WARNING", "ENFORCE", "RETIRED"].map(value => h("option", { key: value, value }, value))),
+            h("button", { type: "button", className: "yk-primary", disabled: busy || !ontologyId.trim() || !capabilityAllowed(data, "knowledge.publish_ontology", "write"), onClick: () => onWrite("publish_ontology", { ontologyId: ontologyId.trim(), targetStatus: ontologyStatus }) }, t("publishOntology")),
+            h("button", { type: "button", className: "yk-quiet", disabled: busy || !ontologyId.trim() || !capabilityAllowed(data, "knowledge.export_ontology", "read"), onClick: () => onLoad("export_ontology", { ontologyId: ontologyId.trim() }) }, t("exportOntology")),
+          ),
+          h("section", { className: "yk-management-form" },
+            h("strong", null, t("importOntology")),
+            h("textarea", { className: "yk-management-input", value: ontologyJsonLd, placeholder: t("ontologyJsonLd"), onInput: event => setOntologyJsonLd(event.currentTarget.value), rows: 4 }),
+            h("button", { type: "button", className: "yk-primary", disabled: busy || !ontologyJsonLd.trim() || !capabilityAllowed(data, "knowledge.import_ontology", "write"), onClick: () => onWrite("import_ontology", { jsonLd: ontologyJsonLd.trim() }) }, t("importOntology")),
+          ),
+          h("section", { className: "yk-management-form" },
+            h("strong", null, t("grantAcl")),
+            h("input", { className: "yk-management-input", value: principalId, placeholder: t("principalId"), onInput: event => setPrincipalId(event.currentTarget.value) }),
+            h("input", { className: "yk-management-input", value: resourceType, placeholder: t("resourceType"), onInput: event => setResourceType(event.currentTarget.value) }),
+            h("input", { className: "yk-management-input", value: resourceId, placeholder: t("resourceId"), onInput: event => setResourceId(event.currentTarget.value) }),
+            h("input", { className: "yk-management-input", value: aclActions, placeholder: t("aclActions"), onInput: event => setAclActions(event.currentTarget.value) }),
+            h("button", { type: "button", className: "yk-primary", disabled: busy || !principalId.trim() || !resourceType.trim() || !resourceId.trim() || !aclActions.trim() || !capabilityAllowed(data, "knowledge.grant_acl", "write"), onClick: () => onWrite("grant_acl", { principalId: principalId.trim(), resourceType: resourceType.trim(), resourceId: resourceId.trim(), actions: aclActions.split(",").map(value => value.trim()).filter(Boolean) }) }, t("grantAcl")),
+          ),
+          h("section", { className: "yk-management-form" },
+            h("strong", null, t("grantDocument")),
+            h("input", { className: "yk-management-input", value: documentId, placeholder: t("documentId"), onInput: event => setDocumentId(event.currentTarget.value) }),
+            h("input", { className: "yk-management-input", value: principalId, placeholder: t("principalId"), onInput: event => setPrincipalId(event.currentTarget.value) }),
+            h("input", { className: "yk-management-input", value: aclActions, placeholder: t("aclActions"), onInput: event => setAclActions(event.currentTarget.value) }),
+            h("button", { type: "button", className: "yk-primary", disabled: busy || !documentId.trim() || !principalId.trim() || !aclActions.trim() || !capabilityAllowed(data, "knowledge.grant_document_principal", "write"), onClick: () => onWrite("grant_document_principal", { documentId: documentId.trim(), principalId: principalId.trim(), actions: aclActions.split(",").map(value => value.trim()).filter(Boolean) }) }, t("grantDocument")),
+          ),
           records.length ? h("div", { className: "yk-management-records" }, records.slice(0, 100).map((item, index) => h("pre", { key: item.id || index }, JSON.stringify(item, null, 2)))) : null,
         ),
       );
@@ -1115,15 +1248,15 @@ window.__ModuleLoader__.load({
           h("textarea", { className: "yk-management-input", value: content, placeholder: t("content"), onInput: event => setContent(event.currentTarget.value), rows: 7 }),
           h("input", { className: "yk-management-input", value: title, placeholder: t("titleField"), onInput: event => setTitle(event.currentTarget.value) }),
           h("input", { className: "yk-management-input", value: fileUrl, placeholder: t("fileUrl"), onInput: event => setFileUrl(event.currentTarget.value) }),
-          h("button", { type: "button", className: "yk-primary", disabled: busy || !content.trim() || !fileUrl.trim() || !capabilityMap(data).has("knowledge.ingest_file"), onClick: () => write("ingest_file", { text: content.trim(), fileUrl: fileUrl.trim(), title: title.trim() || undefined }) }, busy ? t("loadingCapability") : t("ingest")),
-          !capabilityMap(data).has("knowledge.ingest_file") ? h("p", { className: "yk-muted" }, t("missingWriteCapability")) : null,
+          h("button", { type: "button", className: "yk-primary", disabled: busy || !content.trim() || !fileUrl.trim() || !capabilityAllowed(data, "knowledge.ingest_file", "write"), onClick: () => write("ingest_file", { text: content.trim(), fileUrl: fileUrl.trim(), title: title.trim() || undefined }) }, busy ? t("loadingCapability") : t("ingest")),
+          !capabilityAllowed(data, "knowledge.ingest_file", "write") ? h("p", { className: "yk-muted" }, t("missingWriteCapability")) : null,
         ),
         h("section", { className: "yk-panel" },
           h(Title, { title: t("promoteTitle") }),
           h("input", { className: "yk-management-input", value: sourceMemoryIds, placeholder: t("sourceMemoryIds"), onInput: event => setSourceMemoryIds(event.currentTarget.value) }),
           h("input", { className: "yk-management-input", value: title, placeholder: t("titleField"), onInput: event => setTitle(event.currentTarget.value) }),
           h("input", { className: "yk-management-input", value: reason, placeholder: t("reason"), onInput: event => setReason(event.currentTarget.value) }),
-          h("button", { type: "button", className: "yk-primary", disabled: busy || !sourceMemoryIds.trim() || !title.trim() || !reason.trim() || !capabilityMap(data).has("knowledge.promote"), onClick: () => write("promote", { sourceMemoryIds: sourceMemoryIds.split(",").map(value => value.trim()).filter(Boolean), targetSpaceKey: "tenant.all", title: title.trim(), classification: "INTERNAL", reason: reason.trim() }) }, busy ? t("loadingCapability") : t("promote")),
+          h("button", { type: "button", className: "yk-primary", disabled: busy || !sourceMemoryIds.trim() || !title.trim() || !reason.trim() || !capabilityAllowed(data, "knowledge.promote", "write"), onClick: () => write("promote", { sourceMemoryIds: sourceMemoryIds.split(",").map(value => value.trim()).filter(Boolean), targetSpaceKey: "tenant.all", title: title.trim(), classification: "INTERNAL", reason: reason.trim() }) }, busy ? t("loadingCapability") : t("promote")),
         ),
       );
       if (tab === "memoryManage") return h("div", { className: "yk-page" },
@@ -1131,8 +1264,8 @@ window.__ModuleLoader__.load({
           h(Title, { title: t("memoryCaptureTitle") }),
           h("textarea", { className: "yk-management-input", value: content, placeholder: t("content"), onInput: event => setContent(event.currentTarget.value), rows: 7 }),
           h("input", { className: "yk-management-input", value: reason, placeholder: t("reason"), onInput: event => setReason(event.currentTarget.value) }),
-          h("button", { type: "button", className: "yk-primary", disabled: busy || !content.trim() || !capabilityMap(data).has("knowledge.remember"), onClick: () => write("remember", { content: content.trim(), captureReason: reason.trim() || "user-created" }) }, busy ? t("loadingCapability") : t("remember")),
-          !capabilityMap(data).has("knowledge.remember") ? h("p", { className: "yk-muted" }, t("missingWriteCapability")) : null,
+          h("button", { type: "button", className: "yk-primary", disabled: busy || !content.trim() || !capabilityAllowed(data, "knowledge.remember", "write"), onClick: () => write("remember", { content: content.trim(), captureReason: reason.trim() || "user-created" }) }, busy ? t("loadingCapability") : t("remember")),
+          !capabilityAllowed(data, "knowledge.remember", "write") ? h("p", { className: "yk-muted" }, t("missingWriteCapability")) : null,
         ),
       );
       return h("div", { className: "yk-page" },
@@ -1145,7 +1278,7 @@ window.__ModuleLoader__.load({
             h("span", null, item.allowed === false ? t("capabilityUnavailable") : item.access === "write" ? t("capabilityWrite") : item.access === "read" ? t("capabilityRead") : t("capabilityUnavailable")),
           ))),
           records.length ? h("div", { className: "yk-management-records" }, records.slice(0, 100).map((item, index) => h("pre", { key: item.id || index }, JSON.stringify(item, null, 2)))) : null,
-          h("div", { className: "yk-management-actions" }, managementTools.map(item => h("button", { type: "button", className: "yk-primary", key: item, disabled: busy || !capabilityMap(data).has(`knowledge.${item}`) || (item === "provenance_lineage" && !entityId.trim()), onClick: () => onLoad(item, item === "provenance_lineage" ? { entityId: entityId.trim(), maxDepth: 5 } : { page: 1, limit: 100 }) }, busy ? t("loadingCapability") : t("refresh")))),
+          h("div", { className: "yk-management-actions" }, managementTools.map(item => h("button", { type: "button", className: "yk-primary", key: item, disabled: busy || !capabilityAllowed(data, `knowledge.${item}`, "read") || (item === "provenance_lineage" && !entityId.trim()), onClick: () => onLoad(item, item === "provenance_lineage" ? { entityId: entityId.trim(), maxDepth: 5 } : { page: 1, limit: 100 }) }, busy ? t("loadingCapability") : t("refresh")))),
         ),
       );
     }
@@ -1552,7 +1685,7 @@ window.__ModuleLoader__.load({
     const themeRefinementCss = `.yk-metric,.yk-record,.yk-memory-row{border-color:var(--dsw-alias-border-l1)!important}.yk-bar-track{background:var(--dsw-alias-bg-layer-2)!important}.yk-record-icon,.yk-template b,.yk-node-detail{background:var(--dsw-alias-bg-layer-2)!important;color:var(--dsw-alias-brand-primary)!important}.yk-template em{color:var(--dsw-alias-brand-primary)!important}.yk-chip{background:var(--dsw-alias-bg-layer-2)!important;border-color:var(--dsw-alias-border-l1)!important;color:var(--dsw-alias-label-primary)!important}.yk-row-actions .yk-quiet,.yk-error button{border-color:var(--dsw-alias-border-l1)!important;background:var(--dsw-alias-bg-layer-1)!important;color:var(--dsw-alias-label-secondary)!important}.yk-node-detail small,.yk-node-detail-empty{color:var(--dsw-alias-label-secondary)!important}.yk-source-ready i{background:var(--dsw-alias-state-success-primary)!important}.yk-source-degraded i,.yk-source-unavailable i{background:var(--dsw-alias-state-warn-primary)!important}.yk-source-error i{background:var(--dsw-alias-state-error-primary)!important}.yk-source-queued i{background:var(--dsw-alias-brand-primary)!important}.yk-spinner{border-color:var(--dsw-alias-border-l2)!important;border-top-color:var(--dsw-alias-brand-primary)!important}.yk-metric:before,.yk-metric-blue:before{background:var(--dsw-alias-brand-primary)!important}.yk-metric-teal:before,.yk-bar-processing{background:var(--dsw-alias-state-success-primary)!important}.yk-metric-violet:before,.yk-bar-queued{background:var(--dsw-alias-label-tertiary)!important}.yk-metric-amber:before{background:var(--dsw-alias-state-warn-primary)!important}.yk-bar-failed{background:var(--dsw-alias-state-error-primary)!important}.yk-edge{stroke:var(--dsw-alias-border-l2)!important}.yk-node circle{fill:color-mix(in srgb,var(--dsw-alias-brand-primary) 12%,var(--dsw-alias-bg-layer-1))!important;stroke:var(--dsw-alias-brand-primary)!important}.yk-node:nth-of-type(4n) circle{fill:color-mix(in srgb,var(--dsw-alias-state-success-primary) 12%,var(--dsw-alias-bg-layer-1))!important;stroke:var(--dsw-alias-state-success-primary)!important}.yk-node:nth-of-type(4n+1) circle{fill:color-mix(in srgb,var(--dsw-alias-state-warn-primary) 12%,var(--dsw-alias-bg-layer-1))!important;stroke:var(--dsw-alias-state-warn-primary)!important}.yk-node.is-selected circle{fill:var(--dsw-alias-bg-layer-1)!important;stroke:var(--dsw-alias-brand-primary)!important}.yk-node text{fill:var(--dsw-alias-label-secondary)!important}.yk-node.is-selected text{fill:var(--dsw-alias-label-primary)!important}`;
     // Keep long node identities inside the detail card; the graph canvas owns its own scrolling.
     const contentLayoutCss = `.yk-page,.yk-graph-panel,.yk-graph-wrap,.yk-node-detail{min-width:0}.yk-graph-panel,.yk-graph-wrap{grid-template-columns:minmax(0,1fr)}.yk-node-detail{overflow-wrap:anywhere}`;
-    const managementCss = `.yk-management-list{display:grid;gap:8px}.yk-management-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--dsw-alias-border-l1);border-radius:7px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font-size:12px}.yk-management-row span{color:var(--dsw-alias-label-secondary);font-size:11px}.yk-management-records{display:grid;gap:8px;max-height:420px;overflow:auto}.yk-management-records pre{margin:0;padding:10px;border:1px solid var(--dsw-alias-border-l1);border-radius:7px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-secondary);font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere}.yk-management-input{box-sizing:border-box;width:100%;padding:9px 10px;border:1px solid var(--dsw-alias-border-l1);border-radius:7px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;resize:vertical}.yk-management-actions{display:flex;flex-wrap:wrap;gap:8px}.yk-management-console{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.yk-management-card{display:grid;gap:4px;padding:12px;border:1px solid var(--dsw-alias-border-l1);border-radius:7px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);text-align:left;cursor:pointer}.yk-management-card span{color:var(--dsw-alias-label-secondary);font-size:11px}.yk-management-card:disabled{cursor:not-allowed;opacity:.45}@media(max-width:720px){.yk-management-console{grid-template-columns:repeat(2,minmax(0,1fr))}}`;
+    const managementCss = `.yk-management-list{display:grid;gap:8px}.yk-management-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--dsw-alias-border-l1);border-radius:7px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font-size:12px}.yk-management-row span{color:var(--dsw-alias-label-secondary);font-size:11px}.yk-management-records{display:grid;gap:8px;max-height:420px;overflow:auto}.yk-management-records pre{margin:0;padding:10px;border:1px solid var(--dsw-alias-border-l1);border-radius:7px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-secondary);font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere}.yk-management-input{box-sizing:border-box;width:100%;padding:9px 10px;border:1px solid var(--dsw-alias-border-l1);border-radius:7px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;resize:vertical}.yk-management-actions{display:flex;flex-wrap:wrap;gap:8px}.yk-management-form{display:grid;gap:8px;padding-top:12px;border-top:1px solid var(--dsw-alias-border-l1)}.yk-management-console{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.yk-management-card{display:grid;gap:4px;padding:12px;border:1px solid var(--dsw-alias-border-l1);border-radius:7px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);text-align:left;cursor:pointer}.yk-management-card span{color:var(--dsw-alias-label-secondary);font-size:11px}.yk-management-card:disabled{cursor:not-allowed;opacity:.45}@media(max-width:720px){.yk-management-console{grid-template-columns:repeat(2,minmax(0,1fr))}}`;
     function apply(ctx) {
       ctx.effect(
         () => ctx.locale.register(NS, copy),
