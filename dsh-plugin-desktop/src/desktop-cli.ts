@@ -1,8 +1,8 @@
 /** Private RunAsNode bootstrap for the packaged DeepSeek Harness CLI. */
 
-import { readFileSync } from 'node:fs'
+import { readFileSync, realpathSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { resolveProfileDir } from '@deepseek-ai/dsh-app-boot'
 import { packagedDependencyPath } from './packaged-runtime-path.ts'
@@ -147,12 +147,19 @@ export async function runDesktopDshCli(
   }
 }
 
-function isDirectExecution(): boolean {
-  const entry = process.argv[1]
-  return entry !== undefined && fileURLToPath(import.meta.url) === entry
+/** Recognize direct execution even through aliases such as /tmp -> /private/tmp. */
+export function isDirectDesktopCliExecution(moduleUrl: string, entry: string | undefined = process.argv[1]): boolean {
+  if (entry === undefined) return false
+  const filename = fileURLToPath(moduleUrl)
+  if (filename === entry) return true
+  try {
+    return realpathSync(filename) === realpathSync(resolve(entry))
+  } catch {
+    return filename === resolve(entry)
+  }
 }
 
-if (isDirectExecution()) {
+if (isDirectDesktopCliExecution(import.meta.url)) {
   void runDesktopDshCli().catch((cause: unknown) => {
     process.stderr.write(`sensteed-agent: failed to start packaged dsh: ${cause instanceof Error ? cause.stack ?? cause.message : String(cause)}\n`)
     process.exitCode = 1

@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url'
 import { describe, expect, it, vi } from 'vitest'
 import {
   clearElectronRunAsNode,
+  isDirectDesktopCliExecution,
   desktopCliProfileManifestUrl,
   runDesktopDshCli,
   selectedDesktopCliProfile,
@@ -14,6 +15,25 @@ import {
 import { packagedDependencyPath, unpackedAsarPath } from '../src/packaged-runtime-path.ts'
 
 describe('packaged dsh bootstrap', () => {
+  it('recognizes direct CLI execution through a directory alias', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-cli-entry-'))
+    try {
+      const physical = join(root, 'physical')
+      const alias = join(root, 'alias')
+      mkdirSync(physical)
+      const entry = join(physical, 'desktop-cli.js')
+      writeFileSync(entry, '')
+      writeFileSync(join(physical, 'other.js'), '')
+      symlinkSync(physical, alias, 'junction')
+      const moduleUrl = pathToFileURL(realpathSync(entry)).href
+      expect(isDirectDesktopCliExecution(moduleUrl, join(alias, 'desktop-cli.js'))).toBe(true)
+      expect(isDirectDesktopCliExecution(moduleUrl, join(alias, 'other.js'))).toBe(false)
+      expect(isDirectDesktopCliExecution(moduleUrl, undefined)).toBe(false)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
   it('removes every Windows casing of Electron Node mode', () => {
     const environment = {
       ELECTRON_RUN_AS_NODE: '1',
