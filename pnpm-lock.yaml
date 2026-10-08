@@ -9,7 +9,7 @@ overrides:
 
 patchedDependencies:
   '@electron/universal@2.0.3': cdaf19c117b3d1a6c9cb7fcd18341d46202a452d4ed59792d901cb9957b24736
-  app-builder-lib@26.17.0: a8c1c915adbd0c246e9adbed53bba1062733aa09993845e6dcd6f1b675bbebcb
+  app-builder-lib@26.17.0: ca934fdd6e571c92bb0385f620aebe8edafb946e48ec605dada7fdac454d76de
   dshmarket@1.39.0: 3bc46b1b0e5a4ed0906580c0905ee109b98178769c517fda651b68cd79900cc2
   open@11.0.1: 383484d0b84b1bb856145936155333d024f1dfc5d6eaf86104b2a00bac8e8612
 
@@ -19733,7 +19733,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  app-builder-lib@26.17.0(patch_hash=a8c1c915adbd0c246e9adbed53bba1062733aa09993845e6dcd6f1b675bbebcb)(dmg-builder@26.17.0)(electron-builder-squirrel-windows@26.17.0):
+  app-builder-lib@26.17.0(patch_hash=ca934fdd6e571c92bb0385f620aebe8edafb946e48ec605dada7fdac454d76de)(dmg-builder@26.17.0)(electron-builder-squirrel-windows@26.17.0):
     dependencies:
       '@electron/asar': 3.4.1
       '@electron/fuses': 1.8.0
@@ -20468,7 +20468,7 @@ snapshots:
 
   dmg-builder@26.17.0(electron-builder-squirrel-windows@26.17.0):
     dependencies:
-      app-builder-lib: 26.17.0(patch_hash=a8c1c915adbd0c246e9adbed53bba1062733aa09993845e6dcd6f1b675bbebcb)(dmg-builder@26.17.0)(electron-builder-squirrel-windows@26.17.0)
+      app-builder-lib: 26.17.0(patch_hash=ca934fdd6e571c92bb0385f620aebe8edafb946e48ec605dada7fdac454d76de)(dmg-builder@26.17.0)(electron-builder-squirrel-windows@26.17.0)
       builder-util: 26.16.0
       fs-extra: 10.1.0
       js-yaml: 4.3.1
@@ -20603,7 +20603,7 @@ snapshots:
 
   electron-builder-squirrel-windows@26.17.0(dmg-builder@26.17.0):
     dependencies:
-      app-builder-lib: 26.17.0(patch_hash=a8c1c915adbd0c246e9adbed53bba1062733aa09993845e6dcd6f1b675bbebcb)(dmg-builder@26.17.0)(electron-builder-squirrel-windows@26.17.0)
+      app-builder-lib: 26.17.0(patch_hash=ca934fdd6e571c92bb0385f620aebe8edafb946e48ec605dada7fdac454d76de)(dmg-builder@26.17.0)(electron-builder-squirrel-windows@26.17.0)
       builder-util: 26.16.0
       electron-winstaller: 5.4.0
     transitivePeerDependencies:
@@ -20628,7 +20628,7 @@ snapshots:
 
   electron-builder@26.17.0(electron-builder-squirrel-windows@26.17.0):
     dependencies:
-      app-builder-lib: 26.17.0(patch_hash=a8c1c915adbd0c246e9adbed53bba1062733aa09993845e6dcd6f1b675bbebcb)(dmg-builder@26.17.0)(electron-builder-squirrel-windows@26.17.0)
+      app-builder-lib: 26.17.0(patch_hash=ca934fdd6e571c92bb0385f620aebe8edafb946e48ec605dada7fdac454d76de)(dmg-builder@26.17.0)(electron-builder-squirrel-windows@26.17.0)
       builder-util: 26.16.0
       builder-util-runtime: 9.7.0
       chalk: 4.1.2

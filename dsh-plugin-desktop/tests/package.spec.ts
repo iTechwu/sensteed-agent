@@ -7,6 +7,7 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs'
 import { createRequire } from 'node:module'
@@ -1319,6 +1320,61 @@ describe('published package surface', () => {
     expect(legacyCode2Fallback).toBeGreaterThan(installedNsisInstallUtil.indexOf('CheckResult:'))
     expect(legacyCode2Fallback).toBeLessThan(installedNsisInstallUtil.indexOf('Sleep 1000', legacyCode2Fallback))
     expect(installedNsisInstallUtil).toContain('MessageBox MB_OK|MB_ICONEXCLAMATION "$(uninstallFailed): $R0"')
+  })
+
+  it('follows a satisfying pnpm link before resolving its transitive dependencies', async () => {
+    const workspaceRequire = createRequire(new URL('package.json', packageRoot))
+    const builderRequire = createRequire(workspaceRequire.resolve('electron-builder/package.json'))
+    const collectorModule = builderRequire(join(
+      dirname(builderRequire.resolve('app-builder-lib/package.json')),
+      'out/node-module-collector/pnpmNodeModulesCollector.js',
+    )) as {
+      PnpmNodeModulesCollector: new (rootDir: string, tempDirManager: unknown) => {
+        isHoisted: { value: Promise<boolean> }
+        locateFromDepOrRoot: (name: string, parent: string, range: string) => Promise<{ packageDir: string } | null>
+        extractProductionDependencyGraph: (tree: { name: string; version: string; path: string }, id: string) => Promise<void>
+        productionGraph: Record<string, { dependencies: string[] }>
+        allDependencies: Map<string, { name: string; from: string; version: string; path: string }>
+      }
+    }
+    const root = mkdtempSync(join(tmpdir(), 'dsh-collector-link-'))
+    try {
+      const store = join(root, '.pnpm', 'watcher@1.0.0', 'node_modules')
+      for (const name of ['watcher', 'reader', 'leaf']) {
+        mkdirSync(join(store, name), { recursive: true })
+        writeFileSync(join(store, name, 'package.json'), JSON.stringify({
+          name, version: '1.0.0',
+          dependencies: name === 'watcher' ? { reader: '^1.0.0' } : name === 'reader' ? { leaf: '^1.0.0' } : {},
+        }))
+      }
+      mkdirSync(join(root, 'node_modules'))
+      symlinkSync(join(store, 'watcher'), join(root, 'node_modules', 'watcher'), 'junction')
+      const collector = new collectorModule.PnpmNodeModulesCollector(root, {})
+      collector.isHoisted = { value: Promise.resolve(false) }
+
+      const watcher = await collector.locateFromDepOrRoot('watcher', root, '1.0.0')
+      expect(watcher?.packageDir).toBe(realpathSync(join(store, 'watcher')))
+      expect(await collector.locateFromDepOrRoot('reader', watcher!.packageDir, '^1.0.0'))
+        .toMatchObject({ packageDir: realpathSync(join(store, 'reader')) })
+      // pnpm can omit the entire subtree: reconstruct it from installed manifests.
+      await collector.extractProductionDependencyGraph({
+        name: 'watcher', version: '1.0.0', path: watcher!.packageDir,
+      }, 'watcher@1.0.0')
+      expect(collector.productionGraph['watcher@1.0.0']?.dependencies).toEqual(['reader@1.0.0'])
+      expect(collector.productionGraph['reader@1.0.0']?.dependencies).toEqual(['leaf@1.0.0'])
+      const linkedCollector = new collectorModule.PnpmNodeModulesCollector(root, {})
+      linkedCollector.isHoisted = { value: Promise.resolve(false) }
+      linkedCollector.allDependencies.set('reader@link:../reader', {
+        name: 'reader', from: 'reader', version: 'link:../reader', path: realpathSync(join(store, 'reader')),
+      })
+      await linkedCollector.extractProductionDependencyGraph({
+        name: 'watcher', version: '1.0.0', path: watcher!.packageDir,
+      }, 'watcher@1.0.0')
+      expect(linkedCollector.productionGraph['watcher@1.0.0']?.dependencies).toEqual(['reader@link:../reader'])
+      expect(linkedCollector.allDependencies.has('reader@1.0.0')).toBe(false)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 
   it('does not reuse a pnpm package lookup miss across different parents', async () => {

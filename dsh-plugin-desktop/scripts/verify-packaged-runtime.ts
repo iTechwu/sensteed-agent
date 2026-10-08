@@ -108,6 +108,7 @@ export const ALLOWED_SMART_UNPACK_PACKAGE_ROOTS = [
   'node_modules/@deepseek-ai/libreoffice-kit',
   'node_modules/@deepseek-ai/dsh-host-directory-picker-native',
   'node_modules/@deepseek-ai/dsh-sandbox-windows-acl',
+  'node_modules/@deepseek-ai/dsh-sandbox-local',
   'node_modules/@deepseek-ai/dsh-session-persistence-jsonl',
   'node_modules/@deepseek-ai/dsh-subprocess-local',
   'node_modules/@deepseek-ai/dsh-win32-process',
@@ -1492,8 +1493,8 @@ export async function afterPack(
   report: (summary: UnpackedRuntimeSummary) => void = reportUnpackedRuntime,
   verifyAa: typeof verifyPackagedAgentsAnywhere = verifyPackagedAgentsAnywhere,
   smokeNative: PackagedElectronSmoke = (context) => {
-    smokePackagedFsExtRuntime(context)
     smokePackagedBuiltinLoaderRuntime(context)
+    smokePackagedElectronRuntime(context)
   },
   hydrateMac: (context: PackagedRuntimeContext) => void = hydratePackagedMacRuntimeForContext,
   verifyClosure: typeof verifyProfileClosureArtifact = verifyProfileClosureArtifact,
