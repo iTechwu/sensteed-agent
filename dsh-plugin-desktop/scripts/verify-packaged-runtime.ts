@@ -17,6 +17,8 @@ import {
   readSync,
   readdirSync,
   rmSync,
+  statSync,
+  writeSync,
 } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
