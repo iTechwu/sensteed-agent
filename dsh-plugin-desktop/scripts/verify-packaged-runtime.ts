@@ -114,6 +114,15 @@ export const ALLOWED_SMART_UNPACK_PACKAGE_ROOTS = [
   'node_modules/cloudflared',
   'node_modules/cpu-features',
   'node_modules/dsh-better-sidebar',
+  // a0a4298b0b 的运行时闭包：纯 JS 包随发布闭包 unpacked 交付。
+  'node_modules/@opentelemetry/otlp-exporter-base',
+  'node_modules/@opentelemetry/otlp-transformer',
+  'node_modules/@opentelemetry/resources',
+  'node_modules/@opentelemetry/sdk-logs',
+  'node_modules/chokidar',
+  'node_modules/execa',
+  'node_modules/got',
+  'node_modules/turndown',
   'node_modules/fs-ext',
   'node_modules/koffi',
   'node_modules/koffi-win32-x64-3-1-1',
@@ -1398,9 +1407,10 @@ export function repairPackagedAsarHeader(context: PackagedRuntimeContext): void 
         node = (dir[segment] ??= { files: {} })
       }
       const parent = (node.files ??= {})
-      if (parent[segments.at(-1)!] === undefined) {
-        parent[segments.at(-1)!] = { size: bytes, unpacked: true }
-      }
+      // Force the unpacked flag: the writer emits these files physically
+      // while leaving their header entries packed (or absent), and Electron
+      // must read them from app.asar.unpacked.
+      parent[segments.at(-1)!] = { size: bytes, unpacked: true }
     }
     const walkPhysical = (dir: string, path: string): void => {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -1435,7 +1445,9 @@ export function repairPackagedAsarHeader(context: PackagedRuntimeContext): void 
     // The pickle payload lives at the buffer tail (payloadOffset = length -
     // payloadSize, per PickleIterator's payloadOffset = getHeaderSize()).
     const headerBuf = Buffer.alloc(oldHeaderBufLen)
-    headerBuf.writeUInt32LE(payloadSize, 0)
+    // payloadSize covers the whole reserved region so the PickleIterator's
+    // payloadOffset (= buffer.length - payloadSize) lands exactly at 4.
+    headerBuf.writeUInt32LE(oldHeaderBufLen - 4, 0)
     headerBuf.writeUInt32LE(json.length, payloadOffset)
     json.copy(headerBuf, payloadOffset + 4)
     writeSync(fd, headerBuf, 0, headerBuf.length, 8)
