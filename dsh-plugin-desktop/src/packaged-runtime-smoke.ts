@@ -18,6 +18,9 @@ import { rgPath } from '@vscode/ripgrep'
 import AdmZip from 'adm-zip'
 import { exportDiagnosticsZip } from './diagnostic-export.ts'
 import { installProfilePackageResolver } from './module-resolution.ts'
+import { disableAsarArchiveView } from './asar-archive-policy.ts'
+
+disableAsarArchiveView(import.meta.url)
 
 const OK_MARKER = 'DSH_PACKAGED_RUNTIME_OK'
 
