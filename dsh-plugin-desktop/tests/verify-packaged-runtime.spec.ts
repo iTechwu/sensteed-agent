@@ -1140,6 +1140,18 @@ describe('packaged desktop runtime verification', () => {
     }
   })
 
+  it('accepts a direct Profile resolver without generated legacy proxy files', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-profile-direct-resolver-'))
+    try {
+      const modulesDir = join(root, 'profiles', 'node_modules')
+      expect(() => verifyPackagedProfileModuleFallback(modulesDir, join(root, 'app.asar'))).not.toThrow()
+      mkdirSync(modulesDir, { recursive: true })
+      expect(() => verifyPackagedProfileModuleFallback(modulesDir, join(root, 'app.asar'))).not.toThrow()
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
   it('rejects non-directory packaged Profile fallbacks', () => {
     const root = mkdtempSync(join(tmpdir(), 'dsh-packaged-profile-fallback-'))
     const modulesDir = join(root, 'profiles', 'node_modules')

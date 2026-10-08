@@ -19,6 +19,7 @@ import {
   rmSync,
   statSync,
   writeSync,
+  type Dirent,
 } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
@@ -527,11 +528,14 @@ function smokePackagedModule(
   }
 }
 
-/** Verify packaged CLI fallbacks are physical, owned proxies into the current ASAR. */
+/** Validate legacy Profile proxies when present; the current resolver creates none. */
 export function verifyPackagedProfileModuleFallback(modulesDir: string, asarRoot: string): void {
-  const entries = readdirSync(modulesDir, { withFileTypes: true })
-  if (entries.length === 0) {
-    throw new Error('dsh-plugin-desktop: packaged Desktop CLI created no Profile module fallbacks')
+  let entries: Dirent[]
+  try {
+    entries = readdirSync(modulesDir, { withFileTypes: true })
+  } catch (cause) {
+    if ((cause as NodeJS.ErrnoException).code === 'ENOENT') return
+    throw cause
   }
   const packages: Array<{ name: string; directory: string }> = []
   for (const entry of entries) {
