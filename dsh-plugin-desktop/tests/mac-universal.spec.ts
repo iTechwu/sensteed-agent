@@ -1,12 +1,19 @@
+import { execFileSync } from 'node:child_process'
 import {
+  chmodSync,
   existsSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readlinkSync,
   rmSync,
+  statSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs'
+import { createRequire } from 'node:module'
+import { createPackageWithOptions, extractFile, statFile, uncacheAll } from '@electron/asar'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -367,4 +374,99 @@ describe('universal macOS native runtime preparation', () => {
       rmSync(root, { recursive: true, force: true })
     }
   })
+})
+
+// Exercise the same transitive merger electron-builder loads, including pnpm patches.
+const builderRequire = createRequire(createRequire(import.meta.url).resolve('electron-builder'))
+const universalRequire = createRequire(builderRequire.resolve('app-builder-lib'))
+const { makeUniversalApp } = universalRequire('@electron/universal') as {
+  makeUniversalApp: (options: {
+    x64AppPath: string; arm64AppPath: string; outAppPath: string; mergeASARs: boolean
+  }) => Promise<void>
+}
+const { mergeASARs } = createRequire(universalRequire.resolve('@electron/universal'))('./asar-utils.js') as {
+  mergeASARs: (options: {
+    x64AsarPath: string; arm64AsarPath: string; outputAsarPath: string
+  }) => Promise<void>
+}
+
+const fixturePlist = '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>CFBundleName</key><string>Fixture</string></dict></plist>'
+
+describe.skipIf(process.platform !== 'darwin')('real universal macOS archive assembly', () => {
+  it('keeps nested LibreOffice plists in one runtime archive while merging native slices', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-universal-app-'))
+    const nestedPlist = 'node_modules/@deepseek-ai/libreoffice-kit-darwin-arm64/program/LibreOfficeDev.app/Contents/Info.plist'
+    const native = 'node_modules/fixture/native.node'
+    try {
+      const apps = ['x64', 'arm64'].map(arch => join(root, `${arch}.app`))
+      const cSource = join(root, 'native.c')
+      writeFileSync(cSource, 'int fixture(void) { return 42; }\n')
+      for (const [index, arch] of ['x86_64', 'arm64'].entries()) {
+        const app = apps[index]!
+        const source = join(root, `source-${arch}`)
+        mkdirSync(join(app, 'Contents', 'Resources'), { recursive: true })
+        writeFileSync(join(app, 'Contents', 'Info.plist'), fixturePlist)
+        for (const [path, content] of Object.entries({
+          'package.json': '{"name":"fixture","main":"main.cjs"}',
+          'main.cjs': 'module.exports = "packed runtime";',
+          [nestedPlist]: fixturePlist,
+        })) {
+          mkdirSync(dirname(join(source, path)), { recursive: true })
+          writeFileSync(join(source, path), content)
+        }
+        mkdirSync(dirname(join(source, native)), { recursive: true })
+        execFileSync('cc', ['-arch', arch, '-dynamiclib', cSource, '-o', join(source, native)])
+        await createPackageWithOptions(source, join(app, 'Contents/Resources/app.asar'), { unpackDir: 'node_modules' })
+      }
+      const config = JSON.parse(readFileSync(new URL('../electron-builder.json', import.meta.url), 'utf8')) as {
+        mac: { mergeASARs: boolean }
+      }
+      const output = join(root, 'universal.app')
+      await makeUniversalApp({ x64AppPath: apps[0]!, arm64AppPath: apps[1]!, outAppPath: output, mergeASARs: config.mac.mergeASARs })
+      const archive = join(output, 'Contents/Resources/app.asar')
+      expect(extractFile(archive, 'main.cjs').toString()).toBe('module.exports = "packed runtime";')
+      expect(readFileSync(join(`${archive}.unpacked`, nestedPlist), 'utf8')).toContain('<string>Fixture</string>')
+      expect(existsSync(join(output, 'Contents/Resources/app-arm64.asar'))).toBe(false)
+      execFileSync('lipo', [join(`${archive}.unpacked`, native), '-verify_arch', 'x86_64', 'arm64'])
+    } finally {
+      uncacheAll()
+      rmSync(root, { recursive: true, force: true })
+    }
+  }, 30_000)
+
+  it('merges a large exact unpacked set while preserving executable modes and symlinks', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-universal-many-'))
+    try {
+      const source = join(root, 'source')
+      const directory = `node_modules/fixture/${'long-path-'.repeat(16)}`
+      mkdirSync(join(source, directory), { recursive: true })
+      writeFileSync(join(source, 'package.json'), '{"name":"fixture"}')
+      const paths = Array.from({ length: 400 }, (_, index) => `${directory}/payload-${index}.dat`)
+      expect(paths.join(',').length).toBeGreaterThan(65_536)
+      for (const path of paths) writeFileSync(join(source, path), 'payload')
+      const helper = 'node_modules/fixture/helper'
+      const link = 'node_modules/fixture/helper-link'
+      writeFileSync(join(source, helper), '#!/bin/sh\nexit 0\n')
+      chmodSync(join(source, helper), 0o755)
+      symlinkSync('helper', join(source, link))
+      const x64 = join(root, 'x64.asar')
+      const arm64 = join(root, 'arm64.asar')
+      for (const archive of [x64, arm64]) {
+        await createPackageWithOptions(source, archive, { unpackDir: 'node_modules' })
+      }
+      // Repack over the original archive, just as makeUniversalApp does.
+      await mergeASARs({ x64AsarPath: x64, arm64AsarPath: arm64, outputAsarPath: x64 })
+      for (const path of paths) {
+        expect(extractFile(x64, path).toString()).toBe('payload')
+        expect(statFile(x64, path)).toHaveProperty('unpacked', true)
+      }
+      expect(statFile(x64, 'package.json')).not.toHaveProperty('unpacked', true)
+      expect(statSync(join(`${x64}.unpacked`, helper)).mode & 0o111).toBe(0o111)
+      expect(readlinkSync(join(`${x64}.unpacked`, link))).toBe('helper')
+      expect(extractFile(x64, link).toString()).toBe('#!/bin/sh\nexit 0\n')
+    } finally {
+      uncacheAll()
+      rmSync(root, { recursive: true, force: true })
+    }
+  }, 30_000)
 })

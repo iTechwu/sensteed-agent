@@ -890,7 +890,7 @@ describe('published package surface', () => {
       'node_modules/node-addon-require-builtin-darwin-arm64/**',
       'node_modules/node-addon-require-builtin-darwin-x64/**',
     ])
-    expect(builderConfig?.mac?.mergeASARs).toBe(false)
+    expect(builderConfig?.mac?.mergeASARs).toBe(true)
     expect(builderConfig?.mac?.signIgnore).toEqual(['\\.(?:pak|dat|wasm)$'])
     expect(builderConfig?.win?.icon).toBe('build/app-icon.ico')
     expect(builderConfig?.win?.files).toEqual([
@@ -1011,7 +1011,7 @@ describe('published package surface', () => {
         CFBundleLocalizations: ['en', 'zh_CN'],
       },
       hardenedRuntime: true,
-      mergeASARs: false,
+      mergeASARs: true,
       notarize: true,
       signIgnore: ['\\.(?:pak|dat|wasm)$'],
       target: ['dir'],

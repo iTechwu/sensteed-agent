@@ -47,6 +47,7 @@ supportedArchitectures:
     - arm64
 
 patchedDependencies:
+  '@electron/universal@2.0.3': patches/@electron__universal@2.0.3.patch
   app-builder-lib@26.17.0: patches/app-builder-lib@26.17.0.patch
   dshmarket@1.39.0: patches/dshmarket@1.39.0.patch
   open@11.0.1: patches/open@11.0.1.patch

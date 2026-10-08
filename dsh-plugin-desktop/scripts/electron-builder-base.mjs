@@ -94,6 +94,13 @@ export const ELECTRON_BUILDER_BASE = Object.freeze({
       '!node_modules/**/lightningcss-win32*/**',
       '!node_modules/**/@vscode/ripgrep-linux*/**',
       '!node_modules/**/@vscode/ripgrep-win32*/**',
+      // Local stores can retain optional binaries for other platforms. Keep
+      // both macOS slices, but never ship Linux/Windows tool runtimes here.
+      '!node_modules/**/@anthropic-ai/claude-agent-sdk-{linux,win32}-*/**',
+      '!node_modules/**/@dataiku/uv-{linux,win32}-*/**',
+      '!node_modules/**/@openai/codex-{linux,win32}-*/**',
+      '!node_modules/**/@trycua/cua-driver-{linux,win32}-*/**',
+      '!node_modules/**/@ubjs/node-{linux,win32}-*/**',
       '!node_modules/koffi-win32-x64-3-1-1/**',
     ],
     target: [
@@ -110,7 +117,9 @@ export const ELECTRON_BUILDER_BASE = Object.freeze({
     },
     hardenedRuntime: true,
     icon: 'build/app-icon-mac.png',
-    mergeASARs: false,
+    // Keep the single app.asar layout consumed by afterPack and native-runtime
+    // verification. The universal toolchain patch avoids oversized unpack globs.
+    mergeASARs: true,
     notarize: true,
     signIgnore: [
       '\\.(?:pak|dat|wasm)$',

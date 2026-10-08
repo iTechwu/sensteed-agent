@@ -8,6 +8,7 @@ overrides:
   app-builder-lib>@electron/get: 5.1.0
 
 patchedDependencies:
+  '@electron/universal@2.0.3': cdaf19c117b3d1a6c9cb7fcd18341d46202a452d4ed59792d901cb9957b24736
   app-builder-lib@26.17.0: a8c1c915adbd0c246e9adbed53bba1062733aa09993845e6dcd6f1b675bbebcb
   dshmarket@1.39.0: 3bc46b1b0e5a4ed0906580c0905ee109b98178769c517fda651b68cd79900cc2
   open@11.0.1: 383484d0b84b1bb856145936155333d024f1dfc5d6eaf86104b2a00bac8e8612
@@ -17687,7 +17688,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@electron/universal@2.0.3':
+  '@electron/universal@2.0.3(patch_hash=cdaf19c117b3d1a6c9cb7fcd18341d46202a452d4ed59792d901cb9957b24736)':
     dependencies:
       '@electron/asar': 3.4.1
       '@malept/cross-spawn-promise': 2.0.0
@@ -19689,7 +19690,7 @@ snapshots:
       '@electron/notarize': 2.5.0
       '@electron/osx-sign': 1.3.3
       '@electron/rebuild': 4.2.0
-      '@electron/universal': 2.0.3
+      '@electron/universal': 2.0.3(patch_hash=cdaf19c117b3d1a6c9cb7fcd18341d46202a452d4ed59792d901cb9957b24736)
       '@malept/flatpak-bundler': 0.4.0
       '@noble/hashes': 2.3.0
       '@peculiar/webcrypto': 1.7.1
@@ -19737,7 +19738,7 @@ snapshots:
       '@electron/notarize': 2.5.0
       '@electron/osx-sign': 1.3.3
       '@electron/rebuild': 4.2.0
-      '@electron/universal': 2.0.3
+      '@electron/universal': 2.0.3(patch_hash=cdaf19c117b3d1a6c9cb7fcd18341d46202a452d4ed59792d901cb9957b24736)
       '@malept/flatpak-bundler': 0.4.0
       '@noble/hashes': 1.8.0
       '@peculiar/webcrypto': 1.7.1
