@@ -1457,7 +1457,7 @@ export function repairPackagedAsarHeader(context: PackagedRuntimeContext): void 
     writeSync(fd, headerBuf, 0, headerBuf.length, 8)
     console.log(
       `repair diag: wrote headerBuf ${headerBuf.length}B at offset 8 ` +
-      `(payloadSize ${payloadSize}, payloadOffset ${payloadOffset}, added ${added} entries)`,
+      `(payloadSize ${payloadSize}, payloadOffset ${payloadOffset})`,
     )
   } finally {
     closeSync(fd)
