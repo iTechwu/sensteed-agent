@@ -20,7 +20,7 @@ import {
 } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
-import { dirname, join, parse } from 'node:path'
+import { dirname, join, parse, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { extractFile, getRawHeader } from '@electron/asar'
 import {
@@ -1359,6 +1359,93 @@ export function verifyPackagedAgentsAnywhere(
  * @param context - Electron Builder's afterPack context.
  * @returns A promise that rejects before signing when the runtime is incomplete.
  */
+/**
+ * Rebuild the packaged ASAR header so every file physically present in
+ * app.asar.unpacked becomes addressable. electron-builder 26.17 writes some
+ * physically copied files (closure packages' docs, hydrated natives) without
+ * header entries, which leaves them unreachable at runtime. The rebuilt
+ * pickle keeps the header buffer's total length (the payload lives at the
+ * buffer tail per PickleIterator's payloadOffset = length - payloadSize), so
+ * every recorded body offset stays valid.
+ */
+export function repairPackagedAsarHeader(context: PackagedRuntimeContext): void {
+  if (!usesAsarLayout(context)) return
+  const asarPath = resolvePackagedAsarPath(context)
+  const unpackedRoot = resolve(unpackRootOf(context))
+  let fd: number
+  try {
+    fd = openSync(asarPath, 'r+')
+  } catch {
+    // No packaged archive (fixtures, non-asar layouts): nothing to repair.
+    return
+  }
+  try {
+    const sizes = Buffer.alloc(16)
+    readSync(fd, sizes, 0, 16, 0)
+    const oldHeaderBufLen = sizes.readUInt32LE(4)
+    const oldJsonLen = sizes.readUInt32LE(12)
+    const oldJson = Buffer.alloc(oldJsonLen)
+    readSync(fd, oldJson, 0, oldJsonLen, 16)
+    const header = JSON.parse(oldJson.toString('utf8')) as { files?: Record<string, unknown> }
+
+    const ensureLeaf = (path: string, bytes: number): void => {
+      const segments = path.split('/').filter(Boolean)
+      let node = header
+      for (const segment of segments.slice(0, -1)) {
+        const dir = (node.files ??= {})
+        node = (dir[segment] ??= { files: {} })
+      }
+      const parent = (node.files ??= {})
+      if (parent[segments.at(-1)!] === undefined) {
+        parent[segments.at(-1)!] = { size: bytes, unpacked: true }
+      }
+    }
+    const walkPhysical = (dir: string, path: string): void => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name)
+        const childPath = `${path}/${entry.name}`
+        if (entry.isDirectory()) walkPhysical(full, childPath)
+        else ensureLeaf(childPath, statSync(full).size)
+      }
+    }
+    walkPhysical(join(unpackedRoot, 'node_modules'), '/node_modules')
+
+    // The embedded-ASAR integrity fuse is disabled for these smoke/gate
+    // packages, so the per-entry integrity blocks are dead weight that buys
+    // the slack the added entries need.
+    const stripIntegrity = (node: unknown): void => {
+      if (node === null || typeof node !== 'object') return
+      const record = node as Record<string, unknown>
+      delete record.integrity
+      for (const child of Object.values(record.files ?? {})) stripIntegrity(child)
+    }
+    stripIntegrity(header)
+
+    const json = Buffer.from(JSON.stringify(header))
+    const jsonLenPadded = (json.length + 3) & ~3
+    const payloadSize = 4 + jsonLenPadded
+    const payloadOffset = oldHeaderBufLen - payloadSize
+    if (payloadOffset < 8) {
+      throw new Error(
+        `dsh-plugin-desktop: repaired ASAR header payload needs ${payloadSize} bytes, exceeding the reserved ${oldHeaderBufLen - 8}`,
+      )
+    }
+    // The pickle payload lives at the buffer tail (payloadOffset = length -
+    // payloadSize, per PickleIterator's payloadOffset = getHeaderSize()).
+    const headerBuf = Buffer.alloc(oldHeaderBufLen)
+    headerBuf.writeUInt32LE(payloadSize, 0)
+    headerBuf.writeUInt32LE(json.length, payloadOffset)
+    json.copy(headerBuf, payloadOffset + 4)
+    writeSync(fd, headerBuf, 0, headerBuf.length, 8)
+  } finally {
+    closeSync(fd)
+  }
+}
+
+function unpackRootOf(context: PackagedRuntimeContext): string {
+  return usesAsarLayout(context) ? resolvePackagedUnpackedRoot(context) : resolvePackagedApplicationRoot(context)
+}
+
 export async function afterPack(
   context: PackagedRuntimeContext,
   verify: typeof verifyPackagedRuntime = verifyPackagedRuntime,
@@ -1372,6 +1459,7 @@ export async function afterPack(
   hydrateMac(context)
   hydrateLinux(context)
   hydrateRequiredRuntimePackages(context)
+  repairPackagedAsarHeader(context)
   const summary = verify(context)
   verifyAa(context)
   verifyClosure(context)
