@@ -1380,16 +1380,20 @@ export function verifyPackagedAgentsAnywhere(
  * every recorded body offset stays valid.
  */
 export function repairPackagedAsarHeader(context: PackagedRuntimeContext): void {
-  if (!usesAsarLayout(context)) return
+  if (!usesAsarLayout(context)) {
+    console.log('repair diag: skipped, not an asar layout')
+    return
+  }
   const asarPath = resolvePackagedAsarPath(context)
   const unpackedRoot = resolve(unpackRootOf(context))
   let fd: number
   try {
     fd = openSync(asarPath, 'r+')
-  } catch {
-    // No packaged archive (fixtures, non-asar layouts): nothing to repair.
+  } catch (cause) {
+    console.log(`repair diag: skipped, openSync failed: ${cause instanceof Error ? cause.message : String(cause)}`)
     return
   }
+  console.log(`repair diag: running, asar=${asarPath} unpackedRoot=${unpackedRoot}`)
   try {
     const sizes = Buffer.alloc(16)
     readSync(fd, sizes, 0, 16, 0)
@@ -1451,6 +1455,10 @@ export function repairPackagedAsarHeader(context: PackagedRuntimeContext): void 
     headerBuf.writeUInt32LE(json.length, payloadOffset)
     json.copy(headerBuf, payloadOffset + 4)
     writeSync(fd, headerBuf, 0, headerBuf.length, 8)
+    console.log(
+      `repair diag: wrote headerBuf ${headerBuf.length}B at offset 8 ` +
+      `(payloadSize ${payloadSize}, payloadOffset ${payloadOffset}, added ${added} entries)`,
+    )
   } finally {
     closeSync(fd)
   }
