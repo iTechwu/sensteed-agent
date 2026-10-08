@@ -1369,7 +1369,9 @@ export function verifyPackagedAgentsAnywhere(
   }
   if (context.electronPlatformName === 'darwin') {
     const root = usesAsarLayout(context) ? resolvePackagedUnpackedRoot(context) : resolvePackagedApplicationRoot(context)
-    for (const entry of MACOS_UNIVERSAL_NATIVE_ENTRIES.filter(entry => entry.path.endsWith('/bin/uv'))) {
+    const uvEntries = MACOS_UNIVERSAL_NATIVE_ENTRIES.filter(entry => entry.path.endsWith('/bin/uv'))
+      .filter(entry => context.arch === 4 || (context.arch === 1 ? entry.arch === 'x86_64' : entry.arch === 'arm64'))
+    for (const entry of uvEntries) {
       accessSync(join(root, entry.path), constants.X_OK)
     }
   }

@@ -392,6 +392,28 @@ describe('packaged desktop runtime verification', () => {
     }
   })
 
+  it.skipIf(process.platform === 'win32')('checks only the packaged macOS uv architecture for a single-slice artifact', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-packaged-uv-single-'))
+    try {
+      for (const [arch, packageArch] of [[3, 'arm64'], [1, 'x64']] as const) {
+        const base = context(join(root, packageArch), 'darwin', arch)
+        const target: PackagedRuntimeContext = {
+          ...base, packager: { ...base.packager, platformSpecificBuildOptions: { asar: false } },
+        }
+        const path = join(resolvePackagedApplicationRoot(target), 'node_modules', '@dataiku', `uv-darwin-${packageArch}`, 'bin', 'uv')
+        mkdirSync(join(path, '..'), { recursive: true })
+        writeFileSync(path, 'uv fixture')
+        chmodSync(path, 0o755)
+        const read = (path: string): Buffer => Buffer.from(path.endsWith('package.json') ? '{"version":"1.0.0"}' : 'same AA')
+        expect(() => verifyPackagedAgentsAnywhere(target, read, read)).not.toThrow()
+        chmodSync(path, 0o644)
+        expect(() => verifyPackagedAgentsAnywhere(target, read, read)).toThrow()
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
   it('rejects a stale or missing Profile closure manifest before signing', () => {
     const root = mkdtempSync(join(tmpdir(), 'dsh-profile-closure-'))
     try {
