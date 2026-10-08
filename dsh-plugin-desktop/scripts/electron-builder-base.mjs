@@ -8,6 +8,79 @@
  * everything here is layout/packaging policy and changes rarely.
  */
 
+const MACOS_UNUSED_PLATFORM_RUNTIMES = [
+  '!node_modules/**/@anthropic-ai/claude-agent-sdk-{linux,win32}-*/**',
+  '!node_modules/**/@dataiku/uv-{linux,win32}-*/**',
+  '!node_modules/**/@deepseek-ai/libreoffice-kit-{linux,win32}-*/**',
+  '!node_modules/**/@openai/codex-{linux,win32}-*/**',
+  '!node_modules/**/@trycua/cua-driver-{linux,win32}-*/**',
+  '!node_modules/**/@ubjs/node-{linux,win32}-*/**',
+  '!node_modules/**/@vscode/ripgrep-{linux,win32}-*/**',
+  '!node_modules/**/lightningcss-{android,linux,win32}-*/**',
+  '!node_modules/**/node-addon-require-builtin-{linux,win32}-*/**',
+  '!node_modules/**/sherpa-onnx-{linux,win32}-*/**',
+  '!node_modules/**/@img/sharp-{linux,win32}-*/**',
+  '!node_modules/**/@img/sharp-libvips-{linux,win32}-*/**',
+  '!node_modules/**/@koromix/koffi-{linux,win32,freebsd,openbsd}-*/**',
+]
+
+const WINDOWS_UNUSED_PLATFORM_RUNTIMES = [
+  '!node_modules/**/@anthropic-ai/claude-agent-sdk-{darwin,linux}-*/**',
+  '!node_modules/**/@dataiku/uv-{darwin,linux}-*/**',
+  '!node_modules/**/@deepseek-ai/libreoffice-kit-{darwin,linux}-*/**',
+  '!node_modules/**/@openai/codex-{darwin,linux}-*/**',
+  '!node_modules/**/@trycua/cua-driver-{darwin,linux}-*/**',
+  '!node_modules/**/@ubjs/node-{darwin,linux}-*/**',
+  '!node_modules/**/@vscode/ripgrep-{darwin,linux}-*/**',
+  '!node_modules/**/lightningcss-{android,darwin,linux}-*/**',
+  '!node_modules/**/node-addon-require-builtin-{darwin,linux}-*/**',
+  '!node_modules/**/sherpa-onnx-{darwin,linux}-*/**',
+  '!node_modules/**/@img/sharp-{darwin,linux}-*/**',
+  '!node_modules/**/@img/sharp-libvips-{darwin,linux}-*/**',
+  '!node_modules/**/@koromix/koffi-{darwin,linux,freebsd,openbsd}-*/**',
+]
+
+const LINUX_UNUSED_PLATFORM_RUNTIMES = [
+  '!node_modules/**/@anthropic-ai/claude-agent-sdk-{darwin,win32}-*/**',
+  '!node_modules/**/@dataiku/uv-{darwin,win32}-*/**',
+  '!node_modules/**/@deepseek-ai/libreoffice-kit-{darwin,win32}-*/**',
+  '!node_modules/**/@openai/codex-{darwin,win32}-*/**',
+  '!node_modules/**/@trycua/cua-driver-{darwin,win32}-*/**',
+  '!node_modules/**/@ubjs/node-{darwin,win32}-*/**',
+  '!node_modules/**/@vscode/ripgrep-{darwin,win32}-*/**',
+  '!node_modules/**/lightningcss-{android,darwin,win32}-*/**',
+  '!node_modules/**/node-addon-require-builtin-{darwin,win32}-*/**',
+  '!node_modules/**/sherpa-onnx-{darwin,win32}-*/**',
+  '!node_modules/**/@img/sharp-{darwin,win32}-*/**',
+  '!node_modules/**/@img/sharp-libvips-{darwin,win32}-*/**',
+  '!node_modules/**/@koromix/koffi-{darwin,win32,freebsd,openbsd}-*/**',
+  '!node_modules/**/{linux-arm,linux-arm64,linux-ia32,linux-loong64,linux-ppc64,linux-riscv64,linux-s390x,linuxmusl-*,linux-arm64-musl,linux-x64-musl}-*/**',
+  '!node_modules/**/dsh-community-market/node_modules/**',
+]
+
+const COMMON_APP_FILES = [
+  'build/app-icon.ico',
+  'build/app-icon.png',
+  'build/app-icon-mac.png',
+  'build/brand-logo.png',
+  'build/tray-icon*.png',
+  'cordis.patch.yml',
+  'lib/**',
+  'package.json',
+  // a0a4298b0b 的运行时闭包：这些一方依赖的 pnpm store 拷贝会被
+  // 图收集器丢弃，globs 是它们进入 ASAR 的通道。
+  'node_modules/@opentelemetry/otlp-exporter-base/**',
+  'node_modules/@opentelemetry/otlp-transformer/**',
+  'node_modules/@opentelemetry/resources/**',
+  'node_modules/@opentelemetry/sdk-logs/**',
+  'node_modules/chokidar/**',
+  'node_modules/execa/**',
+  'node_modules/got/**',
+  'node_modules/turndown/**',
+  '!node_modules/koffi-darwin-*-3-1-1/**',
+  '!node_modules/node-pty/build/**',
+]
+
 export const ELECTRON_BUILDER_BASE = Object.freeze({
   asar: {
     smartUnpack: true,
@@ -35,28 +108,7 @@ export const ELECTRON_BUILDER_BASE = Object.freeze({
   toolsets: {
     nsis: '1.2.1',
   },
-  files: [
-    'build/app-icon.ico',
-    'build/app-icon.png',
-    'build/app-icon-mac.png',
-    'build/brand-logo.png',
-    'build/tray-icon*.png',
-    'cordis.patch.yml',
-    'lib/**',
-    'package.json',
-    // a0a4298b0b 的运行时闭包：这些一方依赖的 pnpm store 拷贝会被
-    // 图收集器丢弃，globs 是它们进入 ASAR 的通道。
-    'node_modules/@opentelemetry/otlp-exporter-base/**',
-    'node_modules/@opentelemetry/otlp-transformer/**',
-    'node_modules/@opentelemetry/resources/**',
-    'node_modules/@opentelemetry/sdk-logs/**',
-    'node_modules/chokidar/**',
-    'node_modules/execa/**',
-    'node_modules/got/**',
-    'node_modules/turndown/**',
-    '!node_modules/koffi-darwin-*-3-1-1/**',
-    '!node_modules/node-pty/build/**',
-  ],
+  files: COMMON_APP_FILES,
   mac: {
     asarUnpack: [
       'build/app-icon-mac.png',
@@ -97,12 +149,8 @@ export const ELECTRON_BUILDER_BASE = Object.freeze({
       '!node_modules/**/@vscode/ripgrep-win32*/**',
       // Local stores can retain optional binaries for other platforms. Keep
       // both macOS slices, but never ship Linux/Windows tool runtimes here.
-      '!node_modules/**/@anthropic-ai/claude-agent-sdk-{linux,win32}-*/**',
-      '!node_modules/**/@dataiku/uv-{linux,win32}-*/**',
-      '!node_modules/**/@openai/codex-{linux,win32}-*/**',
-      '!node_modules/**/@trycua/cua-driver-{linux,win32}-*/**',
-      '!node_modules/**/@ubjs/node-{linux,win32}-*/**',
       '!node_modules/koffi-win32-x64-3-1-1/**',
+      ...MACOS_UNUSED_PLATFORM_RUNTIMES,
     ],
     target: [
       'dir',
@@ -162,6 +210,7 @@ export const ELECTRON_BUILDER_BASE = Object.freeze({
       '!node_modules/node-addon-require-builtin-win32-arm64*/**',
       '!node_modules/node-addon-require-builtin-win32-ia32*/**',
       '!node_modules/koffi-darwin-*-3-1-1/**',
+      ...WINDOWS_UNUSED_PLATFORM_RUNTIMES,
     ],
     target: [
       {
@@ -187,6 +236,10 @@ export const ELECTRON_BUILDER_BASE = Object.freeze({
     useZip: false,
   },
   linux: {
+    files: [
+      ...COMMON_APP_FILES,
+      ...LINUX_UNUSED_PLATFORM_RUNTIMES,
+    ],
     target: [
       {
         target: 'AppImage',

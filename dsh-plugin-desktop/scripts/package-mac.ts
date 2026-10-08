@@ -149,6 +149,8 @@ export function packageMacSmoke(options: MacSmokePackageOptions = defaultOptions
     options.desktopRoot,
     electronBuilderEnvironment({
       ...cleanEnvironment,
+      DSH_ELECTRON_BUILDER_TARGET_PLATFORM: 'darwin',
+      DSH_ELECTRON_BUILDER_TARGET_ARCH: architecture === 'universal' ? 'universal' : architecture,
       CSC_IDENTITY_AUTO_DISCOVERY: 'false',
       // Preserve pnpm metadata so Electron Builder selects its v11 collector.
     }),

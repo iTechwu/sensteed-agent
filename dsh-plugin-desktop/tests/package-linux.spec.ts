@@ -83,6 +83,8 @@ describe('Linux packaging orchestration', () => {
     }
     // The builder command additionally pins discovery off explicitly.
     expect(seen[0]!.CSC_IDENTITY_AUTO_DISCOVERY).toBe('false')
+    expect(seen[0]!.DSH_ELECTRON_BUILDER_TARGET_PLATFORM).toBe('linux')
+    expect(seen[0]!.DSH_ELECTRON_BUILDER_TARGET_ARCH).toBe('x64')
   })
 
   it('rejects non-Linux hosts and non-x64 architectures', () => {

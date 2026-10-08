@@ -152,6 +152,8 @@ export function packageLinuxArtifacts(
     options.desktopRoot,
     electronBuilderEnvironment({
       ...cleanEnvironment,
+      DSH_ELECTRON_BUILDER_TARGET_PLATFORM: 'linux',
+      DSH_ELECTRON_BUILDER_TARGET_ARCH: 'x64',
       CSC_IDENTITY_AUTO_DISCOVERY: 'false',
     }),
   )

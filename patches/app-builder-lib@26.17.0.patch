@@ -98,10 +98,24 @@ diff --git a/out/node-module-collector/pnpmNodeModulesCollector.js b/out/node-mo
 diff --git a/out/util/appFileCopier.js b/out/util/appFileCopier.js
 --- a/out/util/appFileCopier.js
 +++ b/out/util/appFileCopier.js
-@@ -155,8 +155,31 @@ async function computeNodeModuleFileSets(platformPackager, mainMatcher) {
+@@ -155,8 +155,50 @@ async function computeNodeModuleFileSets(platformPackager, mainMatcher) {
      const result = new Array();
      let index = 0;
      const NODE_MODULES = "node_modules";
++    const targetPlatform = process.env.DSH_ELECTRON_BUILDER_TARGET_PLATFORM;
++    const targetArch = process.env.DSH_ELECTRON_BUILDER_TARGET_ARCH;
++    const matchesTarget = (values, target, universalTargets = []) => {
++        if (!Array.isArray(values) || values.length === 0 || !target)
++            return true;
++        if (values.some(value => value === `!${target}`))
++            return false;
++        const positives = values.filter(value => !value.startsWith("!"));
++        if (positives.length === 0)
++            return true;
++        if (positives.includes(target))
++            return true;
++        return target === "universal" && universalTargets.some(value => positives.includes(value));
++    };
 +    // pnpm's virtual store is physical: the same package directory is reached once per
 +    // declaring branch, while the nested npm-style destinations below would archive the
 +    // same files twice (a hoisted copy plus a stray copy under the declaring package's
@@ -109,19 +123,24 @@ diff --git a/out/util/appFileCopier.js b/out/util/appFileCopier.js
 +    // destination; real duplicate installations keep distinct physical paths and are
 +    // unaffected.
 +    const seenSources = new Set();
-+    // Peer-hash splits can give one name+version two physical directories: a hoisted
-+    // top-level instance plus a nested one under a workspace declaring package. The
-+    // hoisted copy is what Node resolution finds from every package, so a nested copy
-+    // of an identical name+version is redundant — and a native payload nested under a
-+    // workspace package root also trips the packaged-runtime allowlist verifier.
++    // Preserve hoisted instances across pnpm peer-hash splits.
++    // A matching nested name/version is already reachable from its parent.
 +    const hoistedVersions = new Map();
 +    for (const dep of deps) {
 +        const versions = hoistedVersions.get(dep.name) ?? new Set();
 +        versions.add(dep.version);
 +        hoistedVersions.set(dep.name, versions);
 +    }
++    // Keep distinct installed versions; only exact hoisted duplicates are omitted.
++    // This avoids unpacking native files under workspace package roots.
++    // Source-directory deduplication above remains independent of this check.
      const collectNodeModules = async (dep, destination) => {
          const source = dep.dir;
++        const packageJson = await (0, fs_extra_1.readJson)(path.join(source, "package.json")).catch(() => null);
++        if (packageJson && (!matchesTarget(packageJson.os, targetPlatform) || !matchesTarget(packageJson.cpu, targetArch, ["x64", "arm64"]))) {
++            builder_util_1.log.debug({ dep: dep.name, version: dep.version, os: packageJson.os, cpu: packageJson.cpu }, "skipping dependency for another target platform");
++            return;
++        }
 +        if (seenSources.has(source)) {
 +            builder_util_1.log.debug({ dep: dep.name, from: builder_util_1.log.filePath(source), duplicateOf: builder_util_1.log.filePath(destination) }, "skipping physically duplicated module");
 +            return;
@@ -130,7 +149,7 @@ diff --git a/out/util/appFileCopier.js b/out/util/appFileCopier.js
          const matcher = new fileMatcher_1.FileMatcher(source, destination, mainMatcher.macroExpander, mainMatcher.patterns);
          const copier = new NodeModuleCopyHelper_1.NodeModuleCopyHelper(matcher, platformPackager.info);
          const files = await copier.collectNodeModules(dep, nodeModuleExcludedExts, path.relative(mainMatcher.to, destination));
-@@ -164,6 +187,10 @@ async function computeNodeModuleFileSets(platformPackager, mainMatcher) {
+@@ -164,6 +206,10 @@ async function computeNodeModuleFileSets(platformPackager, mainMatcher) {
          builder_util_1.log.debug({ dep: dep.name, from: builder_util_1.log.filePath(source), to: builder_util_1.log.filePath(destination), filesCount: files.length }, "identified module");
          if (dep.dependencies) {
              for (const c of dep.dependencies) {

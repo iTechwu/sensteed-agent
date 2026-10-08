@@ -19,6 +19,8 @@ describe('unsigned directory packaging', () => {
     expect(environment).toEqual({
       CSC_IDENTITY_AUTO_DISCOVERY: 'false',
       DSH_PACKAGE_CHECK_ALREADY_RAN: '1',
+      DSH_ELECTRON_BUILDER_TARGET_PLATFORM: process.platform,
+      DSH_ELECTRON_BUILDER_TARGET_ARCH: process.arch,
       DSH_ELECTRON_BUILDER_TRAVERSAL_ONLY: '1',
     })
   })
@@ -58,6 +60,8 @@ describe('unsigned directory packaging', () => {
         cwd: '/workspace/desktop',
         env: {
           CSC_IDENTITY_AUTO_DISCOVERY: 'false',
+          DSH_ELECTRON_BUILDER_TARGET_PLATFORM: process.platform,
+          DSH_ELECTRON_BUILDER_TARGET_ARCH: process.arch,
           DSH_ELECTRON_BUILDER_TRAVERSAL_ONLY: '1',
           KEEP: 'yes',
         },

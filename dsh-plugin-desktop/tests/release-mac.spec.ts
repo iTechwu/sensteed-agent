@@ -91,6 +91,8 @@ describe('macOS release command boundary', () => {
         APPLE_APP_SPECIFIC_PASSWORD: appPassword,
         APPLE_TEAM_ID: 'TEAM123456',
         DSH_ELECTRON_BUILDER_TRAVERSAL_ONLY: '1',
+        DSH_ELECTRON_BUILDER_TARGET_PLATFORM: 'darwin',
+        DSH_ELECTRON_BUILDER_TARGET_ARCH: 'universal',
       },
     })
     expect(calls[3]).toEqual({
@@ -136,6 +138,8 @@ describe('macOS release command boundary', () => {
     expect(calls[2]?.env.MAC_CERT_P12_BASE64).toBeUndefined()
     expect(calls[2]?.env.MACOS_SIGN_IDENTITY).toBeUndefined()
     expect(calls[2]?.env.DSH_ELECTRON_BUILDER_TRAVERSAL_ONLY).toBe('1')
+    expect(calls[2]?.env.DSH_ELECTRON_BUILDER_TARGET_PLATFORM).toBe('darwin')
+    expect(calls[2]?.env.DSH_ELECTRON_BUILDER_TARGET_ARCH).toBe('universal')
     expect(calls[3]?.env).toEqual({ PATH: '/usr/bin' })
   })
 

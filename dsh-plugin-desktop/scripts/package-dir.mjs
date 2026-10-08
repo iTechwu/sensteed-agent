@@ -32,6 +32,8 @@ export const UNSIGNED_DIRECTORY_BUILD_ARGS = Object.freeze([
 export function unsignedDirectoryBuildEnvironment(environment) {
   return electronBuilderEnvironment({
     ...withoutWindowsSigningSecrets(withoutMacReleaseSecrets(environment)),
+    DSH_ELECTRON_BUILDER_TARGET_PLATFORM: process.platform,
+    DSH_ELECTRON_BUILDER_TARGET_ARCH: process.arch,
     CSC_IDENTITY_AUTO_DISCOVERY: 'false',
   })
 }

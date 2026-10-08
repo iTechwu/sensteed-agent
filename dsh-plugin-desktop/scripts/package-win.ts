@@ -233,6 +233,8 @@ export function packageWindowsArtifact(
     options.desktopRoot,
     electronBuilderEnvironment({
       ...cleanEnvironment,
+      DSH_ELECTRON_BUILDER_TARGET_PLATFORM: 'win32',
+      DSH_ELECTRON_BUILDER_TARGET_ARCH: 'x64',
       CSC_IDENTITY_AUTO_DISCOVERY: 'false',
       // Traverse the installed tree directly: package-manager graph collection can
       // stall on the large linked workspace and pnpm v11 drops deduplicated links.

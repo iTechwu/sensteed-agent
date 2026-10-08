@@ -79,6 +79,7 @@ const builderConfig = JSON.parse(readFileSync(new URL('electron-builder.json', p
   toolsets?: Record<string, unknown>
   files?: unknown
   mac?: {
+    files?: unknown
     asarUnpack?: unknown
     extendInfo?: unknown
     hardenedRuntime?: unknown
@@ -92,7 +93,7 @@ const builderConfig = JSON.parse(readFileSync(new URL('electron-builder.json', p
   win?: { icon?: unknown; files?: unknown; target?: unknown; artifactName?: unknown }
   nsis?: Record<string, unknown>
   portable?: Record<string, unknown>
-  linux?: { icon?: unknown; target?: unknown; artifactName?: unknown; executableName?: unknown }
+  linux?: { files?: unknown; icon?: unknown; target?: unknown; artifactName?: unknown; executableName?: unknown }
   deb?: Record<string, unknown>
 }
 // Resolve the brand document the same way the build does, so packaging jobs
@@ -895,7 +896,7 @@ describe('published package surface', () => {
     expect(builderConfig?.mac?.mergeASARs).toBe(true)
     expect(builderConfig?.mac?.signIgnore).toEqual(['\\.(?:pak|dat|wasm)$'])
     expect(builderConfig?.win?.icon).toBe('build/app-icon.ico')
-    expect(builderConfig?.win?.files).toEqual([
+    expect(builderConfig?.win?.files).toEqual(expect.arrayContaining([
       'node_modules/@agents-anywhere/dsh-bridge-next/**',
       '!node_modules/@agents-anywhere/dsh-bridge-next/node_modules/**',
       '!node_modules/@img/sharp-darwin*/**',
@@ -914,7 +915,10 @@ describe('published package surface', () => {
       '!node_modules/node-addon-require-builtin-win32-arm64*/**',
       '!node_modules/node-addon-require-builtin-win32-ia32*/**',
       '!node_modules/koffi-darwin-*-3-1-1/**',
-    ])
+    ]))
+    expect(builderConfig?.win?.files).toContain(
+      '!node_modules/**/@openai/codex-{darwin,linux}-*/**',
+    )
     expect(builderConfig?.win?.target).toEqual([{
       target: 'nsis',
       arch: ['x64'],
@@ -936,6 +940,15 @@ describe('published package surface', () => {
       artifactName: `${String(activeBrandChannel.artifactPrefix)}-\${version}-\${arch}-Setup.\${ext}`,
     })
     expect(builderConfig?.linux?.icon).toBe('build/app-icon.png')
+    expect(builderConfig?.linux?.files).toContain(
+      '!node_modules/**/dsh-community-market/node_modules/**',
+    )
+    expect(builderConfig?.linux?.files).toContain(
+      '!node_modules/**/@openai/codex-{darwin,win32}-*/**',
+    )
+    expect(builderConfig?.mac?.files).toContain(
+      '!node_modules/**/@openai/codex-{linux,win32}-*/**',
+    )
     expect(builderConfig?.linux?.target).toEqual([
       { target: 'AppImage', arch: ['x64'] },
       { target: 'deb', arch: ['x64'] },
@@ -1320,6 +1333,60 @@ describe('published package surface', () => {
     expect(legacyCode2Fallback).toBeGreaterThan(installedNsisInstallUtil.indexOf('CheckResult:'))
     expect(legacyCode2Fallback).toBeLessThan(installedNsisInstallUtil.indexOf('Sleep 1000', legacyCode2Fallback))
     expect(installedNsisInstallUtil).toContain('MessageBox MB_OK|MB_ICONEXCLAMATION "$(uninstallFailed): $R0"')
+  })
+
+  it('filters installed optional runtimes by the packaging target and keeps both universal slices', async () => {
+    const workspaceRequire = createRequire(new URL('package.json', packageRoot))
+    const builderRequire = createRequire(workspaceRequire.resolve('electron-builder/package.json'))
+    const source = readFileSync(join(
+      dirname(builderRequire.resolve('app-builder-lib/package.json')), 'out/util/appFileCopier.js',
+    ), 'utf8')
+    const start = source.indexOf('async function computeNodeModuleFileSets(')
+    const end = source.indexOf('\n}', start) + 2
+    const root = mkdtempSync(join(tmpdir(), 'dsh-target-runtimes-'))
+    try {
+      const packages = [
+        { name: 'tool-win32-x64', os: ['win32'], cpu: ['x64'] },
+        { name: 'tool-win32-arm64', os: ['win32'], cpu: ['arm64'] },
+        { name: 'tool-linux-x64', os: ['linux'], cpu: ['x64'] },
+        { name: 'tool-linux-arm64', os: ['linux'], cpu: ['arm64'] },
+        { name: 'tool-darwin-x64', os: ['darwin'], cpu: ['x64'] },
+        { name: 'tool-darwin-arm64', os: ['darwin'], cpu: ['arm64'] },
+        { name: 'shared' },
+      ]
+      const deps = packages.map(pkg => {
+        const dir = join(root, pkg.name)
+        mkdirSync(dir)
+        writeFileSync(join(dir, 'package.json'), JSON.stringify({ ...pkg, version: '1.0.0' }))
+        return { name: pkg.name, version: '1.0.0', dir }
+      })
+      for (const [platform, arch, expected] of [
+        ['win32', 'x64', ['tool-win32-x64', 'shared']],
+        ['linux', 'x64', ['tool-linux-x64', 'shared']],
+        ['darwin', 'arm64', ['tool-darwin-arm64', 'shared']],
+        ['darwin', 'universal', ['tool-darwin-x64', 'tool-darwin-arm64', 'shared']],
+      ] as const) {
+        // Execute the installed function; replace only graph collection and file copying.
+        const collect = runInNewContext(`${source.slice(start, end)}; computeNodeModuleFileSets`, {
+          process: { env: { DSH_ELECTRON_BUILDER_TARGET_PLATFORM: platform, DSH_ELECTRON_BUILDER_TARGET_ARCH: arch } },
+          collectNodeModulesWithLogging: async () => deps,
+          getNodeModuleExcludedExts: () => [],
+          fs_extra_1: builderRequire('fs-extra'),
+          path: { join, relative: builderRequire('node:path').relative },
+          builder_util_1: { log: { debug: () => {}, filePath: (value: string) => value } },
+          fileMatcher_1: { FileMatcher: class {} },
+          NodeModuleCopyHelper_1: { NodeModuleCopyHelper: class {
+            metadata = new Map()
+            async collectNodeModules() { return [] }
+          } },
+          validateFileSet: (value: unknown) => value,
+        }) as (packager: unknown, matcher: unknown) => Promise<{ src: string }[]>
+        const sets = await collect({ info: {} }, { to: join(root, 'app'), patterns: [] })
+        expect(sets.map(set => deps.find(dep => dep.dir === set.src)?.name)).toEqual(expected)
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 
   it('follows a satisfying pnpm link before resolving its transitive dependencies', async () => {

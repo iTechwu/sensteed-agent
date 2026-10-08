@@ -82,6 +82,8 @@ describe('macOS DMG smoke packaging', () => {
         PATH: '/usr/bin:/bin',
         SAFE_VALUE: 'kept',
         CSC_IDENTITY_AUTO_DISCOVERY: 'false',
+        DSH_ELECTRON_BUILDER_TARGET_PLATFORM: 'darwin',
+        DSH_ELECTRON_BUILDER_TARGET_ARCH: 'universal',
         DSH_ELECTRON_BUILDER_TRAVERSAL_ONLY: '1',
       },
     })

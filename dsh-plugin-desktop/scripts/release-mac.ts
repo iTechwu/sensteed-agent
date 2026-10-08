@@ -112,7 +112,11 @@ export function releaseMac(options: MacReleaseOptions = defaultReleaseOptions())
     '--config.forceCodeSigning=true', '--config.mac.notarize=true',
     '--config.npmRebuild=false',
     `--config.directories.output=${options.outputDir}`,
-  ], options.desktopRoot, electronBuilderEnvironment(releaseEnvironment))
+  ], options.desktopRoot, electronBuilderEnvironment({
+    ...releaseEnvironment,
+    DSH_ELECTRON_BUILDER_TARGET_PLATFORM: 'darwin',
+    DSH_ELECTRON_BUILDER_TARGET_ARCH: 'universal',
+  }))
   options.run(
     process.execPath,
     ['scripts/verify-mac-release.ts', options.outputDir],
