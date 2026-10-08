@@ -10,6 +10,7 @@ import {
 import { tmpdir } from 'node:os'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { createPackage, extractFile, getRawHeader, uncache } from '@electron/asar'
 import { describe, expect, it, vi } from 'vitest'
 import {
   ALLOWED_SMART_UNPACK_PACKAGE_PREFIXES,
@@ -34,6 +35,7 @@ import {
   REQUIRED_POSIX_FS_EXT_ENTRIES,
   REQUIRED_UNPACKED_RUNTIME_ENTRIES,
   REQUIRED_WINDOWS_X64_NODE_PTY_ENTRIES,
+  repairPackagedAsarHeader,
   resolvePackagedApplicationRoot,
   resolvePackagedAsarPath,
   resolvePackagedExecutablePath,
@@ -43,6 +45,7 @@ import {
   smokePackagedFsExtRuntime,
   summarizeUnpackedRuntime,
   verifyPackagedAgentsAnywhere,
+  verifyPackagedAsar,
   verifyProfileClosureArtifact,
   verifyPackagedRuntime,
   verifyPackagedProfileModuleFallback,
@@ -190,6 +193,55 @@ function physicalFixture(
 }
 
 describe('packaged desktop runtime verification', () => {
+  it.each(['darwin', 'linux', 'win32'])('repairs a real %s ASAR without moving packed bytes', async platform => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-asar-repair-'))
+    const runtimeContext = context(join(root, 'output'), platform)
+    const archive = resolvePackagedAsarPath(runtimeContext)
+    try {
+      const source = join(root, 'source')
+      const packed = {
+        'lib/main.js': 'export const greeting = "你好，桌面";\n',
+        'package.json': '{"name":"asar-repair-fixture","version":"1.0.0"}',
+        'node_modules/fixture/existing.bin': 'original packed bytes',
+      }
+      for (const [path, content] of Object.entries(packed)) {
+        mkdirSync(dirname(join(source, path)), { recursive: true })
+        writeFileSync(join(source, path), content)
+      }
+      mkdirSync(dirname(archive), { recursive: true })
+      await createPackage(source, archive)
+      const before = readFileSync(archive)
+      const bodyOffset = 8 + getRawHeader(archive).headerSize
+      // Reproduce afterPack hydration: one new leaf and one packed leaf
+      // replaced by a physical payload with a different size.
+      const hydrated = {
+        'node_modules/fixture/prebuilds/native.bin': 'hydrated native payload',
+        'node_modules/fixture/existing.bin': 'replacement physical payload',
+      }
+      for (const [path, content] of Object.entries(hydrated)) {
+        const physical = join(resolvePackagedUnpackedRoot(runtimeContext), path)
+        mkdirSync(dirname(physical), { recursive: true })
+        writeFileSync(physical, content)
+      }
+
+      repairPackagedAsarHeader(runtimeContext)
+
+      const index = verifyPackagedAsar(archive, [...Object.keys(packed), ...Object.keys(hydrated)])
+      expect([...index.unpackedFiles].sort()).toEqual(Object.keys(hydrated).sort())
+      expect(getRawHeader(archive).headerSize + 8).toBe(bodyOffset)
+      expect(readFileSync(archive).subarray(bodyOffset)).toEqual(before.subarray(bodyOffset))
+      for (const [path, content] of Object.entries({ ...packed, ...hydrated })) {
+        expect(extractFile(archive, path).toString('utf8')).toBe(content)
+      }
+      const repaired = readFileSync(archive)
+      repairPackagedAsarHeader(runtimeContext)
+      expect(readFileSync(archive)).toEqual(repaired)
+    } finally {
+      uncache(archive)
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
   it('finds a package root from its public entry when package.json is not exported', () => {
     const packageRoot = join('/workspace', 'node_modules', 'pnpm')
     const entry = join(packageRoot, 'bin', 'pnpm.cjs')

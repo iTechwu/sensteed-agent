@@ -1375,9 +1375,9 @@ export function verifyPackagedAgentsAnywhere(
  * app.asar.unpacked becomes addressable. electron-builder 26.17 writes some
  * physically copied files (closure packages' docs, hydrated natives) without
  * header entries, which leaves them unreachable at runtime. The rebuilt
- * pickle keeps the header buffer's total length (the payload lives at the
- * buffer tail per PickleIterator's payloadOffset = length - payloadSize), so
- * every recorded body offset stays valid.
+ * pickle keeps the header buffer's total length and its four-byte Pickle
+ * header, with unused payload space after the JSON, so every recorded body
+ * offset stays valid for both @electron/asar and Electron's native reader.
  */
 export function repairPackagedAsarHeader(context: PackagedRuntimeContext): void {
   if (!usesAsarLayout(context)) {
@@ -1440,18 +1440,17 @@ export function repairPackagedAsarHeader(context: PackagedRuntimeContext): void 
     const json = Buffer.from(JSON.stringify(header))
     const jsonLenPadded = (json.length + 3) & ~3
     const payloadSize = 4 + jsonLenPadded
-    const payloadOffset = oldHeaderBufLen - payloadSize
-    if (payloadOffset < 8) {
+    const payloadOffset = 4
+    if (payloadSize > oldHeaderBufLen - payloadOffset) {
       throw new Error(
-        `dsh-plugin-desktop: repaired ASAR header payload needs ${payloadSize} bytes, exceeding the reserved ${oldHeaderBufLen - 8}`,
+        `dsh-plugin-desktop: repaired ASAR header payload needs ${payloadSize} bytes, exceeding the reserved ${oldHeaderBufLen - payloadOffset}`,
       )
     }
-    // The pickle payload lives at the buffer tail (payloadOffset = length -
-    // payloadSize, per PickleIterator's payloadOffset = getHeaderSize()).
+    // Include the trailing reserved space in payloadSize so both readers
+    // find the JSON length at byte 4 and the JSON at byte 8. Putting the JSON
+    // at the buffer tail while declaring this size makes them read zeroes.
     const headerBuf = Buffer.alloc(oldHeaderBufLen)
-    // payloadSize covers the whole reserved region so the PickleIterator's
-    // payloadOffset (= buffer.length - payloadSize) lands exactly at 4.
-    headerBuf.writeUInt32LE(oldHeaderBufLen - 4, 0)
+    headerBuf.writeUInt32LE(oldHeaderBufLen - payloadOffset, 0)
     headerBuf.writeUInt32LE(json.length, payloadOffset)
     json.copy(headerBuf, payloadOffset + 4)
     writeSync(fd, headerBuf, 0, headerBuf.length, 8)
