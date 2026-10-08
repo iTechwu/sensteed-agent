@@ -1158,7 +1158,7 @@ export function withOffsetFallback(
 export function verifyProfileClosureArtifact(
   context: PackagedRuntimeContext,
   readPackaged: (path: string) => Buffer = path => usesAsarLayout(context)
-    ? extractFile(resolvePackagedAsarPath(context), path)
+    ? extractFile(resolvePackagedAsarPath(context), join(...path.split('/')))
     : readFileSync(join(resolvePackagedApplicationRoot(context), path)),
 ): void {
   const readPackagedOrOffset = withOffsetFallback(context, readPackaged)
@@ -1335,7 +1335,7 @@ export function verifyPackagedAgentsAnywhere(
   context: PackagedRuntimeContext,
   readInstalled: (path: string) => Buffer = readFileSync,
   readPackaged: (path: string) => Buffer = path => usesAsarLayout(context)
-    ? extractFile(resolvePackagedAsarPath(context), path)
+    ? extractFile(resolvePackagedAsarPath(context), join(...path.split('/')))
     : readFileSync(join(resolvePackagedApplicationRoot(context), path)),
 ): void {
   const packagePath = 'node_modules/@agents-anywhere/dsh-bridge-next'

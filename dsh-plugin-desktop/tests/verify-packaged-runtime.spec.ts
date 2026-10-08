@@ -231,7 +231,7 @@ describe('packaged desktop runtime verification', () => {
       expect(getRawHeader(archive).headerSize + 8).toBe(bodyOffset)
       expect(readFileSync(archive).subarray(bodyOffset)).toEqual(before.subarray(bodyOffset))
       for (const [path, content] of Object.entries({ ...packed, ...hydrated })) {
-        expect(extractFile(archive, path).toString('utf8')).toBe(content)
+        expect(extractFile(archive, join(...path.split('/'))).toString('utf8')).toBe(content)
       }
       const repaired = readFileSync(archive)
       repairPackagedAsarHeader(runtimeContext)
