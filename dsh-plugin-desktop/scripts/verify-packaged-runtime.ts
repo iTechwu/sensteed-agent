@@ -609,6 +609,9 @@ export function smokePackagedElectronRuntime(
     ELECTRON_RUN_AS_NODE: '1',
     DSH_HOME: smokeHome,
     DSH_TELEMETRY_DISABLED: '1',
+    // pnpm's executable shims can inject a build-machine dependency search path.
+    // Every smoke dependency must resolve from this installation or its Profile.
+    NODE_PATH: undefined,
   }
   const checks = [
     {

@@ -3,6 +3,8 @@
 import { fileURLToPath } from 'node:url'
 import fs, { type BigIntStats, type PathLike, type Stats, type StatOptions } from 'node:fs'
 import { syncBuiltinESMExports } from 'node:module'
+import { createHash } from 'node:crypto'
+import { normalize } from 'node:path'
 
 /** A path segment Electron would open as an archive, or its unpacked sibling. */
 const ARCHIVE_SEGMENT = /(?:^|[\\/])[^\\/]*\.asar(?:\.unpacked)?(?:[\\/]|$)/iu
@@ -11,8 +13,13 @@ const ARCHIVE_SEGMENT = /(?:^|[\\/])[^\\/]*\.asar(?:\.unpacked)?(?:[\\/]|$)/iu
 export function normalizeAsarBigIntStats(path: PathLike, options: StatOptions | undefined, stats: Stats | BigIntStats): Stats | BigIntStats {
   const filename = path instanceof URL ? fileURLToPath(path) : path.toString()
   if (options?.bigint !== true || typeof stats.mode === 'bigint' || !ARCHIVE_SEGMENT.test(filename)) return stats
+  // Electron synthesizes an incrementing inode for every ASAR stat call.
+  // The immutable archive entry instead needs a stable identity for fs-local's
+  // version token, including when stat and lstat query the same entry.
+  const inode = createHash('sha256').update(normalize(filename).replace(/[\\/]$/u, '')).digest().readBigUInt64BE()
   return new Proxy(stats, {
     get(target, key) {
+      if (key === 'ino') return inode
       if (typeof key === 'string' && /^(?:atime|mtime|ctime|birthtime)Ns$/u.test(key)) {
         const milliseconds = Reflect.get(target, key.replace(/Ns$/u, 'Ms')) as number
         return BigInt(Math.round(milliseconds * 1_000_000))

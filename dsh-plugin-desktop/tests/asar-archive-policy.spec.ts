@@ -32,6 +32,18 @@ describe('Electron asar archive view', () => {
     expect(normalizeAsarBigIntStats(pathToFileURL(archivePath), { bigint: true }, numeric).isDirectory()).toBe(true)
   })
 
+  it('keeps the same virtual entry identity when Electron changes its synthetic inode', () => {
+    const first = statSync(tmpdir())
+    const second = statSync(tmpdir())
+    second.ino = first.ino + 1
+    const archivePath = join(root, 'app.asar', 'skills')
+    const a = normalizeAsarBigIntStats(archivePath, { bigint: true }, first)
+    const b = normalizeAsarBigIntStats(`${archivePath}/`, { bigint: true }, second)
+    const other = normalizeAsarBigIntStats(join(root, 'app.asar', 'other'), { bigint: true }, second)
+    expect(a.ino).toBe(b.ino)
+    expect(a.ino).not.toBe(other.ino)
+  })
+
   it('turns the archive view off for code shipped unpacked', () => {
     const proc: AsarArchiveProcess = {}
     expect(disableAsarArchiveView(moduleIn('app', 'lib', 'host-process-entry.js'), proc)).toBe(true)

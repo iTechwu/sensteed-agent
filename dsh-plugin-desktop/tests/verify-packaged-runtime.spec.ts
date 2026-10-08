@@ -1122,7 +1122,12 @@ describe('packaged desktop runtime verification', () => {
       }
     })
 
-    smokePackagedElectronRuntime(runtimeContext, run)
+    vi.stubEnv('NODE_PATH', '/build-machine/node_modules')
+    try {
+      smokePackagedElectronRuntime(runtimeContext, run)
+    } finally {
+      vi.unstubAllEnvs()
+    }
 
     expect(run).toHaveBeenCalledTimes(6)
     for (const [executable, args, environment] of run.mock.calls) {
@@ -1131,6 +1136,7 @@ describe('packaged desktop runtime verification', () => {
       expect(args.some(arg => arg.includes('app.asar'))).toBe(true)
       expect(environment.ELECTRON_RUN_AS_NODE).toBe('1')
       expect(environment.DSH_HOME).toEqual(expect.any(String))
+      expect(environment.NODE_PATH).toBeUndefined()
     }
   })
 
