@@ -128,6 +128,7 @@ export const ALLOWED_SMART_UNPACK_PACKAGE_ROOTS = [
   'node_modules/koffi-win32-x64-3-1-1',
   'node_modules/ssh2',
   'node_modules/node-addon-require-builtin',
+  'node_modules/node-addon-native-custom-loader',
   'node_modules/node-pty',
   // pnpm embeds executable and native helper payloads.
   'node_modules/pnpm',
@@ -182,6 +183,7 @@ export const REQUIRED_RUNTIME_PACKAGE_MANIFESTS = [
   'node_modules/execa/package.json',
   'node_modules/got/package.json',
   'node_modules/turndown/package.json',
+  'node_modules/node-addon-native-custom-loader/package.json',
 ] as const
 
 /** Materialize runtime packages that Electron Builder cannot copy through pnpm links. */
@@ -486,21 +488,38 @@ export function smokePackagedFsExtRuntime(
   context: PackagedRuntimeContext,
   run: PackagedElectronRunner = runPackagedElectron,
 ): void {
+  smokePackagedModule(context, ['fs-ext', 'fs-ext.js'], 'fs-ext native ABI', run)
+}
+
+/** Load the Host's native loader and its transitive helper from the actual packaged app. */
+export function smokePackagedBuiltinLoaderRuntime(
+  context: PackagedRuntimeContext,
+  run: PackagedElectronRunner = runPackagedElectron,
+): void {
+  smokePackagedModule(context, ['node-addon-require-builtin', 'lib', 'index.js'], 'Host native loader', run)
+}
+
+function smokePackagedModule(
+  context: PackagedRuntimeContext,
+  entryPath: readonly string[],
+  label: string,
+  run: PackagedElectronRunner,
+): void {
   if (!packagedRuntimeRunnable(context)) return
   const executable = resolvePackagedExecutablePath(context)
-  const entry = join(resolvePackagedAsarPath(context), 'node_modules', 'fs-ext', 'fs-ext.js')
+  const entry = join(resolvePackagedRuntimeRoot(context), 'node_modules', ...entryPath)
   const result = run(executable, ['--expose-internals', entry], {
     ...process.env,
     ELECTRON_RUN_AS_NODE: '1',
   })
   if (result.error !== undefined) {
-    throw new Error('dsh-plugin-desktop: packaged fs-ext native ABI smoke could not start', {
+    throw new Error(`dsh-plugin-desktop: packaged ${label} smoke could not start`, {
       cause: result.error,
     })
   }
   if (result.status !== 0 || result.stdout.trim() !== '') {
     throw new Error(
-      `dsh-plugin-desktop: packaged fs-ext native ABI smoke failed with status ${String(result.status)}; `
+      `dsh-plugin-desktop: packaged ${label} smoke failed with status ${String(result.status)}; `
       + `signal=${String(result.signal ?? null)}; `
       + `stdout=${JSON.stringify(result.stdout.trim())}; stderr=${JSON.stringify(result.stderr.trim())}`,
     )
@@ -1472,7 +1491,10 @@ export async function afterPack(
   verify: typeof verifyPackagedRuntime = verifyPackagedRuntime,
   report: (summary: UnpackedRuntimeSummary) => void = reportUnpackedRuntime,
   verifyAa: typeof verifyPackagedAgentsAnywhere = verifyPackagedAgentsAnywhere,
-  smokeNative: PackagedElectronSmoke = smokePackagedFsExtRuntime,
+  smokeNative: PackagedElectronSmoke = (context) => {
+    smokePackagedFsExtRuntime(context)
+    smokePackagedBuiltinLoaderRuntime(context)
+  },
   hydrateMac: (context: PackagedRuntimeContext) => void = hydratePackagedMacRuntimeForContext,
   verifyClosure: typeof verifyProfileClosureArtifact = verifyProfileClosureArtifact,
   hydrateLinux: (context: PackagedRuntimeContext) => void = hydratePackagedLinuxFsExtRuntimeForContext,

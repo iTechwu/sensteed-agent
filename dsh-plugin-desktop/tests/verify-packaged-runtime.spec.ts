@@ -43,6 +43,7 @@ import {
   resolveRuntimePackageRoot,
   smokePackagedElectronRuntime,
   smokePackagedFsExtRuntime,
+  smokePackagedBuiltinLoaderRuntime,
   summarizeUnpackedRuntime,
   verifyPackagedAgentsAnywhere,
   verifyPackagedAsar,
@@ -498,6 +499,23 @@ describe('packaged desktop runtime verification', () => {
 
     expect(() => smokePackagedFsExtRuntime(context('/build', process.platform), run))
       .toThrow('packaged fs-ext native ABI smoke failed')
+  })
+
+  it('rejects a packaged Host whose native loader helper is missing', () => {
+    const run = vi.fn<PackagedElectronRunner>(() => ({
+      status: 1,
+      stdout: '',
+      stderr: "Cannot find module 'node-addon-native-custom-loader'",
+    }))
+    const runtimeContext = context('/build', process.platform)
+
+    expect(() => smokePackagedBuiltinLoaderRuntime(runtimeContext, run))
+      .toThrow("Cannot find module 'node-addon-native-custom-loader'")
+    expect(run).toHaveBeenCalledWith(
+      resolvePackagedExecutablePath(runtimeContext),
+      ['--expose-internals', join(resolvePackagedAsarPath(runtimeContext), 'node_modules', 'node-addon-require-builtin', 'lib', 'index.js')],
+      expect.objectContaining({ ELECTRON_RUN_AS_NODE: '1' }),
+    )
   })
 
   // 水合只在 linux 打包路径执行;win32 的 statSync.mode 不含 Unix 权限位,

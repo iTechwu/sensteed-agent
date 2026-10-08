@@ -53,6 +53,7 @@
       "node_modules/fs-ext/**",
       "node_modules/@agents-anywhere/dsh-bridge-next/lib/bundled-connector/**",
       "node_modules/node-addon-require-builtin/**",
+      "node_modules/node-addon-native-custom-loader/**",
       "node_modules/node-addon-require-builtin-darwin-arm64/**",
       "node_modules/node-addon-require-builtin-darwin-x64/**"
     ],
@@ -119,6 +120,7 @@
       "build/tray-icon-blue@2x.png",
       "node_modules/@agents-anywhere/dsh-bridge-next/lib/bundled-connector/**",
       "node_modules/node-addon-require-builtin/**",
+      "node_modules/node-addon-native-custom-loader/**",
       "node_modules/node-addon-require-builtin-win32-x64/**",
       "node_modules/node-addon-require-builtin-win32-arm64/**"
     ],

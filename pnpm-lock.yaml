@@ -2597,6 +2597,9 @@ importers:
       negotiator:
         specifier: ^1.0.0
         version: 1.1.0
+      node-addon-native-custom-loader:
+        specifier: 0.1.7
+        version: 0.1.7
       node-addon-require-builtin:
         specifier: ^0.1.6
         version: 0.1.7

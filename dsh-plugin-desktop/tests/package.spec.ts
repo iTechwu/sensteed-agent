@@ -887,6 +887,7 @@ describe('published package surface', () => {
       'node_modules/fs-ext/**',
       'node_modules/@agents-anywhere/dsh-bridge-next/lib/bundled-connector/**',
       'node_modules/node-addon-require-builtin/**',
+      'node_modules/node-addon-native-custom-loader/**',
       'node_modules/node-addon-require-builtin-darwin-arm64/**',
       'node_modules/node-addon-require-builtin-darwin-x64/**',
     ])
@@ -1143,6 +1144,7 @@ describe('published package surface', () => {
     expect(manifest.peerDependencies?.electron).toBe('44.0.0')
     expect(manifest.devDependencies?.electron).toBe('44.0.0')
     expect(manifest.dependencies?.pnpm).toBe('11.7.0')
+    expect(manifest.dependencies?.['node-addon-native-custom-loader']).toBe('0.1.7')
   })
 
   it('keeps the packaged pnpm manifest, lock entry, and installed runtime on 11.7.0', () => {
