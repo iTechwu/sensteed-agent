@@ -866,6 +866,16 @@ describe('published package surface', () => {
       'cordis.patch.yml',
       'lib/**',
       'package.json',
+      // a0a4298b0b 的运行时闭包：这些一方依赖的 pnpm store 拷贝会被
+      // 图收集器丢弃，globs 是它们进入 ASAR 的通道。
+      'node_modules/@opentelemetry/otlp-exporter-base/**',
+      'node_modules/@opentelemetry/otlp-transformer/**',
+      'node_modules/@opentelemetry/resources/**',
+      'node_modules/@opentelemetry/sdk-logs/**',
+      'node_modules/chokidar/**',
+      'node_modules/execa/**',
+      'node_modules/got/**',
+      'node_modules/turndown/**',
       '!node_modules/koffi-darwin-*-3-1-1/**',
       '!node_modules/node-pty/build/**',
     ])
