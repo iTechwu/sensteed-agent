@@ -913,6 +913,7 @@ async function start(): Promise<void> {
       lanAddresses: desktopLanAddresses(),
     })
     electronLogger.info(`${BIN_NAME}: ${proxyResolution.summary}`)
+    runtime.setAuthProxySource(proxyResolution.source)
     for (const diagnostic of proxyResolution.diagnostics) electronLogger.error(`${BIN_NAME}: ${diagnostic}`)
     const releaseProxy = await installProxyFromEnvironment(
       desktopProxyEnvLookup(desktopLaunchEnvironment, proxyResolution.overlay),

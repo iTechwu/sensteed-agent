@@ -50,6 +50,23 @@ class DofeAuthTokenError extends Error {
   constructor(message: string, readonly code?: string) { super(message) }
 }
 
+/** Fixed copy only: transport errors may contain URLs, so never show their raw text. */
+function loginNetworkError(error: unknown): string {
+  const seen = new Set<unknown>()
+  let current = error
+  while (current instanceof Error && !seen.has(current)) {
+    seen.add(current)
+    const code = (current as NodeJS.ErrnoException).code
+    if (/ERR_PROXY_CONNECTION_FAILED|ERR_TUNNEL_CONNECTION_FAILED/u.test(current.message)
+      || code === 'ECONNREFUSED' && /127\.0\.0\.1|::1|localhost/u.test(current.message)) {
+      return '无法连接本机或系统代理，请启动代理或关闭系统代理后重试登录'
+    }
+    if (current.name === 'TimeoutError') return '登录请求超时，请检查网络和系统代理后重试'
+    current = current.cause
+  }
+  return '登录未完成，请检查网络或稍后重试'
+}
+
 export class DofeAuthService {
   private snapshot: DofeAuthSnapshot = { status: 'idle' }
   private accessToken: string | undefined
@@ -102,7 +119,7 @@ export class DofeAuthService {
         this.logger?.error(`dsh-plugin-desktop: dofe 登录流程失败: ${formatDesktopErrorDetails(error)}`)
         const invalid = error instanceof DofeAuthTokenError && error.code === 'invalid_grant'
         this.fail(
-          invalid ? '登录授权已失效，请重新登录' : '登录未完成，请检查网络或稍后重试',
+          invalid ? '登录授权已失效，请重新登录' : loginNetworkError(error),
           invalid ? 'invalid_grant' : undefined,
         )
       }

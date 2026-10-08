@@ -137,6 +137,13 @@ export function createHostRuntime(rpc: HostRpc, snapshot: RuntimeSnapshot): Desk
     },
     openOpenMontage: apiKey => send('native:openOpenMontage', [apiKey]),
     openExternal: url => send('native:openExternal', [url]),
+    requestDofeAuth: async (url, init) => {
+      const { signal, ...options } = init
+      const response = await send<{ body: string; status: number; headers: [string, string][] }>('native:requestDofeAuth',
+        [url, { ...options, headers: [...new Headers(init.headers).entries()] }], signal ?? undefined)
+      return new Response([204, 205, 304].includes(response.status) ? null : response.body,
+        { status: response.status, headers: response.headers })
+    },
     openBossWeb: url => send('native:openBossWeb', [url]),
     openContentPlatformWeb: (platform, url) => send('native:openContentPlatformWeb', [platform, url]),
   }
@@ -176,6 +183,11 @@ export function bindNativeRuntime(rpc: HostRpc, runtime: DesktopRuntime): () => 
   handle('native:openOpenMontage', ([apiKey]) => runtime.openOpenMontage(apiKey as string))
   handle('native:reportMandatoryUpdatePolicy', ([policy]) => { runtime.reportMandatoryUpdatePolicy(policy as Parameters<DesktopRuntime['reportMandatoryUpdatePolicy']>[0]) })
   handle('native:openExternal', ([url]) => runtime.openExternal(url as string))
+  handle('native:requestDofeAuth', async ([url, init], signal) => {
+    if (!runtime.requestDofeAuth) throw new Error('Desktop authentication transport is unavailable')
+    const response = await runtime.requestDofeAuth(url, { ...init, signal })
+    return { body: await response.text(), status: response.status, headers: [...response.headers.entries()] }
+  })
   handle('native:openBossWeb', ([url]) => runtime.openBossWeb(url as string | undefined))
   handle('native:openContentPlatformWeb', ([platform, url]) =>
     runtime.openContentPlatformWeb(platform as 'toutiao' | 'baidu' | 'xiaohongshu' | 'sohu', url as string))

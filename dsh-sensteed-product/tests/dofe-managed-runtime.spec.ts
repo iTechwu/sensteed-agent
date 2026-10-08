@@ -42,6 +42,20 @@ function createHarness(settings: DofeAccessSettings, failAt = Number.POSITIVE_IN
 }
 
 describe('dofe-managed MCP runtime', () => {
+  it.skipIf(BRAND_VARIANT !== 'sensteed')('uses the native network even during the initial saved-session restore', async () => {
+    const harness = createHarness({ setupComplete: false, validationVersion: 0, enabledPlugins: [], modelId: '', protocol: 'chat-completions', authMode: 'feishu' })
+    harness.ctx.credentials.readRecord.mockResolvedValue({ kind: 'grant', payload: { refreshToken: 'fixture' } } as never)
+    const requestDofeAuth = vi.fn(async () => { throw new Error('net::ERR_PROXY_CONNECTION_FAILED') })
+    Object.assign(harness.ctx.desktopRuntime, { requestDofeAuth })
+    const nodeFetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('stale Node proxy'))
+    try {
+      await apply(harness.ctx as never)
+      expect(requestDofeAuth).toHaveBeenCalledWith('https://user.hozonauto.com/api/.well-known/openid-configuration', expect.objectContaining({ redirect: 'error' }))
+      expect(nodeFetch).not.toHaveBeenCalled()
+      // A transport failure must not invalidate the user's saved setup.
+      expect(harness.ctx.settings.update).not.toHaveBeenCalledWith(expect.anything(), { setupComplete: false })
+    } finally { nodeFetch.mockRestore() }
+  })
   it('creates only enabled routes and keeps wrapper capabilities out of MCP clients', async () => {
     const harness = createHarness({
       setupComplete: true,

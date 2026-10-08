@@ -7,7 +7,10 @@ import {
   net,
   Notification,
   shell,
+  session,
 } from 'electron'
+import { requestDofeAuth } from './dofe-auth-network.ts'
+import type { DesktopProxySource } from './system-proxy.ts'
 import { spawn } from 'node:child_process'
 import { RemoteControlOffer, remoteControlOfferCopy } from './remote-control-offer.ts'
 import { readFileSync } from 'node:fs'
@@ -172,6 +175,18 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
   private readonly contentPlatformWindows = new Map<'toutiao' | 'baidu' | 'xiaohongshu' | 'sohu', ContentPlatformWebWindow>()
   private restartRequest: Promise<void> | undefined
   private hostStoppedRecovery: Promise<void> | undefined
+  private authProxySource: DesktopProxySource = 'none'
+
+  setAuthProxySource(source: DesktopProxySource): void { this.authProxySource = source }
+
+  async requestDofeAuth(url: string, init: RequestInit): Promise<Response> {
+    return requestDofeAuth(this.authProxySource === 'environment'
+      ? { request: (url, options) => globalThis.fetch(url, options) }
+      : {
+        request: (url, options) => net.fetch(url, options),
+        refreshSystemProxy: () => session.defaultSession.forceReloadProxyConfig(),
+      }, url, init)
+  }
 
   constructor(
     private readonly restart: (target?: 'recovery' | 'safe-mode') => Promise<void>,

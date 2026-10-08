@@ -276,6 +276,7 @@ const electron = vi.hoisted(() => {
     nativeImage: { createFromPath },
     nativeTheme,
     net: { fetch: vi.fn(), request: vi.fn() },
+    session: { defaultSession: { forceReloadProxyConfig: vi.fn(async () => {}) } },
     Notification,
     notifications,
     resetZoomLevel: () => { zoomLevel = 0 },
@@ -320,6 +321,7 @@ vi.mock('electron', () => ({
   nativeImage: electron.nativeImage,
   nativeTheme: electron.nativeTheme,
   net: electron.net,
+  session: electron.session,
   Notification: electron.Notification,
   screen: electron.screen,
   shell: electron.shell,
@@ -355,6 +357,30 @@ const spec: DesktopShellSpec = {
 }
 
 describe('Electron desktop runtime', () => {
+  it.each(['system', 'none'] as const)('uses live Chromium proxy routing for SSO when the launch source is %s', async source => {
+    const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
+    const runtime = new ElectronDesktopRuntime(async () => {})
+    runtime.setAuthProxySource(source)
+    electron.net.fetch.mockResolvedValueOnce(new Response('{}'))
+    const nodeFetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('stale Node proxy'))
+    const url = 'https://user.hozonauto.com/api/.well-known/openid-configuration'
+    expect((await runtime.requestDofeAuth(url, {})).status).toBe(200)
+    expect(electron.session.defaultSession.forceReloadProxyConfig).toHaveBeenCalledOnce()
+    expect(electron.net.fetch).toHaveBeenCalledWith(url, expect.objectContaining({ redirect: 'error', credentials: 'omit' }))
+    expect(nodeFetch).not.toHaveBeenCalled()
+  })
+
+  it('retains an explicitly configured environment proxy for SSO', async () => {
+    const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
+    const runtime = new ElectronDesktopRuntime(async () => {})
+    runtime.setAuthProxySource('environment')
+    const nodeFetch = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response('{}'))
+    await runtime.requestDofeAuth('https://user.hozonauto.com/api/.well-known/openid-configuration', {})
+    expect(nodeFetch).toHaveBeenCalledOnce()
+    expect(electron.net.fetch).not.toHaveBeenCalled()
+    expect(electron.session.defaultSession.forceReloadProxyConfig).not.toHaveBeenCalled()
+  })
+
   beforeEach(() => {
     clearMainWindowState()
     electron.app.isPackaged = false

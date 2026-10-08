@@ -32,6 +32,20 @@ function credentialStore(refreshToken?: string) {
 }
 
 describe('DofeAuthService', () => {
+  it.each([
+    new Error('fetch failed', { cause: Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:7990'), { code: 'ECONNREFUSED' }) }),
+    new Error('net::ERR_PROXY_CONNECTION_FAILED'),
+  ])('explains an unavailable proxy without exposing raw request details', async error => {
+    const service = new DofeAuthService({ openExternal: vi.fn() }, credentialStore('refresh') as never,
+      vi.fn().mockRejectedValue(error))
+    try {
+      const status = await service.restore()
+      expect(status.status).toBe('error')
+      expect(status.error).toContain('代理')
+      expect(status.error).not.toContain('7990')
+      expect(status.code).toBeUndefined()
+    } finally { await service.dispose() }
+  })
   it('removes the saved grant and model key on logout so restart cannot sign in again', async () => {
     const credentials = credentialStore('refresh-old')
     const fetcher = vi.fn()

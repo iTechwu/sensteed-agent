@@ -44,6 +44,7 @@ export interface DofeLauncherRuntime {
   }): { refresh(): void; dispose(): void }
   openOpenMontage(key: string): Promise<void>
   openExternal(url: string): Promise<void>
+  requestDofeAuth?(url: string, init: RequestInit): Promise<Response>
 }
 
 /** Run once with the launcher runtime whenever it appears (or immediately if present). */
@@ -110,6 +111,10 @@ const ROUTES: readonly ManagedMcpRoute[] = [
  * is the narrowest way to keep its transport aligned with the credential seam.
  */
 export async function apply(ctx: Context): Promise<void> {
+  // Restore may issue requests before the tray/MCP setup below. Observe the
+  // launcher first so both silent renewal and interactive login use its transport.
+  let launcher: DofeLauncherRuntime | undefined
+  observeLauncherRuntime(ctx, runtime => { launcher = runtime })
   const access = ctx.settings.register<DofeAccessSettings>(
     DOFE_ACCESS_SETTINGS_NAMESPACE,
     z.object({
@@ -156,7 +161,9 @@ export async function apply(ctx: Context): Promise<void> {
         },
       },
       ctx.credentials,
-      globalThis.fetch,
+      (input, init) => launcher?.requestDofeAuth
+        ? launcher.requestDofeAuth(String(input), init ?? {})
+        : globalThis.fetch(input, init),
       async snapshot => {
       const current = access.get()
       const entitlements = snapshot.entitlements!
@@ -212,7 +219,6 @@ export async function apply(ctx: Context): Promise<void> {
   let activeKey: string | undefined
   let tray: { refresh(): void; dispose(): void } | undefined
   let reload: Promise<void> = Promise.resolve()
-  let launcher: DofeLauncherRuntime | undefined
   observeLauncherRuntime(ctx, runtime => {
     launcher = runtime
     tray = runtime.registerTrayItem({
