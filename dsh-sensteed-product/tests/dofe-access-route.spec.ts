@@ -38,6 +38,41 @@ function response(): ServerResponse & { body: string } {
 }
 
 describe('DoFe model_api_key validation route', () => {
+  it.each([429, 500, 503])('reports tenant service HTTP %s as unavailable, not an invalid key', async status => {
+    const res = response()
+    const logger = { error: vi.fn() }
+    await handleDofeModelCatalogRequest(request({ key: 'secret' }), res, ORIGIN,
+      vi.fn(async () => new Response('secret backend detail', { status })), undefined, logger)
+    expect(JSON.parse(res.body)).toEqual({ models: [], reason: 'tenant_unavailable' })
+    expect(logger.error).toHaveBeenCalledWith(`dofe-access: tenant request failed (HTTP ${status})`)
+    expect(JSON.stringify(logger.error.mock.calls)).not.toContain('secret')
+  })
+
+  it.each([401, 403, 503])('distinguishes rejected keys from catalog outages (%s)', async status => {
+    const res = response()
+    await handleDofeModelCatalogRequest(request({ key: 'secret' }), res, ORIGIN, vi.fn()
+      .mockResolvedValueOnce(Response.json({ tenantSlug: BRAND_TENANT }))
+      .mockResolvedValueOnce(new Response('backend detail', { status })))
+    expect(JSON.parse(res.body).reason).toBe(status === 503 ? 'models_unavailable' : 'invalid_key')
+  })
+
+  it('logs only a transport code for tenant failures and never exposes a credential', async () => {
+    const res = response()
+    const logger = { error: vi.fn() }
+    const error = new Error('fetch failed: Bearer secret', { cause: Object.assign(new Error('secret'), { code: 'ECONNREFUSED' }) })
+    await handleDofeModelCatalogRequest(request({ key: 'secret' }), res, ORIGIN,
+      vi.fn().mockRejectedValue(error), undefined, logger)
+    expect(JSON.parse(res.body)).toEqual({ models: [], reason: 'tenant_unavailable' })
+    expect(logger.error).toHaveBeenCalledWith('dofe-access: tenant request failed (ECONNREFUSED)')
+  })
+
+  it('reads a valid top-level tenant when an optional nested tenant is null', async () => {
+    const res = response()
+    await handleDofeAccessValidationRequest(request({ key: 'secret' }), res, ORIGIN, vi.fn()
+      .mockResolvedValueOnce(Response.json({ tenantSlug: BRAND_TENANT, tenant: null }))
+      .mockResolvedValueOnce(Response.json({})))
+    expect(JSON.parse(res.body)).toEqual({ valid: true })
+  })
   it('registers both handlers on the Desktop private web surface', () => {
     const source = readFileSync(new URL('../src/routes.ts', import.meta.url), 'utf8')
 

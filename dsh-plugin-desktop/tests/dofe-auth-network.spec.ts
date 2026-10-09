@@ -5,6 +5,18 @@ const discovery = 'https://user.hozonauto.com/api/.well-known/openid-configurati
 const token = 'https://user.hozonauto.com/api/oauth/token'
 
 describe('native SSO transport', () => {
+  it.each([
+    'https://ai.hozonauto.com/api/internal/auth/context',
+    ...['openai', 'anthropic', 'openai_response'].map(protocol => `https://ai.hozonauto.com/api/v1/models?protocol=${protocol}`),
+  ])('uses the same live route for model setup: %s', async url => {
+    const refreshSystemProxy = vi.fn(async () => {})
+    const request = vi.fn(async () => Response.json({}))
+    await requestDofeAuth({ request, refreshSystemProxy }, url, { headers: { Authorization: 'Bearer stored-key' } })
+    expect(refreshSystemProxy).toHaveBeenCalledOnce()
+    expect(request).toHaveBeenCalledWith(url, expect.objectContaining({ headers: { Authorization: 'Bearer stored-key' }, redirect: 'error', credentials: 'omit' }))
+    await expect(requestDofeAuth({ request }, url, { method: 'POST' })).rejects.toThrow('Unsupported')
+    await expect(requestDofeAuth({ request }, url + '&redirect=https://other.example', {})).rejects.toThrow('Unsupported')
+  })
   it('refreshes the system route on every attempt so disabling a dead proxy recovers without restart', async () => {
     let configuredProxy = true
     let cachedProxy = true

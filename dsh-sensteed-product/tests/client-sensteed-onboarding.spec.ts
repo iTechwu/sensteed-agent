@@ -183,6 +183,39 @@ it('keeps the entitled default model selectable when the catalog is temporarily 
   }
 })
 
+it.each(['tenant_unavailable', 'tenant_mismatch', 'invalid_key', 'models_unavailable', 'network'])('keeps setup blocked after %s and permits an explicit catalog retry', async reason => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+  const snapshot = { value: { setupComplete: false, validationVersion: 0, enabledPlugins: ['knowledge'], modelId: '', protocol: 'messages', authMode: 'feishu', identity: { ssoSub: 'user', name: 'User' }, entitlements: { plugins: ['knowledge'], allowedProtocols: ['messages'], defaultModel: 'preferred-model' } } }
+  const settingsScope = { getSnapshot: () => snapshot, subscribe: () => () => {} }
+  const credentials = { describe: vi.fn(async () => ({ ok: true, value: { MODELS_API_KEY: { configured: true } } })) }
+  const fetcher = vi.fn().mockImplementationOnce(async () => {
+    if (reason === 'network') throw new Error('network unavailable')
+    return Response.json({ models: [], reason })
+  }).mockResolvedValueOnce(Response.json({ models: [{ id: 'preferred-model' }] }))
+  vi.stubGlobal('fetch', fetcher)
+  const container = document.createElement('div')
+  document.body.append(container)
+  const root = createRoot(container)
+  try {
+    await act(async () => root.render(createElement(DofeAccessSection, { settingsApi: {}, settingsScope, credentials, t: (key: string) => key } as never)))
+    const select = container.querySelector('select') as HTMLSelectElement
+    const save = container.querySelector('.dshDofeAccessPrimary') as HTMLButtonElement
+    expect(select.value).toBe('')
+    expect(select.disabled).toBe(true)
+    expect(save.disabled).toBe(true)
+    expect(container.querySelector('[role="alert"]')).not.toBeNull()
+    expect(fetcher).toHaveBeenCalledOnce()
+    const retry = [...container.querySelectorAll('button')].find(button => button.textContent === 'loadModels')!
+    await act(async () => retry.click())
+    expect(fetcher).toHaveBeenCalledTimes(2)
+    expect(JSON.parse(fetcher.mock.calls[1]![1].body)).toEqual({ key: '', protocol: 'messages', useStored: true })
+    expect(select.value).toBe('preferred-model')
+    expect(save.disabled).toBe(false)
+    expect(container.querySelector('[role="alert"]')).toBeNull()
+    expect(snapshot.value.setupComplete).toBe(false)
+  } finally { await act(async () => root.unmount()); container.remove() }
+})
+
 it('does not flash setup while loading saved credentials or reopen it for a profile update', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   let snapshot = { value: { setupComplete: true, validationVersion: 5, modelId: 'model-a', enabledPlugins: ['knowledge'], authMode: 'feishu', identity: { ssoSub: 'user', name: 'Before' } } }

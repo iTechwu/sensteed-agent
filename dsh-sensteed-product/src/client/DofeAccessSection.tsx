@@ -16,7 +16,8 @@ import { DOFE_ACCESS_MODELS_PATH, DOFE_ACCESS_VALIDATE_PATH } from '../dofe-acce
 import { DEFAULT_DOFE_PROTOCOL, DOFE_ANTHROPIC_BASE_URL, normalizeDofeUiProtocol, parseDofeModelCatalog, UI_DOFE_PROTOCOLS, type DofeModel, type DofeProtocol } from '../dofe-models.ts'
 
 const STYLE_ID = 'dsh-dofe-access-styles'
-const ACCESS_REQUEST_TIMEOUT_MS = 15000
+// The Host performs tenant validation and catalog loading sequentially (10s each).
+const ACCESS_REQUEST_TIMEOUT_MS = 25000
 const CSS = `
 #dsh-dofe-access-gate { position: fixed; inset: 0; z-index: 2147483000; pointer-events: none; }
 .dshDofeAccessLoading { position: absolute; left: 50%; top: 24px; transform: translateX(-50%); padding: 12px 20px; border-radius: 8px; background: var(--dsw-alias-bg-layer-1, #fff); color: var(--dsw-alias-label-primary, #172033); box-shadow: 0 2px 8px rgba(5, 10, 18, .12); }
@@ -110,13 +111,13 @@ const CSS = `
 }
 `
 
-type AccessFailureReason = 'invalid_key' | 'tenant_mismatch' | 'tenant_unavailable'
+type AccessFailureReason = 'invalid_key' | 'tenant_mismatch' | 'tenant_unavailable' | 'models_unavailable'
 type ValidationResult = { valid: true } | { valid: false; reason?: AccessFailureReason }
 
 function accessFailureReason(value: unknown): AccessFailureReason | undefined {
   if (typeof value !== 'object' || value === null) return undefined
   const reason = (value as { reason?: unknown }).reason
-  return reason === 'invalid_key' || reason === 'tenant_mismatch' || reason === 'tenant_unavailable'
+  return reason === 'invalid_key' || reason === 'tenant_mismatch' || reason === 'tenant_unavailable' || reason === 'models_unavailable'
     ? reason
     : undefined
 }
@@ -328,8 +329,10 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
           found = []
         }
       }
-      if (!response.ok || found.length === 0) {
-        if (preferredModel) {
+      if (!response.ok || failureReason !== undefined || found.length === 0) {
+        // An entitled default can fill an empty successful catalog, but must
+        // never hide a failed tenant check or a failed gateway request.
+        if (response.ok && failureReason === undefined && preferredModel) {
           setModels([{ id: preferredModel, name: preferredModel }])
           setSelectedModel(preferredModel)
           setError(undefined)
@@ -337,7 +340,7 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
         }
         setModels([])
         setSelectedModel('')
-        setError(failureReason === 'tenant_mismatch' ? t('tenantMismatch') : failureReason === 'tenant_unavailable' ? t('tenantUnavailable') : t('modelsError'))
+        setError(failureReason === 'tenant_mismatch' ? t('tenantMismatch') : failureReason === 'tenant_unavailable' ? t('tenantUnavailable') : failureReason === 'invalid_key' ? t('invalidKey') : t('modelsError'))
         return
       }
       setModels(found)
@@ -346,12 +349,6 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
         return found.some(model => model.id === candidate) ? candidate : found[0]!.id
       })
     } catch {
-      if (preferredModel) {
-        setModels([{ id: preferredModel, name: preferredModel }])
-        setSelectedModel(preferredModel)
-        setError(undefined)
-        return
-      }
       setModels([])
       setSelectedModel('')
       setError(t('modelsError'))
@@ -387,7 +384,7 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
       if (!validation.valid) {
         busyRef.current = false
         setBusy(false)
-        setError(validation.reason === 'tenant_mismatch' ? t('tenantMismatch') : validation.reason === 'tenant_unavailable' ? t('tenantUnavailable') : t('invalidKey'))
+        setError(validation.reason === 'tenant_mismatch' ? t('tenantMismatch') : validation.reason === 'tenant_unavailable' ? t('tenantUnavailable') : validation.reason === 'models_unavailable' ? t('modelsError') : t('invalidKey'))
         return
       }
     }
@@ -495,6 +492,7 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
       <div className="dshDofeAccessField"><div className="dshDofeAccessFieldHeader"><span className="dshDofeAccessLabel" id="dofe-protocol-label">{t('protocolTitle')}</span></div><div className="dshDofeAccessProtocols" role="radiogroup" aria-labelledby="dofe-protocol-label">{UI_DOFE_PROTOCOLS.map(p => <label key={p} className={`dshDofeAccessProtocol${protocol === p ? ' dshDofeAccessProtocolSelected' : ''}`}><input type="radio" name="dofe-protocol" value={p} checked={protocol === p} disabled={interactionBusy || (BRAND_VARIANT === 'sensteed' && !settings.value?.entitlements?.allowedProtocols.includes(p))} onChange={() => { setProtocol(p); setModels([]); setSelectedModel(''); setError(undefined); void loadModels({ protocol: p }) }} /><span>{p === 'messages' ? t('protocolMessages') : t('protocolChat')}</span></label>)}</div></div>
       <div className="dshDofeAccessField"><div className="dshDofeAccessFieldHeader"><label className="dshDofeAccessLabel" htmlFor="dofe-model-select">{t('modelsTitle')}</label></div>{loadingModels && <p className="dshDofeAccessHint" role="status">{t('loadingModels')}</p>}{!loadingModels && models.length === 0 && <p className="dshDofeAccessHint" role="status">{t('modelsPlaceholder')}</p>}<div className="dshDofeAccessModelRow"><select id="dofe-model-select" className="dshDofeAccessModelSelect" value={selectedModel} disabled={interactionBusy || models.length === 0} onChange={event => setSelectedModel(event.currentTarget.value)}><option value="">{models.length === 0 ? t('modelsPlaceholder') : t('modelsEmpty')}</option>{models.map(model => <option key={model.id} value={model.id}>{model.name} ({model.id})</option>)}</select></div></div>
       {error !== undefined && <p className="dshDofeAccessError" role="alert">{error}</p>}
+      {error !== undefined && models.length === 0 && <Button disabled={interactionBusy} onClick={() => void loadModels()}>{t('loadModels')}</Button>}
       <div className={`dshDofeAccessActions${onboarding ? ' dshDofeAccessActionsOnboarding' : ''}`}><Button className="dshDofeAccessPrimary" variant="primary" disabled={interactionBusy || (!draft.trim() && configured !== true) || models.length === 0 || !selectedModel || (onboarding && enabledPlugins.length === 0)} onClick={() => void save()}>{busy ? t('saving') : t('save')}{!busy && <ArrowRight size={16} aria-hidden="true" />}</Button>{!onboarding && <span className="dshDofeAccessStatus" role="status">{configured === true ? t('configured') : configured === false ? t('missing') : ''}</span>}</div>
     </section>}
   </div>

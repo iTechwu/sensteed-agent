@@ -18,6 +18,7 @@ import { YootunAuditModelsClient } from './yootun-audit-models-client.ts'
 import { handleYootunAuditRequest, YOOTUN_AUDIT_PATH } from './yootun-audit-route.ts'
 import { YootunAuditService } from './yootun-audit-service.ts'
 import { YootunAuditStore } from './yootun-audit-store.ts'
+import type { DofeLauncherRuntime } from './dofe-managed.ts'
 
 export const name = 'dofe-product-routes'
 export const inject = ['webServer', 'connection', 'credentials', 'dofeAuth']
@@ -96,6 +97,14 @@ export async function apply(ctx: Context, config: { auditSyncEnabled: boolean })
   // Lets the catalog route honor { useStored: true } without the renderer ever seeing the key.
   const resolveStoredModelsKey = async (): Promise<string | undefined> =>
     (await ctx.credentials.resolve(MODELS_API_KEY_REF))?.value
+  // Resolve lazily, including after launcher replacement. Login and subsequent
+  // setup must share the live native route instead of the Host's boot-time proxy.
+  const accessFetch: typeof fetch = (input, init) => {
+    const runtime = ctx.get('desktopRuntime') as DofeLauncherRuntime | undefined
+    return runtime?.requestDofeAuth
+      ? runtime.requestDofeAuth(String(input), init ?? {})
+      : globalThis.fetch(input, init)
+  }
   for (const [path, handler] of dofeAccessRoutes) {
     ctx.effect(
       () => ctx.webServer.register({
@@ -103,7 +112,7 @@ export async function apply(ctx: Context, config: { auditSyncEnabled: boolean })
         path,
         handler: (req, res) => {
           if (rejectDesktopRequest(ctx, req, res)) return
-          return handler(req, res, rendererOrigin, globalThis.fetch, resolveStoredModelsKey)
+          return handler(req, res, rendererOrigin, accessFetch, resolveStoredModelsKey, ctx.logger)
         },
       }),
       '@dofe/dsh-sensteed-product: private DoFe access route',

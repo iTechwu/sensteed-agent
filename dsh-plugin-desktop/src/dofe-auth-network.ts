@@ -1,9 +1,13 @@
-/** The native login transport follows current system proxy/PAC rules, not a boot snapshot. */
+/** Login and model setup follow current system proxy/PAC rules, not a boot snapshot. */
 const AUTH_ENDPOINTS = new Map([
   ['https://user.hozonauto.com/api/.well-known/openid-configuration', 'GET'],
   ['https://user.hozonauto.com/api/oauth/token', 'POST'],
   ['https://user.hozonauto.com/api/oauth/userinfo', 'GET'],
   ['https://ai.hozonauto.com/api/auth/desktop/provision-key', 'POST'],
+  ['https://ai.hozonauto.com/api/internal/auth/context', 'GET'],
+  ['https://ai.hozonauto.com/api/v1/models?protocol=openai', 'GET'],
+  ['https://ai.hozonauto.com/api/v1/models?protocol=anthropic', 'GET'],
+  ['https://ai.hozonauto.com/api/v1/models?protocol=openai_response', 'GET'],
 ])
 
 export interface DofeAuthNetwork {
@@ -12,7 +16,7 @@ export interface DofeAuthNetwork {
   refreshSystemProxy?: () => Promise<void>
 }
 
-/** Only the fixed login endpoints may carry authentication material over this private bridge. */
+/** Only fixed login and setup endpoints may carry credentials over this private bridge. */
 export async function requestDofeAuth(network: DofeAuthNetwork, url: string, init: RequestInit): Promise<Response> {
   if (AUTH_ENDPOINTS.get(url) !== (init.method ?? 'GET').toUpperCase()) {
     throw new Error('Unsupported desktop authentication endpoint or method')

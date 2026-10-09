@@ -258,7 +258,7 @@ export interface DesktopRuntime {
   /** Open an external HTTPS URL in the user's default browser. */
   openExternal(url: string): Promise<void>
 
-  /** Fixed SSO/Models endpoints using the launcher's current network configuration. */
+  /** Fixed SSO, tenant validation and model catalog endpoints using the current network configuration. */
   requestDofeAuth?(url: string, init: RequestInit): Promise<Response>
 
   /** Open the in-app BOSS Zhipin browser window (web-use login for recruiting). */
