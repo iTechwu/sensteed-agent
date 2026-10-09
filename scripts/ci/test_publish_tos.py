@@ -1,0 +1,186 @@
+import copy
+import importlib.util
+import json
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from types import SimpleNamespace
+import unittest
+
+spec = importlib.util.spec_from_file_location('publish_tos', Path(__file__).with_name('publish-tos.py'))
+publisher = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(publisher)
+
+
+class MissingObject(Exception):
+    status_code = 404
+    code = 'NoSuchKey'
+
+
+class FakeTos:
+    def __init__(self, previous=None, fail_upload=False, corrupt_head=False, conflict=False):
+        self.previous = previous
+        self.fail_upload = fail_upload
+        self.corrupt_head = corrupt_head
+        self.conflict = conflict
+        self.calls = []
+        self.objects = {}
+
+    def get_object(self, bucket, key):
+        if self.previous is None:
+            raise MissingObject()
+        return SimpleNamespace(read=lambda: json.dumps(self.previous).encode(), etag='old-etag')
+
+    def upload_file(self, bucket, key, file_path, **kwargs):
+        self.calls.append(('upload', key, kwargs))
+        if self.fail_upload:
+            raise RuntimeError('network unavailable')
+        self.objects[key] = SimpleNamespace(content_length=Path(file_path).stat().st_size, meta=kwargs['meta'])
+
+    def head_object(self, bucket, key):
+        result = copy.deepcopy(self.objects[key])
+        if self.corrupt_head:
+            result.meta['sha256'] = 'corrupt'
+        return result
+
+    def put_object(self, bucket, key, **kwargs):
+        self.calls.append(('put', key, kwargs))
+        if self.conflict and '/channels/' in key:
+            raise RuntimeError('precondition failed')
+        self.objects[key] = kwargs
+
+
+class PublicationTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.env = dict(TOS_ACCESS_KEY_ID='test-id', TOS_SECRET_ACCESS_KEY='test-secret',
+                        TOS_REGION='test-region', TOS_ENDPOINT='tos.example.com',
+                        TOS_PUBLIC_BASE_URL='https://downloads.example.com',
+                        DESKTOP_VERSION='2.0.11-beta.18', GITHUB_SHA='a' * 40, UPSTREAM_SHA='b' * 40,
+                        GITHUB_RUN_ID='123', GITHUB_RUN_ATTEMPT='2', RELEASE='false')
+        self.config = publisher.settings(self.env)
+        self.context = publisher.release_context(self.env)
+        for platform, endings in dict(macos=['universal.dmg'], windows=['x64-Setup.exe', 'x64-Portable.zip'],
+                                      linux=['x64.AppImage', 'x64.deb']).items():
+            folder = self.root / platform
+            folder.mkdir()
+            for ending in endings:
+                (folder / ('Sensteed-Agent-Beta-2.0.11-beta.18-' + ending)).write_bytes(b'installer payload')
+
+    def test_config_supports_endpoint_hostname_and_requires_secrets(self):
+        self.assertEqual(self.config['TOS_ENDPOINT'], 'https://tos.example.com')
+        self.assertEqual(self.config['TOS_BUCKET'], 'dofe-public')
+        for name, value in [('TOS_SECRET_ACCESS_KEY', ''), ('TOS_ENDPOINT', 'http://example.com'),
+                            ('TOS_ENDPOINT', 'https://user:password@example.com'),
+                            ('TOS_PUBLIC_BASE_URL', 'https://example.com?token=x'), ('TOS_BUCKET', 'another-bucket')]:
+            with self.subTest(name=name, value=value), self.assertRaises(ValueError):
+                publisher.settings({**self.env, name: value})
+
+    def test_signed_release_requires_credentials_only_in_preflight(self):
+        env = {**self.env, 'RELEASE': 'true'}
+        with self.assertRaisesRegex(ValueError, 'MAC_CERT_P12_BASE64'):
+            publisher.settings(env, check_signing=True)
+        publisher.settings(env)
+
+    def test_candidate_uploads_every_platform_before_manifest_and_never_advances_channel(self):
+        client = FakeTos()
+        key, manifest = publisher.publish(client, self.config, self.context, self.root)
+        self.assertEqual(len(manifest['artifacts']), 5)
+        self.assertTrue(key.startswith('sensteed-agent/candidates/' + 'a' * 40 + '/123-2/'))
+        self.assertEqual([call[0] for call in client.calls], ['upload'] * 5 + ['put'])
+        self.assertTrue(client.calls[-1][2]['forbid_overwrite'])
+        self.assertTrue(all(item['signing'] == 'unsigned' for item in manifest['artifacts']))
+        self.assertEqual(manifest['upstreamCommit'], 'b' * 40)
+
+    def test_upload_or_verification_failure_never_publishes_manifest_or_channel(self):
+        self.context['release'] = True
+        for options in [dict(fail_upload=True), dict(corrupt_head=True)]:
+            client = FakeTos(**options)
+            with self.subTest(options=options), self.assertRaises((ValueError, RuntimeError)):
+                publisher.publish(client, self.config, self.context, self.root)
+            self.assertFalse(any(call[0] == 'put' for call in client.calls))
+
+    def test_release_advances_channel_last_using_compare_and_swap(self):
+        self.context = publisher.release_context({**self.env, 'RELEASE': 'true'})
+        for previous in [None, {'version': '2.0.11-beta.9'}]:
+            client = FakeTos(previous=previous)
+            key, manifest = publisher.publish(client, self.config, self.context, self.root)
+            self.assertIn('/releases/beta/2.0.11-beta.18/', key)
+            self.assertEqual(client.calls[-1][1], 'sensteed-agent/channels/beta.json')
+            self.assertEqual(client.calls[-2][1], key)
+            self.assertEqual(manifest['artifacts'][0]['signing'], 'signed-notarized')
+            condition = client.calls[-1][2]
+            self.assertEqual(condition['cache_control'], 'no-store')
+            if previous:
+                self.assertEqual(condition['if_match'], 'old-etag')
+            else:
+                self.assertTrue(condition['forbid_overwrite'])
+
+    def test_equal_or_newer_channel_prevents_uploads(self):
+        self.context['release'] = True
+        for version in ['2.0.11-beta.18', '2.0.11-beta.19', '2.0.12-beta.1']:
+            client = FakeTos(previous={'version': version})
+            with self.assertRaisesRegex(ValueError, 'newer'):
+                publisher.publish(client, self.config, self.context, self.root)
+            self.assertEqual(client.calls, [])
+
+    def test_channel_race_is_reported_without_overwriting_existing_pointer(self):
+        self.context['release'] = True
+        client = FakeTos(previous={'version': '2.0.11-beta.17'}, conflict=True)
+        with self.assertRaisesRegex(RuntimeError, 'precondition'):
+            publisher.publish(client, self.config, self.context, self.root)
+        self.assertNotIn('sensteed-agent/channels/beta.json', client.objects)
+
+    def test_missing_platform_extra_file_empty_file_and_version_mismatch_fail_before_upload(self):
+        target = next((self.root / 'linux').iterdir())
+        original = target.read_bytes()
+        for mode in ['missing', 'empty', 'extra', 'version']:
+            client = FakeTos()
+            extra = self.root / 'linux' / 'debug.log'
+            renamed = target.with_name(target.name.replace('beta.18', 'beta.180'))
+            if mode == 'missing':
+                target.unlink()
+            elif mode == 'empty':
+                target.write_bytes(b'')
+            elif mode == 'extra':
+                extra.write_text('log')
+            else:
+                target.rename(renamed)
+            with self.subTest(mode=mode), self.assertRaises(ValueError):
+                publisher.publish(client, self.config, self.context, self.root)
+            self.assertEqual(client.calls, [])
+            extra.unlink(missing_ok=True)
+            renamed.unlink(missing_ok=True)
+            target.write_bytes(original)
+
+    def test_permission_error_reading_channel_is_not_treated_as_empty_channel(self):
+        self.context['release'] = True
+        client = FakeTos()
+        def denied(*args):
+            raise PermissionError('denied')
+        client.get_object = denied
+        with self.assertRaises(PermissionError):
+            publisher.publish(client, self.config, self.context, self.root)
+        self.assertEqual(client.calls, [])
+
+    def test_stable_version_cannot_publish_beta_files_or_wrong_architecture(self):
+        for version in ['2.0.11', '2.0.11-beta.18']:
+            client = FakeTos()
+            self.context['version'] = version
+            target = next((self.root / 'windows').iterdir())
+            renamed = target.with_name(target.name.replace('-x64-', '-arm64-'))
+            target.rename(renamed)
+            with self.subTest(version=version), self.assertRaises(ValueError):
+                publisher.publish(client, self.config, self.context, self.root)
+            self.assertEqual(client.calls, [])
+            renamed.rename(target)
+
+    def test_invalid_source_or_run_identity_is_rejected(self):
+        for name, value in [('GITHUB_SHA', 'dev'), ('UPSTREAM_SHA', ''), ('GITHUB_RUN_ID', '../123')]:
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                publisher.release_context({**self.env, name: value})
+
+
+if __name__ == '__main__':
+    unittest.main()

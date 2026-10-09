@@ -5,8 +5,15 @@ on:
     branches: [master]
   push:
     branches: [master, dev]
+    tags: ['v*']
   workflow_dispatch:
     inputs:
+      publish_kind:
+        description: 'Candidate artifacts or a signed release that advances the TOS channel'
+        type: choice
+        options: [candidate, release]
+        default: candidate
+        required: true
       brand:
         description: 'White-label brand variant for the packaged applications'
         type: choice
@@ -38,12 +45,15 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       product: ${{ steps.scope.outputs.product }}
+      upstream_sha: ${{ steps.source.outputs.upstream_sha }}
+      upstream_repository: ${{ steps.source.outputs.upstream_repository }}
+      version: ${{ steps.source.outputs.version }}
+      release: ${{ steps.source.outputs.release }}
+      channel: ${{ steps.source.outputs.channel }}
     steps:
       - uses: actions/checkout@v6
         with:
-          # GitHub's pull-request merge ref can retain the base branch's
-          # submodule gitlink when the PR advances it to a descendant. Check
-          # out the actual PR head so pinned submodules match upstream.json.
+          # Validate the actual PR head; all jobs share one resolved sibling commit.
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
@@ -63,13 +73,51 @@ jobs:
           node scripts/verify-bilingual-docs.mjs
           node --test scripts/market-dependency-direction.test.mjs
           node scripts/verify-market-dependency-direction.mjs
-          if [[ "$EVENT_NAME" == "workflow_dispatch" || -z "$BASE_SHA" || "$BASE_SHA" =~ ^0+$ ]]; then
+          if [[ "$EVENT_NAME" == "workflow_dispatch" || "$GITHUB_REF" == refs/tags/* || -z "$BASE_SHA" || "$BASE_SHA" =~ ^0+$ ]]; then
             product=true
           else
             git diff --check "$BASE_SHA" "$HEAD_SHA"
             product="$(git diff --name-only -z "$BASE_SHA" "$HEAD_SHA" | node scripts/classify-ci-changes.mjs)"
           fi
           echo "product=$product" >> "$GITHUB_OUTPUT"
+
+      - name: Test CI publication contracts
+        run: |
+          node --test scripts/ci/resolve-source.test.mjs
+          python3 -B -m unittest discover -s scripts/ci -p 'test_*.py'
+      - name: Resolve one Harness commit for every platform
+        if: steps.scope.outputs.product == 'true'
+        id: source
+        env:
+          PUBLISH_KIND: ${{ inputs.publish_kind || 'candidate' }}
+        run: node scripts/ci/resolve-source.mjs
+
+  publish-config:
+    needs: changes
+    if: >-
+      needs.changes.outputs.product == 'true' && github.event_name != 'pull_request' &&
+      (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Validate TOS and optional release signing configuration
+        env:
+          RELEASE: ${{ needs.changes.outputs.release }}
+          TOS_ACCESS_KEY_ID: ${{ secrets.TOS_ACCESS_KEY_ID }}
+          TOS_SECRET_ACCESS_KEY: ${{ secrets.TOS_SECRET_ACCESS_KEY }}
+          TOS_BUCKET: ${{ vars.TOS_BUCKET || secrets.TOS_BUCKET || 'dofe-public' }}
+          TOS_REGION: ${{ vars.TOS_REGION || secrets.TOS_REGION }}
+          TOS_ENDPOINT: ${{ vars.TOS_ENDPOINT || secrets.TOS_ENDPOINT }}
+          TOS_PUBLIC_BASE_URL: ${{ vars.TOS_PUBLIC_BASE_URL || secrets.TOS_PUBLIC_BASE_URL }}
+          MAC_CERT_P12_BASE64: ${{ secrets.MAC_CERT_P12_BASE64 }}
+          MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: python3 -B scripts/ci/publish-tos.py --check-config
 
   # Product gate: AA profile smoke is temporarily paused below.
   # A documentation-only change already passed diff validation in `changes`.
@@ -104,14 +152,18 @@ jobs:
       - name: Fetch sibling DeepSeek Harness checkout
         if: needs.changes.outputs.product == 'true'
         shell: bash
+        env:
+          UPSTREAM_SHA: ${{ needs.changes.outputs.upstream_sha }}
+          UPSTREAM_REPOSITORY: ${{ needs.changes.outputs.upstream_repository }}
         run: |
           set -euo pipefail
           upstream_dir="$GITHUB_WORKSPACE/../deepseek-harness"
           if command -v cygpath >/dev/null 2>&1; then upstream_dir="$(cygpath -u "$upstream_dir")"; fi
           mkdir -p "$upstream_dir"
-          curl --fail --location --retry 3 https://github.com/iTechwu/sensteed-harness/archive/refs/heads/dev.tar.gz | tar -xz --strip-components=1 -C "$upstream_dir"
+          curl --fail --location --retry 3 "https://github.com/$UPSTREAM_REPOSITORY/archive/$UPSTREAM_SHA.tar.gz" | tar -xz --strip-components=1 -C "$upstream_dir"
           git -C "$upstream_dir" init --quiet
           git -C "$upstream_dir" -c user.name=CI -c user.email=ci@localhost commit --allow-empty --quiet -m "CI source archive"
+          node -e "const fs=require('node:fs'); const u=require('./upstream.json'); if(JSON.parse(fs.readFileSync('../deepseek-harness/package.json')).version!==u.sourceVersion) throw Error('Harness sourceVersion mismatch')"
           node scripts/upstream-workspace-link.mjs
           node scripts/prepare-dofe-ui.mjs
           node scripts/build-dofe-ui.mjs
@@ -167,14 +219,18 @@ jobs:
       - run: corepack enable
       - name: Fetch sibling DeepSeek Harness checkout
         shell: bash
+        env:
+          UPSTREAM_SHA: ${{ needs.changes.outputs.upstream_sha }}
+          UPSTREAM_REPOSITORY: ${{ needs.changes.outputs.upstream_repository }}
         run: |
           set -euo pipefail
           upstream_dir="$GITHUB_WORKSPACE/../deepseek-harness"
           if command -v cygpath >/dev/null 2>&1; then upstream_dir="$(cygpath -u "$upstream_dir")"; fi
           mkdir -p "$upstream_dir"
-          curl --fail --location --retry 3 https://github.com/iTechwu/sensteed-harness/archive/refs/heads/dev.tar.gz | tar -xz --strip-components=1 -C "$upstream_dir"
+          curl --fail --location --retry 3 "https://github.com/$UPSTREAM_REPOSITORY/archive/$UPSTREAM_SHA.tar.gz" | tar -xz --strip-components=1 -C "$upstream_dir"
           git -C "$upstream_dir" init --quiet
           git -C "$upstream_dir" -c user.name=CI -c user.email=ci@localhost commit --allow-empty --quiet -m "CI source archive"
+          node -e "const fs=require('node:fs'); const u=require('./upstream.json'); if(JSON.parse(fs.readFileSync('../deepseek-harness/package.json')).version!==u.sourceVersion) throw Error('Harness sourceVersion mismatch')"
           node scripts/upstream-workspace-link.mjs
           node scripts/prepare-dofe-ui.mjs
           node scripts/build-dofe-ui.mjs
@@ -251,17 +307,14 @@ jobs:
       - name: Upload Windows applications
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ inputs.brand || 'sensteed' }}-agent-windows-x64
+          name: desktop-windows
           path: |
-            dsh-plugin-desktop/dist/*-Agent-Beta-*-Setup.exe
-            dsh-plugin-desktop/dist/*-Agent-Beta-*-Portable.zip
+            dsh-plugin-desktop/dist/*-Agent-*-Setup.exe
+            dsh-plugin-desktop/dist/*-Agent-*-Portable.zip
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
+          compression-level: 0
 
-  # macOS-only universal packaging smoke on a real macOS runner: the signed
-  # release is built manually on a credentialed machine, so an unsigned DMG
-  # here catches Intel and Apple Silicon packaging regressions before a manual
-  # release. No signing secrets ever reach this job.
   # Linux x64 distribution artifacts: unsigned AppImage and Debian package
   # built on a stock ubuntu runner, mirroring the Windows packaging job.
   desktop-linux:
@@ -280,14 +333,18 @@ jobs:
       - run: corepack enable
       - name: Fetch sibling DeepSeek Harness checkout
         shell: bash
+        env:
+          UPSTREAM_SHA: ${{ needs.changes.outputs.upstream_sha }}
+          UPSTREAM_REPOSITORY: ${{ needs.changes.outputs.upstream_repository }}
         run: |
           set -euo pipefail
           upstream_dir="$GITHUB_WORKSPACE/../deepseek-harness"
           if command -v cygpath >/dev/null 2>&1; then upstream_dir="$(cygpath -u "$upstream_dir")"; fi
           mkdir -p "$upstream_dir"
-          curl --fail --location --retry 3 https://github.com/iTechwu/sensteed-harness/archive/refs/heads/dev.tar.gz | tar -xz --strip-components=1 -C "$upstream_dir"
+          curl --fail --location --retry 3 "https://github.com/$UPSTREAM_REPOSITORY/archive/$UPSTREAM_SHA.tar.gz" | tar -xz --strip-components=1 -C "$upstream_dir"
           git -C "$upstream_dir" init --quiet
           git -C "$upstream_dir" -c user.name=CI -c user.email=ci@localhost commit --allow-empty --quiet -m "CI source archive"
+          node -e "const fs=require('node:fs'); const u=require('./upstream.json'); if(JSON.parse(fs.readFileSync('../deepseek-harness/package.json')).version!==u.sourceVersion) throw Error('Harness sourceVersion mismatch')"
           node scripts/upstream-workspace-link.mjs
           node scripts/prepare-dofe-ui.mjs
           node scripts/build-dofe-ui.mjs
@@ -319,6 +376,17 @@ jobs:
           NODE_OPTIONS: '--max-old-space-size=6144'
         run: pnpm --filter dsh-plugin-desktop dist:linux
 
+      - name: Stage Linux applications for publication
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-linux
+          path: |
+            dsh-plugin-desktop/dist/*.AppImage
+            dsh-plugin-desktop/dist/*.deb
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
   desktop-macos:
     needs: changes
     if: needs.changes.outputs.product == 'true'
@@ -344,14 +412,18 @@ jobs:
           find "$HOME/.cache/node/corepack" -path '*/node-gyp/gyp/gyp_main.py' -type f -exec chmod +x {} +
       - name: Fetch sibling DeepSeek Harness checkout
         shell: bash
+        env:
+          UPSTREAM_SHA: ${{ needs.changes.outputs.upstream_sha }}
+          UPSTREAM_REPOSITORY: ${{ needs.changes.outputs.upstream_repository }}
         run: |
           set -euo pipefail
           upstream_dir="$GITHUB_WORKSPACE/../deepseek-harness"
           if command -v cygpath >/dev/null 2>&1; then upstream_dir="$(cygpath -u "$upstream_dir")"; fi
           mkdir -p "$upstream_dir"
-          curl --fail --location --retry 3 https://github.com/iTechwu/sensteed-harness/archive/refs/heads/dev.tar.gz | tar -xz --strip-components=1 -C "$upstream_dir"
+          curl --fail --location --retry 3 "https://github.com/$UPSTREAM_REPOSITORY/archive/$UPSTREAM_SHA.tar.gz" | tar -xz --strip-components=1 -C "$upstream_dir"
           git -C "$upstream_dir" init --quiet
           git -C "$upstream_dir" -c user.name=CI -c user.email=ci@localhost commit --allow-empty --quiet -m "CI source archive"
+          node -e "const fs=require('node:fs'); const u=require('./upstream.json'); if(JSON.parse(fs.readFileSync('../deepseek-harness/package.json')).version!==u.sourceVersion) throw Error('Harness sourceVersion mismatch')"
           node scripts/upstream-workspace-link.mjs
           node scripts/prepare-dofe-ui.mjs
           node scripts/build-dofe-ui.mjs
@@ -376,19 +448,34 @@ jobs:
           npm_config_minimum_release_age: '0'
         run: pnpm --filter dsh-plugin-desktop check:mac-package
       - name: Build macOS smoke artifact
+        if: needs.changes.outputs.release != 'true'
         env:
           CI: 'false'
           npm_config_minimum_release_age: '0'
           DSH_PACKAGE_CHECK_ALREADY_RAN: '1'
           NODE_OPTIONS: '--max-old-space-size=6144'
         run: pnpm --filter dsh-plugin-desktop dist:mac-smoke
+      - name: Build signed and notarized macOS release
+        if: needs.changes.outputs.release == 'true' && github.event_name != 'pull_request'
+        env:
+          CI: 'false'
+          npm_config_minimum_release_age: '0'
+          NODE_OPTIONS: '--max-old-space-size=6144'
+          MAC_CERT_P12_BASE64: ${{ secrets.MAC_CERT_P12_BASE64 }}
+          MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: pnpm --filter dsh-plugin-desktop dist:mac
       - name: Upload macOS application
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ inputs.brand || 'sensteed' }}-agent-macos-universal
-          path: dsh-plugin-desktop/dist/mac-smoke/*.dmg
+          name: desktop-macos
+          path: dsh-plugin-desktop/dist/${{ needs.changes.outputs.release == 'true' && 'mac-release' || 'mac-smoke' }}/*.dmg
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
+          compression-level: 0
 
   # Sibling link smoke: the Windows junction materialization plus the
   # portable-shell scripts that must resolve the sibling checkout's own
@@ -408,14 +495,18 @@ jobs:
       - run: corepack enable
       - name: Fetch sibling DeepSeek Harness checkout
         shell: bash
+        env:
+          UPSTREAM_SHA: ${{ needs.changes.outputs.upstream_sha }}
+          UPSTREAM_REPOSITORY: ${{ needs.changes.outputs.upstream_repository }}
         run: |
           set -euo pipefail
           upstream_dir="$GITHUB_WORKSPACE/../deepseek-harness"
           if command -v cygpath >/dev/null 2>&1; then upstream_dir="$(cygpath -u "$upstream_dir")"; fi
           mkdir -p "$upstream_dir"
-          curl --fail --location --retry 3 https://github.com/iTechwu/sensteed-harness/archive/refs/heads/dev.tar.gz | tar -xz --strip-components=1 -C "$upstream_dir"
+          curl --fail --location --retry 3 "https://github.com/$UPSTREAM_REPOSITORY/archive/$UPSTREAM_SHA.tar.gz" | tar -xz --strip-components=1 -C "$upstream_dir"
           git -C "$upstream_dir" init --quiet
           git -C "$upstream_dir" -c user.name=CI -c user.email=ci@localhost commit --allow-empty --quiet -m "CI source archive"
+          node -e "const fs=require('node:fs'); const u=require('./upstream.json'); if(JSON.parse(fs.readFileSync('../deepseek-harness/package.json')).version!==u.sourceVersion) throw Error('Harness sourceVersion mismatch')"
           node scripts/upstream-workspace-link.mjs
           node scripts/prepare-dofe-ui.mjs
           node scripts/build-dofe-ui.mjs
@@ -426,3 +517,47 @@ jobs:
           node -e "const p=require('node:fs').realpathSync('deepseek-harness'); if(!p.endsWith('deepseek-harness')) process.exit(1); console.log('link ->', p)"
       - run: node scripts/verify-layout.mjs
       - run: corepack pnpm --dir ../deepseek-harness --version
+
+  publish-tos:
+    needs: [changes, publish-config, check, desktop-windows, desktop-linux, desktop-macos, upstream-command-windows]
+    if: >-
+      github.event_name != 'pull_request' &&
+      (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: tos-sensteed-agent-${{ needs.changes.outputs.channel }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install official TOS SDK
+        run: python -m pip install -r scripts/ci/tos-requirements.txt
+      - uses: actions/download-artifact@v8
+        with:
+          name: desktop-windows
+          path: artifacts/windows
+      - uses: actions/download-artifact@v8
+        with:
+          name: desktop-macos
+          path: artifacts/macos
+      - uses: actions/download-artifact@v8
+        with:
+          name: desktop-linux
+          path: artifacts/linux
+      - name: Publish installers and checksum manifest to TOS
+        env:
+          TOS_ACCESS_KEY_ID: ${{ secrets.TOS_ACCESS_KEY_ID }}
+          TOS_SECRET_ACCESS_KEY: ${{ secrets.TOS_SECRET_ACCESS_KEY }}
+          TOS_BUCKET: ${{ vars.TOS_BUCKET || secrets.TOS_BUCKET || 'dofe-public' }}
+          TOS_REGION: ${{ vars.TOS_REGION || secrets.TOS_REGION }}
+          TOS_ENDPOINT: ${{ vars.TOS_ENDPOINT || secrets.TOS_ENDPOINT }}
+          TOS_PUBLIC_BASE_URL: ${{ vars.TOS_PUBLIC_BASE_URL || secrets.TOS_PUBLIC_BASE_URL }}
+          DESKTOP_VERSION: ${{ needs.changes.outputs.version }}
+          UPSTREAM_SHA: ${{ needs.changes.outputs.upstream_sha }}
+          RELEASE: ${{ needs.changes.outputs.release }}
+        run: python -B scripts/ci/publish-tos.py --artifacts artifacts
