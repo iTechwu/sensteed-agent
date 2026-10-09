@@ -29,6 +29,8 @@ test('TOS publication requires all gates and isolates credentials from PR builds
   assert.match(publish, /github.event_name != 'pull_request'/)
   assert.doesNotMatch(publish, /always\(\)|continue-on-error/)
   assert.match(publish, /cancel-in-progress: false/)
+  assert.match(publish, /timeout-minutes: 120/)
+  assert.match(publish, /name: Publish installers and checksum manifest to TOS\s+timeout-minutes: 100/)
   assert.equal((workflow.match(/archive\/\$UPSTREAM_SHA\.tar\.gz/g) || []).length, 5)
   assert.doesNotMatch(workflow, /archive\/refs\/heads\/dev/)
   const builds = workflow.slice(workflow.indexOf('  check:'), workflow.indexOf('  publish-tos:'))

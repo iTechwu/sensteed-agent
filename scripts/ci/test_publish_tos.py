@@ -1,10 +1,14 @@
 import copy
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import redirect_stdout
 import importlib.util
+from io import StringIO
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location('publish_tos', Path(__file__).with_name('publish-tos.py'))
 publisher = importlib.util.module_from_spec(spec)
@@ -34,6 +38,13 @@ class FakeTos:
         self.calls.append(('upload', key, kwargs))
         if self.fail_upload:
             raise RuntimeError('network unavailable')
+        size = Path(file_path).stat().st_size
+        if 'data_transfer_listener' in kwargs:
+            kwargs['data_transfer_listener'](size, size, size, SimpleNamespace(name='Data_Transfer_RW'))
+            kwargs['upload_event_listener'](
+                SimpleNamespace(name='Upload_Event_Upload_Part_Succeed'), None,
+                bucket, key, 'upload-id', file_path, None,
+                SimpleNamespace(part_number=1, part_size=size))
         self.objects[key] = SimpleNamespace(content_length=Path(file_path).stat().st_size, meta=kwargs['meta'])
 
     def head_object(self, bucket, key):
@@ -261,6 +272,36 @@ class PublicationTests(unittest.TestCase):
         for name, value in [('GITHUB_SHA', 'dev'), ('UPSTREAM_SHA', ''), ('GITHUB_RUN_ID', '../123')]:
             with self.subTest(name=name), self.assertRaises(ValueError):
                 publisher.release_context({**self.env, name: value})
+
+
+class UploadProgressTests(unittest.TestCase):
+    def test_transfer_logs_are_throttled_and_include_retry_bytes_and_speed(self):
+        output = StringIO()
+        with patch.object(publisher, 'monotonic', side_effect=[0, 1, 30, 31, 60]), redirect_stdout(output):
+            progress = publisher.UploadProgress(dict(platform='macos', name='installer.dmg', size=100))
+            for sent in [10, 50, 75, 150]:
+                progress.transfer(sent, 100, 10, None)
+        lines = output.getvalue().splitlines()
+        self.assertEqual(len(lines), 2)
+        self.assertIn('sent=50 bytes (including retries); elapsed=30s; average=', lines[0])
+        self.assertIn('sent=150 bytes (including retries); elapsed=60s; average=', lines[1])
+
+    def test_parallel_part_events_report_confirmed_bytes_and_omit_sdk_details(self):
+        output = StringIO()
+        progress = publisher.UploadProgress(dict(platform='macos', name='installer.dmg', size=100))
+        def part(number):
+            progress.event(SimpleNamespace(name='Upload_Event_Upload_Part_Succeed'), None,
+                           'secret-bucket', 'secret-key', 'secret-upload-id', 'secret-path', 'secret-checkpoint',
+                           SimpleNamespace(part_number=number, part_size=25))
+        with redirect_stdout(output):
+            with ThreadPoolExecutor(max_workers=4) as pool:
+                list(pool.map(part, range(1, 5)))
+            progress.event(SimpleNamespace(name='Upload_Event_Complete_Multipart_Upload_Failed'),
+                           RuntimeError('secret-request-headers'), None, None, None, None, None, None)
+        self.assertEqual(progress.confirmed, 100)
+        self.assertIn('confirmed=100/100 bytes (100.0%)', output.getvalue())
+        self.assertIn('Upload_Event_Complete_Multipart_Upload_Failed', output.getvalue())
+        self.assertNotIn('secret', output.getvalue())
 
 
 if __name__ == '__main__':

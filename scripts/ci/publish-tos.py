@@ -7,6 +7,8 @@ from pathlib import Path
 import re
 import sys
 from tempfile import TemporaryDirectory
+from threading import Lock
+from time import monotonic
 from urllib.parse import quote, urlsplit, urlunsplit
 from xml.etree import ElementTree
 
@@ -185,6 +187,40 @@ def read_channel(client, bucket, key):
     return json.loads(response.read()), response.etag
 
 
+class UploadProgress:
+    """Report SDK transfer and multipart events without exposing request details."""
+    def __init__(self, item):
+        self.label = f"{item['platform']}/{item['name']}"
+        self.size = item['size']
+        self.started = self.last_report = monotonic()
+        self.confirmed = 0
+        self.lock = Lock()
+
+    def transfer(self, consumed_bytes, total_bytes, rw_once_bytes, transfer_type):
+        with self.lock:
+            now = monotonic()
+            if now - self.last_report < 30:
+                return
+            self.last_report = now
+            elapsed = now - self.started
+            # SDK transfer counters include bytes sent again during request retries.
+            print(f'TOS transfer: {self.label}; sent={consumed_bytes} bytes (including retries); '
+                  f'elapsed={elapsed:.0f}s; average={consumed_bytes / elapsed / 1024 / 1024:.2f} MiB/s',
+                  flush=True)
+
+    def event(self, event_type, error, bucket, key, upload_id, file_path, checkpoint_file, part_info):
+        with self.lock:
+            elapsed = monotonic() - self.started
+            if event_type.name == 'Upload_Event_Upload_Part_Succeed':
+                self.confirmed += part_info.part_size
+                print(f'TOS progress: {self.label}; confirmed={self.confirmed}/{self.size} bytes '
+                      f'({self.confirmed / self.size:.1%}); part={part_info.part_number}; '
+                      f'elapsed={elapsed:.0f}s', flush=True)
+            else:
+                print(f'TOS multipart: {self.label}; event={event_type.name}; elapsed={elapsed:.0f}s',
+                      flush=True)
+
+
 def publish(client, config, context, directory):
     bucket = config['TOS_BUCKET']
     files = inventory(directory, context, config['TOS_PUBLIC_BASE_URL'])
@@ -196,8 +232,11 @@ def publish(client, config, context, directory):
             raise ValueError('Release must be newer than the published channel version')
     for item in files:
         print(f"TOS upload: {item['platform']}/{item['name']} ({item['size']} bytes)", flush=True)
+        progress = UploadProgress(item)
         client.upload_file(bucket, item['key'], str(directory / item['platform'] / item['name']),
                            task_num=4, enable_checkpoint=False,
+                           data_transfer_listener=progress.transfer,
+                           upload_event_listener=progress.event,
                            content_type='application/octet-stream',
                            cache_control='public, max-age=31536000, immutable',
                            meta={'sha256': item['sha256']})
