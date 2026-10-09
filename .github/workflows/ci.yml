@@ -380,6 +380,15 @@ jobs:
           DSH_PACKAGE_CHECK_ALREADY_RAN: '1'
           NODE_OPTIONS: '--max-old-space-size=6144'
         run: pnpm --filter dsh-plugin-desktop dist:linux
+      - name: Upload Linux applications
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.brand || 'sensteed' }}-agent-linux-x64
+          path: |
+            dsh-plugin-desktop/dist/*-Agent-Beta-*.AppImage
+            dsh-plugin-desktop/dist/*-Agent-Beta-*.deb
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Stage Linux applications for publication
         uses: actions/upload-artifact@v7
