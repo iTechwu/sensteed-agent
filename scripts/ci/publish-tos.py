@@ -7,7 +7,8 @@ from pathlib import Path
 import re
 import sys
 from tempfile import TemporaryDirectory
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote, urlsplit, urlunsplit
+from xml.etree import ElementTree
 
 
 VERSION = re.compile(r'(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-beta\.(0|[1-9]\d*))?')
@@ -41,6 +42,20 @@ def settings(env, check_signing=False):
             raise ValueError(name + ' must be an HTTPS URL without credentials, query or fragment')
         if name == 'TOS_ENDPOINT' and parsed.path not in ['', '/']:
             raise ValueError('TOS_ENDPOINT must be a service endpoint without a path')
+    parsed = urlsplit(result['TOS_ENDPOINT'])
+    host = parsed.hostname
+    bucket_prefix = result['TOS_BUCKET'] + '.'
+    if host.startswith(bucket_prefix):
+        host = host[len(bucket_prefix):]
+    # TOS4 signatures belong to the native service, not the S3 compatibility endpoint.
+    official = re.fullmatch(r'tos-(s3-)?([a-z0-9-]+)\.volces\.com', host)
+    if official:
+        if official[2] != result['TOS_REGION']:
+            raise ValueError('TOS_REGION does not match the region in TOS_ENDPOINT')
+        if official[1]:
+            print('TOS endpoint: using the native endpoint for the configured S3 service region.', flush=True)
+        host = 'tos-' + official[2] + '.volces.com'
+        result['TOS_ENDPOINT'] = urlunsplit(('https', host + (f':{parsed.port}' if parsed.port else ''), '', '', ''))
     if check_signing and env.get('RELEASE') == 'true':
         signing = ['MAC_CERT_P12_BASE64', 'MACOS_SIGN_IDENTITY', 'CSC_KEY_PASSWORD',
                    'APPLE_ID', 'APPLE_APP_SPECIFIC_PASSWORD', 'APPLE_TEAM_ID']
@@ -114,12 +129,26 @@ def diagnostic(error, env):
         value = getattr(error, name, None)
         if value is not None:
             fields[name] = str(value)
+    message = fields.get('message', '')
+    if message.lstrip().startswith('<'):
+        # S3 errors are XML; ArgumentValue can echo an entire Authorization header.
+        fields.pop('message', None)
+        if len(message) <= 65536 and '<!DOCTYPE' not in message and '<!ENTITY' not in message:
+            try:
+                root = ElementTree.fromstring(message)
+                for tag, name in [('Code', 'code'), ('RequestId', 'request_id'), ('EC', 'ec'), ('Message', 'message')]:
+                    value = root.findtext(tag)
+                    if value:
+                        fields[name] = value
+            except ElementTree.ParseError:
+                fields['message'] = 'Unparseable service error body omitted'
     if isinstance(error, (ValueError, KeyError)):
         fields['message'] = str(error)
     for name, value in fields.items():
         for secret in sorted((value for key, value in env.items() if key.startswith('TOS_') and value),
                              key=len, reverse=True):
             value = value.replace(secret, '[redacted]').replace(quote(secret, safe=''), '[redacted]')
+        value = re.sub(r'(?:TOS4|AWS4)-HMAC-SHA256[^\r\n]*', '[redacted-authorization]', value)
         value = re.sub(r'https?://[^\s<>]+', '[redacted-url]', value)
         fields[name] = value[:1000]
     return 'TOS publication failed: ' + json.dumps(fields, ensure_ascii=True)

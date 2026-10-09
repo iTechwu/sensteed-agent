@@ -23,7 +23,7 @@ Repository Settings → Secrets and variables → Actions:
 | `TOS_SECRET_ACCESS_KEY` | Secret | TOS Secret Key |
 | `TOS_BUCKET` | Variable or Secret | `dofe-public`, also the default |
 | `TOS_REGION` | Variable or Secret | Bucket region |
-| `TOS_ENDPOINT` | Variable or Secret | Public TOS service endpoint, hostname or HTTPS URL, without a bucket path |
+| `TOS_ENDPOINT` | Variable or Secret | Public TOS endpoint, hostname or HTTPS URL; official S3 and bucket domains are normalized to the native service endpoint in the same region |
 | `TOS_PUBLIC_BASE_URL` | Variable or Secret | HTTPS download domain mapped to the bucket root, without temporary signing parameters |
 
 Non-sensitive configuration prefers Variables and also accepts Secrets. GitHub may mask a download domain stored as a Secret, making log or summary links incomplete; move that configuration to Variables for clickable links. Credentials reach only preflight and upload steps. CI uses a pinned official Python TOS SDK with multipart upload and CRC verification. Neither the SDK nor upload credentials are bundled into the App.

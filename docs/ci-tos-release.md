@@ -23,7 +23,7 @@ GitHub Actions 构建安装包，`dofe-public` 保存最终产物。GitHub Artif
 | `TOS_SECRET_ACCESS_KEY` | Secret | TOS Secret Key |
 | `TOS_BUCKET` | Variable 或 Secret | `dofe-public`，未填写时使用此值 |
 | `TOS_REGION` | Variable 或 Secret | 桶所属地域 |
-| `TOS_ENDPOINT` | Variable 或 Secret | TOS 公网服务端点，支持主机名或 HTTPS URL，不含桶名路径 |
+| `TOS_ENDPOINT` | Variable 或 Secret | TOS 公网服务端点，支持主机名或 HTTPS URL；官方 S3 兼容域名及桶域名会转换为同地域原生服务端点 |
 | `TOS_PUBLIC_BASE_URL` | Variable 或 Secret | 指向桶根目录的 HTTPS 下载域名，不含临时签名参数 |
 
 非敏感配置优先读取 Variables，兼容已存入 Secrets 的配置。GitHub 可能遮蔽存于 Secrets 的下载域名，导致日志或摘要链接不完整；需要可点击链接时将该配置迁移至 Variables。凭证仅传入配置预检和上传步骤。CI 通过固定版本的官方 Python TOS SDK 分片上传并启用 CRC 校验，不向 App 打包 SDK 或上传凭证。

@@ -232,6 +232,31 @@ class PublicationTests(unittest.TestCase):
         for secret in ['test-region', 'test-secret', 'private', 'request headers']:
             self.assertNotIn(secret, output)
 
+    def test_s3_and_bucket_endpoints_resolve_to_native_service_for_same_region(self):
+        for endpoint in ['tos-s3-cn-beijing.volces.com', 'https://tos-s3-cn-beijing.volces.com/',
+                         'https://dofe-public.tos-s3-cn-beijing.volces.com',
+                         'https://dofe-public.tos-cn-beijing.volces.com']:
+            with self.subTest(endpoint=endpoint):
+                config = publisher.settings({**self.env, 'TOS_ENDPOINT': endpoint, 'TOS_REGION': 'cn-beijing'})
+                self.assertEqual(config['TOS_ENDPOINT'], 'https://tos-cn-beijing.volces.com')
+                self.assertEqual(config['TOS_PUBLIC_BASE_URL'], self.env['TOS_PUBLIC_BASE_URL'])
+        with self.assertRaisesRegex(ValueError, 'region'):
+            publisher.settings({**self.env, 'TOS_ENDPOINT': 'tos-s3-cn-beijing.volces.com'})
+
+    def test_xml_service_error_excludes_echoed_authorization(self):
+        error = RuntimeError()
+        error.status_code = 400
+        error.message = ('<Error><Code>InvalidArgument</Code><RequestId>req-123</RequestId>'
+                         '<Message>Unsupported Authorization Type</Message><EC>0002-00000002</EC>'
+                         '<ArgumentName>Authorization</ArgumentName><ArgumentValue>'
+                         'TOS4-HMAC-SHA256 Credential=test-id, Signature=sensitive-signature'
+                         '</ArgumentValue></Error>')
+        output = publisher.diagnostic(error, self.env)
+        for expected in ['InvalidArgument', 'req-123', 'Unsupported Authorization Type', '0002-00000002']:
+            self.assertIn(expected, output)
+        for secret in ['Credential', 'sensitive-signature', 'ArgumentValue', 'test-id']:
+            self.assertNotIn(secret, output)
+
     def test_invalid_source_or_run_identity_is_rejected(self):
         for name, value in [('GITHUB_SHA', 'dev'), ('UPSTREAM_SHA', ''), ('GITHUB_RUN_ID', '../123')]:
             with self.subTest(name=name), self.assertRaises(ValueError):
