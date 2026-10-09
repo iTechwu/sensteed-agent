@@ -244,12 +244,15 @@ def publish(client, config, context, directory):
         head = client.head_object(bucket, item['key'])
         if head.content_length != item['size'] or head.meta.get('sha256') != item['sha256']:
             raise ValueError('Uploaded artifact verification failed for ' + item['platform'])
+        print(f"TOS download: {item['platform']}/{item['name']} -> {item['url']}", flush=True)
     manifest = {**context, 'formatVersion': 1, 'artifacts': files}
     body = (json.dumps(manifest, indent=2, ensure_ascii=True) + '\n').encode()
     manifest_key = context['prefix'] + '/manifest.json'
     print('TOS write: version manifest', flush=True)
     client.put_object(bucket, manifest_key, content=body, content_type='application/json',
                       cache_control='public, max-age=31536000, immutable', forbid_overwrite=True)
+    manifest_url = config['TOS_PUBLIC_BASE_URL'].rstrip('/') + '/' + quote(manifest_key, safe='/')
+    print(f'TOS manifest download: {manifest_url}', flush=True)
     if context['release']:
         # Compare-and-swap also protects against another workflow or an external publisher.
         condition = {'if_match': etag} if etag else {'forbid_overwrite': True}

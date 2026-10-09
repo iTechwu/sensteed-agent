@@ -119,6 +119,34 @@ class PublicationTests(unittest.TestCase):
         self.assertIn('Sensteed-Agent%20Beta-', manifest['artifacts'][0]['url'])
         self.assertEqual([call[0] for call in client.calls], ['upload'] * 5 + ['put'])
 
+    def test_candidates_and_releases_print_all_download_urls_after_verification(self):
+        macos = next((self.root / 'macos').iterdir())
+        macos.rename(macos.with_name(macos.name.replace('Sensteed-Agent-Beta', 'Sensteed-Agent Beta')))
+        for release in ['false', 'true']:
+            with self.subTest(release=release):
+                context = publisher.release_context({**self.env, 'RELEASE': release})
+                output = StringIO()
+                with redirect_stdout(output):
+                    key, manifest = publisher.publish(FakeTos(), self.config, context, self.root)
+                logs = output.getvalue()
+                self.assertEqual(logs.count('TOS download:'), 5)
+                for item in manifest['artifacts']:
+                    expected = f"TOS download: {item['platform']}/{item['name']} -> {item['url']}"
+                    self.assertIn(expected, logs)
+                    self.assertLess(logs.index(f"TOS verify: {item['platform']}/{item['name']}"),
+                                    logs.index(expected))
+                self.assertIn('Sensteed-Agent%20Beta-', logs)
+                self.assertIn('TOS manifest download: ' + self.config['TOS_PUBLIC_BASE_URL'] + '/' + key, logs)
+
+    def test_failed_uploads_and_verification_do_not_print_download_urls(self):
+        for options in [dict(fail_upload=True), dict(corrupt_head=True)]:
+            with self.subTest(options=options):
+                output = StringIO()
+                with redirect_stdout(output), self.assertRaises((ValueError, RuntimeError)):
+                    publisher.publish(FakeTos(**options), self.config, self.context, self.root)
+                self.assertNotIn('TOS download:', output.getvalue())
+                self.assertNotIn('TOS manifest download:', output.getvalue())
+
     def test_linux_aliases_do_not_allow_wrong_versions_or_other_architectures(self):
         for suffix, architecture in [('.AppImage', 'x86_64'), ('.deb', 'amd64')]:
             path = next((self.root / 'linux').glob('*' + suffix))
