@@ -93,6 +93,40 @@ class PublicationTests(unittest.TestCase):
         self.assertTrue(all(item['signing'] == 'unsigned' for item in manifest['artifacts']))
         self.assertEqual(manifest['upstreamCommit'], 'b' * 40)
 
+    def test_publishes_actual_electron_builder_filenames_from_ci(self):
+        macos = next((self.root / 'macos').iterdir())
+        macos.rename(macos.with_name('Sensteed-Agent Beta-2.0.11-beta.18-universal.dmg'))
+        for suffix, architecture in [('.AppImage', 'x86_64'), ('.deb', 'amd64')]:
+            path = next((self.root / 'linux').glob('*' + suffix))
+            path.rename(path.with_name(path.name.replace('-x64', '-' + architecture)))
+        client = FakeTos()
+        _, manifest = publisher.publish(client, self.config, self.context, self.root)
+        linux = [item for item in manifest['artifacts'] if item['platform'] == 'linux']
+        self.assertEqual([item['arch'] for item in linux], ['x64', 'x64'])
+        self.assertEqual([item['name'].split('-')[-1] for item in linux],
+                         ['x86_64.AppImage', 'amd64.deb'])
+        self.assertIn('Sensteed-Agent%20Beta-', manifest['artifacts'][0]['url'])
+        self.assertEqual([call[0] for call in client.calls], ['upload'] * 5 + ['put'])
+
+    def test_linux_aliases_do_not_allow_wrong_versions_or_other_architectures(self):
+        for suffix, architecture in [('.AppImage', 'x86_64'), ('.deb', 'amd64')]:
+            path = next((self.root / 'linux').glob('*' + suffix))
+            actual_name = path.name.replace('-x64', '-' + architecture)
+            rejected = [actual_name.replace('beta.18', 'beta.180'),
+                        actual_name.replace(architecture, 'arm64'),
+                        actual_name.replace(architecture, 'amd64' if architecture == 'x86_64' else 'x86_64')]
+            for name in rejected:
+                client = FakeTos()
+                renamed = path.with_name(name)
+                path.rename(renamed)
+                with self.subTest(name=name), self.assertRaises(ValueError) as error:
+                    publisher.publish(client, self.config, self.context, self.root)
+                self.assertIn(name, str(error.exception))
+                self.assertIn('linux', str(error.exception))
+                self.assertIn('2.0.11-beta.18', str(error.exception))
+                self.assertEqual(client.calls, [])
+                renamed.rename(path)
+
     def test_upload_or_verification_failure_never_publishes_manifest_or_channel(self):
         self.context['release'] = True
         for options in [dict(fail_upload=True), dict(corrupt_head=True)]:

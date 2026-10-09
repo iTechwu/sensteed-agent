@@ -85,10 +85,14 @@ def inventory(directory, context, public_url):
             path = matches[0]
             if path.is_symlink() or not path.is_file() or path.stat().st_size == 0:
                 raise ValueError('Artifact must be a nonempty regular file')
-            tail = r'(?:-universal)?\.dmg' if platform == 'macos' else '-x64' + re.escape(suffix)
+            # electron-builder uses target-specific names for the same x64 architecture.
+            architecture = {'.AppImage': '(?:x64|x86_64)', '.deb': '(?:x64|amd64)'}.get(suffix, 'x64')
+            tail = r'(?:-universal)?\.dmg' if platform == 'macos' else '-' + architecture + re.escape(suffix)
             if (not re.fullmatch(r'[A-Za-z0-9._ -]+', path.name)
                     or not re.search(r'(?<![0-9.])' + re.escape(context['version']) + tail + '$', path.name)):
-                raise ValueError('Artifact filename must contain the exact release version')
+                raise ValueError(
+                    f"Invalid {platform} artifact {path.name!r}: expected exact version "
+                    f"{context['version']} and a supported architecture suffix for {suffix}")
             digest = hashlib.sha256()
             with path.open('rb') as stream:
                 for chunk in iter(lambda: stream.read(1024 * 1024), b''):
