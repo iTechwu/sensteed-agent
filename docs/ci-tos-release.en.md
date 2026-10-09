@@ -50,7 +50,7 @@ Channel publishers run serially. GitHub concurrency may replace a pending job, s
 
 ## Downloads and client updates
 
-After publication, find package and manifest information in the Actions run summary. GitHub Secrets cannot be read back locally; local checks can inspect names only. The first Actions upload validates permissions, region, network, and endpoint configuration.
+After publication, find package and manifest information in the Actions run summary. GitHub Secrets cannot be read back locally; local checks can inspect names only. Actions preflight uploads a tiny probe using multipart upload and checks it with HEAD to validate permissions, region, network, and endpoint configuration. The probe remains at `sensteed-agent/diagnostics/<run-id>-<attempt>/probe.txt` without changing release manifests or channels. Error logs retain redacted service error codes, request IDs, and the failed stage.
 
 The TOS channel manifest is a publication output, not a replacement for the existing client version API. This change does not modify the online update service or client download allowlist. App updates require the service to read manifests and serve version-pinned downloads and SHA-256 hashes. Redirecting to TOS/CDN also requires new clients to allow the exact download domain. Existing clients can use a proxy on their original trusted domain, but cannot follow redirects to unapproved domains.
 

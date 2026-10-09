@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import re
 import sys
+from tempfile import TemporaryDirectory
 from urllib.parse import quote, urlsplit
 
 
@@ -106,6 +107,45 @@ def inventory(directory, context, public_url):
     return files
 
 
+def diagnostic(error, env):
+    """Allowlist SDK diagnostics; never serialize its headers, URL, body or exception repr."""
+    fields = {'type': type(error).__name__}
+    for name in ['status_code', 'code', 'request_id', 'ec', 'message']:
+        value = getattr(error, name, None)
+        if value is not None:
+            fields[name] = str(value)
+    if isinstance(error, (ValueError, KeyError)):
+        fields['message'] = str(error)
+    for name, value in fields.items():
+        for secret in sorted((value for key, value in env.items() if key.startswith('TOS_') and value),
+                             key=len, reverse=True):
+            value = value.replace(secret, '[redacted]').replace(quote(secret, safe=''), '[redacted]')
+        value = re.sub(r'https?://[^\s<>]+', '[redacted-url]', value)
+        fields[name] = value[:1000]
+    return 'TOS publication failed: ' + json.dumps(fields, ensure_ascii=True)
+
+
+def probe(client, config, env):
+    """Exercise the same multipart and HEAD operations with a tiny, isolated object."""
+    run_id, attempt = env['GITHUB_RUN_ID'], env['GITHUB_RUN_ATTEMPT']
+    if not all(re.fullmatch(r'[1-9]\d*', value) for value in [run_id, attempt]):
+        raise ValueError('Invalid workflow run identity')
+    key = f'sensteed-agent/diagnostics/{run_id}-{attempt}/probe.txt'
+    payload = b'Sensteed CI TOS multipart probe\n'
+    checksum = hashlib.sha256(payload).hexdigest()
+    with TemporaryDirectory() as directory:
+        path = Path(directory) / 'probe.txt'
+        path.write_bytes(payload)
+        print('TOS probe: multipart upload', flush=True)
+        client.upload_file(config['TOS_BUCKET'], key, str(path), task_num=1, enable_checkpoint=False,
+                           content_type='text/plain', meta={'sha256': checksum}, cache_control='no-store')
+    print('TOS probe: verify uploaded object', flush=True)
+    head = client.head_object(config['TOS_BUCKET'], key)
+    if head.content_length != len(payload) or head.meta.get('sha256') != checksum:
+        raise ValueError('TOS probe verification failed')
+    print('TOS multipart upload and HEAD verification passed.', flush=True)
+
+
 def read_channel(client, bucket, key):
     try:
         response = client.get_object(bucket, key)
@@ -126,22 +166,26 @@ def publish(client, config, context, directory):
         if previous and version_key(previous['version']) >= version_key(context['version']):
             raise ValueError('Release must be newer than the published channel version')
     for item in files:
+        print(f"TOS upload: {item['platform']}/{item['name']} ({item['size']} bytes)", flush=True)
         client.upload_file(bucket, item['key'], str(directory / item['platform'] / item['name']),
                            task_num=4, enable_checkpoint=False,
                            content_type='application/octet-stream',
                            cache_control='public, max-age=31536000, immutable',
                            meta={'sha256': item['sha256']})
+        print(f"TOS verify: {item['platform']}/{item['name']}", flush=True)
         head = client.head_object(bucket, item['key'])
         if head.content_length != item['size'] or head.meta.get('sha256') != item['sha256']:
             raise ValueError('Uploaded artifact verification failed for ' + item['platform'])
     manifest = {**context, 'formatVersion': 1, 'artifacts': files}
     body = (json.dumps(manifest, indent=2, ensure_ascii=True) + '\n').encode()
     manifest_key = context['prefix'] + '/manifest.json'
+    print('TOS write: version manifest', flush=True)
     client.put_object(bucket, manifest_key, content=body, content_type='application/json',
                       cache_control='public, max-age=31536000, immutable', forbid_overwrite=True)
     if context['release']:
         # Compare-and-swap also protects against another workflow or an external publisher.
         condition = {'if_match': etag} if etag else {'forbid_overwrite': True}
+        print('TOS write: channel index', flush=True)
         client.put_object(bucket, channel_key, content=body, content_type='application/json',
                           cache_control='no-store', **condition)
     return manifest_key, manifest
@@ -150,17 +194,22 @@ def publish(client, config, context, directory):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--check-config', action='store_true')
+    parser.add_argument('--probe', action='store_true')
     parser.add_argument('--artifacts', type=Path, default=Path('artifacts'))
     args = parser.parse_args()
     config = settings(os.environ, check_signing=args.check_config)
     if args.check_config:
         print('TOS configuration is present; no secret values printed.')
-        return
-    context = release_context(os.environ)
+        if not args.probe:
+            return
     import tos
     client = tos.TosClientV2(ak=config['TOS_ACCESS_KEY_ID'], sk=config['TOS_SECRET_ACCESS_KEY'],
                              endpoint=config['TOS_ENDPOINT'], region=config['TOS_REGION'],
                              enable_crc=True, max_retry_count=3)
+    if args.probe:
+        probe(client, config, os.environ)
+        return
+    context = release_context(os.environ)
     key, manifest = publish(client, config, context, args.artifacts)
     summary = ['## TOS artifacts', '', f"Version: `{context['version']}`", '',
                f"Manifest: `{key}`", '', '| Platform | File | SHA-256 |', '| --- | --- | --- |']
@@ -176,9 +225,5 @@ if __name__ == '__main__':
     try:
         main()
     except Exception as error:
-        # SDK exceptions may carry request headers: never dump credentials into CI logs.
-        if isinstance(error, (ValueError, KeyError)):
-            print(str(error), file=sys.stderr)
-        else:
-            print(f"TOS publication failed ({type(error).__name__}, status={getattr(error, 'status_code', 'unknown')}).", file=sys.stderr)
+        print(diagnostic(error, os.environ), file=sys.stderr)
         sys.exit(1)

@@ -50,7 +50,7 @@ sensteed-agent/channels/<beta|stable>.json
 
 ## 下载与客户端更新
 
-发布成功后在 Actions 运行摘要查看安装包和清单。GitHub Secrets 不可读回，本地只能检查配置名称；首次实际上传由 Actions 验证账号权限、地域、网络及端点。
+发布成功后在 Actions 运行摘要查看安装包和清单。GitHub Secrets 不可读回，本地只能检查配置名称；Actions 前置检查会通过分片上传一个小型探测文件并执行 HEAD，验证账号权限、地域、网络及端点。探测文件保留在 `sensteed-agent/diagnostics/<run-id>-<attempt>/probe.txt`，不修改版本清单或渠道。错误日志保留脱敏的服务端错误码、请求编号和失败阶段。
 
 TOS 渠道清单是发布输出，并非现有客户端版本 API 的替代接口。本次不变更线上更新服务或客户端下载白名单。要接入 App 内更新，需要更新服务读取清单、按目标版本提供下载及 SHA-256；若重定向到 TOS/CDN，新客户端还需允许精确下载域名。旧客户端可通过原受信任域名代理下载，不能直接重定向到未允许域名。
 

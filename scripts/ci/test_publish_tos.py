@@ -210,6 +210,28 @@ class PublicationTests(unittest.TestCase):
             self.assertEqual(client.calls, [])
             renamed.rename(target)
 
+    def test_probe_exercises_multipart_and_head_without_releasing_artifacts(self):
+        client = FakeTos()
+        publisher.probe(client, self.config, self.env)
+        self.assertEqual(len(client.calls), 1)
+        self.assertEqual(client.calls[0][1], 'sensteed-agent/diagnostics/123-2/probe.txt')
+        with self.assertRaisesRegex(ValueError, 'verification'):
+            publisher.probe(FakeTos(corrupt_head=True), self.config, self.env)
+
+    def test_sdk_diagnostic_preserves_error_code_and_request_id_without_credentials(self):
+        error = RuntimeError('request headers must never be printed')
+        error.status_code = 400
+        error.code = 'AuthorizationQueryParametersError'
+        error.request_id = 'request-123'
+        error.message = 'invalid region test-region; test-secret; https://example.com/?signature=private'
+        error.header = {'Authorization': 'private-header'}
+        error.request_url = 'private-url'
+        output = publisher.diagnostic(error, self.env)
+        self.assertIn('AuthorizationQueryParametersError', output)
+        self.assertIn('request-123', output)
+        for secret in ['test-region', 'test-secret', 'private', 'request headers']:
+            self.assertNotIn(secret, output)
+
     def test_invalid_source_or_run_identity_is_rejected(self):
         for name, value in [('GITHUB_SHA', 'dev'), ('UPSTREAM_SHA', ''), ('GITHUB_RUN_ID', '../123')]:
             with self.subTest(name=name), self.assertRaises(ValueError):
