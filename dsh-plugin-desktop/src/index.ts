@@ -85,8 +85,11 @@ import {
 export const name = 'desktop-shell'
 
 /** Services required before the shell can register its renderer generation. */
-/** Services required by the desktop shell; `desktopRuntime` is probed, not required. */
-export const inject = ['webServer', 'webRuntime', 'appExit', 'settings', 'connection', 'tools', 'credentials']
+/** Services required by the desktop shell; `desktopRuntime` is probed, not required.
+ * `webStartup` 取代了上游已删除的 `webRuntime`(见 fork 升级指南
+ * v0.2.1-alpha.1/web-listener-trust-config):它由 web-startup 行提供,承载
+ * invocation trust 与监听地址事实。 */
+export const inject = ['webServer', 'webStartup', 'appExit', 'settings', 'connection', 'tools', 'credentials']
 
 /**
  * Standard settings namespace shared by tray and configuration surfaces, the

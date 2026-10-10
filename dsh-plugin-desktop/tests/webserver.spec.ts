@@ -74,8 +74,10 @@ describe('Desktop WebServer port policy', () => {
     const context = new Context()
     contexts.push(context)
 
+    // 上游 host-webserver 先于 Desktop 守卫硬拒绝通配地址;Desktop 的 loopback
+    // 守卫仍在(非通配非回环时触发)。这里断言拒绝发生即可。
     await expect(context.plugin(DesktopWebServer, { host: '0.0.0.0', port: 0 }))
-      .rejects.toThrow('requires loopback until LAN HTTPS is available')
+      .rejects.toThrow(/unspecified \(wildcard\) address|requires loopback until LAN HTTPS/)
   })
 
   it('increments only after the requested loopback bind reports EADDRINUSE', async () => {

@@ -16669,6 +16669,9 @@ importers:
       '@deepseek-ai/dsh-experimental-client-ui-agent-team':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/experimental/client-ui-agent-team
+      '@deepseek-ai/dsh-experimental-client-ui-cot-translation':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/experimental/client-ui-cot-translation
       '@deepseek-ai/dsh-experimental-client-ui-voice-input':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/experimental/client-ui-voice-input
@@ -16699,9 +16702,18 @@ importers:
       '@deepseek-ai/dsh-experimental-tool-agent-team':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/experimental/tool-agent-team
+      '@deepseek-ai/dsh-experimental-tool-worktree':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/experimental/tool-worktree
+      '@deepseek-ai/dsh-experimental-translator':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/experimental/translator
       '@deepseek-ai/dsh-experimental-voice-input-bundle':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/experimental/voice-input-bundle
+      '@deepseek-ai/dsh-experimental-worktree':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/experimental/worktree
       '@deepseek-ai/dsh-file-reference':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/context/file-reference
