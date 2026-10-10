@@ -252,9 +252,19 @@ export async function refreshBundledContents(root, options = {}) {
       summary.refreshed.push(skill.name)
       summary.shaByRepository.set(skill.repository, fetched.sha)
     }
-    await pruneStaleSkills(root, skillOutputs, emit)
-    await mkdir(dirname(resolve(root, BUNDLED_MANIFEST)), { recursive: true })
-    await writeFile(resolve(root, BUNDLED_MANIFEST), `${JSON.stringify({ schemaVersion: 1, skills: skillOutputs }, null, 2)}\n`)
+    // Filtered runs must not shrink the committed set: carry through the
+    // committed outputs of manifest skills this run did not fetch.
+    const manifestPath = resolve(root, BUNDLED_MANIFEST)
+    const manifestRepositories = new Set(manifest.skills.map(entry => entry.repository))
+    const fetchedRepositories = new Set(fetchedSkills.map(({ skill }) => skill.repository))
+    const carried = existsSync(manifestPath)
+      ? (JSON.parse(await readFile(manifestPath, 'utf8')).skills ?? [])
+        .filter(output => manifestRepositories.has(output.repository) && !fetchedRepositories.has(output.repository))
+      : []
+    const allOutputs = [...carried, ...skillOutputs]
+    await pruneStaleSkills(root, allOutputs, emit)
+    await mkdir(dirname(manifestPath), { recursive: true })
+    await writeFile(manifestPath, `${JSON.stringify({ schemaVersion: 1, skills: allOutputs }, null, 2)}\n`)
     await writeFile(resolve(root, 'bundled.json'), `${JSON.stringify(manifest, null, 2)}\n`)
 
     for (const plugin of manifest.plugins) {
