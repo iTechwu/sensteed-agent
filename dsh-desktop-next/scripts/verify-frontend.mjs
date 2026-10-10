@@ -5,7 +5,7 @@ import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { runInNewContext } from 'node:vm'
-import { serveWebDocument } from '../lib/web-document.js'
+import { APP_BOOT_SCRIPT, serveWebDocument } from '../lib/web-document.js'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const require = createRequire(import.meta.url)
@@ -14,8 +14,31 @@ const official = readFileSync(join(webRoot, 'index.html'), 'utf8')
 const local = await serveWebDocument(new Request('dsh-app://app/'), webRoot)
 const html = await local.text()
 assert.equal(local.status, 200)
-assert.equal(html.replace('<script>globalThis.__DSH_BOOT_READY__ = Promise.withResolvers()</script>', ''), official)
+assert.ok(html.includes('<style id="dsh-next-loading-style">'), 'Next must style the document before the official boot page loads')
+assert.equal(html.replace(/<style id="dsh-next-loading-style">[\s\S]*?<\/style>/u, '')
+  .replace(APP_BOOT_SCRIPT, ''), official)
 assert.ok(html.includes('/assets/'), 'Official production frontend must carry built assets')
+
+// Electron hides custom-protocol Worker requests from webRequest, so the upload
+// plugin's default Worker transport can never authenticate. The boot script
+// installs its page-owned carrier; fail if the official client stops reading it.
+const uploadClient = readFileSync(require.resolve('@deepseek-ai/dsh-client-file-upload/client'), 'utf8')
+assert.ok(uploadClient.includes('globalThis.__DSH_FILE_UPLOAD__') && uploadClient.includes('hook.fetch'),
+  'The file-upload client no longer reads the page-owned __DSH_FILE_UPLOAD__ fetch carrier')
+
+// Market client bundles resolve primitives from the official Web at runtime. A
+// removed export can blank the entire settings section without breaking build.
+const marketClient = readFileSync(require.resolve('dshmarket/client'), 'utf8')
+const primitivesSource = readFileSync(require.resolve('@deepseek-ai/dsh-client-ui-primitives'), 'utf8')
+const exported = new Set(primitivesSource.match(/export \{([^}]+)\};/s)?.[1]?.split(',').map(name => name.trim()) ?? [])
+assert.ok(exported.size > 0, 'Cannot inspect official UI primitive exports')
+const directReferences = [...marketClient.matchAll(/_deepseek_ai_dsh_client_ui_primitives\.(\w+)/g)].map(match => match[1])
+const iconAliases = [...marketClient.matchAll(/pickIcon\("(\w+)", "(\w+)"\)/g)]
+assert.ok(directReferences.length > 0 && iconAliases.length > 0, 'Market bundle must resolve host primitives and icon aliases')
+for (const name of directReferences) assert.ok(exported.has(name), `Market references missing UI primitive ${name}`)
+for (const [, newer, older] of iconAliases) {
+  assert.ok(exported.has(newer) || exported.has(older), `Market icon ${newer}/${older} is unavailable`)
+}
 
 for (const platform of ['darwin', 'win32', 'linux']) {
   const exposed = new Map()
@@ -38,7 +61,7 @@ for (const platform of ['darwin', 'win32', 'linux']) {
             if (args[0] === 'dsh-next:browser-acquire') return Promise.resolve({ lease: 'lease-1', partition: 'partition-1' })
             return Promise.resolve(undefined)
           }, send() {},
-          on: (channel, listener) => listeners.set(channel, listener), removeListener: channel => listeners.delete(channel),
+          on: (channel, listener) => listeners.set(channel, listener), removeListener: channel => listeners.delete(channel), off: channel => listeners.delete(channel),
         } }
       },
       process: { platform }, location: { protocol: 'dsh-app:', hostname },
@@ -48,6 +71,15 @@ for (const platform of ['darwin', 'win32', 'linux']) {
     }, { filename: entry })
     if (hostname === 'app') {
       // dsh 0.1.7 drives the native Sidebar browser itself off this carrier.
+      const { keyboard, shortcuts } = exposed.get('dshDesktop')
+      assert.equal(typeof keyboard.closeWindow, 'function')
+      for (const name of ['get', 'edit', 'recording', 'subscribe']) assert.equal(typeof shortcuts[name], 'function')
+      const input = []
+      const unsubscribe = keyboard.subscribe(value => input.push(value))
+      listeners.get('dsh-next:shortcuts-input')({}, { kind: 'keyboard', code: 'KeyB', revision: 'fixture' })
+      assert.equal(input[0].code, 'KeyB')
+      unsubscribe()
+      assert.equal(listeners.has('dsh-next:shortcuts-input'), false)
       const browser = exposed.get('dshDesktop').browser
       assert.deepEqual(await browser.acquire('/workspace/one'), { lease: 'lease-1', partition: 'partition-1' })
       assert.deepEqual([...invocations.at(-1)], ['dsh-next:browser-acquire', '/workspace/one'])
@@ -99,4 +131,4 @@ for (const platform of ['darwin', 'win32', 'linux']) {
   await permissions.openSettings('screen')
   assert.deepEqual([...invocations.at(-1)], ['dsh-next:permission-settings', 'screen'])
 }
-console.log('Next frontend check passed: official 0.1.7-rc.2 entry and independent sandboxed preloads for macOS, Windows and Linux.')
+console.log('Next frontend check passed: official 0.2.1-alpha.2 entry and independent sandboxed preloads for macOS, Windows and Linux.')

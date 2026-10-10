@@ -65,7 +65,7 @@ export class DesktopBrowserGuests {
   /**
    * Install attachment checks before the application document can create a webview.
    * @param window - primary application window.
-   * @param attachInput - attaches native input after guest ownership is verified and returns its disposer.
+   * @param attachInput - attaches native keys to an approved guest and returns its disposer.
    */
   bind(window: BrowserWindow, attachInput: (guest: WebContents, name: DesktopBrowserLeaseId) => () => void): void {
     const owner = window.webContents

@@ -30,6 +30,7 @@ it('writes a plugin-reported agent failure to the real Host log files', async ()
   try {
     writeFileSync(join(home, 'settings.yaml'), 'dsh-desktop:\n  mode: advanced\nagent-presets:\n  default: minimal\n')
     const prepared = prepareDesktopProfile('1', home, 'win32', undefined, undefined, undefined, { aaEnabled: false })
+    prepared.overlays = []
     prepared.port = 0
 
     // A real server-side plugin. Its `apply` runs inside the Host's plugin
@@ -60,13 +61,14 @@ export function apply(ctx) {
   }, 100)
 }
 `)
-    prepared.patches.push({ insert: [{ id: 'agent-error-probe', name: 'agent-error-probe' }] })
+    prepared.overlays.push({ insert: [{ id: 'agent-error-probe', name: 'agent-error-probe' }] })
 
     const packageRoot = new URL('../', import.meta.url)
     const pnpmBinPath = fileURLToPath(new URL('node_modules/pnpm/bin/pnpm.mjs', packageRoot))
     const electronVersion = JSON.parse(readFileSync(new URL('node_modules/electron/package.json', packageRoot), 'utf8')).version
     pnpm = installDesktopPnpmRuntime({ platform: process.platform, appExecutable: process.execPath, pnpmBinPath,
       electronVersion, stateDir: join(home, 'runtime'), environment: process.env })
+    prepared.patches.push(...prepared.overlays)
     child = fork(fileURLToPath(new URL('./fixtures/isolated-host/child.mjs', import.meta.url)), [], {
       execArgv: [], stdio: ['ignore', 'pipe', 'pipe', 'ipc'], serialization: 'advanced',
     })
@@ -80,7 +82,7 @@ export function apply(ctx) {
     child.on('exit', () => rpc?.close(stderr || 'worker exited'))
     let shell: DesktopShellSpec | undefined
     const runtime = {
-      platform: 'win32', windowsBuild: 22631, locale: 'en',
+      platform: 'win32', locale: 'en',
       updates: { isPackaged: false, canDownload: false, currentVersion: '2.0.7-beta.1', statePath: join(home, 'updates') },
       schedule(spec: DesktopShellSpec) { shell = spec; return async () => {} },
       registerTrayItem() { return { refresh() {}, dispose() {} } },

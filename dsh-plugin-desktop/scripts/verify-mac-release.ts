@@ -10,6 +10,7 @@ import {
   selectMacUniversalPackagedEntries,
 } from './mac-universal.ts'
 import { DESKTOP_PRODUCT_NAME } from '../src/product-identity.ts'
+import { verifyMacEntitlements } from './verify-mac-entitlements.ts'
 
 /** Injectable filesystem and command boundaries for release verification. */
 export interface MacReleaseVerificationOptions {
@@ -25,6 +26,8 @@ export interface MacReleaseVerificationOptions {
   readonly makeMountPoint: () => string
   /** Execute one macOS verification command. */
   readonly run: (command: string, args: readonly string[]) => void
+  /** Inspect signed main/Helper entitlements; custom verifiers may own this check. */
+  readonly verifyEntitlements?: (appPath: string, productName: string) => void
   /** Remove the detached empty mount point. */
   readonly removeMountPoint: (mountPoint: string) => void
   /** Probe a physical path inside the mounted application. */
@@ -56,6 +59,7 @@ function defaultOptions(): MacReleaseVerificationOptions {
     listDmgs,
     makeMountPoint: () => mkdtempSync(join(tmpdir(), 'sensteed-agent-dmg-')),
     run,
+    verifyEntitlements: verifyMacEntitlements,
     removeMountPoint: mountPoint => rmdirSync(mountPoint),
     exists: existsSync,
   }
@@ -101,6 +105,7 @@ export function verifyMacRelease(
       }
     }
     options.run('codesign', ['--verify', '--deep', '--strict', '--verbose=2', appPath])
+    options.verifyEntitlements?.(appPath, options.productName)
     options.run('spctl', ['--assess', '--type', 'execute', '--verbose=4', appPath])
     options.run('xcrun', ['stapler', 'validate', appPath])
   } catch (cause) {

@@ -16,6 +16,7 @@ const dmgName = `${DESKTOP_ARTIFACT_PREFIX}-${packageVersion}`
 function options(overrides: Partial<MacReleaseVerificationOptions> = {}) {
   const calls: Array<{ command: string; args: readonly string[] }> = []
   const removeMountPoint = vi.fn()
+  const verifyEntitlements = vi.fn()
   const value: MacReleaseVerificationOptions = {
     distDir: '/release/dist',
     productName,
@@ -26,7 +27,7 @@ function options(overrides: Partial<MacReleaseVerificationOptions> = {}) {
     exists: () => true,
     ...overrides,
   }
-  return { calls, removeMountPoint, value }
+  return { calls, removeMountPoint, verifyEntitlements, value }
 }
 
 describe('macOS release artifact verification', () => {

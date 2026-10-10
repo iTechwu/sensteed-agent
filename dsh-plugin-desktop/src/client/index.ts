@@ -1,3 +1,4 @@
+import { installUiDiagnostics } from './ui-diagnostics.ts'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
@@ -141,6 +142,7 @@ export function apply(ctx: ClientContext): void {
       : `required desktop surfaces are unavailable: ${missing.join(', ')}`
   }
   applyDesktopBrand(ctx)
+  ctx.effect(installUiDiagnostics, 'Desktop client failure diagnostics')
   ctx.effect(
     () => provideDesktopWindow(ctx, desktopWindowService(environment)),
     'dsh-plugin-desktop: native window geometry service',

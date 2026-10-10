@@ -227,7 +227,6 @@ import {
   recoverOversizedSessionProjectionCache,
   type SessionProjectionCacheRecoveryResult,
 } from './session-projcache-recovery.ts'
-import { windowsSupportsMica } from './window-material.ts'
 import {
   removeLegacyModelCredentials,
   removeModelCredentialEnvironment,
@@ -1559,7 +1558,6 @@ async function start(): Promise<void> {
           appVersion,
           profileName: activeProfileName,
           platform: runtime.platform,
-          micaSupported: process.platform === 'win32' && windowsSupportsMica(runtime.windowsBuild),
           ...setupSettings,
           market: marketSelection.requested,
           aaEnabled: profilePreferences?.aaEnabled === true,

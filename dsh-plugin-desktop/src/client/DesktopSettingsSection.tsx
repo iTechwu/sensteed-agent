@@ -21,10 +21,12 @@ export interface DesktopShellSettings {
   readonly mode: 'compatibility' | 'extended' | 'advanced'
   readonly macosMaterial: 'off' | 'transparent'
   readonly linuxMaterial: 'off' | 'transparent'
+  /** Legacy Windows value; Windows has no selectable material and renders opaque. */
   readonly windowsMaterial: 'off' | 'acrylic' | 'mica'
   readonly port: number
   readonly openBrowser: boolean
   readonly networkExposure: 'loopback' | 'lan'
+  readonly developerLogging?: boolean
   readonly logLevel: 'debug' | 'info' | 'warn' | 'error'
 }
 
@@ -35,6 +37,8 @@ export interface DesktopNotificationSettings {
   readonly notifyOnTurnFailure: boolean
   readonly notifyOnJobCompletion: boolean
   readonly notifyOnJobFailure: boolean
+  readonly notifyOnScheduleCompletion: boolean
+  readonly notifyOnScheduleFailure: boolean
 }
 
 /** Registration-side business face for the Desktop settings section. */
@@ -44,7 +48,6 @@ export interface DesktopSettingsSectionInjected {
   /** Installed Desktop product version rendered by the update section. */
   readonly version: string
   readonly initialMode: DesktopShellSettings['mode']
-  readonly micaSupported: boolean
   readonly setMode: (mode: DesktopShellSettings['mode']) => Promise<void>
   readonly desktopSettings: Pick<DesktopSettingsForm<DesktopShellSettings>, 'getSnapshot' | 'subscribe' | 'set'>
   readonly notificationSettings: Pick<DesktopSettingsForm<DesktopNotificationSettings>, 'getSnapshot' | 'subscribe' | 'set'>
@@ -58,6 +61,7 @@ export interface DesktopSettingsSectionInjected {
     readonly nativeLanConfirmation?: boolean
     readonly jobNotifications?: boolean
     readonly updates?: boolean
+    readonly logging?: boolean
   }
   readonly introNotice?: ReactNode
   readonly browserActions?: ReactNode
@@ -71,7 +75,7 @@ export type DesktopSettingsSectionProps =
   & InjectFace<DesktopSettingsSectionInjected>
 
 type Translate = DesktopSettingsSectionProps['t']
-type BusyOperation = 'load' | 'create-profile' | 'select-profile' | 'delete-profile' | 'select-aa' | 'select-market' | 'mode' | 'material' | 'web' | 'notification'
+type BusyOperation = 'load' | 'create-profile' | 'select-profile' | 'delete-profile' | 'select-aa' | 'select-market' | 'mode' | 'material' | 'web' | 'notification' | 'logging'
 type RestartState = 'none' | 'restarting' | 'required'
 type LanPollWait = (signal: AbortSignal) => Promise<void>
 
@@ -356,7 +360,6 @@ export function DesktopSettingsSection({
   platform,
   version,
   initialMode,
-  micaSupported,
   setMode: persistMode,
   desktopSettings,
   notificationSettings,
@@ -442,6 +445,8 @@ export function DesktopSettingsSection({
     notifyOnTurnFailure: true,
     notifyOnJobCompletion: true,
     notifyOnJobFailure: true,
+    notifyOnScheduleCompletion: true,
+    notifyOnScheduleFailure: true,
   }
 
   const createProfile = (event: FormEvent): void => {
@@ -525,11 +530,6 @@ export function DesktopSettingsSection({
           throw new Error(`dsh-plugin-desktop: invalid Linux material ${JSON.stringify(next)}`)
         }
         await desktopSettings.set('linuxMaterial', next)
-      } else if (platform === 'win32') {
-        if (next !== 'off' && (next !== 'mica' || !micaSupported)) {
-          throw new Error(`dsh-plugin-desktop: unavailable Windows material ${JSON.stringify(next)}`)
-        }
-        await desktopSettings.set('windowsMaterial', next)
       }
       if (capabilities?.materialRequiresRestart !== false) requestRestart()
     })
@@ -767,33 +767,20 @@ export function DesktopSettingsSection({
             status={mode === 'advanced' ? t('selected') : undefined}
           />
         </div>}
-        {platform !== 'linux' && (
+        {platform === 'darwin' && (
           <label className="sensteedAgentSettingsMaterialField">
             <span className="sensteedAgentSettingsMaterialCopy">
               <span className="sensteedAgentSettingsChoiceTitle">{t('windowMaterial')}</span>
-              <span className="sensteedAgentSettingsChoiceBody">
-                {t(capabilities?.materialRequiresRestart === false ? 'windowMaterialBodyHot' : 'windowMaterialBody')}
-              </span>
+              <span className="sensteedAgentSettingsChoiceBody">{t('windowMaterialBody')}</span>
             </span>
             <select
               className="sensteedAgentSettingsSelect"
-              value={platform === 'darwin'
-                ? desktop.value?.macosMaterial ?? 'transparent'
-                : desktop.value?.windowsMaterial === 'acrylic'
-                  || (!micaSupported && desktop.value?.windowsMaterial === 'mica')
-                  ? 'off'
-                  : desktop.value?.windowsMaterial ?? 'off'}
+              value={desktop.value?.macosMaterial ?? 'transparent'}
               disabled={!settingsWritable || busy !== undefined || restart !== 'none'}
               onChange={event => { setMaterial(event.currentTarget.value) }}
             >
               <option value="off">{t('windowMaterialOff')}</option>
-              {platform === 'darwin'
-                ? <option value="transparent">{t('windowMaterialTransparent')}</option>
-                : (
-                    <>
-                      {micaSupported && <option value="mica">{t('windowMaterialMica')}</option>}
-                    </>
-                  )}
+              <option value="transparent">{t('windowMaterialTransparent')}</option>
             </select>
           </label>
         )}
@@ -823,6 +810,18 @@ export function DesktopSettingsSection({
             checked={notificationValue.notifyOnTurnFailure}
             disabled={!notificationValue.enabled || !notificationsWritable || busy !== undefined}
             onChange={checked => { setNotification('notifyOnTurnFailure', checked) }}
+          />
+          <DesktopSettingsToggleRow
+            label={t('scheduleCompletion')}
+            checked={notificationValue.notifyOnScheduleCompletion}
+            disabled={!notificationValue.enabled || !notificationsWritable || busy !== undefined}
+            onChange={checked => { setNotification('notifyOnScheduleCompletion', checked) }}
+          />
+          <DesktopSettingsToggleRow
+            label={t('scheduleFailure')}
+            checked={notificationValue.notifyOnScheduleFailure}
+            disabled={!notificationValue.enabled || !notificationsWritable || busy !== undefined}
+            onChange={checked => { setNotification('notifyOnScheduleFailure', checked) }}
           />
           {capabilities?.jobNotifications !== false && <><DesktopSettingsToggleRow
             label={t('jobCompletion')}
@@ -931,6 +930,20 @@ export function DesktopSettingsSection({
         </section>
       )}
 
+      {capabilities?.logging !== false && <section className="sensteedAgentSettingsGroup" aria-labelledby="dsh-desktop-logging-title">
+        <h3 id="dsh-desktop-logging-title">{t('loggingTitle')}</h3>
+        <DesktopSettingsToggleRow label={t('developerLogging')} checked={desktop.value?.developerLogging === true}
+          disabled={!settingsWritable || busy !== undefined}
+          onChange={checked => { void run('logging', async () => { await desktopSettings.set('developerLogging', checked) }) }} />
+        <p className="sensteedAgentSettingsGroupIntro">{t('developerLoggingBody')}</p>
+        <label className="sensteedAgentSettingsToggleRow">
+          <span>{t('logLevel')}</span>
+          <select value={desktop.value?.logLevel ?? 'info'} disabled={!settingsWritable || busy !== undefined}
+            onChange={event => { const value = event.target.value as DesktopShellSettings['logLevel']; void run('logging', async () => { await desktopSettings.set('logLevel', value) }) }}>
+            <option value="debug">Debug</option><option value="info">Info</option><option value="warn">Warn</option><option value="error">Error</option>
+          </select>
+        </label>
+      </section>}
       {extraSections}
       {confirmLan && (
         <div

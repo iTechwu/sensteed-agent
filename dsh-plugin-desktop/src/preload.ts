@@ -4,6 +4,7 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { installBootSplash } from './boot-splash.ts'
 import { BRAND_DISPLAY_NAME } from './generated-product-identity.ts'
 import { DESKTOP_FILE_PATH_BRIDGE } from './file-path-bridge-contract.ts'
+import { DESKTOP_NATIVE_DIRECTORY_PICKER_CHANNEL } from './directory-picker-contract.ts'
 import {
   DESKTOP_RENDERER_ACTION_CHANNEL,
   DESKTOP_RENDERER_ACTIONS_BRIDGE,
@@ -23,6 +24,15 @@ const actions: DesktopRendererActionsBridge = {
   invoke: (action: DesktopRendererAction) => ipcRenderer.invoke(DESKTOP_RENDERER_ACTION_CHANNEL, action),
 }
 contextBridge.exposeInMainWorld(DESKTOP_RENDERER_ACTIONS_BRIDGE, actions)
+
+// The official native directory-flow plugin captures this seam at apply time.
+// Install it before any client plugin runs; the Host's macOS osascript chooser
+// otherwise waits for AppleEvents and may time out without showing a window.
+if (process.platform === 'darwin') {
+  contextBridge.exposeInMainWorld('__DSH_DIRECTORY_PICKER__', Object.freeze({
+    pick: (): Promise<string | null> => ipcRenderer.invoke(DESKTOP_NATIVE_DIRECTORY_PICKER_CHANNEL),
+  }))
+}
 
 // Upstream client plugins recognize the Desktop renderer by this carrier. Version 1
 // without `updates` or `browser` keeps upstream update badges and the embedded

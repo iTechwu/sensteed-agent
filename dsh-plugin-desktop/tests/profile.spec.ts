@@ -29,6 +29,7 @@ import {
   resolveDesktopSettingsDocument,
   shippedSkillRoot,
   validateDshMarketBundlePatches,
+  UPSTREAM_PRODUCT_ANALYTICS_ROW_IDS,
 } from '../src/profile.ts'
 import { setDesktopProfileBundleSelected } from '../src/desktop-plugins.ts'
 import { migrateLegacyAgentPresetSettings } from '../src/setup-wizard-settings.ts'
@@ -525,6 +526,12 @@ virtualStoreDirMaxLength: 120
         trustedHosts: ['lab.internal', '192.168.1.5', '10.0.0.7'],
       }),
     }))
+    // The fork pins alpha.2, whose Connection row already routes Web trust
+    // through the webStartup service.
+    expect(rows.find(row => row.id === 'connection')).toEqual(expect.objectContaining({
+      inject: ['webStartup'],
+      config: { trustedHosts: { __jsExpr: '[...new Set([...(ctx.webStartup.trustedHosts), ...["lab.internal","192.168.1.5","10.0.0.7"]])]' } },
+    }))
     expect(rows.find(row => row.id === 'desktop-webserver')).toEqual(expect.objectContaining({
       config: { host: '127.0.0.1', port: 43_120 },
     }))
@@ -760,6 +767,21 @@ virtualStoreDirMaxLength: 120
     expect(() => validateDshMarketBundlePatches([{
       insert: [{ id: 'dsh-market', name: 'unexpected-market' }],
     }])).toThrow('must insert exactly the canonical dsh-market row')
+  })
+
+  it('keeps upstream Desktop product analytics off even when a user patch enables it', () => {
+    const home = temporaryHome()
+    writeFileSync(join(ensureDesktopProfile(home), 'cordis.patch.yml'), [
+      '- id: product-analytics',
+      '  disabled: false',
+      '',
+    ].join('\n'))
+
+    const rows = composeEntries([prepareDesktopProfile(undefined, home, 'darwin').patches])
+
+    for (const id of UPSTREAM_PRODUCT_ANALYTICS_ROW_IDS) {
+      expect(rows.find(row => row.id === id)).toEqual(expect.objectContaining({ disabled: true }))
+    }
   })
 
   it('boots a selected Web profile without overriding its compatibility UI rows', () => {
@@ -1056,11 +1078,13 @@ virtualStoreDirMaxLength: 120
     ensureDesktopProfile(home)
     writeFileSync(join(home, 'settings.yaml'), ['sensteed-agent:', '  mode: advanced', ''].join('\n'))
 
-    prepareDesktopProfile(undefined, home, 'darwin')
+    const prepared = prepareDesktopProfile(undefined, home, 'darwin')
 
-    // The Loader has not started yet, so upstream's import still finds the section.
-    expect(readFileSync(join(home, 'settings.yaml'), 'utf8'))
-      .toBe(['desktop-shell:', '  mode: advanced', ''].join('\n'))
+    // The pending section lands in the Profile's patch layer before the Loader's
+    // one-shot import can rename it away, and the document is consumed to empty.
+    expect(readFileSync(join(home, 'settings.yaml'), 'utf8')).toBe('{}\n')
+    expect(composeEntries([prepared.patches]).find(row => row.id === 'desktop-shell'))
+      .toEqual(expect.objectContaining({ config: expect.objectContaining({ mode: 'advanced' }) }))
   })
 
   it('keeps legacy browser intent but clamps LAN exposure when compatibility mode is selected', () => {
@@ -1099,10 +1123,11 @@ virtualStoreDirMaxLength: 120
     const prepared = prepareDesktopProfile(undefined, home, 'win32')
     const rows = composeEntries([prepared.patches])
 
+    // A removed Windows Mica preference still boots and renders opaque.
     expect(prepared).toEqual(expect.objectContaining({
       mode: 'extended',
       macosMaterial: 'off',
-      windowsMaterial: 'mica',
+      windowsMaterial: 'off',
     }))
     expect(rows.find(row => row.id === 'ui-layout')?.disabled).toBe(true)
     expect(rows.find(row => row.id === 'ui-sidebar')?.disabled).toBe(false)
@@ -1111,6 +1136,7 @@ virtualStoreDirMaxLength: 120
       config: expect.objectContaining({
         mode: 'extended',
         macosMaterial: 'off',
+        // The user's legacy leaf is carried through unchanged, never rewritten.
         windowsMaterial: 'mica',
       }),
     }))

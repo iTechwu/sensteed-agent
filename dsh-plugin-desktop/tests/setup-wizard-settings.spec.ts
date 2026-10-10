@@ -41,7 +41,7 @@ function values(overrides: Partial<DesktopSetupWizardSettings> = {}): DesktopSet
   return {
     mode: 'compatibility',
     macosMaterial: 'transparent',
-    windowsMaterial: 'mica',
+    windowsMaterial: 'off',
     openBrowser: true,
     networkExposure: 'lan',
     notifications: {
@@ -50,6 +50,8 @@ function values(overrides: Partial<DesktopSetupWizardSettings> = {}): DesktopSet
       notifyOnTurnFailure: true,
       notifyOnJobCompletion: false,
       notifyOnJobFailure: true,
+      notifyOnScheduleCompletion: true,
+      notifyOnScheduleFailure: true,
     },
     ...overrides,
   }
@@ -117,7 +119,7 @@ describe('Desktop Setup Wizard settings document', () => {
     expect(document['sensteed-agent']).toMatchObject({
       mode: 'compatibility',
       macosMaterial: 'transparent',
-      windowsMaterial: 'mica',
+      windowsMaterial: 'off',
       port: 61201,
       logLevel: 'warn',
       futureField: 'preserved',
@@ -130,6 +132,8 @@ describe('Desktop Setup Wizard settings document', () => {
       notifyOnTurnFailure: true,
       notifyOnJobCompletion: false,
       notifyOnJobFailure: true,
+      notifyOnScheduleCompletion: true,
+      notifyOnScheduleFailure: true,
       futureNotification: 'keep',
     })
     expect(readDesktopSetupWizardSettings(path)).toEqual(next)
@@ -227,7 +231,7 @@ describe('Desktop Setup Wizard settings document', () => {
       notifications: { enabled: true } as DesktopSetupWizardSettings['notifications'],
     })
     await expect(updateDesktopSetupWizardSettings(path, incomplete))
-      .rejects.toThrow('all five notification booleans')
+      .rejects.toThrow('all seven notification booleans')
 
     const next = values({ openBrowser: false, networkExposure: 'lan' })
     await expect(updateDesktopSetupWizardSettings(path, next)).resolves.toMatchObject({
@@ -506,7 +510,7 @@ describe('Desktop Setup Wizard settings document', () => {
     const path = join(root, 'settings.yaml')
     writeFileSync(path, 'unrelated:\n  keep: true\n', { mode: 0o600 })
     const first = values({ mode: 'extended', windowsMaterial: 'off', openBrowser: false, networkExposure: 'loopback' })
-    const second = values({ mode: 'compatibility', windowsMaterial: 'mica', networkExposure: 'loopback' })
+    const second = values({ mode: 'compatibility', windowsMaterial: 'off', networkExposure: 'loopback' })
 
     await Promise.all([
       updateDesktopSetupWizardSettings(path, first),

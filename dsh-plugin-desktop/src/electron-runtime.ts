@@ -11,6 +11,7 @@ import {
 } from 'electron'
 import { requestDofeAuth } from './dofe-auth-network.ts'
 import type { DesktopProxySource } from './system-proxy.ts'
+import { configureDeveloperLogging, type DiagnosticPreferences } from './developer-logging.ts'
 import { spawn } from 'node:child_process'
 import { RemoteControlOffer, remoteControlOfferCopy } from './remote-control-offer.ts'
 import { readFileSync } from 'node:fs'
@@ -63,6 +64,7 @@ import {
   recordDesktopUpdateArtifact,
   resolveDesktopUpdateArtifact,
   type DesktopUpdateArtifact,
+  type UpdateArtifactResponse,
 } from './update-download.ts'
 import type { UpdateCheckResult } from './update-checker.ts'
 import type { DesktopInstallationId } from './desktop-installation-id.ts'
@@ -77,7 +79,6 @@ import { OpenMontageWindow } from './openmontage-window.ts'
 import { BossWebWindow, BOSS_LOGIN_URL } from './yootun-boss-web-window.ts'
 import { setCachedMandatoryPolicy, type CachedMandatoryUpdatePolicy } from './mandatory-policy-cache.ts'
 import { ContentPlatformWebWindow } from './yootun-content-platform-window.ts'
-import { windowsBuildNumber } from './window-material.ts'
 import { desktopNativeCopy } from './native-dialog-copy.ts'
 import {
   FileMainWindowStateStore,
@@ -104,8 +105,19 @@ export function desktopPreloadPath(moduleUrl: string = import.meta.url): string 
 
 const PRODUCT_VERSION = desktopProductVersion()
 
-/** Adapt Electron's redirect-aware net.request to the update downloader seam. */
-export function requestDesktopArtifact(url: string, init: RequestInit = {}): Promise<{ response: Response; finalUrl: string }> {
+/** Main-process deadline for one Renderer generation to settle its client Loader. */
+export const RENDERER_BOOT_TIMEOUT_MS = 120_000
+
+/** HTTP statuses whose Response must be constructed without a body stream. */
+const NULL_BODY_STATUSES = new Set([204, 205, 304])
+
+/**
+ * Download-request adapter over Electron `net.request`. `net.fetch` cannot
+ * supply the HTTPS check: its Response carries an empty `url` (a
+ * documented Electron limitation), so redirects are followed here and the
+ * settled URL is reported alongside the response for validation.
+ */
+export function requestDesktopArtifact(url: string, init: RequestInit): Promise<UpdateArtifactResponse> {
   return new Promise((resolve, reject) => {
     let finalUrl = url
     let settled = false
@@ -128,7 +140,7 @@ export function requestDesktopArtifact(url: string, init: RequestInit = {}): Pro
       const headers = new Headers()
       for (const [key, value] of Object.entries(incoming.headers ?? {})) headers.set(key, Array.isArray(value) ? value.join(', ') : value)
       const status = incoming.statusCode ?? 200
-      const body = status === 204 || status === 205 || status === 304
+      const body = NULL_BODY_STATUSES.has(status)
         ? undefined
         : Readable.toWeb(incoming as unknown as import('node:stream').Readable) as ReadableStream<Uint8Array>
       finish(undefined, { response: new Response(body, { status, headers }), finalUrl })
@@ -147,13 +159,12 @@ export function requestDesktopArtifact(url: string, init: RequestInit = {}): Pro
   })
 }
 
-/** Main-process deadline for one Renderer generation to settle its client Loader. */
-export const RENDERER_BOOT_TIMEOUT_MS = 30_000
-
 /** Native adapter used by the Sensteed-Agent launcher and owned by its Cordis shell plugin. */
 export class ElectronDesktopRuntime implements DesktopRuntime {
+  configureDeveloperLogging(preferences: DiagnosticPreferences): void { configureDeveloperLogging(preferences) }
+
+  setupOnboarding?: import('./setup-onboarding-bridge.ts').DesktopOnboardingBridge
   readonly platform: DesktopPlatform
-  readonly windowsBuild: number | undefined
   private readonly platformStrategy: ElectronPlatformStrategy
   readonly updates: DesktopUpdateAdapter
 
@@ -198,7 +209,6 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
   ) {
     this.platformStrategy = electronPlatformStrategy()
     this.platform = this.platformStrategy.platform
-    this.windowsBuild = this.platform === 'win32' ? windowsBuildNumber() : undefined
     const platformStrategy = this.platformStrategy
     this.workspaceAdmission = new ElectronWorkspaceAdmission({
       platform: this.platform,
@@ -326,6 +336,7 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
         platform: this.platformStrategy,
         spec,
         preloadPath: desktopPreloadPath(),
+        pickDirectory: () => this.pickDirectory(),
         buildApplicationMenuItems: () => this.buildApplicationMenuItems(),
         isQuitting: () => this.quitting,
         buildTrayTemplate: () => this.buildTrayTemplate(spec),
@@ -341,6 +352,7 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
         logError: message => { this.logError(message) },
         mainWindowState: this.mainWindowState,
         platformLoginTitle: () => PLATFORM_LOGIN_TITLE[this.currentLocale],
+        setupOnboarding: this.setupOnboarding,
         chromeActions: {
           ...(remoteOffer ? { remoteControl: {
             read: () => remoteOffer.read(),
@@ -691,10 +703,6 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
   setThemeSource(source: DesktopThemeSource): void {
     if (this.platform !== 'linux' && this.generation !== undefined) {
       nativeTheme.themeSource = source
-      // Windows can retain the preceding DWM Mica palette until the window is
-      // recomposed (for example after minimize/restore). Reapplying the active
-      // material invalidates the backdrop immediately after a live theme change.
-      this.generation.refreshThemeMaterial()
     }
   }
 

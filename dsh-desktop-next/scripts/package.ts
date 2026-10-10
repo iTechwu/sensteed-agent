@@ -28,7 +28,7 @@ if (mode === 'dir') {
   if (process.platform === 'darwin') prepareRuntime()
   packageDirectory({ cwd: desktopRoot, electronBuilderCli: require.resolve('electron-builder/cli.js'), electronDistPath: join(dirname(require.resolve('electron/package.json')), 'dist') })
 } else if (mode === 'mac') {
-  releaseMac({ ...shared, listCodeSigningIdentities: env => {
+  releaseMac({ ...shared, arch: 'arm64', listCodeSigningIdentities: env => {
     const result = spawnSync('security', ['find-identity', '-v', '-p', 'codesigning'], { env, encoding: 'utf8' })
     if (result.error || result.status !== 0) throw result.error ?? new Error('Signing identity discovery failed')
     return result.stdout

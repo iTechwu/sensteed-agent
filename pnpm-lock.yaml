@@ -15843,9 +15843,42 @@ importers:
       '@deepseek-ai/dsh-experimental-agent-team-profile':
         specifier: 0.2.1-alpha.2
         version: link:../deepseek-harness/packages/experimental/agent-team-profile
+      '@deepseek-ai/dsh-experimental-auto-review':
+        specifier: 0.2.1-alpha.2
+        version: link:../deepseek-harness/packages/experimental/auto-review
+      '@deepseek-ai/dsh-experimental-badge-skill-bundle':
+        specifier: 0.2.1-alpha.2
+        version: link:../deepseek-harness/packages/experimental/badge-skill-bundle
       '@deepseek-ai/dsh-experimental-computer-use-cua-driver-native':
         specifier: 0.2.1-alpha.2
         version: link:../deepseek-harness/packages/experimental/computer-use-cua-driver-native
+      '@deepseek-ai/dsh-experimental-cot-translation-bundle':
+        specifier: 0.2.1-alpha.2
+        version: link:../deepseek-harness/packages/experimental/cot-translation-bundle
+      '@deepseek-ai/dsh-experimental-inspector':
+        specifier: 0.2.1-alpha.2
+        version: link:../deepseek-harness/packages/experimental/inspector
+      '@deepseek-ai/dsh-experimental-inspector-profile':
+        specifier: 0.2.1-alpha.2
+        version: link:../deepseek-harness/packages/experimental/inspector-profile
+      '@deepseek-ai/dsh-experimental-ralph-bundle':
+        specifier: 0.2.1-alpha.2
+        version: link:../deepseek-harness/packages/experimental/ralph-bundle
+      '@deepseek-ai/dsh-experimental-session-search':
+        specifier: 0.2.1-alpha.2
+        version: link:../deepseek-harness/packages/experimental/session-search
+      '@deepseek-ai/dsh-experimental-session-titles-bundle':
+        specifier: 0.2.1-alpha.2
+        version: link:../deepseek-harness/packages/experimental/session-titles-bundle
+      '@deepseek-ai/dsh-experimental-terminal-bundle':
+        specifier: 0.2.1-alpha.2
+        version: link:../deepseek-harness/packages/experimental/terminal-bundle
+      '@deepseek-ai/dsh-experimental-tool-worktree':
+        specifier: 0.2.1-alpha.2
+        version: link:../deepseek-harness/packages/experimental/tool-worktree
+      '@deepseek-ai/dsh-experimental-voice-input-bundle':
+        specifier: 0.2.1-alpha.2
+        version: link:../deepseek-harness/packages/experimental/voice-input-bundle
       '@deepseek-ai/dsh-file-reference':
         specifier: 0.2.1-alpha.2
         version: link:../deepseek-harness/packages/context/file-reference
@@ -16132,6 +16165,9 @@ importers:
       '@base-ui/react':
         specifier: ^1.7.0
         version: 1.7.0(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@deepseek-ai/dsh-client-shortcuts':
+        specifier: 0.2.1-alpha.2
+        version: link:../deepseek-harness/packages/client/shortcuts
       '@deepseek-ai/dsh-client-ui-sidebar-browser':
         specifier: 0.2.1-alpha.2
         version: link:../deepseek-harness/packages/client/ui-sidebar-browser
@@ -16150,6 +16186,9 @@ importers:
       '@tailwindcss/vite':
         specifier: ^4
         version: 4.3.3(vite@8.2.1(@types/node@22.20.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0))
+      '@types/mdast':
+        specifier: ^4.0.0
+        version: 4.0.4
       '@types/node':
         specifier: ^22.20.0
         version: 22.20.1
@@ -16198,6 +16237,9 @@ importers:
       mdast-util-math:
         specifier: ^3.0.0
         version: 3.0.0(supports-color@9.4.0)
+      mdast-util-to-string:
+        specifier: ^4.0.0
+        version: 4.0.0
       micromark-core-commonmark:
         specifier: ^2.0.3
         version: 2.0.4
@@ -30218,7 +30260,7 @@ snapshots:
       '@deepseek-ai/dsh-home-paths': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
       '@deepseek-ai/dsh-lazy-require': 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
       '@deepseek-ai/schemastery': 3.18.4
-      sharp: 0.35.3(@types/node@22.20.1)
+      sharp: 0.35.5(@types/node@22.20.1)
     transitivePeerDependencies:
       - '@types/node'
 

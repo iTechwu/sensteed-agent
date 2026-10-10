@@ -1,4 +1,4 @@
-/** Beta-only: republish the Loader's startup activation report to the Host log. */
+/** Republish the Loader's startup activation report to the Host log. */
 import type { Context } from '@deepseek-ai/cordis'
 import { auditStartupEntries } from '@deepseek-ai/dsh-app-boot'
 

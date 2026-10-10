@@ -1,7 +1,7 @@
 {
   "repository": "https://github.com/deepseek-ai/deepseek-harness",
-  "commit": "3d34decd9db3589c89a8ec91533a181cc80b43c4",
-  "version": "0.1.7-rc.2",
+  "commit": "d743267388641bc76f17c45ce8b4c231aed1d32c",
+  "version": "0.2.1-alpha.2",
   "files": [
     {
       "upstream": "apps/desktop/src/host-process.ts",
@@ -71,7 +71,7 @@
     {
       "upstream": "apps/desktop/src/preload-platform.ts",
       "local": "src/preload-platform.ts",
-      "upstreamSha256": "ebcb8c921a16cc4b2aba61bf98329e5df7bcf13ffc55931736e88b422865335d"
+      "upstreamSha256": "ab7e89b0a65c650a264a611f2abf3cc43346be796e2dbc9d24b0d04f7b96212f"
     },
     {
       "upstream": "apps/desktop/src/preload-theme.ts",
@@ -92,6 +92,21 @@
       "upstream": "apps/desktop/src/windows-layout.ts",
       "local": "src/windows-layout.ts",
       "upstreamSha256": "c032247c34d9794171aa3bd67534d511aca9f8963058d9976fb57f8c06a24628"
+    },
+    {
+      "upstream": "apps/desktop/src/keyboard.ts",
+      "local": "src/keyboard.ts",
+      "upstreamSha256": "7cf07391d8998813ea894d0e5d2f47053f5cc13dc9f48f257856cd19143b6728"
+    },
+    {
+      "upstream": "apps/desktop/src/keybindings.ts",
+      "local": "src/keybindings.ts",
+      "upstreamSha256": "44b1d0c19a430acaf5b6d19b10d6e4db0eda450ecc333731d82cebb87a6e403f"
+    },
+    {
+      "upstream": "apps/desktop/tests/keybindings.spec.ts",
+      "local": "tests/keybindings.spec.ts",
+      "upstreamSha256": "3d90e7dfde4733a9fec33b44a3347805404d4ba0a1a68ca4648ec5e94002a3ad"
     }
   ]
 }

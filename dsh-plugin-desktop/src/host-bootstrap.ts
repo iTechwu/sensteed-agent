@@ -7,13 +7,14 @@ import { DSH_LAUNCH_ENVIRONMENT_KEY, type LaunchEnvironmentSnapshot } from '@dee
 import { DESKTOP_PACKAGE_NAME as BIN_NAME } from './product-identity.ts'
 import { observeDesktopPreferenceSettings } from './settings-bridge.ts'
 import { installProfilePackageResolver } from './module-resolution.ts'
+import { DesktopPluginPackages } from './plugin-packages.ts'
 import { createDesktopWebProfile, listDesktopProfiles, canDeleteDesktopProfile, deleteDesktopProfile, selectDesktopProfile } from './profile-manager.ts'
 import { DesktopProfileService } from './profile-service.ts'
 import { DesktopActionsService } from './desktop-actions.ts'
 import { clearDesktopProfilePluginState, DesktopPluginsService } from './desktop-plugins.ts'
 import { desktopMarketSnapshotWithEffective, selectDesktopMarketProvider, type DesktopMarketProvider, type DesktopMarketSnapshot } from './desktop-market.ts'
 import DesktopSettingsController from './desktop-settings-controller.ts'
-import { clearDesktopProfilePreferences, desktopProfilePreferencesFromSettings, writeDesktopProfilePreferences, type DesktopProfilePreferences, type DesktopProfilePreferencesStateV1 } from './profile-preferences.ts'
+import { clearDesktopProfilePreferences, desktopProfilePreferencesFromSettings, readDesktopProfilePreferences, writeDesktopProfilePreferences, type DesktopProfilePreferences, type DesktopProfilePreferencesStateV1 } from './profile-preferences.ts'
 import { clearDesktopProfileUsageHistory, type DesktopReleaseUserDataLocations } from './profile-channel-admission.ts'
 import { desktopInstallAnchor, type PreparedDesktopProfile } from './profile.ts'
 import { desktopLanBrowserUrls, desktopLoopbackBrowserUrl } from './desktop-network.ts'
@@ -23,6 +24,8 @@ import type { DesktopPnpmBootstrap } from './pnpm.ts'
 import type { DesktopRuntime } from './runtime.ts'
 import type { DesktopStartupGenerationHost } from './startup-generation.ts'
 import { FileExporter } from './file-exporter.ts'
+import { initializeDeveloperLogging, diagnosticRunId } from './developer-logging.ts'
+import { installHostDeveloperLogging } from './host-developer-logging.ts'
 import { installAgentErrorLogging } from './agent-error-logging.ts'
 import { LogFileSink } from './log-files.ts'
 
@@ -55,6 +58,7 @@ export interface DesktopHostOptions {
   desktopProxyOverlay: Readonly<Record<string, string>>
   desktopPnpmBootstrap: DesktopPnpmBootstrap
   logDirectory: string
+  diagnosticRunId?: string
 }
 
 export async function bootDesktopHost(options: DesktopHostOptions, runtime: DesktopRuntime,
@@ -72,10 +76,19 @@ export async function bootDesktopHost(options: DesktopHostOptions, runtime: Desk
   const logSink = new LogFileSink(options.logDirectory, {
     maxFileBytes: 10 * 1024 * 1024, maxDirectoryBytes: 200 * 1024 * 1024,
   })
+  logSink.purgeOlderThan(7)
+  initializeDeveloperLogging((level, line) => logSink.writeRecord(level, JSON.parse(line)), options.diagnosticRunId ?? diagnosticRunId())
   let fileExporter: FileExporter | undefined
     let currentProfilePreferences: DesktopProfilePreferences = profilePreferences
     let profilePreferencesWriteTail: Promise<void> = Promise.resolve()
     let profilePreferencesStopping = false
+    // Setup saves from the Electron process after this Host booted; follow the
+    // durable file so its Market and AA choices are neither reverted nor hidden.
+    const latestProfilePreferences = (): DesktopProfilePreferences =>
+      readDesktopProfilePreferences(marketUserDataDir, prepared.profile.dir) ?? currentProfilePreferences
+    const readProfilePreferences = (): DesktopProfilePreferences => {
+      try { return latestProfilePreferences() } catch { return currentProfilePreferences }
+    }
     const enqueueProfilePreferencesWrite = (
       update: (current: DesktopProfilePreferences) => DesktopProfilePreferences,
     ): Promise<DesktopProfilePreferencesStateV1> => {
@@ -83,7 +96,7 @@ export async function bootDesktopHost(options: DesktopHostOptions, runtime: Desk
         return Promise.reject(new Error(`${BIN_NAME}: Profile preferences are stopping`))
       }
       const write = profilePreferencesWriteTail.then(async () => {
-        const next = update(currentProfilePreferences)
+        const next = update(latestProfilePreferences())
         const stored = await writeDesktopProfilePreferences(
           marketUserDataDir,
           prepared.profile.dir,
@@ -127,6 +140,8 @@ export async function bootDesktopHost(options: DesktopHostOptions, runtime: Desk
           () => releasePackageResolver,
           'dsh-plugin-desktop: profile package resolution',
         )
+        // Official plugin metadata and package lookups read the packages this resolver loads.
+        await hostCtx.plugin(DesktopPluginPackages)
         hostCtx.provide(DSH_LAUNCH_ENVIRONMENT_KEY, desktopLaunchEnvironment)
         hostCtx.provide('desktopBrowserAccess', browserAccess)
         hostCtx.provide('desktopLanHttps', lanHttps)
@@ -158,6 +173,7 @@ export async function bootDesktopHost(options: DesktopHostOptions, runtime: Desk
         }
         // Registered before the plugin tree mounts, so no agent can fail unrecorded.
         installAgentErrorLogging(hostCtx)
+        installHostDeveloperLogging(hostCtx)
         await hostCtx.plugin(DesktopProfileService, {
           current: {
             name: activeProfileName,
@@ -208,13 +224,13 @@ export async function bootDesktopHost(options: DesktopHostOptions, runtime: Desk
           pendingSettingsRestart = undefined
         }, 'dsh-plugin-desktop: pending Desktop settings restart')
         const readMarket = () => desktopMarketSnapshotWithEffective(
-          desktopProfileMarketSnapshot(currentProfilePreferences.market),
+          desktopProfileMarketSnapshot(readProfilePreferences().market),
           prepared.market.effective,
         )
         hostCtx.provide('desktopSettingsController', new DesktopSettingsController({
           profiles: hostCtx.desktopProfiles,
           readMarket,
-          readAa: () => ({ requested: currentProfilePreferences.aaEnabled === true, effective: prepared.aaEnabled }),
+          readAa: () => ({ requested: readProfilePreferences().aaEnabled === true, effective: prepared.aaEnabled }),
           selectAa: async enabled => {
             await enqueueProfilePreferencesWrite(current => desktopProfilePreferencesFromSettings(
               current,

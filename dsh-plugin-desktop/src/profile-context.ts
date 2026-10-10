@@ -1,10 +1,11 @@
-/** alpha.2 launcher facts shared by embedded and isolated Desktop Hosts. */
-import { delimiter } from 'node:path'
+/** Launcher facts shared by embedded and isolated Desktop Hosts. */
+import { delimiter, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type { Context } from '@deepseek-ai/cordis'
 
 import type { AppReady } from '@deepseek-ai/dsh-cmdline'
 import type { DesktopPnpmBootstrap } from './pnpm.ts'
+import { findOverlayPackage } from './package-overlay.ts'
 import { withDesktopPnpmPolicy } from './pnpm-policy.ts'
 import { desktopInstallAnchor, prepareDesktopProfile, type PreparedDesktopProfile } from './profile.ts'
 
@@ -23,6 +24,12 @@ export function createDesktopProfileBoot(prepared: PreparedDesktopProfile, pnpm:
     dir: prepared.profile.dir,
     patchPath: prepared.profile.patchPath,
     installAnchor: desktopInstallAnchor(),
+    // Compatibility checks must inspect the same artifact as the module loader,
+    // even before pluginPackages exists. Never inspect stale ancestor copies.
+    resolvePackageManifest: (packageName: string) => findOverlayPackage(packageName, {
+      installPackageUrl: pathToFileURL(desktopInstallAnchor()).href,
+      profilePackageUrl: pathToFileURL(join(prepared.profile.dir, 'package.json')).href,
+    })?.selected.manifestPath,
     cwd: process.cwd(),
     home: prepared.homeDir,
     startedBundles: prepared.profile.layers.map(layer => layer.packageName),
@@ -58,6 +65,7 @@ export function createDesktopProfileBoot(prepared: PreparedDesktopProfile, pnpm:
       {
         aaEnabled: options.aaEnabled,
         lanAddresses: prepared.lanAddresses,
+        generationMode: prepared.mode,
         ...(profilePatches === undefined ? {} : { profilePatches }),
       } as Parameters<typeof prepareDesktopProfile>[6],
     ).patches, ...context.overlays],
