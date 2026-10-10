@@ -9,7 +9,6 @@
  */
 
 import { CODE_LANG_BY_EXT } from './file-icons.js'
-import { REQUEST_TIMEOUT_MS } from './rpc.js'
 import { ICON_REFRESH, FILE_ICON_EDIT, FILE_ICON_PREVIEW } from './styles.js'
 
 /** 取路径小写扩展名。 */
@@ -28,6 +27,21 @@ export function previewKind(path) {
   if (ext === 'csv') return 'csv'
   if (ext === 'tsv') return 'tsv'
   return 'text'
+}
+
+/** 常见无扩展名/点文件本身就是文本配置，应允许直接编辑。 */
+var EDITABLE_FILE_NAMES = new Set([
+  '.gitignore', '.gitattributes', '.gitmodules', '.dockerignore',
+  '.editorconfig', '.npmrc', '.yarnrc', '.yarnrc.yml',
+  'dockerfile', 'makefile', 'justfile', 'taskfile', 'procfile',
+  'vagrantfile', 'gemfile', 'rakefile', 'brewfile',
+  'license', 'licence', 'notice', 'authors', 'contributors',
+])
+
+function baseNameOf(path) {
+  var value = String(path || '').replace(/[\\/]+$/, '')
+  var slash = Math.max(value.lastIndexOf('/'), value.lastIndexOf('\\'))
+  return value.slice(slash + 1).toLowerCase()
 }
 
 /** RFC 4180 风格的分隔符解析（引号感知，"" 转义），返回行数组。 */
@@ -73,6 +87,7 @@ export function isEditableTextFile(path) {
   var kind = previewKind(path)
   var ext = extOfName(path)
   return kind === 'markdown' || kind === 'html' || kind === 'json'
+    || EDITABLE_FILE_NAMES.has(baseNameOf(path))
     || Object.prototype.hasOwnProperty.call(CODE_LANG_BY_EXT, ext)
 }
 
@@ -493,7 +508,7 @@ export function createPreviewRenderers(ctx) {
     React.useEffect(function () {
       var cancelled = false
       var made = null
-      fetch('data:application/pdf;base64,' + props.data, { credentials: 'same-origin', redirect: 'error', signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
+      fetch('data:application/pdf;base64,' + props.data)
         .then(function (r) { return r.blob() })
         .then(function (blob) {
           if (cancelled) { URL.revokeObjectURL(made); return }

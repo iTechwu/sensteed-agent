@@ -116,22 +116,9 @@ export function createFilesView(ctx) {
   function PreviewOverlay() {
     var s = useStore()
     var files = s.files
-    var active = files.overlay && files.active ? findFileEntry(files.active) : null
-    var overlayActive = Boolean(active)
-    React.useEffect(function () {
-      if (!overlayActive || typeof document === 'undefined') return
-      var lastTrigger = document.activeElement
-      function onKey(event) {
-        if (event.key === 'Escape') setFiles({ overlay: false, overlayMax: false, overlayReturn: null })
-      }
-      document.addEventListener('keydown', onKey)
-      return function () {
-        document.removeEventListener('keydown', onKey)
-        // 浮层关闭后把焦点还给打开它的元素，保持键盘路径可回退
-        requestAnimationFrame(() => lastTrigger?.focus())
-      }
-    }, [overlayActive])
-    if (!overlayActive) return null
+    if (!files.overlay || !files.active) return null
+    var active = findFileEntry(files.active)
+    if (!active) return null
     var close = function () { setFiles({ overlay: false, overlayMax: false, overlayReturn: null }) }
     var closeAndCloseTab = function () {
       if (active.dirty && typeof window !== 'undefined' && !window.confirm(T('files.unsavedConfirm'))) return

@@ -4,8 +4,6 @@
  * 经 getState/setState 访问器读写；files 相关动作（预览/自动保存等）由
  * main 以包装函数延迟注入，避免与 files-store 的初始化顺序耦合。
  */
-import { REQUEST_TIMEOUT_MS } from './rpc.js'
-
 export function createExplorerData(ctx) {
   var T = ctx.T
   var rpc = ctx.rpc
@@ -664,7 +662,7 @@ export function createExplorerData(ctx) {
       // 中小文件：fetch 流式读字节计进度，完成后 Blob 另存（峰值≈文件体积）
       updateUpload(name, 0, size, 0, 1, true)
       try {
-        var r = await fetch(res.url, { credentials: 'same-origin', redirect: 'error', signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
+        var r = await fetch(res.url)
         if (!r.ok) throw new Error('HTTP ' + r.status)
         var total = Number(r.headers.get('content-length')) || size
         var reader = r.body.getReader()

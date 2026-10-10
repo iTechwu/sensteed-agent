@@ -1,6 +1,3 @@
-/** 共享有界超时策略：所有浏览器侧 fetch 统一 30s 上限，防止挂起占用会话。 */
-export const REQUEST_TIMEOUT_MS = 30000
-
 /** Resolve the host origin the same-origin plugin endpoints live under. */
 export function hostBase({ location = globalThis.location } = {}) {
   const origin = location && location.origin

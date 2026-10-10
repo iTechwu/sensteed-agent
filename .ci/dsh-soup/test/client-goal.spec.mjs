@@ -57,6 +57,7 @@ const factoryModule = loadedFactory((name) => {
 
 // apply 注册 goal dock 到 slots
 const registered = []
+const sidebarRight = { openResource: () => 'official sidebar' }
 const ctx = {
   slots: {
     inject: (name, cb) => cb(),
@@ -69,6 +70,11 @@ const ctx = {
   sessions: { binding: () => ({ session: { projections: { faceOf: () => undefined } } }) },
   remote: { goals: { edit: () => Promise.resolve({ ok: true }), pause: () => Promise.resolve({ ok: true }), resume: () => Promise.resolve({ ok: true }), clear: () => Promise.resolve({ ok: true }) } },
   timer: { interval: () => () => {} },
+  // sidebarRight 属于动态提供服务；模拟宿主在 apply 后把它交给 soup，
+  // 确保产物文件桥接不依赖一次性的反射轮询。
+  inject: (names, callback) => {
+    if (names.length === 1 && names[0] === 'sidebarRight') callback({ sidebarRight })
+  },
   // i18n stub：register 吸收词典；bind 返回翻译函数（返回 key 本身，
   // 断言即可验证「组件走 T('key') 而非硬编码中文」的接线）
   locale: { register: () => {}, bind: () => (key) => key },
@@ -77,6 +83,7 @@ const ctx = {
 const applyFn = factoryModule.apply || factoryModule.default
 if (applyFn) applyFn(ctx)
 else throw new Error('apply not found')
+if (!sidebarRight.__dshSoupFileBridge) throw new Error('file resource bridge must subscribe to sidebarRight service injection')
 
 const goalReg = registered.find((r) => r.reg && r.reg.id === 'goal')
 if (!goalReg) throw new Error('goal dock not registered')
@@ -441,10 +448,15 @@ if (!clientSource.includes("ext === 'ipynb'")) throw new Error('previewKind must
 const fileIconsSource = readFileSync(new URL('../lib/client/file-icons.js', import.meta.url), 'utf8')
 if (!fileIconsSource.includes("py: 'py', rb: 'rb', go: 'go', rs: 'rs'")) throw new Error('code language table must cover common languages')
 const fileIcons = await import('../lib/client/file-icons.js')
+const previewRenderers = await import('../lib/client/preview-renderers.js')
 for (const name of ['a.md', 'x.ts', 'y.lua', 'LICENSE', 'noext', 'z.jpg']) {
   const svg = fileIcons.iconSvgFor({ type: 'file', name })
   if (typeof svg !== 'string' || svg.length === 0) throw new Error('iconSvgFor must resolve: ' + name)
 }
+for (const name of ['.gitignore', '.gitattributes', '.dockerignore', 'Dockerfile', 'Makefile', 'LICENSE']) {
+  if (!previewRenderers.isEditableTextFile(name)) throw new Error('text config must be editable: ' + name)
+}
+if (previewRenderers.isEditableTextFile('photo.png')) throw new Error('image files must not be editable')
 if (fileIcons.iconSvgFor({ type: 'directory', name: 'd', open: true }) !== fileIcons.NB_SVG.folderFavorite) {
   throw new Error('open directory must use folderFavorite')
 }
