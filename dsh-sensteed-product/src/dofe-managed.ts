@@ -15,7 +15,7 @@ import {
   normalizeDofePluginIds,
 } from './dofe-plugins.ts'
 import { BRAND_TENANT, BRAND_VARIANT } from './generated-product-identity.ts'
-import { KNOWLEDGE_ROUTING_PROMPT } from './knowledge-routing.ts'
+import { managedCapabilitiesPrompt } from './managed-capabilities.ts'
 import { DofeAuthService } from './dofe-auth-service.ts'
 import { financeMcpConfig } from './finance-mcp.ts'
 
@@ -206,10 +206,16 @@ export async function apply(ctx: Context): Promise<void> {
     }, 'dofe-managed: SSO session lifetime')
     await restore()
   }
+  let financeAuthorized = false
   ctx.systemPrompt.section({
     name: 'dofe:managed-access',
     order: 4,
-    text: `DoFe 托管能力：模型请求统一使用 Models API；${KNOWLEDGE_ROUTING_PROMPT} 空间由服务端根据 tenant/team/user 权限解析；商业工具、单张图片、5–10 秒单镜头短视频或复杂视频使用已加载的 mcp__tools-*、mcp__media__ 与 mcp__openmontage__ 工具（脚本/多镜头/复刻/字幕/配音用 mcp__openmontage__，单镜头直连用 mcp__media__）。启动引导只收集一次 model_api_key，之后不要要求用户再次提供。`,
+    text: context => managedCapabilitiesPrompt({
+      ready: accessReady(access.get()),
+      enabled: enabledPlugins(access.get()),
+      financeAllowed: financeAuthorized,
+      toolNames: ctx.tools.schemas(context.scope).map(tool => tool.name),
+    }),
   })
   let routeClients: { dispose(): void | Promise<void> }[] = []
   let financeClient: { dispose(): void | Promise<void> } | undefined
@@ -302,6 +308,7 @@ export async function apply(ctx: Context): Promise<void> {
   }
 
   const reconcileFinance = async (): Promise<void> => {
+    financeAuthorized = false
     const resolved = await ctx.credentials.resolve(MODELS_API_KEY_REF)
     const next = resolved?.value
     const accessSettings = access.get()
@@ -332,6 +339,7 @@ export async function apply(ctx: Context): Promise<void> {
       }
     }
     const ready = baseReady && financeAllowed
+    financeAuthorized = ready
     const nextSignature = ready
       ? `${next}\0${session!.accessToken}`
       : session === undefined ? undefined : `finance-denied:${accessSettings.identity?.ssoSub ?? ''}`

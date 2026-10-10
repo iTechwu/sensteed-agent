@@ -30,6 +30,10 @@ function harness(overrides = {}) {
       registerTrayItem: (item: typeof tray) => { tray.enabled = item.enabled; return { refresh() {}, dispose() {} } },
     },
     systemPrompt: { section: vi.fn() },
+    tools: { schemas: vi.fn(() => [
+      { name: 'mcp__media__create_generation_task' },
+      { name: 'mcp__finance__query' },
+    ]) },
     plugin: vi.fn(async () => ({ dispose() {} })),
     on: vi.fn(), provide: vi.fn(), logger: { error: vi.fn(), info: vi.fn() },
     effect: (effect: () => (() => unknown)) => { effects.push(effect()) },
@@ -76,6 +80,9 @@ describe('Sensteed startup authorization', () => {
       headers: { Authorization: 'Bearer model-key', 'X-Sensteed-SSO-Authorization': 'Bearer access-new' },
     }))
     expect(h.tray.enabled()).toBe(false)
+    const section = h.ctx.systemPrompt.section.mock.calls.find(([s]) => s.name === 'dofe:managed-access')![0]
+    expect(section.text({})).toContain('财务管理')
+    expect(section.text({})).toContain('图片与短视频')
     expect(h.ctx.desktopRuntime.openExternal).not.toHaveBeenCalled()
     await h.dispose()
   })
@@ -94,6 +101,12 @@ describe('Sensteed startup authorization', () => {
     await apply(h.ctx as never)
     expect(h.ctx.plugin).toHaveBeenCalledTimes(1)
     expect(h.ctx.plugin).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ serverName: 'finance' }))
+    const section = h.ctx.systemPrompt.section.mock.calls.find(([s]) => s.name === 'dofe:managed-access')![0]
+    expect(section.text({})).not.toContain('财务')
+    expect(section.text({})).toContain('图片与短视频')
+    h.ctx.tools.schemas.mockReturnValue([])
+    expect(section.text({ scope: 'restricted-agent' })).not.toContain('图片与短视频')
+    expect(h.ctx.tools.schemas).toHaveBeenLastCalledWith('restricted-agent')
     await h.dispose()
   })
 
