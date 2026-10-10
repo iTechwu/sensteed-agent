@@ -75,6 +75,10 @@ const COMMON_APP_FILES = [
   'build/tray-icon*.png',
   'cordis.patch.yml',
   'lib/**',
+  // App-bundled third-party skills (bundled/skills) + the in-package manifest
+  // consumed by the packaged runtime smoke. Written only by
+  // scripts/refresh-bundled.mjs; the afterPack verifier asserts the entries.
+  'bundled/**',
   'package.json',
   // a0a4298b0b 的运行时闭包：这些一方依赖的 pnpm store 拷贝会被
   // 图收集器丢弃，globs 是它们进入 ASAR 的通道。

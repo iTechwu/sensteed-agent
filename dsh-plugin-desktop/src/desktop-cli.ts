@@ -7,6 +7,7 @@ import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { resolveProfileDir } from '@deepseek-ai/dsh-app-boot'
 import { packagedDependencyPath } from './packaged-runtime-path.ts'
 import { assertDesktopProfileName } from './profile-manager.ts'
+import { bundledSkillRoot } from './bundled-skill-root.ts'
 import { withoutForwardedDesktopPnpmPolicy } from './pnpm-policy.ts'
 import { installProfilePackageResolver } from './module-resolution.ts'
 import { withAsarModuleResolver } from './asar-module-resolver-state.ts'
@@ -103,6 +104,10 @@ export async function runDesktopDshCli(
 ): Promise<void> {
   const profileName = takeDefaultProfile(environment)
   clearElectronRunAsNode(environment)
+  // Same bundled-skills contract as the Host entries: packaged CLI runs see
+  // the app-bundled skill root as well.
+  const bundledSkills = bundledSkillRoot(import.meta.url)
+  if (bundledSkills !== undefined) environment.DSH_BUNDLED_SKILL_DIR = bundledSkills
   // The CLI's agent lists and reads user workspaces; see asar-archive-policy.ts.
   disableAsarArchiveView(DSH_ENTRY_URL, asarProcess)
   const selected = profileName === undefined

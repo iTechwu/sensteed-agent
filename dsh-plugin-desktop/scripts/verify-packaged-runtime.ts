@@ -177,6 +177,23 @@ export const REQUIRED_AGENT_PRESET_RUNTIME_ENTRIES = [
   'node_modules/@deepseek-ai/dsh-web-app/presets/ptc.patch.yml',
 ] as const
 
+/** App-bundled third-party skills written only by `scripts/refresh-bundled.mjs`.
+ * Derived from the in-package manifest so a refreshed snapshot set is asserted
+ * exactly as committed. Empty until the first refresh seeds the snapshot. */
+export const REQUIRED_BUNDLED_SKILL_ENTRIES = Object.freeze((() => {
+  const manifestPath = join(DESKTOP_PACKAGE_ROOT, 'bundled', 'manifest.json')
+  if (!existsSync(manifestPath)) return [] as string[]
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+    skills?: { kind?: string, path?: string }[]
+  }
+  return [
+    'bundled/manifest.json',
+    ...(manifest.skills ?? [])
+      .filter(skill => typeof skill.path === 'string')
+      .map(skill => `bundled/skills/${skill.path}${skill.kind === 'dir' ? '/SKILL.md' : ''}`),
+  ]
+})())
+
 /** External packages imported by required desktop plugins but not reliably discovered through pnpm links. */
 export const REQUIRED_RUNTIME_PACKAGE_MANIFESTS = [
   'node_modules/@opentelemetry/otlp-exporter-base/package.json',
@@ -306,6 +323,7 @@ export const REQUIRED_PACKAGED_RUNTIME_ENTRIES = [
   'node_modules/@deepseek-ai/dsh-web-frontend/dist/index.html',
   'node_modules/@deepseek-ai/dsh-app-boot/lib/index.js',
   ...REQUIRED_AGENT_PRESET_RUNTIME_ENTRIES,
+  ...REQUIRED_BUNDLED_SKILL_ENTRIES,
   'node_modules/open/index.js',
   'node_modules/pnpm/bin/pnpm.mjs',
 ] as const
@@ -342,6 +360,8 @@ export const FORBIDDEN_UNPACKED_RUNTIME_ENTRIES = [
   'node_modules/@deepseek-ai/dsh-web-app/lib/index.js',
   // Preset inputs are ordinary read-only data covered by ASAR integrity.
   ...REQUIRED_AGENT_PRESET_RUNTIME_ENTRIES,
+  // App-bundled third-party skills stay inside app.asar for the same reason.
+  ...REQUIRED_BUNDLED_SKILL_ENTRIES,
   'node_modules/@vscode/ripgrep/lib/index.js',
   'node_modules/open/index.js',
   'node_modules/yaml/dist/index.js',

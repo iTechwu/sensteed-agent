@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "skills": [
+    {
+      "name": "dashi-ppt-skill",
+      "repository": "https://github.com/chuspeeism/dashi-ppt-skill",
+      "ref": null,
+      "snapshotDir": "dsh-plugin-desktop/bundled/skills/dashi-ppt-skill",
+      "resolvedSha": "",
+      "refreshedAt": ""
+    },
+    {
+      "name": "humanizer",
+      "repository": "https://github.com/blader/humanizer",
+      "ref": null,
+      "snapshotDir": "dsh-plugin-desktop/bundled/skills/humanizer",
+      "resolvedSha": "225a6f39ac85f76ee48dbad772ea4abe4ed6c9d8",
+      "refreshedAt": "2026-10-10T12:27:56.143Z"
+    }
+  ],
+  "plugins": [
+    {
+      "name": "dsh-opencli",
+      "package": "@dofe/dsh-opencli",
+      "source": "sibling",
+      "snapshotDir": ".ci/dsh-opencli"
+    },
+    {
+      "name": "dsh-plugin-console",
+      "package": "@noob-stupid/dsh-plugin-console",
+      "source": "sibling",
+      "snapshotDir": ".ci/dsh-plugin-console"
+    },
+    {
+      "name": "dsh-sensteed-finance",
+      "package": "@dofe/dsh-sensteed-finance",
+      "source": "sibling",
+      "snapshotDir": ".ci/dsh-sensteed-finance"
+    },
+    {
+      "name": "dsh-sensteed-knowledge",
+      "package": "@dofe/dsh-sensteed-knowledge",
+      "source": "sibling",
+      "snapshotDir": ".ci/dsh-sensteed-knowledge"
+    },
+    {
+      "name": "dsh-sensteed-supplier-intelligence",
+      "package": "@dofe/dsh-sensteed-supplier-intelligence",
+      "source": "sibling",
+      "snapshotDir": ".ci/dsh-sensteed-supplier-intelligence"
+    },
+    {
+      "name": "dsh-sensteed-video-notes",
+      "package": "@dofe/dsh-sensteed-video-notes",
+      "source": "sibling",
+      "snapshotDir": ".ci/dsh-sensteed-video-notes"
+    },
+    {
+      "name": "dsh-tools-mcp",
+      "package": "@dofe/dsh-tools-mcp",
+      "source": "sibling",
+      "snapshotDir": ".ci/dsh-tools-mcp"
+    },
+    {
+      "name": "dsh-knowledge-capture",
+      "package": "@dofe/dsh-knowledge-capture",
+      "source": "sibling",
+      "snapshotDir": "scripts/ci-snapshots/dsh-knowledge-capture"
+    },
+    {
+      "name": "dsh-soup",
+      "package": "@lyhue1991/dsh-soup",
+      "source": "github",
+      "upstream": "https://github.com/lyhue1991/dsh-soup",
+      "siblingDir": "../docker-helm.dofe.ai/plugins/dsh-soup",
+      "siblingRepository": "../docker-helm.dofe.ai",
+      "snapshotDir": ".ci/dsh-soup"
+    }
+  ]
+}

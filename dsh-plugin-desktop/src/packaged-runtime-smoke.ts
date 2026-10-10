@@ -232,7 +232,10 @@ try {
   rmSync(root, { recursive: true, force: true })
 }
 
-await verifyBundledSkills(fileURLToPath(new URL('./', installAnchor)))
+const applicationRoot = fileURLToPath(new URL('./', installAnchor))
+// `bundled/skills` sits beside `lib/` inside the same ASAR; passing it lets the
+// smoke also assert every app-bundled third-party skill is discoverable.
+await verifyBundledSkills(applicationRoot, join(applicationRoot, 'bundled', 'skills'))
 await smokeSessionMigration()
 await smokeDiagnosticExportWorker()
 

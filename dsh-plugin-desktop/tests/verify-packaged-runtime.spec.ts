@@ -28,6 +28,7 @@ import {
   MAX_UNPACKED_RUNTIME_BYTES,
   MAX_UNPACKED_RUNTIME_FILES,
   REQUIRED_AGENT_PRESET_RUNTIME_ENTRIES,
+  REQUIRED_BUNDLED_SKILL_ENTRIES,
   REQUIRED_DSH_CLI_RUNTIME_ENTRIES,
   REQUIRED_PACKAGED_RUNTIME_ENTRIES,
   REQUIRED_MACOS_UNPACKED_RUNTIME_ENTRIES,
@@ -282,6 +283,15 @@ describe('packaged desktop runtime verification', () => {
       'node_modules/@deepseek-ai/dsh-web-app/presets/ptc.patch.yml',
     ])
     for (const entry of REQUIRED_AGENT_PRESET_RUNTIME_ENTRIES) {
+      expect(REQUIRED_PACKAGED_RUNTIME_ENTRIES).toContain(entry)
+      expect(FORBIDDEN_UNPACKED_RUNTIME_ENTRIES).toContain(entry)
+    }
+  })
+
+  it('requires every app-bundled skill entry and keeps it inside app.asar', () => {
+    expect(REQUIRED_BUNDLED_SKILL_ENTRIES).toContain('bundled/manifest.json')
+    for (const entry of REQUIRED_BUNDLED_SKILL_ENTRIES) {
+      expect(entry.startsWith('bundled/')).toBe(true)
       expect(REQUIRED_PACKAGED_RUNTIME_ENTRIES).toContain(entry)
       expect(FORBIDDEN_UNPACKED_RUNTIME_ENTRIES).toContain(entry)
     }

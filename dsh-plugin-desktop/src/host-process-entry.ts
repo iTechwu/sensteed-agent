@@ -12,6 +12,7 @@ import type { DesktopStartupGenerationHost } from './startup-generation.ts'
 import { disableAsarArchiveView } from './asar-archive-policy.ts'
 import { DESKTOP_PACKAGE_NAME } from './product-identity.ts'
 import { dshProductVersion } from './dsh-product-version.ts'
+import { bundledSkillRoot } from './bundled-skill-root.ts'
 
 // The Host lists and reads user workspaces; see asar-archive-policy.ts.
 disableAsarArchiveView(import.meta.url)
@@ -20,6 +21,12 @@ disableAsarArchiveView(import.meta.url)
 // product-telemetry and product-analytics rows. The supervisor may inject a
 // packaged value; otherwise the running DSH runtime version is the honest one.
 process.env.DSH_CLIENT_VERSION ??= dshProductVersion()
+
+// App-bundled third-party skills mount through the harness's dedicated
+// 'bundled' provider root; an absent snapshot directory leaves the variable
+// untouched so nothing bundled is announced.
+const bundledSkills = bundledSkillRoot(import.meta.url)
+if (bundledSkills !== undefined) process.env.DSH_BUNDLED_SKILL_DIR = bundledSkills
 
 const parentPort = process.parentPort
 if (!parentPort) throw new Error('DSH Host must be started by the Desktop supervisor')

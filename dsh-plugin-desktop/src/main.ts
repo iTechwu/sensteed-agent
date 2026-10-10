@@ -60,6 +60,7 @@ import {
 } from './crash-evidence.ts'
 import { dshProductVersion } from './dsh-product-version.ts'
 import { exportDesktopDiagnostics } from './diagnostic-export.ts'
+import { bundledSkillRoot } from './bundled-skill-root.ts'
 import { createDesktopLifecycleRecorder } from './lifecycle-events.ts'
 import type {
   DesktopLifecycleFailureReason,
@@ -1817,6 +1818,10 @@ async function start(): Promise<void> {
         },
       })
     } else {
+      // Same bundled-skills contract as the isolated Host entry: the legacy
+      // in-process boot must announce the app-bundled skill root too.
+      const bundledSkills = bundledSkillRoot(import.meta.url)
+      if (bundledSkills !== undefined) process.env.DSH_BUNDLED_SKILL_DIR = bundledSkills
       let currentProfilePreferences: DesktopProfilePreferences = profilePreferences
       let profilePreferencesWriteTail: Promise<void> = Promise.resolve()
       let profilePreferencesStopping = false

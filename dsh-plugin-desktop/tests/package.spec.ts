@@ -842,6 +842,8 @@ describe('published package surface', () => {
       'build/tray-icon*.png',
       'cordis.patch.yml',
       'lib/**',
+      // 内置第三方 skills 快照（scripts/refresh-bundled.mjs 产物）与包内清单。
+      'bundled/**',
       'package.json',
       // a0a4298b0b 的运行时闭包：这些一方依赖的 pnpm store 拷贝会被
       // 图收集器丢弃，globs 是它们进入 ASAR 的通道。
