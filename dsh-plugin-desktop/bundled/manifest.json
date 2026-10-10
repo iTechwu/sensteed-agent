@@ -2,11 +2,109 @@
   "schemaVersion": 1,
   "skills": [
     {
+      "name": "dashi-ppt",
+      "kind": "dir",
+      "path": "dashi-ppt",
+      "repository": "https://github.com/chuspeeism/dashi-ppt-skill",
+      "resolvedSha": "21dc7e5fc8c3a0d7f6a94948153dd1ee954f4e64"
+    },
+    {
       "name": "humanizer",
       "kind": "dir",
       "path": "humanizer",
       "repository": "https://github.com/blader/humanizer",
       "resolvedSha": "225a6f39ac85f76ee48dbad772ea4abe4ed6c9d8"
+    },
+    {
+      "name": "huashu-art-motion",
+      "kind": "dir",
+      "path": "huashu-art-motion",
+      "repository": "https://github.com/alchaincyf/huashu-art-motion",
+      "resolvedSha": "9ff59339f934e08483ba0a5b1db20f4c2c421b35"
+    },
+    {
+      "name": "bambu-labs",
+      "kind": "dir",
+      "path": "bambu-labs",
+      "repository": "https://github.com/earthtojake/text-to-cad",
+      "resolvedSha": "b48ff49e00968ac07af08572b0595483dae07c85"
+    },
+    {
+      "name": "cad",
+      "kind": "dir",
+      "path": "cad",
+      "repository": "https://github.com/earthtojake/text-to-cad",
+      "resolvedSha": "b48ff49e00968ac07af08572b0595483dae07c85"
+    },
+    {
+      "name": "dfam-check",
+      "kind": "dir",
+      "path": "dfam-check",
+      "repository": "https://github.com/earthtojake/text-to-cad",
+      "resolvedSha": "b48ff49e00968ac07af08572b0595483dae07c85"
+    },
+    {
+      "name": "dfm",
+      "kind": "dir",
+      "path": "dfm",
+      "repository": "https://github.com/earthtojake/text-to-cad",
+      "resolvedSha": "b48ff49e00968ac07af08572b0595483dae07c85"
+    },
+    {
+      "name": "dxf",
+      "kind": "dir",
+      "path": "dxf",
+      "repository": "https://github.com/earthtojake/text-to-cad",
+      "resolvedSha": "b48ff49e00968ac07af08572b0595483dae07c85"
+    },
+    {
+      "name": "engineering-drawing",
+      "kind": "dir",
+      "path": "engineering-drawing",
+      "repository": "https://github.com/earthtojake/text-to-cad",
+      "resolvedSha": "b48ff49e00968ac07af08572b0595483dae07c85"
+    },
+    {
+      "name": "gcode",
+      "kind": "dir",
+      "path": "gcode",
+      "repository": "https://github.com/earthtojake/text-to-cad",
+      "resolvedSha": "b48ff49e00968ac07af08572b0595483dae07c85"
+    },
+    {
+      "name": "sdf",
+      "kind": "dir",
+      "path": "sdf",
+      "repository": "https://github.com/earthtojake/text-to-cad",
+      "resolvedSha": "b48ff49e00968ac07af08572b0595483dae07c85"
+    },
+    {
+      "name": "sendcutsend",
+      "kind": "dir",
+      "path": "sendcutsend",
+      "repository": "https://github.com/earthtojake/text-to-cad",
+      "resolvedSha": "b48ff49e00968ac07af08572b0595483dae07c85"
+    },
+    {
+      "name": "srdf",
+      "kind": "dir",
+      "path": "srdf",
+      "repository": "https://github.com/earthtojake/text-to-cad",
+      "resolvedSha": "b48ff49e00968ac07af08572b0595483dae07c85"
+    },
+    {
+      "name": "step-parts",
+      "kind": "dir",
+      "path": "step-parts",
+      "repository": "https://github.com/earthtojake/text-to-cad",
+      "resolvedSha": "b48ff49e00968ac07af08572b0595483dae07c85"
+    },
+    {
+      "name": "urdf",
+      "kind": "dir",
+      "path": "urdf",
+      "repository": "https://github.com/earthtojake/text-to-cad",
+      "resolvedSha": "b48ff49e00968ac07af08572b0595483dae07c85"
     }
   ]
 }

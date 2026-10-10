@@ -41,6 +41,11 @@ const DEFAULT_SIBLING_REPOSITORY = '../docker-helm.dofe.ai'
 const FLAT_MD_EXCLUSIONS = /^(?:README|CONTRIBUTING|LICENSE|AGENTS|CHANGELOG|CODE_OF_CONDUCT)(?:\..*)?$/i
 /** Directories copied verbatim except for VCS/build noise. */
 const COPY_EXCLUDED_DIRS = new Set(['.git', 'node_modules', '.github'])
+/** Skill snapshots additionally drop build outputs: they are reproducible
+ * from the committed sources the snapshot ships, and upstream-committed
+ * `dist/` trees (e.g. dashi-ppt's 24M renderer bundle) would otherwise
+ * dominate the installer payload. */
+const SKILL_SNAPSHOT_EXCLUDED_DIRS = new Set([...COPY_EXCLUDED_DIRS, 'dist'])
 
 const log = (...lines) => {
   for (const line of lines) console.log(`dsh-bundled: ${line}`)
@@ -172,10 +177,10 @@ function listDir(dir) {
   }
 }
 
-async function copyDir(from, to) {
+async function copyDir(from, to, excluded = COPY_EXCLUDED_DIRS) {
   await cp(from, to, {
     recursive: true,
-    filter: source => !COPY_EXCLUDED_DIRS.has(basename(source)),
+    filter: source => !excluded.has(basename(source)),
   })
 }
 
@@ -234,7 +239,7 @@ export async function refreshBundledContents(root, options = {}) {
           : join(skillsRoot, `${target.name}.md`)
         await rm(dest, { recursive: true, force: true })
         const from = resolve(fetched.cache, target.from)
-        if (target.kind === 'dir') await copyDir(from, dest)
+        if (target.kind === 'dir') await copyDir(from, dest, SKILL_SNAPSHOT_EXCLUDED_DIRS)
         else await writeFile(dest, await readFile(from, 'utf8'))
         skillOutputs.push({
           name: target.name,

@@ -5,9 +5,9 @@
       "name": "dashi-ppt-skill",
       "repository": "https://github.com/chuspeeism/dashi-ppt-skill",
       "ref": null,
-      "snapshotDir": "dsh-plugin-desktop/bundled/skills/dashi-ppt-skill",
-      "resolvedSha": "",
-      "refreshedAt": ""
+      "snapshotDir": "dsh-plugin-desktop/bundled/skills/dashi-ppt",
+      "resolvedSha": "21dc7e5fc8c3a0d7f6a94948153dd1ee954f4e64",
+      "refreshedAt": "2026-10-10T17:43:27.335Z"
     },
     {
       "name": "humanizer",
@@ -15,7 +15,23 @@
       "ref": null,
       "snapshotDir": "dsh-plugin-desktop/bundled/skills/humanizer",
       "resolvedSha": "225a6f39ac85f76ee48dbad772ea4abe4ed6c9d8",
-      "refreshedAt": "2026-10-10T12:27:56.143Z"
+      "refreshedAt": "2026-10-10T17:43:27.344Z"
+    },
+    {
+      "name": "huashu-art-motion",
+      "repository": "https://github.com/alchaincyf/huashu-art-motion",
+      "ref": null,
+      "snapshotDir": "dsh-plugin-desktop/bundled/skills/huashu-art-motion",
+      "resolvedSha": "9ff59339f934e08483ba0a5b1db20f4c2c421b35",
+      "refreshedAt": "2026-10-10T17:43:27.507Z"
+    },
+    {
+      "name": "text-to-cad",
+      "repository": "https://github.com/earthtojake/text-to-cad",
+      "ref": null,
+      "snapshotDir": "dsh-plugin-desktop/bundled/skills",
+      "resolvedSha": "b48ff49e00968ac07af08572b0595483dae07c85",
+      "refreshedAt": "2026-10-10T17:43:27.546Z"
     }
   ],
   "plugins": [
