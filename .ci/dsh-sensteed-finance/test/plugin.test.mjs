@@ -40,7 +40,8 @@ async function loadHost(overrides = {}) {
     effect(factory) { return factory() },
     logger: { warn() {} },
     webServer: { port: 1, register(value) { routes.set(value.path, value); return () => {} } },
-    tools: { register(value) { tools.set(value.name, value); return () => {} } },
+    dofeAccess: () => ({ ready: true, financeAllowed: true }),
+    tools: { schemas: () => [{ name: 'mcp__finance__query' }], register(value) { tools.set(value.name, value); return () => {} } },
     systemPrompt: { section(value) { sections.push(value); return () => {} } },
     settings: overrides.settings,
     dofeAuth: overrides.dofeAuth ?? { getDatasourceSession: () => ({ accessToken: 'feishu-test-token', tenantId: 'tenant-1', operator: 'op-1' }) },
@@ -98,8 +99,8 @@ test('registers a prefix route, a bootstrap tool, and finance guidance', async (
   assert.equal(routes.get(BASE).kind, 'prefix')
   assert.ok(tools.get('sensteed_finance_bootstrap'))
   assert.equal(sections[0].name, 'sensteed:finance-guidance')
-  assert.match(sections[0].text, /finance_analysis_brief/u)
-  assert.match(sections[0].text, /财务口吻/u)
+  assert.match(sections[0].text({}), /finance_analysis_brief/u)
+  assert.match(sections[0].text({}), /财务口吻/u)
 })
 
 test('GET routes call the public Datasource REST API', async () => {

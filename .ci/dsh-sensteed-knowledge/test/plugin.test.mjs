@@ -8,7 +8,10 @@ import { ACTIONS, COMPANY_TEMPLATES, KNOWLEDGE_PERMISSION_VERSION, MCP_URL, appl
 
 const root = new URL('../', import.meta.url)
 const readyAccess = { ready: true, enabledPlugins: ['knowledge'], entitlements: { plugins: ['knowledge'], knowledge: { plugin: 'knowledge', permissionVersion: KNOWLEDGE_PERMISSION_VERSION, accesses: ['read', 'write'] } } }
-const apply = (ctx, overrides) => applyKnowledge({ dofeAccess: readyAccess, ...ctx }, overrides)
+const apply = (ctx, overrides) => applyKnowledge({
+  dofeAccess: readyAccess, ...ctx,
+  tools: { schemas: () => Object.values(ACTIONS).map(name => ({ name: `mcp__knowledge__${name.replaceAll('.', '_')}_testhash` })), ...ctx.tools },
+}, overrides)
 
 test('normalizes partial knowledge sources to the degraded warning state', async () => {
   const source = await readFile(new URL('src/client.js', root), 'utf8')
@@ -124,11 +127,11 @@ test('publishes an explicit Knowledge versus Web routing contract', async () => 
     tools: { register() { return () => {} } },
     systemPrompt: { section(value) { section = value; return () => {} } },
   }, { fetch: async () => new Response('{}', { status: 200 }) })
-  assert.match(section.text, /企业内部事实优先使用 knowledge_search/u)
-  assert.match(section.text, /公开实时信息.*web_search\/web_fetch/u)
-  assert.match(section.text, /混合问题必须先调用 Knowledge/u)
-  assert.match(section.text, /不要调用任何 mcp__knowledge__\* 直连工具/u)
-  assert.match(section.text, /Knowledge 不可用时明确说明企业知识不可用/u)
+  assert.match(section.text({}), /企业内部事实优先使用 knowledge_search/u)
+  assert.match(section.text({}), /公开实时信息.*web_search\/web_fetch/u)
+  assert.match(section.text({}), /混合问题必须先调用 Knowledge/u)
+  assert.match(section.text({}), /不要调用任何 mcp__knowledge__\* 直连工具/u)
+  assert.match(section.text({}), /Knowledge 不可用时明确说明企业知识不可用/u)
 })
 
 test('publishes per-tool input schemas so invalid MCP arguments fail before the gateway', async () => {

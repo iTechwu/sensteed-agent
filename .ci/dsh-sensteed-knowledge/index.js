@@ -30,7 +30,7 @@ const TOOL_OUTPUT = {
 }
 
 export const name = 'sensteed-knowledge-tools'
-export const inject = ['tools', 'systemPrompt', 'credentials', 'webServer', 'sensteedAudit']
+export const inject = ['tools', 'systemPrompt', 'credentials', 'webServer', 'sensteedAudit', 'dofeAccess']
 
 const UUID = { type: 'string', format: 'uuid' }
 const INTEGER = (minimum, maximum) => ({ type: 'integer', minimum, ...(maximum === undefined ? {} : { maximum }) })
@@ -215,7 +215,7 @@ const TOOL_NAMES_BY_REMOTE = Object.fromEntries(Object.entries(TOOL_DEFINITIONS)
 const KNOWLEDGE_ROUTING_PROMPT = [
   '数据源路由规则（必须遵守）：',
   '1. 企业内部事实优先使用 knowledge_search；已确认经验、会话记忆或用户偏好使用 knowledge_recall。',
-  '2. 企业内部事实包括当前租户及其园区、公司、客户、会员、员工、招聘、销售、供应链、库存、财务、项目、制度、流程、服务标准、合同和历史复盘。',
+  '2. 企业内部事实仅限当前租户授权范围内的业务资料、制度流程和历史记录；资料类别不代表用户拥有对应业务功能或数据权限。',
   '3. 公开实时信息（新闻、今天/最新/当前、价格行情、天气、赛事、股票、汇率、官方网页）才使用 web_search/web_fetch。',
   '4. 混合问题必须先调用 Knowledge 获取企业事实，再按需调用 Web 获取外部实时信息；网页结果不能替代企业事实。',
   '5. 只要问题可能涉及企业事实，就先调用 knowledge_search 或 knowledge_recall，不要直接凭模型记忆作答。Knowledge 不可用时明确说明企业知识不可用；只有问题本身是公开信息时才降级到 Web。',
@@ -230,31 +230,61 @@ export function apply(ctx, overrides = {}) {
     const access = typeof ctx.get === 'function' ? ctx.get('dofeAccess') : ctx.dofeAccess
     return typeof access === 'function' ? access() : access
   }
-  for (const [name, [remoteName, description]] of Object.entries(TOOL_DEFINITIONS)) {
-    const dispose = ctx.tools.register({
-      name,
-      description,
-      parameters: OBJECT({ input: TOOL_INPUT_SCHEMAS[name] }, ['input']),
-      output: TOOL_OUTPUT,
-      timeoutMs: REQUEST_TIMEOUT_MS,
-      isConcurrencySafe: () => true,
-      async execute(args, exec) {
-        const violations = validateToolArguments(name, args)
-        if (violations.length > 0) return { ok: false, error: 'invalid_tool_arguments', details: violations }
-        const credential = await resolveModelsKey(ctx)
-        if (!credential) return { ok: false, error: 'model_api_key_unavailable' }
-        const permission = resolveKnowledgePermission(remoteName, accessState())
-        if (!permission.allowed) return { ok: false, error: permission.reason }
-        return executeKnowledge(ctx, fetchImpl, credential, remoteName, args?.input || {}, 'agent_tool', exec?.signal)
-      },
-    })
-    disposers.push(dispose)
+  const registered = new Map()
+  let reconciling = false
+  let disposed = false
+  const reconcileTools = () => {
+    if (reconciling || disposed) return
+    reconciling = true
+    try {
+      const gatewayTools = ctx.tools.schemas?.() ?? []
+      for (const [name, [remoteName, description]] of Object.entries(TOOL_DEFINITIONS)) {
+        // The MCP bridge normalizes dots and appends an identity hash. All
+        // names in this catalog fit before its truncation boundary.
+        const prefix = `mcp__knowledge__${remoteName.replaceAll('.', '_')}_`
+        const available = gatewayTools.some(tool => tool.name.startsWith(prefix))
+        if (!available || !resolveKnowledgePermission(remoteName, accessState()).allowed) {
+          registered.get(name)?.()
+          registered.delete(name)
+          continue
+        }
+        if (registered.has(name)) continue
+        const inputSchema = TOOL_INPUT_SCHEMAS[name] ?? TOOL_INPUT_SCHEMAS[remoteName]
+        if (!inputSchema) throw new Error(`Knowledge tool ${name} has no input schema`)
+        const dispose = ctx.tools.register({
+          name,
+          description,
+          parameters: OBJECT({ input: inputSchema }, ['input']),
+          output: TOOL_OUTPUT,
+          timeoutMs: REQUEST_TIMEOUT_MS,
+          isConcurrencySafe: () => true,
+          async execute(args, exec) {
+            const violations = validateToolArguments(name, args)
+            if (violations.length > 0) return { ok: false, error: 'invalid_tool_arguments', details: violations }
+            const credential = await resolveModelsKey(ctx)
+            if (!credential) return { ok: false, error: 'model_api_key_unavailable' }
+            const permission = resolveKnowledgePermission(remoteName, accessState())
+            if (!permission.allowed) return { ok: false, error: permission.reason }
+            return executeKnowledge(ctx, fetchImpl, credential, remoteName, args?.input || {}, 'agent_tool', exec?.signal)
+          },
+        })
+        registered.set(name, dispose)
+      }
+    } finally { reconciling = false }
+  }
+  reconcileTools()
+  disposers.push(() => { disposed = true; for (const dispose of registered.values()) dispose?.(); registered.clear() })
+  if (ctx.on) {
+    disposers.push(ctx.on('dofe/access-changed', reconcileTools))
+    disposers.push(ctx.on('tools/change', reconcileTools))
   }
 
   disposers.push(ctx.systemPrompt.section({
     name: 'sensteed-knowledge:governance',
     order: 9,
-    text: `${KNOWLEDGE_ROUTING_PROMPT}\n企业 Knowledge、Memory 与知识图谱统一通过 https://ai.hozonauto.com/mcp/knowledge 的公开 MCP 网关访问。运行时先用 knowledge_loadout 获取服务端解析的空间绑定，按需用 knowledge_context_pack 注入稳定规则、已确认 Memory 与会话交接；不要在客户端保存或猜测 space UUID。当前企业资料属于服务端授权的 tenant.all 空间，具体可见范围以服务端权限为准；个人资料使用 user.personal，会话与工作记忆使用 user.agent_runtime，团队资料只使用服务端授权的 team.<groupId>。所有事实必须保留文档、版本、Memory 或 Session 引用；remember 只创建候选，明确确认后才可进入 confirmed；forget 立即执行。`,
+    text: context => registered.has('knowledge_search') && resolveKnowledgePermission('knowledge.search', accessState()).allowed
+      && (!context?.scope || ctx.tools.schemas(context.scope).some(tool => tool.name === 'knowledge_search'))
+      ? `${KNOWLEDGE_ROUTING_PROMPT}\n企业 Knowledge、Memory 与知识图谱统一通过 https://ai.hozonauto.com/mcp/knowledge 的公开 MCP 网关访问。运行时先用 knowledge_loadout 获取服务端解析的空间绑定，按需用 knowledge_context_pack 注入稳定规则、已确认 Memory 与会话交接；不要在客户端保存或猜测 space UUID。当前企业资料属于服务端授权的 tenant.all 空间，具体可见范围以服务端权限为准；个人资料使用 user.personal，会话与工作记忆使用 user.agent_runtime，团队资料只使用服务端授权的 team.<groupId>。所有事实必须保留文档、版本、Memory 或 Session 引用；${resolveKnowledgePermission('knowledge.remember', accessState()).allowed ? 'remember 只创建候选，明确确认后才可进入 confirmed；forget 立即执行。' : '当前仅可介绍只读知识能力。'}` : '',
   }))
 
   if (ctx.webServer) {

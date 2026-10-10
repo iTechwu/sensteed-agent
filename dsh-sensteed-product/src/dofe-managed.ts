@@ -21,6 +21,7 @@ import { financeMcpConfig } from './finance-mcp.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context { dofeAuth: DofeAuthService; dofeAccess: () => DofeAccessGate }
+  interface Events { 'dofe/access-changed'(): void }
 }
 
 export const name = 'dofe-managed'
@@ -79,6 +80,7 @@ export const DOFE_MCP_BASE_URL = 'https://ai.hozonauto.com/mcp'
 
 export interface DofeAccessGate {
   readonly ready: boolean
+  readonly financeAllowed?: boolean
   readonly entitlements?: DofeAccessSettings['entitlements']
   readonly enabledPlugins?: readonly DofePluginId[]
 }
@@ -138,11 +140,13 @@ export async function apply(ctx: Context): Promise<void> {
       },
     },
   )
+  let financeAuthorized = false
   ctx.provide('dofeAccess', () => {
     const current = access.get()
     const granted = current.entitlements?.plugins.includes('knowledge') === true
     return {
       ready: current.setupComplete && current.validationVersion === DOFE_ACCESS_VALIDATION_VERSION && current.authMode === 'feishu' && Boolean(current.identity?.ssoSub),
+      financeAllowed: financeAuthorized,
       enabledPlugins: normalizeDofePluginIds(current.enabledPlugins, BRAND_VARIANT)
         .filter(plugin => current.entitlements?.plugins.includes(plugin)),
       entitlements: current.entitlements === undefined ? undefined : {
@@ -206,7 +210,6 @@ export async function apply(ctx: Context): Promise<void> {
     }, 'dofe-managed: SSO session lifetime')
     await restore()
   }
-  let financeAuthorized = false
   ctx.systemPrompt.section({
     name: 'dofe:managed-access',
     order: 4,
@@ -252,6 +255,18 @@ export async function apply(ctx: Context): Promise<void> {
     && accessSettings.validationVersion === DOFE_ACCESS_VALIDATION_VERSION
     && accessSettings.authMode === 'feishu'
     && Boolean(accessSettings.identity?.ssoSub)
+
+  // The shared workflow plugin also runs in non-product hosts; this product
+  // owns whether its guidance is visible to the current user and agent scope.
+  ctx.on('system-prompt/assemble', async (_assembly, context, next) => {
+    const assembly = await next()
+    const current = access.get()
+    if (!accessReady(current) || !enabledPlugins(current).has('openmontage')
+      || !ctx.tools.schemas(context.scope).some(tool => tool.name.startsWith('mcp__openmontage__'))) {
+      assembly.sections = assembly.sections.filter(section => section.name !== 'openmontage:guidance')
+    }
+    return assembly
+  })
 
   const reconcileRoutes = async (): Promise<void> => {
     const resolved = await ctx.credentials.resolve(MODELS_API_KEY_REF)
@@ -361,16 +376,26 @@ export async function apply(ctx: Context): Promise<void> {
   }
 
   const scheduleFinance = (): void => {
-    reload = reload.then(reconcileFinance, reconcileFinance)
+    financeAuthorized = false
+    ctx.emit?.('dofe/access-changed')
+    const reconcile = async () => {
+      await reconcileFinance()
+      ctx.emit?.('dofe/access-changed')
+    }
+    reload = reload.then(reconcile, reconcile)
   }
 
   const scheduleAll = (): void => {
+    financeAuthorized = false
+    ctx.emit?.('dofe/access-changed')
     reload = reload.then(async () => {
       await reconcileRoutes()
       await reconcileFinance()
+      ctx.emit?.('dofe/access-changed')
     }, async () => {
       await reconcileRoutes()
       await reconcileFinance()
+      ctx.emit?.('dofe/access-changed')
     })
   }
 

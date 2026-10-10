@@ -13,7 +13,7 @@ const FINANCE_WORKSPACE_ACCESS_PATH = '/finance/permissions/workspace-access'
 const REQUEST_TIMEOUT_MS = 30000
 const MAX_BODY_BYTES = 32 * 1024
 
-export const inject = ['webServer', 'credentials', 'tools', 'systemPrompt', 'dofeAuth']
+export const inject = ['webServer', 'credentials', 'tools', 'systemPrompt', 'dofeAuth', 'dofeAccess']
 
 /** Resolve the live Feishu session on every call; never trust a browser-supplied identity. */
 async function resolveConfig(ctx) {
@@ -52,34 +52,59 @@ export function apply(ctx, overrides = {}) {
 
   const disposers = []
 
-  if (ctx.tools?.register) {
-    disposers.push(ctx.tools.register({
-      name: 'sensteed_finance_bootstrap',
-      description: '获取财务分析上下文：当前租户 ID、财务主体列表与可用的 mcp__finance__* 工具说明。做任何财务分析前先调用本工具。',
-      parameters: { type: 'object', additionalProperties: false, properties: {} },
-      output: { schema: { type: 'object', additionalProperties: true }, render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }] },
-      isConcurrencySafe: () => true,
-      async execute() {
-        const config = await resolveConfig(ctx)
-        if (!config.tenantId) {
-          return { ok: false, error: '请先使用飞书登录，再打开财务管理。' }
-        }
-        if (!(await resolveWorkspaceAccess(config))) {
-          return { ok: false, error: '当前账号没有财务团队权限，无法使用财务管理。' }
-        }
-        const orgs = await financeApiCall(fetchImpl, config, 'finance_get_orgs', {}, now(), ctx.logger)
-        if (!orgs.ok) return orgs
-        return {
-          ok: true,
-          result: {
-            tenantId: config.tenantId,
-            operator: config.operatorId,
-            orgs: orgs.data.orgs || [],
-            usage: 'tenantId 用于所有 mcp__finance__* 工具入参；金额单位一律为元；分析首选 mcp__finance__finance_analysis_brief 建立口径基线。',
-          },
-        }
-      },
-    }))
+  const canUseFinance = scope => {
+    const gate = typeof ctx.dofeAccess === 'function' ? ctx.dofeAccess() : undefined
+    return gate?.ready === true && gate.financeAllowed === true
+      && ctx.tools?.schemas?.(scope).some(tool => tool.name.startsWith('mcp__finance__')) === true
+  }
+  let disposeBootstrap
+  let reconciling = false
+  let disposed = false
+  const reconcileTools = () => {
+    if (reconciling || disposed) return
+    reconciling = true
+    try {
+      if (!canUseFinance()) {
+        const old = disposeBootstrap
+        disposeBootstrap = undefined
+        old?.()
+        return
+      }
+      if (disposeBootstrap) return
+      disposeBootstrap = ctx.tools.register({
+        name: 'sensteed_finance_bootstrap',
+        description: '获取财务分析上下文：当前租户 ID、财务主体列表与可用的 mcp__finance__* 工具说明。做任何财务分析前先调用本工具。',
+        parameters: { type: 'object', additionalProperties: false, properties: {} },
+        output: { schema: { type: 'object', additionalProperties: true }, render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }] },
+        isConcurrencySafe: () => true,
+        async execute() {
+          const config = await resolveConfig(ctx)
+          if (!config.tenantId) {
+            return { ok: false, error: '请先使用飞书登录，再打开财务管理。' }
+          }
+          if (!(await resolveWorkspaceAccess(config))) {
+            return { ok: false, error: '当前账号没有财务团队权限，无法使用财务管理。' }
+          }
+          const orgs = await financeApiCall(fetchImpl, config, 'finance_get_orgs', {}, now(), ctx.logger)
+          if (!orgs.ok) return orgs
+          return {
+            ok: true,
+            result: {
+              tenantId: config.tenantId,
+              operator: config.operatorId,
+              orgs: orgs.data.orgs || [],
+              usage: 'tenantId 用于所有 mcp__finance__* 工具入参；金额单位一律为元；分析首选 mcp__finance__finance_analysis_brief 建立口径基线。',
+            },
+          }
+        },
+      })
+    } finally { reconciling = false }
+  }
+  reconcileTools()
+  disposers.push(() => { disposed = true; disposeBootstrap?.(); disposeBootstrap = undefined })
+  if (ctx.on) {
+    disposers.push(ctx.on('dofe/access-changed', reconcileTools))
+    disposers.push(ctx.on('tools/change', reconcileTools))
   }
 
   // 统一数据面：一个前缀路由内部分发（webServer 只有 exact/prefix 两种匹配）。
@@ -134,7 +159,7 @@ export function apply(ctx, overrides = {}) {
     disposers.push(ctx.systemPrompt.section({
       name: 'sensteed:finance-guidance',
       order: 8,
-      text: FINANCE_GUIDANCE,
+      text: context => canUseFinance(context?.scope) ? FINANCE_GUIDANCE : '',
     }))
   }
 
@@ -276,6 +301,9 @@ async function dispatchGet(fetchImpl, config, sub, url, res, logger) {
       break
     case '/filing-tasks':
       calls = [['finance_filing_task_list', { ...tenant(), status: query.status, type: query.type, year: query.year, page: query.page, limit: query.limit }]]
+      break
+    case '/cost-items':
+      calls = [['finance_get_cost_items', tenant()]]
       break
     case '/filing-assignments':
       calls = [['finance_filing_assignments_query', { ...tenant(), ...operatorArg(), departmentId: query.departmentId, status: query.status, year: query.year, page: query.page, limit: query.limit }]]
@@ -584,6 +612,7 @@ function resolveFinanceRoute(toolName, args = {}) {
     finance_budget_adjustment_post: ['POST', `/finance/budget/adjustments/${args.id}/post`],
     finance_budget_adjustment_cancel: ['POST', `/finance/budget/adjustments/${args.id}/cancel`],
     finance_filing_assignments_query: ['GET', '/finance/filing/assignments'],
+    finance_get_cost_items: ['GET', '/finance/cost-items'],
     finance_filing_rows_upsert: ['PUT', `/finance/filing/assignments/${args.assignmentId}/rows`],
     finance_filing_task_list: ['GET', '/finance/filing/tasks'],
     finance_filing_task_create: ['POST', '/finance/filing/tasks'],

@@ -35,7 +35,7 @@ function harness(overrides = {}) {
       { name: 'mcp__finance__query' },
     ]) },
     plugin: vi.fn(async () => ({ dispose() {} })),
-    on: vi.fn(), provide: vi.fn(), logger: { error: vi.fn(), info: vi.fn() },
+    on: vi.fn(), emit: vi.fn(), provide: vi.fn(), logger: { error: vi.fn(), info: vi.fn() },
     effect: (effect: () => (() => unknown)) => { effects.push(effect()) },
   }
   return {
@@ -82,6 +82,9 @@ describe('Sensteed startup authorization', () => {
     expect(h.tray.enabled()).toBe(false)
     const section = h.ctx.systemPrompt.section.mock.calls.find(([s]) => s.name === 'dofe:managed-access')![0]
     expect(section.text({})).toContain('财务管理')
+    const getGate = h.ctx.provide.mock.calls.find(([name]) => name === 'dofeAccess')![1]
+    expect(getGate().financeAllowed).toBe(true)
+    expect(h.ctx.emit).toHaveBeenCalledWith('dofe/access-changed')
     expect(section.text({})).toContain('图片与短视频')
     expect(h.ctx.desktopRuntime.openExternal).not.toHaveBeenCalled()
     await h.dispose()
@@ -103,6 +106,11 @@ describe('Sensteed startup authorization', () => {
     expect(h.ctx.plugin).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ serverName: 'finance' }))
     const section = h.ctx.systemPrompt.section.mock.calls.find(([s]) => s.name === 'dofe:managed-access')![0]
     expect(section.text({})).not.toContain('财务')
+    const getGate = h.ctx.provide.mock.calls.find(([name]) => name === 'dofeAccess')![1]
+    expect(getGate().financeAllowed).toBe(false)
+    const assemble = h.ctx.on.mock.calls.find(([name]) => name === 'system-prompt/assemble')![1]
+    const assembly = { sections: [{ name: 'openmontage:guidance' }, { name: 'other' }] }
+    expect((await assemble(assembly, {}, async () => assembly)).sections).toEqual([{ name: 'other' }])
     expect(section.text({})).toContain('图片与短视频')
     h.ctx.tools.schemas.mockReturnValue([])
     expect(section.text({ scope: 'restricted-agent' })).not.toContain('图片与短视频')

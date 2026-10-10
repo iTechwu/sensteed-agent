@@ -16,8 +16,11 @@ export function managedCapabilitiesPrompt(input: {
   if (!input.ready) return [...rules, '当前未就绪，不能宣称具备任何托管业务能力。'].join('\n')
   const has = (prefix: string) => input.toolNames.some(name => name.startsWith(prefix))
   const available = (id: DofePluginId, prefix: string) => input.enabled.has(id) && has(prefix)
-  if (available('knowledge', 'mcp__knowledge__')) {
-    rules.push('企业知识与记忆：按当前用户和空间权限检索知识、处理记忆；仅介绍实际工具支持的读写动作。', KNOWLEDGE_ROUTING_PROMPT)
+  const knowledgeWrapper = available('knowledge', 'knowledge_')
+  if (knowledgeWrapper || available('knowledge', 'mcp__knowledge__')) {
+    rules.push('企业知识与记忆：按当前用户和空间权限检索知识、处理记忆；仅介绍实际工具支持的读写动作。')
+    // The management plugin owns the wrapped tool argument/routing contract.
+    if (!knowledgeWrapper) rules.push(KNOWLEDGE_ROUTING_PROMPT)
   }
   if (available('tools', 'mcp__tools-')) rules.push('商业调研与热点分析：仅限当前已加载的商业工具。')
   if (available('media', 'mcp__media__')) rules.push('图片与短视频：通过 Media 工具生成单张图片、5–10 秒单镜头视频；如本轮仅有查询工具，只介绍查询能力。')

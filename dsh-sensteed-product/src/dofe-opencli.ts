@@ -2,9 +2,10 @@
 import { execFile } from 'node:child_process'
 import type { Context } from '@deepseek-ai/cordis'
 import { DOFE_ACCESS_SETTINGS_NAMESPACE, DOFE_ACCESS_VALIDATION_VERSION, type DofeAccessSettings } from './dofe-plugins.ts'
+import { registerManagedTool } from './managed-tool.ts'
 
 export const name = 'dofe-opencli'
-export const inject = ['tools', 'settings']
+export const inject = ['tools', 'settings', 'dofeAccess']
 
 const TIMEOUT_MS = 90_000
 const MAX_OUTPUT_BYTES = 2 * 1024 * 1024
@@ -51,7 +52,7 @@ function runOpenCli(args: string[], signal: AbortSignal): Promise<{ ok: boolean;
 }
 
 export function apply(ctx: Context): void | (() => void) {
-  const dispose = ctx.tools.register({
+  const dispose = registerManagedTool(ctx, 'opencli', {
     name: 'dofe_opencli',
     description: 'Use the preinstalled DoFe OpenCLI bridge for approved read-only research routes.',
     parameters: {

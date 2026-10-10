@@ -33,7 +33,7 @@
   ],
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "node --test test/plugin.test.mjs",
+    "test": "node --test test/*.test.mjs",
     "check": "npm run build && node --check lib/client.js && npm test"
   },
   "license": "MIT",

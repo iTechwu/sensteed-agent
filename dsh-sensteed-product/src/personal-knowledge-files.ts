@@ -2,9 +2,10 @@ import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import type { FileAttachmentRef, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
+import { managedPluginAllowed, registerManagedTool } from './managed-tool.ts'
 
 export const name = 'personal-knowledge-files'
-export const inject = ['tools', 'attachments', 'credentials', 'systemPrompt']
+export const inject = ['tools', 'attachments', 'credentials', 'systemPrompt', 'dofeAccess']
 export const KNOWLEDGE_UPLOAD_URL = 'https://knowledge.hozonauto.com/api/plugin/v1/files/upload'
 const MAX_FILE_BYTES = 20 * 1024 * 1024
 const mimeTypes: Record<string, string> = {
@@ -17,12 +18,13 @@ const mimeTypes: Record<string, string> = {
   odp: 'application/vnd.oasis.opendocument.presentation', epub: 'application/epub+zip',
 }
 
-export function apply(ctx: Context): void {
+export function apply(ctx: Context): () => void {
   ctx.systemPrompt.section({
     name: 'sensteed:personal-files', order: 7,
-    text: 'For a pasted image or attached document, use personal_knowledge_files list to discover its attachmentId. Use upload when the user asks to understand, search, or add it to personal Knowledge. Report whether the file became searchable or only its original was stored. Only current-session user attachments may be uploaded.',
+    text: context => managedPluginAllowed(ctx, 'knowledge') && ctx.tools.get('personal_knowledge_files', context.scope)
+      ? 'For a pasted image or attached document, use personal_knowledge_files list to discover its attachmentId. Use upload when the user asks to understand, search, or add it to personal Knowledge. Report whether the file became searchable or only its original was stored. Only current-session user attachments may be uploaded.' : '',
   })
-  ctx.tools.register(defineTool({
+  return registerManagedTool(ctx, 'knowledge', defineTool({
     name: 'personal_knowledge_files',
     description: 'List current-session user images and files, or upload one to the private personal Knowledge library for understanding and search.',
     parameters: {

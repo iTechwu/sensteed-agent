@@ -5,7 +5,9 @@ type Tool = { execute(args: unknown, exec: unknown): Promise<unknown> }
 function harness() {
   let tool: Tool
   const ctx = {
-    tools: { register: (value: Tool) => { tool = value } },
+    dofeAccess: () => ({ ready: true, enabledPlugins: ['knowledge'], entitlements: { plugins: ['knowledge'] } }),
+    on: () => () => {},
+    tools: { register: (value: Tool) => { tool = value; return () => {} }, get: () => tool },
     systemPrompt: { section: vi.fn() },
     credentials: { resolve: vi.fn(async () => ({ value: 'test-key' })) },
     attachments: { readImage: vi.fn(), readFileStream: vi.fn(async function* () { yield Buffer.from('hello') }) },
