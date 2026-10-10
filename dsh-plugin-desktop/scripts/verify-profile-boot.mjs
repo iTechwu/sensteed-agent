@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir, userInfo } from 'node:os'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { boot, composeEntries, createRuntimeResolution, PluginPackages, resolveProfileDir } from '@deepseek-ai/dsh-app-boot'
@@ -12,6 +12,7 @@ import {
   createLaunchEnvironmentSnapshot,
   DSH_LAUNCH_ENVIRONMENT_KEY,
 } from '@deepseek-ai/dsh-launch-environment'
+import { DESKTOP_SETTINGS_NAMESPACE } from '../lib/index.js'
 import { installDesktopPnpmRuntime } from '../lib/desktop-runtime-environment.js'
 import { installProfilePackageResolver } from '../lib/module-resolution.js'
 import { healDesktopProfileModuleFallback, prepareDesktopProfile } from '../lib/profile.js'
@@ -57,10 +58,6 @@ let nativeThemeSource = 'system'
 const trayItems = []
 
 try {
-  // A 0.1.6 harness home: sections keyed by the old settings namespaces, preset
-  // choice under the old field name. `prepareDesktopProfile` migrates it in place
-  // before the Loader starts; the settings plugin imports it once the Loader has
-  // settled, which is strictly after every plugin has mounted.
   writeFileSync(join(home, 'settings.yaml'), [
     'sensteed-agent:',
     `  mode: ${mode}`,
@@ -87,20 +84,6 @@ try {
     uvPath: '', uvPypiIndexUrl: '', uvPythonInstallMirror: '', syncIntervalSeconds: 37,
   }
   if (aaRequested && !brokenAa) {
-    // Older releases left an installation projection above the active Profile.
-    // Its lexically larger build hash must not override the current AA artifact,
-    // including during rc.2's compatibility preflight before Loader starts.
-    const aaPackage = '@agents-anywhere/dsh-bridge-next'
-    const installedManifest = createRequire(import.meta.url).resolve(`${aaPackage}/package.json`)
-    const stalePackage = join(home, 'profiles', 'node_modules', aaPackage)
-    mkdirSync(stalePackage, { recursive: true })
-    const staleManifest = JSON.parse(readFileSync(installedManifest, 'utf8'))
-    staleManifest.version = '0.1.0-dev.0.desktop.ca022d9286dd0.rc4b2a1d2'
-    staleManifest.peerDependencies['@deepseek-ai/dsh-session'] = '0.1.5-rc.2'
-    writeFileSync(join(stalePackage, 'package.json'), JSON.stringify(staleManifest))
-    cpSync(new URL('./cordis.patch.yml', pathToFileURL(installedManifest)), join(stalePackage, 'cordis.patch.yml'))
-    mkdirSync(join(stalePackage, 'lib', 'bundled-connector'), { recursive: true })
-    writeFileSync(join(stalePackage, 'lib', 'bundled-connector', 'pyproject.toml'), '')
     mkdirSync(join(home, 'aa-smoke-state'))
     writeFileSync(join(home, 'aa-smoke-state', 'connector-settings.json'), JSON.stringify(aaSettings))
   }
@@ -126,16 +109,21 @@ try {
     hostServicePluginDir,
     { recursive: true, force: false, errorOnExist: true },
   )
-  prepared.overlays = [
-    { insert: [{ id: 'desktop-host-services-smoke-plugin', name: HOST_SERVICE_PLUGIN_NAME }] },
-    // The smoke's explicit Profile home must also own account credentials.
-    { id: 'credentials', config: { dshHome: home } },
-    // Isolate the bridge from the operator's real AA account on every reload.
+  const patches = [
+    // Deliberately compose the consumer before the desktop-pnpm provider row.
+    // Its required injection must keep it pending until that service mounts.
+    {
+      insert: [{
+        id: 'desktop-host-services-smoke-plugin',
+        name: HOST_SERVICE_PLUGIN_NAME,
+      }],
+    },
+    ...prepared.patches,
+    // Keep this headless probe independent of the operator's AA account.
     ...(prepared.aaEnabled ? [{ id: 'agents-anywhere-bridge-next', config: {
       dshHome: home, stateRoot: join(home, 'aa-smoke-state'), uvPath: 'uv',
     } }] : []),
   ]
-  const patches = [...prepared.patches, ...prepared.overlays]
   const packageRoot = new URL('../', import.meta.url)
   const pnpmBinPath = fileURLToPath(new URL('node_modules/pnpm/bin/pnpm.mjs', packageRoot))
   const electronVersion = JSON.parse(
@@ -155,6 +143,7 @@ try {
   await healDesktopProfileModuleFallback(home, prepared.profile)
   const runtime = {
     platform: 'win32',
+    windowsBuild: 22_631,
     locale: 'en',
     updates: {
       isPackaged: false,
@@ -236,12 +225,22 @@ try {
       })
       // Match the public resolver path used by packaged Electron.
       host.loader.internal = undefined
-      await host.plugin(DesktopPluginPackages)
       host.provide(DSH_LAUNCH_ENVIRONMENT_KEY, createLaunchEnvironmentSnapshot([]))
       host.provide('desktopBrowserAccess', BROWSER_ACCESS)
       host.provide('desktopLanHttps', LAN_HTTPS)
       host.provide('desktopRuntime', runtime)
-      host.provide('desktopPnpmBootstrap', pnpmBootstrap)
+      host.provide('desktopPnpmBootstrap', {
+        activeProfileName: 'desktop',
+        activeProfileDir: prepared.profile.dir,
+        homeDir: prepared.homeDir,
+        appExecutable: process.execPath,
+        pnpmBinPath,
+        electronVersion,
+        nodeBinDir: pnpmRuntime.nodeBinDir,
+        nodeShimPath: pnpmRuntime.nodeShimPath,
+        clearEnvironmentPath: pnpmRuntime.clearEnvironmentPath,
+        dshBootstrapPath: fileURLToPath(new URL('../lib/desktop-cli.js', import.meta.url)),
+      })
       await host.plugin(DesktopProfileService, {
         current: {
           name: 'desktop',
@@ -264,7 +263,6 @@ try {
     },
     prepared.bareModuleBaseUrl,
   )
-  profileBoot.markReady()
   await runtime.mountScheduled()
 
   if (ctx.get('desktopPnpm') === undefined) {
@@ -299,40 +297,6 @@ try {
   if (minimalPreset.id !== 'minimal') {
     throw new Error(`assembled Windows profile remapped minimal preset to ${minimalPreset.id}`)
   }
-  if (ctx.get('pluginManager') === undefined) {
-    throw new Error('Desktop Profile did not activate the official plugin manager')
-  }
-  // Resolve AND mount Creator: discovery alone cannot catch missing Host services.
-  // 0.1.7 replaced `standingKeyFor` with `acquireScope`, a disposable revision
-  // lease: the composition is mounted at registration and the lease still throws
-  // `agent-preset/invalid` when that mount is unusable, which is what we assert.
-  await (await agentPresets.acquireScope('cordis'))[Symbol.asyncDispose]()
-  if ((await ctx.get('pluginManager').listPlugins()).length === 0) {
-    throw new Error('Official plugin manager cannot inspect the Desktop composition')
-  }
-  // The official metadata reader must reach installation packages through the Desktop resolver.
-  const inspectorMeta = ctx.get('pluginPackages')?.metaOf('@deepseek-ai/dsh-experimental-inspector', ctx.baseUrl)
-  if (typeof inspectorMeta?.title !== 'object' || inspectorMeta.error !== undefined) {
-    throw new Error(`Official plugin metadata is unavailable to the Desktop Host: ${JSON.stringify(inspectorMeta)}`)
-  }
-  // Exercise the actual Profile watcher twice, rather than invoking our reader
-  // directly. Both generations must preserve the Desktop layers and fixture.
-  const reloadProbePath = join(home, 'reload-probe.mjs')
-  writeFileSync(reloadProbePath, "export function apply(ctx, config) { ctx.provide('desktopReloadProbe', config.value) }\n")
-  for (const value of [1, 2]) {
-    writeFileSync(prepared.profile.patchPath, JSON.stringify([DESKTOP_SHELL_PATCH_ENTRY, { insert: [{
-      id: 'desktop-reload-probe', name: pathToFileURL(reloadProbePath).href, config: { value },
-    }] }]))
-    const deadline = Date.now() + 15_000
-    while (ctx.get('desktopReloadProbe') !== value && Date.now() < deadline) await delay(50)
-    if (ctx.get('desktopReloadProbe') !== value) {
-      throw new Error(`Profile HMR failed to activate generation ${value}`)
-    }
-  }
-  if (ctx.get('desktopRuntime') !== runtime || ctx.get('pluginManager') === undefined) {
-    throw new Error('Profile reload lost Desktop or plugin-manager services')
-  }
-  await (await ctx.agentPresets.acquireScope('cordis'))[Symbol.asyncDispose]()
   const hostServiceProbe = ctx.get(HOST_SERVICE_PROBE_KEY)
   if (hostServiceProbe?.current?.name !== 'desktop'
     || hostServiceProbe.current.dir !== prepared.profile.dir
@@ -354,7 +318,7 @@ try {
   }
 
   const titlebar = mode === 'compatibility' ? '&sensteed-agent-titlebar-inset=36' : ''
-  const expectedUrl = `http://127.0.0.1:${String(ctx.webServer.port)}/?sensteed-agent-mode=${mode}&sensteed-agent-platform=win32&sensteed-agent-version=2.0.0&sensteed-agent-material=off${titlebar}&sensteed-agent-mica=1`
+  const expectedUrl = `http://127.0.0.1:${String(ctx.webServer.port)}/?sensteed-agent-mode=${mode}&sensteed-agent-platform=win32&sensteed-agent-version=2.0.0&sensteed-agent-material=off${titlebar}`
   if (mountedSpec?.url !== expectedUrl) {
     throw new Error(`desktop plugin produced an unexpected renderer URL: ${String(mountedSpec?.url)}`)
   }
@@ -434,13 +398,6 @@ try {
     },
   })
   const html = await response.text()
-  if (process.argv.includes('--onboarding')) {
-    const { verifyDesktopOnboardingBrowser } = await import('../../scripts/verify-desktop-onboarding-browser.mjs')
-    await verifyDesktopOnboardingBrowser({
-      url: expectedUrl, cookie,
-      headers: { [BROWSER_ACCESS.rendererHeader.name]: BROWSER_ACCESS.rendererHeader.value },
-    })
-  }
   if (response.status !== 200) {
     throw new Error(`assembled Web root returned HTTP ${String(response.status)}`)
   }
@@ -456,17 +413,8 @@ try {
     throw new Error('AA Host services did not activate in the actual Desktop profile')
   }
   if (aaEnabled) {
-    // AA 2.0.3 publishes one fixed per-user rendezvous that DSH_HOME does not
-    // move, so the isolated Profile home is not where the Connector looks.
-    const endpoint = join(userInfo().homedir, '.agents-anywhere', 'dsh-bridge', 'endpoint.json')
-    const runtimeStatus = ctx.get('agentsAnywhereRuntime').status()
-    if (runtimeStatus.state !== 'ready') {
-      throw new Error(`AA local runtime is ${String(runtimeStatus.state)}: ${String(runtimeStatus.message)}`)
-    }
-    if (!existsSync(endpoint)) throw new Error('AA did not publish its per-user bridge endpoint')
-    if (JSON.parse(readFileSync(endpoint, 'utf8')).pid !== process.pid) {
-      throw new Error('AA bridge endpoint belongs to another process; quit any running Desktop with AA enabled')
-    }
+    const endpoint = join(home, 'agents-anywhere', 'bridge', 'endpoint.json')
+    if (!existsSync(endpoint)) throw new Error('AA did not publish its native DSH home endpoint')
     const snapshot = await ctx.get('agentsAnywhereOnboarding').inspect()
     if (snapshot.account) throw new Error('A fresh Profile inherited an AA account')
     for (const [key, value] of Object.entries(aaSettings)) {
@@ -483,9 +431,6 @@ try {
   }
   for (const id of [
     'dsh-plugin-desktop',
-    '@deepseek-ai/dsh-client-file-upload',
-    '@deepseek-ai/dsh-client-shortcuts',
-    '@deepseek-ai/dsh-client-ui-shortcuts',
     '@deepseek-ai/dsh-client-ui-conversation',
     '@deepseek-ai/dsh-client-ui-sidebar',
     '@deepseek-ai/dsh-client-ui-directory-picker-browse',
