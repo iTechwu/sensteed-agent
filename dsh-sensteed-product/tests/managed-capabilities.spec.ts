@@ -27,6 +27,7 @@ describe('authorized capability introduction', () => {
   it('includes knowledge routing only with entitlement and visible tools', () => {
     const allowed = { ...input, enabled: new Set(['knowledge'] as const), toolNames: ['mcp__knowledge__search'] }
     expect(managedCapabilitiesPrompt(allowed)).toContain('数据源路由规则')
+    expect(managedCapabilitiesPrompt(allowed)).not.toContain('财务')
     expect(managedCapabilitiesPrompt({ ...allowed, toolNames: [] })).not.toContain('数据源路由规则')
   })
 })
