@@ -256,7 +256,7 @@ settings:
     mkdirSync(modulesDir, { recursive: true })
     writeFileSync(join(modulesDir, '.modules.yaml'), `layoutVersion: 5
 nodeLinker: hoisted
-packageManager: pnpm@11.7.0
+packageManager: pnpm@11.28.5
 virtualStoreDirMaxLength: 120
 `)
 
@@ -288,7 +288,7 @@ virtualStoreDirMaxLength: 120
     mkdirSync(modulesDir, { recursive: true })
     writeFileSync(join(modulesDir, '.modules.yaml'), `layoutVersion: 5
 nodeLinker: hoisted
-packageManager: pnpm@11.7.0
+packageManager: pnpm@11.28.5
 virtualStoreDirMaxLength: 120
 `)
 
@@ -304,7 +304,7 @@ virtualStoreDirMaxLength: 120
     mkdirSync(modulesDir, { recursive: true })
     writeFileSync(join(modulesDir, '.modules.yaml'), `layoutVersion: 5
 nodeLinker: hoisted
-packageManager: pnpm@11.7.0
+packageManager: pnpm@11.28.5
 virtualStoreDirMaxLength: 60
 `)
 
@@ -327,7 +327,7 @@ customSetting: preserved
 `)
     writeFileSync(join(modulesDir, '.modules.yaml'), `layoutVersion: 5
 nodeLinker: hoisted
-packageManager: pnpm@11.7.0
+packageManager: pnpm@11.28.5
 virtualStoreDirMaxLength: 120
 `)
 
@@ -375,7 +375,7 @@ autoInstallPeers: true
 `)
     writeFileSync(join(modulesDir, '.modules.yaml'), `layoutVersion: 5
 nodeLinker: hoisted
-packageManager: pnpm@11.7.0
+packageManager: pnpm@11.28.5
 virtualStoreDirMaxLength: 120
 `)
 

@@ -96,7 +96,7 @@ describe('desktop profile dependency repair', () => {
     // The fake pnpm "wrote" hoisted-compatible metadata for this platform.
     writeFileSync(join(home, 'profiles', 'desktop', 'node_modules', '.modules.yaml'), `layoutVersion: 5
 nodeLinker: hoisted
-packageManager: pnpm@11.7.0
+packageManager: pnpm@11.28.5
 virtualStoreDirMaxLength: ${process.platform === 'win32' ? 60 : 120}
 `)
     child.stdout.end('offline ok\n')

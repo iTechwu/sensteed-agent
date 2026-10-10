@@ -20,8 +20,8 @@ const market = readJson('dsh-community-market/package.json')
 const upstreamDir = resolve(root, upstream.localCheckout)
 const upstreamPackage = readJson(resolve(upstreamDir, 'package.json'))
 
-if (workspace.packageManager !== 'pnpm@11.7.0') {
-  fail('the product workspace must pin pnpm@11.7.0')
+if (workspace.packageManager !== 'pnpm@11.28.5') {
+  fail('the product workspace must pin pnpm@11.28.5')
 }
 // 两个工作区合并为一个依赖图,必须共用同一个 pnpm 发布版。
 if (upstreamPackage.packageManager !== workspace.packageManager) {

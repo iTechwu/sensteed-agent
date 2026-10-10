@@ -36,6 +36,12 @@ linkWorkspacePackages: true
 verifyDepsBeforeRun: false
 
 overrides:
+  # fork 历史上经 registry 发布过 0.1.x 旧包,desktop lockfile 残留的孤儿
+  # snapshot 段在 pnpm 11.28 的 peer 补装下会向 registry 重拉 range
+  # >=0.1.1 <0.2.0-0 —— 该区间内唯一存在的 0.1.7-alpha.2 因镜像元数据滞后
+  # 解析失败,这里显式钉住让孤儿 peer 可解析。不被任何 importer 引用,
+  # 纯满足解析器。
+  '@deepseek-ai/dsh-invariants': 0.1.7-alpha.2
   app-builder-lib>@electron/get: 5.1.0
 
 supportedArchitectures:

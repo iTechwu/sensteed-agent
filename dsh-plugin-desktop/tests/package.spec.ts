@@ -1157,11 +1157,11 @@ describe('published package surface', () => {
     expect(manifest.dependencies).not.toHaveProperty('electron')
     expect(manifest.peerDependencies?.electron).toBe('44.0.0')
     expect(manifest.devDependencies?.electron).toBe('44.0.0')
-    expect(manifest.dependencies?.pnpm).toBe('11.7.0')
+    expect(manifest.dependencies?.pnpm).toBe('11.28.5')
     expect(manifest.dependencies?.['node-addon-native-custom-loader']).toBe('0.1.7')
   })
 
-  it('keeps the packaged pnpm manifest, lock entry, and installed runtime on 11.7.0', () => {
+  it('keeps the packaged pnpm manifest, lock entry, and installed runtime on 11.28.5', () => {
     const lockfile = readFileSync(new URL('pnpm-lock.yaml', workspaceRoot), 'utf8')
     const workspaceRequire = createRequire(new URL('package.json', packageRoot))
     const installedPnpm = JSON.parse(readFileSync(
@@ -1169,9 +1169,9 @@ describe('published package surface', () => {
       'utf8',
     )) as { version?: unknown }
 
-    expect(manifest.dependencies?.pnpm).toBe('11.7.0')
-    expect(lockfile).toContain('pnpm@11.7.0:')
-    expect(installedPnpm.version).toBe('11.7.0')
+    expect(manifest.dependencies?.pnpm).toBe('11.28.5')
+    expect(lockfile).toContain('pnpm@11.28.5:')
+    expect(installedPnpm.version).toBe('11.28.5')
   })
 
   it('packages the native-compiled Koffi Windows runtime', () => {

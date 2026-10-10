@@ -2,5 +2,5 @@
   "repository": "git@github.com:iTechwu/sensteed-harness.git",
   "branch": "dev",
   "localCheckout": "../deepseek-harness",
-  "sourceVersion": "0.2.1-alpha.1"
+  "sourceVersion": "0.2.1-alpha.2"
 }
