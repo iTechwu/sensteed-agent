@@ -1,5 +1,5 @@
 /** Headless bootstrap for the Beta isolated Host experiment. */
-import { boot, createRuntimeResolution, resolveProfileDir, PluginPackages } from '@deepseek-ai/dsh-app-boot'
+import { boot, resolveProfileDir } from '@deepseek-ai/dsh-app-boot'
 import { provideCmdline } from '@deepseek-ai/dsh-cmdline'
 import { createDesktopProfileBoot } from './profile-context.ts'
 import { logInactiveStartupEntries } from './startup-audit.ts'
@@ -119,14 +119,12 @@ export async function bootDesktopHost(options: DesktopHostOptions, runtime: Desk
     // and reads the Profile's registry-installed @deepseek-ai copies instead
     // of this installation's workspace versions. Mount it before the composed
     // tree imports anything, exactly like the upstream CLI launcher.
-    const resolution = await createRuntimeResolution({ installAnchor: desktopInstallAnchor(), profile: prepared.profile })
     const ctx = await boot(
       BIN_NAME,
       prepared.rootConfig,
       prepared.patches,
       async (hostCtx) => {
         profileBoot.prepare(hostCtx)
-        await hostCtx.plugin(PluginPackages, { resolution })
         // Keep Host imports and browser bundle discovery on the same public
         // profile-overlay resolver used by packaged Electron.
         hostCtx.loader.internal = undefined
