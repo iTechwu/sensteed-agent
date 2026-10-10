@@ -188,7 +188,7 @@ try {
         },
         requestRejection() { return undefined },
       })
-      host.provide('webRuntime', {})
+      host.provide('webStartup', {})
       host.provide('appExit', () => {})
       // dofe-managed publishes its workflow guidance through this seam.
       host.provide('systemPrompt', { section() {} })

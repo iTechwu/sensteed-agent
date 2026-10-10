@@ -204,17 +204,6 @@ export function packageWindowsArtifact(
   options.prepareRuntime()
   pruneBridgeDependencyResidue(options.desktopRoot)
   options.run(
-    options.commandShell,
-    [
-      '/d',
-      '/s',
-      '/c',
-      'node ../node_modules/.pnpm/@electron+rebuild@4.2.0/node_modules/@electron/rebuild/lib/cli.js --version 44.0.0 --module-dir ../deepseek-harness --which-module fs-ext --arch x64',
-    ],
-    options.desktopRoot,
-    cleanEnvironment,
-  )
-  options.run(
     options.nodeExecutable,
     [
       options.builderCli,

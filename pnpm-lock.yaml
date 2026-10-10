@@ -16681,6 +16681,24 @@ importers:
       '@deepseek-ai/dsh-experimental-computer-use-cua-driver-native':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/experimental/computer-use-cua-driver-native
+      '@deepseek-ai/dsh-experimental-badge-skill-bundle':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/experimental/badge-skill-bundle
+      '@deepseek-ai/dsh-experimental-cot-translation-bundle':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/experimental/cot-translation-bundle
+      '@deepseek-ai/dsh-experimental-ralph-bundle':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/experimental/ralph-bundle
+      '@deepseek-ai/dsh-experimental-session-search':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/experimental/session-search
+      '@deepseek-ai/dsh-experimental-session-titles-bundle':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/experimental/session-titles-bundle
+      '@deepseek-ai/dsh-experimental-terminal-bundle':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/experimental/terminal-bundle
       '@deepseek-ai/dsh-experimental-inspector':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/experimental/inspector

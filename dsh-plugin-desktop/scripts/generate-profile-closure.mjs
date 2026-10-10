@@ -49,6 +49,13 @@ function closureFrom(manifest, rootManifestPath) {
       queue.push(dependency)
     }
   }
+  // The sealed runtime verifies these packages at top-level node_modules.
+  // Declare every required first-party node at the deploy root so the physical
+  // collector cannot omit a transitive bundle hidden behind a workspace link.
+  const missing = [...packages.keys()].filter(name => manifest.dependencies?.[name] === undefined)
+  if (missing.length > 0) {
+    throw new Error(`profile closure packages must be direct desktop dependencies: ${missing.sort().join(', ')}`)
+  }
   const dshVersion = packages.get('@deepseek-ai/dsh')
   if (dshVersion === undefined) throw new Error('profile closure requires @deepseek-ai/dsh in the first-party closure')
   const orderedPackages = Object.fromEntries([...packages.entries()].sort(([a], [b]) => a.localeCompare(b)))
