@@ -119,28 +119,23 @@ try {
   assert.equal((await rpc('listPlugins')).find(row => row.moduleName === packages[2])?.enabled, true)
   await stop()
   ;({ origin, cookie } = await boot('desktop'))
-  // market/dshmarket 经重启后光纤 active;AA 桥 2.0.1 在 rc.2 服务图下
-  // 持续等待注入(sessions/sessionQuery/workspaceRegistry 之一)而保持
-  // pending,入口已注册且 enabled 持久化生效——其光纤激活是 AA 包
-  // 与 rc.2 的兼容性事项,不在此冒烟断言。
-  for (const name of packages.slice(1, 2)) {
+  // The pinned 2.0.2 AA bridge resolves the current Host services after restart.
+  // Both official Market and remote control must actually activate.
+  for (const name of packages.slice(1)) {
     const row = (await rpc('listPlugins')).find(row => row.moduleName === name)
     assert.equal(row?.fiberPhase, 'active', JSON.stringify(row))
     assert.equal(row?.enabled, true, JSON.stringify(row))
   }
-  const pendingAa = (await rpc('listPlugins')).find(row => row.moduleName === packages[2])
-  assert.equal(pendingAa?.enabled, true, JSON.stringify(pendingAa))
-  assert.equal(pendingAa?.fiberPhase, null, JSON.stringify(pendingAa))
   const aaRow = (await rpc('listPlugins')).find(row => row.moduleName === packages[2])
   const disabledRow = await rpc('setPluginEnabled', { id: aaRow.entryId, enabled: false })
   assert.equal(disabledRow.application, 'applied', JSON.stringify(disabledRow))
   assert.equal((await rpc('listPlugins')).find(row => row.moduleName === packages[2])?.enabled, false)
-  // 已知不兼容: AA 桥 2.0.1 针对旧 dsh-session 构建,rc.2 已移除其引用的
-  // SessionLogOffset 导出,重新使能会在导入阶段失败。此断言钉住该失败
-  // 的可观察形态;AA 包发布兼容 rc.2 的版本后改回 applied。
+  // A compatible bridge also supports enabling its plugin within the live Host.
   const enabledRow = await rpc('setPluginEnabled', { id: aaRow.entryId, enabled: true })
-  assert.equal(enabledRow.application, 'failed', JSON.stringify(enabledRow))
-  assert.match(enabledRow.error?.diagnostic ?? '', /failed to import/)
+  assert.equal(enabledRow.application, 'applied', JSON.stringify(enabledRow))
+  const reenabledAa = (await rpc('listPlugins')).find(row => row.moduleName === packages[2])
+  assert.equal(reenabledAa?.enabled, true, JSON.stringify(reenabledAa))
+  assert.equal(reenabledAa?.fiberPhase, 'active', JSON.stringify(reenabledAa))
   const selectedMarket = await rpc('setBundleEnabled', { name: packages[0], enabled: true })
   assert.equal(selectedMarket.application, 'applied', JSON.stringify(selectedMarket))
   assert.deepEqual(manager.features('desktop'), { market: true, remoteControl: true, dshMarket: true })
@@ -222,9 +217,7 @@ try {
   const html = await page.text()
   assert.ok(html.includes('dsh-community-market'), 'Market client must appear in the boot manifest')
   assert.ok(html.includes('"id":"dsh-desktop-next"'), 'Next window controls must be a client boot entry')
-  // AA 桥 2.0.1 与 rc.2 不兼容(服务端 failed to import),其客户端模块
-  // 亦未进入启动清单;AA 包发布兼容版本后恢复出现断言。
-  assert.equal(html.includes('@agents-anywhere/dsh-bridge-next'), false, 'Broken AA client must stay out of the boot manifest')
+  assert.ok(html.includes('@agents-anywhere/dsh-bridge-next'), 'The enabled AA client must appear in the boot manifest')
   // rc.2 rpc 层无市场互斥(见前注),两个市场客户端共存于启动清单;
   // 互斥选择由 desktop-next 设置层裁决。
   assert.ok(html.includes('"id":"dshmarket"'), 'The dshmarket client stays in the boot manifest')

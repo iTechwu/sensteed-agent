@@ -8,6 +8,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
+import { finished } from 'node:stream/promises'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { createPackage, extractFile, getRawHeader, uncache } from '@electron/asar'
@@ -210,7 +211,8 @@ describe('packaged desktop runtime verification', () => {
         writeFileSync(join(source, path), content)
       }
       mkdirSync(dirname(archive), { recursive: true })
-      await createPackage(source, archive)
+      // asar 3 resolves with an ending stream before its bytes reach the file.
+      await finished(await createPackage(source, archive))
       const before = readFileSync(archive)
       const bodyOffset = 8 + getRawHeader(archive).headerSize
       // Reproduce afterPack hydration: one new leaf and one packed leaf

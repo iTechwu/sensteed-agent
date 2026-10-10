@@ -1,5 +1,6 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
+import { finished } from 'node:stream/promises'
 import { join } from 'node:path'
 import { createPackageWithOptions } from '@electron/asar'
 import { describe, expect, it } from 'vitest'
@@ -56,7 +57,7 @@ describe('packaged runtime size contract', () => {
       mkdirSync(join(source, 'node_modules/fixture/bin'), { recursive: true })
       writeFileSync(join(source, 'main.js'), 'export const runtime = true')
       writeFileSync(join(source, 'node_modules/fixture/bin/tool'), 'native bytes')
-      await createPackageWithOptions(source, archive, { unpack: '**/bin/tool' })
+      await finished(await createPackageWithOptions(source, archive, { unpack: '**/bin/tool' }))
       writeFileSync(join(root, 'app.asar.unpacked/node_modules/fixture', 'hydrated.cjs'), 'added')
       const outputPath = join(root, 'size.json')
       const result = writePackageSizeReport({ archive, unpackedRoot: archive + '.unpacked',
