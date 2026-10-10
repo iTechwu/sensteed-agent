@@ -9,6 +9,7 @@ import { referencesPrunedFrontendPackage, verifyUnusedFrontendRuntime } from '..
 describe('unused frontend dependency artifact guard', () => {
   it('distinguishes embedded bundle comments from real resolver inputs', () => {
     expect(referencesPrunedFrontendPackage('// node_modules/react-icons/si/index.mjs\nexport const Icon = () => null')).toBeUndefined()
+    expect(referencesPrunedFrontendPackage('const value = `prefix ${name}`; const pattern = /["`]/;\n/** `react-icons` is embedded */\nexport const Icon = 1')).toBeUndefined()
     for (const source of [
       'import { Icon } from "react-icons/si"',
       'require("react-icons")',
