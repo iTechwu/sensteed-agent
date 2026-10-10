@@ -1,0 +1,327 @@
+{
+  "measuredOn": "2026-10-10",
+  "desktopVersion": "2.0.11-beta.21",
+  "upstreamVersion": "0.2.1-alpha.2",
+  "electronVersion": "44.0.0",
+  "platform": "darwin",
+  "arch": "arm64",
+  "scope": "Unsigned local DMG smoke; not a universal or signed-release measurement",
+  "before": {
+    "archiveBytes": 723675662,
+    "unpackedBytes": 871129916,
+    "payloadBytes": 1594805578,
+    "installerBytes": 662101840,
+    "sourceMapBytes": 218939340
+  },
+  "after": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "archiveBytes": 449586484,
+    "unpackedBytes": 869668515,
+    "payloadBytes": 1319254999,
+    "sourceMapBytes": 0,
+    "fileCount": 42599,
+    "largestPackages": [
+      {
+        "path": "node_modules/@openai/codex-darwin-arm64",
+        "bytes": 288136909
+      },
+      {
+        "path": "node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64",
+        "bytes": 199258405
+      },
+      {
+        "path": "node_modules/@deepseek-ai/libreoffice-kit-darwin-arm64",
+        "bytes": 153160381
+      },
+      {
+        "path": "node_modules/@trycua/cua-driver-darwin-arm64",
+        "bytes": 53208005
+      },
+      {
+        "path": "node_modules/@dataiku/uv-darwin-arm64",
+        "bytes": 39539551
+      },
+      {
+        "path": "node_modules/cloudflared",
+        "bytes": 39404679
+      },
+      {
+        "path": "node_modules/sherpa-onnx-darwin-arm64",
+        "bytes": 34088707
+      },
+      {
+        "path": "node_modules/mermaid",
+        "bytes": 25299848
+      },
+      {
+        "path": "node_modules/@deepseek-ai/dsh-experimental-inspector",
+        "bytes": 24829294
+      },
+      {
+        "path": "node_modules/sharp/node_modules/@img/sharp-libvips-darwin-arm64",
+        "bytes": 18239169
+      },
+      {
+        "path": "node_modules/@img/sharp-libvips-darwin-arm64",
+        "bytes": 17773478
+      },
+      {
+        "path": "node_modules/pnpm",
+        "bytes": 16554569
+      },
+      {
+        "path": "node_modules/@deepseek-ai/dsh-client-ui-sidebar-documentpreview",
+        "bytes": 15394332
+      },
+      {
+        "path": "node_modules/chrome-devtools-mcp",
+        "bytes": 13294714
+      },
+      {
+        "path": "node_modules/dsh-better-sidebar",
+        "bytes": 11823714
+      },
+      {
+        "path": "node_modules/playwright-core",
+        "bytes": 11487687
+      },
+      {
+        "path": "node_modules/openai",
+        "bytes": 10500218
+      },
+      {
+        "path": "node_modules/@linxin666/dsh-pet",
+        "bytes": 9888375
+      },
+      {
+        "path": "node_modules/@deepseek-ai/dsh-client-ui-settings-account",
+        "bytes": 9509057
+      },
+      {
+        "path": "node_modules/@img/sharp-wasm32",
+        "bytes": 9066232
+      },
+      {
+        "path": "node_modules/cytoscape-fcose",
+        "bytes": 8669558
+      },
+      {
+        "path": "node_modules/lightningcss-darwin-arm64",
+        "bytes": 8549308
+      },
+      {
+        "path": "node_modules/lucide-react",
+        "bytes": 7697393
+      },
+      {
+        "path": "node_modules/@deepseek-ai/dsh-web-frontend",
+        "bytes": 6498007
+      },
+      {
+        "path": "node_modules/drizzle-orm",
+        "bytes": 6217943
+      },
+      {
+        "path": "node_modules/@google/genai",
+        "bytes": 6005263
+      },
+      {
+        "path": "node_modules/@deepseek-ai/dsh-llm-pi-ai/node_modules/@anthropic-ai/sdk",
+        "bytes": 5526457
+      },
+      {
+        "path": "node_modules/zod",
+        "bytes": 5429652
+      },
+      {
+        "path": "node_modules/cytoscape",
+        "bytes": 5379821
+      },
+      {
+        "path": "node_modules/@earendil-works/pi-ai/node_modules/openai",
+        "bytes": 5322662
+      }
+    ],
+    "largestFiles": [
+      {
+        "path": "node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex",
+        "bytes": 220584000,
+        "unpacked": true
+      },
+      {
+        "path": "node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/claude",
+        "bytes": 199257984,
+        "unpacked": true
+      },
+      {
+        "path": "node_modules/@deepseek-ai/libreoffice-kit-darwin-arm64/bin/libreoffice-kit",
+        "bytes": 140736432,
+        "unpacked": true
+      },
+      {
+        "path": "node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex-code-mode-host",
+        "bytes": 62767552,
+        "unpacked": true
+      },
+      {
+        "path": "node_modules/@trycua/cua-driver-darwin-arm64/libcua_driver_sdk.dylib",
+        "bytes": 51494720,
+        "unpacked": true
+      },
+      {
+        "path": "node_modules/@dataiku/uv-darwin-arm64/bin/uv",
+        "bytes": 39539088,
+        "unpacked": true
+      },
+      {
+        "path": "node_modules/cloudflared/bin/cloudflared",
+        "bytes": 39364384,
+        "unpacked": true
+      },
+      {
+        "path": "node_modules/sherpa-onnx-darwin-arm64/libonnxruntime.dylib",
+        "bytes": 29006384,
+        "unpacked": true
+      },
+      {
+        "path": "node_modules/sharp/node_modules/@img/sharp-libvips-darwin-arm64/lib/libvips-cpp.8.18.7.dylib",
+        "bytes": 18231688,
+        "unpacked": true
+      },
+      {
+        "path": "node_modules/@img/sharp-libvips-darwin-arm64/lib/libvips-cpp.8.18.3.dylib",
+        "bytes": 17765992,
+        "unpacked": true
+      },
+      {
+        "path": "node_modules/pnpm/dist/pnpm.mjs",
+        "bytes": 15896609,
+        "unpacked": false
+      },
+      {
+        "path": "node_modules/@deepseek-ai/dsh-experimental-inspector/lib/devtools/entrypoints/lighthouse_worker/lighthouse_worker.js",
+        "bytes": 9204549,
+        "unpacked": false
+      },
+      {
+        "path": "node_modules/@img/sharp-wasm32/lib/sharp-wasm32-0.35.3.node.wasm",
+        "bytes": 8900872,
+        "unpacked": false
+      },
+      {
+        "path": "node_modules/lightningcss-darwin-arm64/lightningcss.darwin-arm64.node",
+        "bytes": 8532944,
+        "unpacked": true
+      },
+      {
+        "path": "node_modules/mermaid/dist/mermaid.js",
+        "bytes": 8254234,
+        "unpacked": false
+      },
+      {
+        "path": "node_modules/chrome-devtools-mcp/build/src/third_party/index.js",
+        "bytes": 7515665,
+        "unpacked": false
+      },
+      {
+        "path": "node_modules/@deepseek-ai/dsh-client-ui-sidebar-documentpreview/lib/client.pdf.js",
+        "bytes": 7108806,
+        "unpacked": false
+      },
+      {
+        "path": "node_modules/@deepseek-ai/dsh-client-ui-sidebar-documentpreview/lib/client.excel.js",
+        "bytes": 7060440,
+        "unpacked": false
+      },
+      {
+        "path": "node_modules/dsh-better-sidebar/lib/client-mermaid.js",
+        "bytes": 7000812,
+        "unpacked": false
+      },
+      {
+        "path": "node_modules/@deepseek-ai/dsh-client-ui-settings-account/lib/client.js",
+        "bytes": 5280186,
+        "unpacked": false
+      },
+      {
+        "path": "node_modules/cytoscape-fcose/demo/demo.gif",
+        "bytes": 4631886,
+        "unpacked": false
+      },
+      {
+        "path": "node_modules/@vscode/ripgrep-darwin-arm64/bin/rg",
+        "bytes": 4528512,
+        "unpacked": true
+      },
+      {
+        "path": "node_modules/sherpa-onnx-darwin-arm64/libsherpa-onnx-c-api.dylib",
+        "bytes": 4275368,
+        "unpacked": true
+      },
+      {
+        "path": "node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/codex-path/rg",
+        "bytes": 4030432,
+        "unpacked": true
+      },
+      {
+        "path": "node_modules/chrome-devtools-mcp/build/src/third_party/lighthouse-devtools-mcp-bundle.js",
+        "bytes": 3892874,
+        "unpacked": false
+      },
+      {
+        "path": "node_modules/mermaid/dist/mermaid.min.js",
+        "bytes": 3572661,
+        "unpacked": false
+      },
+      {
+        "path": "node_modules/playwright-core/lib/coreBundle.js",
+        "bytes": 3469825,
+        "unpacked": false
+      },
+      {
+        "path": "node_modules/cytoscape-fcose/demo/incrementalConstraints.gif",
+        "bytes": 3175063,
+        "unpacked": false
+      },
+      {
+        "path": "node_modules/playwright-core/lib/utilsBundle.js",
+        "bytes": 3048692,
+        "unpacked": false
+      },
+      {
+        "path": "node_modules/playwright/lib/transform/babelBundle.js",
+        "bytes": 2901531,
+        "unpacked": false
+      }
+    ]
+  },
+  "installerAfter": {
+    "name": "Sensteed-Agent Beta-2.0.11-beta.21-arm64.dmg",
+    "bytes": 588116505,
+    "sha256": "02dc3d51ec99d9ecda0fa88d584b74b0ab843ce7969b368437c89ed4f276d905"
+  },
+  "preservedTools": {
+    "@openai/codex-darwin-arm64": {
+      "files": 6,
+      "bytes": 288136909,
+      "runtimeFilesCompared": 5,
+      "runtimeFilesMatchInstalledBytes": true,
+      "runtimeInventorySha256": "30b948aefc71e30daef7828f9eda529f784191a51f76435dad9501b326a5b2f7"
+    },
+    "@anthropic-ai/claude-agent-sdk-darwin-arm64": {
+      "files": 3,
+      "bytes": 199258405,
+      "runtimeFilesCompared": 2,
+      "runtimeFilesMatchInstalledBytes": true,
+      "runtimeInventorySha256": "999b4df5ef18aa7fc970e25a69e711f40b6a2583fcbcd9bf955f6c8d44aa3e0d"
+    },
+    "@deepseek-ai/libreoffice-kit-darwin-arm64": {
+      "files": 737,
+      "bytes": 153160381,
+      "runtimeFilesCompared": 736,
+      "runtimeFilesMatchInstalledBytes": true,
+      "runtimeInventorySha256": "608747774904b66c3c005d2d006b7c3be8d98f4c1f02b8209bc9b3b70bfb2f6b"
+    }
+  }
+}
