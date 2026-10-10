@@ -883,6 +883,7 @@ describe('published package surface', () => {
       '!node_modules/koffi-darwin-*-3-1-1/**',
       '!node_modules/node-pty/build/**',
       '!**/*.{js,cjs,mjs,ts,cts,mts,css}.map',
+      '!node_modules/**/react-icons/**/*.{js,cjs,mjs,ts,cts,mts}',
     ])
     expect(builderConfig?.mac?.icon).toBe('build/app-icon-mac.png')
     expect(builderConfig?.mac?.asarUnpack).toEqual([

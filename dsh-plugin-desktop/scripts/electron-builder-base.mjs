@@ -62,6 +62,9 @@ const LINUX_UNUSED_PLATFORM_RUNTIMES = [
 // native runtimes, manifests, and licenses in the installed product.
 const RUNTIME_DEBUG_EXCLUSIONS = [
   '!**/*.{js,cjs,mjs,ts,cts,mts,css}.map',
+  // The sidebar embeds its selected icons in lib/client*.js. Keep package
+  // metadata and licenses; afterPack rejects future runtime references.
+  '!node_modules/**/react-icons/**/*.{js,cjs,mjs,ts,cts,mts}',
 ]
 
 const COMMON_APP_FILES = [

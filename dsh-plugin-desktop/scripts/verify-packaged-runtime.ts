@@ -27,6 +27,7 @@ import { dirname, join, parse, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { extractFile, getRawHeader } from '@electron/asar'
 import { packageSizeReportPath, pruneHydratedSourceMaps, writePackageSizeReport } from './package-size.ts'
+import { verifyUnusedFrontendRuntime } from './unused-frontend-runtime.ts'
 import {
   disablePackagedMacSshCryptoRuntime,
   FORBIDDEN_MACOS_UNIVERSAL_ENTRIES,
@@ -1511,6 +1512,7 @@ export async function afterPack(
   hydrateLinux: (context: PackagedRuntimeContext) => void = hydratePackagedLinuxFsExtRuntimeForContext,
   recordSize: (context: PackagedRuntimeContext) => void = (context) => {
     if (!usesAsarLayout(context)) throw new Error('package size verification requires the standard ASAR layout')
+    verifyUnusedFrontendRuntime(resolvePackagedAsarPath(context))
     const arch = context.arch === 4 ? 'universal' : context.arch === 3 ? 'arm64' : 'x64'
     writePackageSizeReport({
       archive: resolvePackagedAsarPath(context),

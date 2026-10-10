@@ -48,7 +48,8 @@
     "node_modules/turndown/**",
     "!node_modules/koffi-darwin-*-3-1-1/**",
     "!node_modules/node-pty/build/**",
-    "!**/*.{js,cjs,mjs,ts,cts,mts,css}.map"
+    "!**/*.{js,cjs,mjs,ts,cts,mts,css}.map",
+    "!node_modules/**/react-icons/**/*.{js,cjs,mjs,ts,cts,mts}"
   ],
   "mac": {
     "asarUnpack": [
@@ -102,7 +103,8 @@
       "!node_modules/**/@img/sharp-{linux,win32}-*/**",
       "!node_modules/**/@img/sharp-libvips-{linux,win32}-*/**",
       "!node_modules/**/@koromix/koffi-{linux,win32,freebsd,openbsd}-*/**",
-      "!**/*.{js,cjs,mjs,ts,cts,mts,css}.map"
+      "!**/*.{js,cjs,mjs,ts,cts,mts,css}.map",
+      "!node_modules/**/react-icons/**/*.{js,cjs,mjs,ts,cts,mts}"
     ],
     "target": [
       "dir"
@@ -170,7 +172,8 @@
       "!node_modules/**/@img/sharp-{darwin,linux}-*/**",
       "!node_modules/**/@img/sharp-libvips-{darwin,linux}-*/**",
       "!node_modules/**/@koromix/koffi-{darwin,linux,freebsd,openbsd}-*/**",
-      "!**/*.{js,cjs,mjs,ts,cts,mts,css}.map"
+      "!**/*.{js,cjs,mjs,ts,cts,mts,css}.map",
+      "!node_modules/**/react-icons/**/*.{js,cjs,mjs,ts,cts,mts}"
     ],
     "target": [
       {
@@ -219,6 +222,7 @@
       "!node_modules/koffi-darwin-*-3-1-1/**",
       "!node_modules/node-pty/build/**",
       "!**/*.{js,cjs,mjs,ts,cts,mts,css}.map",
+      "!node_modules/**/react-icons/**/*.{js,cjs,mjs,ts,cts,mts}",
       "!node_modules/**/@anthropic-ai/claude-agent-sdk-{darwin,win32}-*/**",
       "!node_modules/**/@dataiku/uv-{darwin,win32}-*/**",
       "!node_modules/**/@deepseek-ai/libreoffice-kit-{darwin,win32}-*/**",
