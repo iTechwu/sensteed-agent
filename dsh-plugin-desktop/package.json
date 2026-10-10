@@ -505,6 +505,7 @@
     "@dofe/dsh-sensteed-knowledge": "file:../../docker-helm.dofe.ai/plugins/dsh-sensteed-knowledge",
     "@dofe/dsh-sensteed-product": "workspace:*",
     "@dofe/dsh-sensteed-supplier-intelligence": "file:../../docker-helm.dofe.ai/plugins/dsh-sensteed-supplier-intelligence",
+    "@dofe/dsh-sensteed-video-notes": "file:../../docker-helm.dofe.ai/plugins/dsh-sensteed-video-notes",
     "@dofe/dsh-tools-mcp": "file:../../docker-helm.dofe.ai/plugins/dsh-tools-mcp",
     "@earendil-works/pi-ai": "^0.87.1",
     "@eslint-community/regexpp": "^4.12.2",

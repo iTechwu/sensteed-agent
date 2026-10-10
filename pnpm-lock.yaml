@@ -17341,6 +17341,9 @@ importers:
       '@dofe/dsh-sensteed-supplier-intelligence':
         specifier: file:../../docker-helm.dofe.ai/plugins/dsh-sensteed-supplier-intelligence
         version: file:../docker-helm.dofe.ai/plugins/dsh-sensteed-supplier-intelligence
+      '@dofe/dsh-sensteed-video-notes':
+        specifier: file:../../docker-helm.dofe.ai/plugins/dsh-sensteed-video-notes
+        version: file:../docker-helm.dofe.ai/plugins/dsh-sensteed-video-notes
       '@dofe/dsh-tools-mcp':
         specifier: file:../../docker-helm.dofe.ai/plugins/dsh-tools-mcp
         version: file:../docker-helm.dofe.ai/plugins/dsh-tools-mcp
@@ -21151,6 +21154,9 @@ packages:
 
   '@dofe/dsh-sensteed-supplier-intelligence@file:../docker-helm.dofe.ai/plugins/dsh-sensteed-supplier-intelligence':
     resolution: {directory: ../docker-helm.dofe.ai/plugins/dsh-sensteed-supplier-intelligence, type: directory}
+
+  '@dofe/dsh-sensteed-video-notes@file:../docker-helm.dofe.ai/plugins/dsh-sensteed-video-notes':
+    resolution: {directory: ../docker-helm.dofe.ai/plugins/dsh-sensteed-video-notes, type: directory}
 
   '@dofe/dsh-tools-mcp@file:../docker-helm.dofe.ai/plugins/dsh-tools-mcp':
     resolution: {directory: ../docker-helm.dofe.ai/plugins/dsh-tools-mcp, type: directory}
@@ -34422,6 +34428,8 @@ snapshots:
   '@dofe/dsh-sensteed-knowledge@file:../docker-helm.dofe.ai/plugins/dsh-sensteed-knowledge': {}
 
   '@dofe/dsh-sensteed-supplier-intelligence@file:../docker-helm.dofe.ai/plugins/dsh-sensteed-supplier-intelligence': {}
+
+  '@dofe/dsh-sensteed-video-notes@file:../docker-helm.dofe.ai/plugins/dsh-sensteed-video-notes': {}
 
   '@dofe/dsh-tools-mcp@file:../docker-helm.dofe.ai/plugins/dsh-tools-mcp': {}
 

@@ -35,7 +35,7 @@ const RESERVED_ROW_IDS = new Set([
   'agent-default-model', 'ui-settings-models', 'ui-brand-official',
   'desktop-terminal', 'desktop-diagnostics', 'desktop-notifications',
   'desktop-pnpm', 'desktop-profiles', 'desktop-updates', 'desktop-browser-tools',
-  'ui-dsh-soup', 'dofe-sensteed-supplier-intelligence',
+  'ui-dsh-soup', 'dofe-sensteed-supplier-intelligence', 'dofe-sensteed-video-notes',
 ])
 const OWN_ROW_IDS = new Set([
   'dofe-managed', 'personal-knowledge-files', 'dofe-sensteed-finance',

@@ -141,6 +141,7 @@ describe('published package surface', () => {
       ['@dofe/dsh-tools-mcp', 'dsh-tools-mcp'],
       ['@dofe/dsh-sensteed-finance', 'dsh-sensteed-finance'],
       ['@dofe/dsh-sensteed-supplier-intelligence', 'dsh-sensteed-supplier-intelligence'],
+      ['@dofe/dsh-sensteed-video-notes', 'dsh-sensteed-video-notes'],
       ['@lyhue1991/dsh-soup', 'dsh-soup'],
     ] as const
     for (const [name, directory] of plugins) {
@@ -167,7 +168,7 @@ describe('published package surface', () => {
     for (const overlayed of ['@dofe/dsh-sensteed-finance']) {
       expect(productNames.has(overlayed), `product cordis.patch.yml must insert ${overlayed}`).toBe(true)
     }
-    for (const overlayed of ['@dofe/dsh-sensteed-supplier-intelligence', '@lyhue1991/dsh-soup']) {
+    for (const overlayed of ['@dofe/dsh-sensteed-supplier-intelligence', '@dofe/dsh-sensteed-video-notes', '@lyhue1991/dsh-soup']) {
       expect(overlayNames.has(overlayed), `cordis.patch.yml must insert ${overlayed}`).toBe(true)
     }
     expect(workspaceManifest.scripts?.['dofe-ui:build'])
@@ -186,6 +187,7 @@ describe('published package surface', () => {
       ['dsh-plugin-console', 'lib/index.js'], ['dsh-tools-mcp', 'index.js'],
       ['dsh-sensteed-finance', 'index.js'],
       ['dsh-sensteed-supplier-intelligence', 'index.js'],
+      ['dsh-sensteed-video-notes', 'index.js'],
       ['dsh-soup', 'lib/index.js'],
     ])
     for (const [name, main] of pluginMains) {

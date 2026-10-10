@@ -1,0 +1,28 @@
+{
+  "name": "@dofe/dsh-sensteed-video-notes",
+  "version": "0.1.0",
+  "description": "视频笔记：YouTube/小红书/抖音/Bilibili/本地视频 → 带真实截图与可追溯时间线的 Markdown/HTML 笔记（经 video-processing MCP）",
+  "type": "module",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "files": [
+    "cordis.patch.yml",
+    "index.js",
+    "skills"
+  ],
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check index.js && node --check skills/video-notes/scripts/align-timeline.mjs && node --check skills/video-notes/scripts/render-note.mjs && node --check skills/video-notes/scripts/validate-note.mjs && npm test"
+  },
+  "license": "MIT",
+  "private": true
+}
