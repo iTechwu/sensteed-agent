@@ -16654,6 +16654,9 @@ importers:
       '@deepseek-ai/dsh-experimental-auto-review':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/experimental/auto-review
+      '@deepseek-ai/dsh-experimental-badge-skill-bundle':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/experimental/badge-skill-bundle
       '@deepseek-ai/dsh-experimental-browser-use-chrome-devtools-mcp':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/experimental/browser-use-chrome-devtools-mcp
@@ -17649,9 +17652,6 @@ importers:
         specifier: 4.1.8
         version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@22.20.1)(happy-dom@20.11.15)(jsdom@29.1.1(@noble/hashes@2.4.0))(vite@8.2.1(@types/node@22.20.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0))
     optionalDependencies:
-      '@deepseek-ai/dsh-experimental-badge-skill-bundle':
-        specifier: workspace:*
-        version: link:../deepseek-harness/packages/experimental/badge-skill-bundle
       '@deepseek-ai/node-addon-system-darwin-arm64':
         specifier: 0.1.2
         version: link:../deepseek-harness/native/system/packages/darwin-arm64
