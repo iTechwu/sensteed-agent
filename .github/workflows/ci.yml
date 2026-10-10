@@ -171,6 +171,7 @@ jobs:
           node -e "const fs=require('node:fs'); const u=require('./upstream.json'); if(JSON.parse(fs.readFileSync('../deepseek-harness/package.json')).version!==u.sourceVersion) throw Error('Harness sourceVersion mismatch')"
           node scripts/upstream-workspace-link.mjs
           node scripts/prepare-dofe-ui.mjs
+          node scripts/refresh-bundled.mjs --offline
           node scripts/build-dofe-ui.mjs
       - name: Resolve pnpm store path
         if: needs.changes.outputs.product == 'true'
@@ -238,6 +239,7 @@ jobs:
           node -e "const fs=require('node:fs'); const u=require('./upstream.json'); if(JSON.parse(fs.readFileSync('../deepseek-harness/package.json')).version!==u.sourceVersion) throw Error('Harness sourceVersion mismatch')"
           node scripts/upstream-workspace-link.mjs
           node scripts/prepare-dofe-ui.mjs
+          node scripts/refresh-bundled.mjs --offline
           node scripts/build-dofe-ui.mjs
       - name: Resolve pnpm store path
         id: pnpm-store
@@ -361,6 +363,7 @@ jobs:
           node -e "const fs=require('node:fs'); const u=require('./upstream.json'); if(JSON.parse(fs.readFileSync('../deepseek-harness/package.json')).version!==u.sourceVersion) throw Error('Harness sourceVersion mismatch')"
           node scripts/upstream-workspace-link.mjs
           node scripts/prepare-dofe-ui.mjs
+          node scripts/refresh-bundled.mjs --offline
           node scripts/build-dofe-ui.mjs
       - name: Resolve pnpm store path
         id: pnpm-store
@@ -458,6 +461,7 @@ jobs:
           node -e "const fs=require('node:fs'); const u=require('./upstream.json'); if(JSON.parse(fs.readFileSync('../deepseek-harness/package.json')).version!==u.sourceVersion) throw Error('Harness sourceVersion mismatch')"
           node scripts/upstream-workspace-link.mjs
           node scripts/prepare-dofe-ui.mjs
+          node scripts/refresh-bundled.mjs --offline
           node scripts/build-dofe-ui.mjs
       - name: Resolve pnpm store path
         id: pnpm-store
@@ -552,6 +556,7 @@ jobs:
           node -e "const fs=require('node:fs'); const u=require('./upstream.json'); if(JSON.parse(fs.readFileSync('../deepseek-harness/package.json')).version!==u.sourceVersion) throw Error('Harness sourceVersion mismatch')"
           node scripts/upstream-workspace-link.mjs
           node scripts/prepare-dofe-ui.mjs
+          node scripts/refresh-bundled.mjs --offline
           node scripts/build-dofe-ui.mjs
       - name: Probe the materialized workspace link
         shell: bash

@@ -43,6 +43,9 @@ function options(calls: CommandCall[], logs: string[] = []): MacSmokePackageOpti
       calls.push({ command, args: [...args], cwd, env: { ...env } })
     },
     log: message => logs.push(message),
+    refreshBundled: () => {
+      calls.push({ command: 'refresh-bundled', args: [], cwd: '/repo', env: {} })
+    },
   }
 }
 
@@ -55,14 +58,20 @@ describe('macOS DMG smoke packaging', () => {
     packageMacSmoke({ ...options(calls, logs), prepareRuntime })
 
     expect(prepareRuntime).toHaveBeenCalledOnce()
-    expect(calls).toHaveLength(3)
+    expect(calls).toHaveLength(4)
     expect(calls[0]).toEqual({
+      command: 'refresh-bundled',
+      args: [],
+      cwd: '/repo',
+      env: {},
+    })
+    expect(calls[1]).toEqual({
       command: 'corepack',
       args: ['pnpm', '--filter', 'dsh-plugin-desktop', 'check:mac-package'],
       cwd: '/repo',
       env: { PATH: '/usr/bin:/bin', SAFE_VALUE: 'kept' },
     })
-    expect(calls[1]).toEqual({
+    expect(calls[2]).toEqual({
       command: '/usr/local/bin/node',
       args: [
         '/repo/node_modules/electron-builder/cli.js',
@@ -87,7 +96,7 @@ describe('macOS DMG smoke packaging', () => {
         DSH_ELECTRON_BUILDER_TRAVERSAL_ONLY: '1',
       },
     })
-    expect(calls[2]).toEqual({
+    expect(calls[3]).toEqual({
       command: '/usr/local/bin/node',
       args: [
         '/repo/dsh-plugin-desktop/scripts/verify-mac-smoke.ts',
@@ -195,6 +204,8 @@ describe('macOS DMG smoke packaging', () => {
     }
 
     expect(() => packageMacSmoke(value)).toThrow('headless check failed')
-    expect(calls).toHaveLength(1)
+    expect(calls).toHaveLength(2)
+    expect(calls[0]?.command).toBe('refresh-bundled')
+    expect(calls[1]?.command).toBe('corepack')
   })
 })

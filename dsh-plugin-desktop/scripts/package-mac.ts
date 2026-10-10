@@ -9,6 +9,7 @@ import { withoutMacReleaseSecrets } from './release-preflight.ts'
 import { macSmokeArchitecture, prepareInstalledMacUniversalRuntime } from './mac-universal.ts'
 import { prepareFsExtForElectron } from './prepare-fs-ext.ts'
 import { electronBuilderEnvironment } from './electron-builder-environment.ts'
+import { refreshBundledForPackaging } from './refresh-bundled-cli.ts'
 
 /** Injectable native macOS packaging boundary used by focused tests. */
 export interface MacSmokePackageOptions {
@@ -45,6 +46,8 @@ export interface MacSmokePackageOptions {
   ) => void
   /** Report non-secret packaging progress. */
   readonly log: (message: string) => void
+  /** Refresh the bundled skills/plugins before the check gate. */
+  readonly refreshBundled: () => void
 }
 
 function run(
@@ -83,6 +86,7 @@ function defaultOptions(): MacSmokePackageOptions {
     nodeExecutable: process.execPath,
     run,
     log: message => console.log(message),
+    refreshBundled: () => refreshBundledForPackaging('refresh', workspaceRoot),
   }
 }
 
@@ -115,6 +119,7 @@ export function packageMacSmoke(options: MacSmokePackageOptions = defaultOptions
   options.log('Building an unsigned macOS DMG smoke; signing and notarization are release-only steps.')
   options.log(`Packaging only the ${architecture} application; universal Mac packaging is disabled.`)
   if (options.env.DSH_PACKAGE_CHECK_ALREADY_RAN !== '1') {
+    options.refreshBundled()
     options.run(
       'corepack',
       ['pnpm', '--filter', 'dsh-plugin-desktop', 'check:mac-package'],

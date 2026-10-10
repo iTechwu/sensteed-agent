@@ -7,6 +7,7 @@ import { dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { prepareFsExtForElectron } from './prepare-fs-ext.ts'
 import { electronBuilderEnvironment } from './electron-builder-environment.ts'
+import { refreshBundledForPackaging } from './refresh-bundled-cli.ts'
 
 /**
  * Remove the published tarball's residual nested `node_modules/.bin` from the
@@ -96,6 +97,8 @@ export interface WindowsPackageOptions {
   ) => void
   /** Report non-secret packaging progress. */
   readonly log: (message: string) => void
+  /** Refresh the bundled skills/plugins before the check gate. */
+  readonly refreshBundled: () => void
 }
 
 /**
@@ -151,6 +154,7 @@ export function createWindowsPackageOptions(verifier = './verify-win-installer.t
     nodeExecutable: process.execPath,
     run,
     log: message => console.log(message),
+    refreshBundled: () => refreshBundledForPackaging('refresh', workspaceRoot),
   }
 }
 
@@ -187,6 +191,7 @@ export function packageWindowsArtifact(
     options.log(`Packaging the ${artifact} with ${compression} compression.`)
   }
   if (options.env.DSH_PACKAGE_CHECK_ALREADY_RAN !== '1') {
+    options.refreshBundled()
     options.run(
       options.commandShell,
       [

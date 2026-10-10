@@ -12,6 +12,7 @@ import {
 import { prepareInstalledMacUniversalRuntime } from './mac-universal.ts'
 import { prepareFsExtForElectron } from './prepare-fs-ext.ts'
 import { electronBuilderEnvironment } from './electron-builder-environment.ts'
+import { refreshBundledForPackaging } from './refresh-bundled-cli.ts'
 
 /** Injectable release boundary used by focused tests. */
 export interface MacReleaseOptions {
@@ -39,6 +40,8 @@ export interface MacReleaseOptions {
   readonly log: (message: string) => void
   /** Validate and prepare the Apple Silicon runtime tree. */
   readonly prepareRuntime: () => void
+  /** Verify the committed bundled skills/plugins before the check gate. */
+  readonly refreshBundled: () => void
 }
 
 function listCodeSigningIdentities(env: NodeJS.ProcessEnv): string {
@@ -78,6 +81,8 @@ function defaultReleaseOptions(): MacReleaseOptions {
       prepareFsExtForElectron({ platform: 'darwin', arch: 'arm64', desktopRoot })
       prepareInstalledMacUniversalRuntime(desktopRoot, ['arm64'])
     },
+    // Signed releases are hermetic: verify the committed snapshot, no network.
+    refreshBundled: () => refreshBundledForPackaging('verify', resolve(desktopRoot, '..')),
   }
 }
 
@@ -100,6 +105,7 @@ export function releaseMac(options: MacReleaseOptions = defaultReleaseOptions())
 
   // The workspace check includes the package build and repository-layout gate. Signing
   // material is withheld from every build, test, Loader smoke, and layout subprocess.
+  options.refreshBundled()
   options.run(
     process.execPath,
     ['scripts/prepare-agents-anywhere-release.mjs', '--verify-release'],

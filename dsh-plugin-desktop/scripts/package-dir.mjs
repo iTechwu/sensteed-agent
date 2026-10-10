@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { electronBuilderEnvironment } from './electron-builder-environment.ts'
 import { withoutWindowsSigningSecrets } from './package-win.ts'
 import { withoutMacReleaseSecrets } from './release-preflight.ts'
+import { refreshBundledForPackaging } from './refresh-bundled-cli.ts'
 
 const require = createRequire(import.meta.url)
 const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)))
@@ -47,6 +48,7 @@ export function unsignedDirectoryBuildEnvironment(environment) {
  *   electronDistPath?: string,
  *   nodeExecutable?: string,
  *   run?: typeof spawnSync,
+ *   refreshBundled?: () => void,
  * }} [options]
  */
 export function packageDirectory(options = {}) {
@@ -54,6 +56,9 @@ export function packageDirectory(options = {}) {
   const nodeExecutable = options.nodeExecutable ?? process.execPath
   const electronBuilderCli = options.electronBuilderCli ?? builderCli
   const configuredElectronDist = options.electronDistPath ?? electronDist
+  const refreshBundled = options.refreshBundled
+    ?? (() => refreshBundledForPackaging('refresh', resolve(packageRoot, '..')))
+  refreshBundled()
   const result = run(
     nodeExecutable,
     [

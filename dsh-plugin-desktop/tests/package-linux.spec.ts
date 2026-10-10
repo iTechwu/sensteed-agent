@@ -19,6 +19,7 @@ function options(overrides: Partial<LinuxPackageOptions> = {}): LinuxPackageOpti
     nodeExecutable: '/node/bin/node',
     run: vi.fn(),
     log: () => {},
+    refreshBundled: vi.fn(),
     ...overrides,
   }
 }
@@ -30,17 +31,22 @@ describe('Linux packaging orchestration', () => {
     const order: string[] = []
     run.mockImplementation((_command, args) => { order.push(args.join(' ')) })
 
-    packageLinuxArtifacts(options({ run, prepareRuntime }))
+    packageLinuxArtifacts(options({
+      run,
+      prepareRuntime,
+      refreshBundled: () => { order.unshift('refresh-bundled') },
+    }))
 
     expect(run).toHaveBeenCalledTimes(3)
-    expect(order[0]).toBe('pnpm --filter dsh-plugin-desktop check:linux-package')
-    expect(order[1]).toContain('--linux')
-    expect(order[1]).toContain('AppImage')
-    expect(order[1]).toContain('deb')
-    expect(order[1]).toContain('--publish')
-    expect(order[1]).toContain('never')
-    expect(order[1]).toContain('--config.npmRebuild=false')
-    expect(order[2]).toContain('verify-linux-artifacts.ts')
+    expect(order[0]).toBe('refresh-bundled')
+    expect(order[1]).toBe('pnpm --filter dsh-plugin-desktop check:linux-package')
+    expect(order[2]).toContain('--linux')
+    expect(order[2]).toContain('AppImage')
+    expect(order[2]).toContain('deb')
+    expect(order[2]).toContain('--publish')
+    expect(order[2]).toContain('never')
+    expect(order[2]).toContain('--config.npmRebuild=false')
+    expect(order[3]).toContain('verify-linux-artifacts.ts')
     expect(prepareRuntime).toHaveBeenCalledOnce()
   })
 
