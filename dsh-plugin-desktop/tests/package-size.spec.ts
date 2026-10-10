@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { createPackageWithOptions } from '@electron/asar'
 import { describe, expect, it } from 'vitest'
 import {
-  assertPackageSize, payloadPackageRoot, pruneHydratedSourceMaps,
+  assertPackageSize, packageSizeTargetArch, payloadPackageRoot, pruneHydratedSourceMaps,
   summarizePackageSize, writePackageSizeReport,
 } from '../scripts/package-size.ts'
 
@@ -32,6 +32,20 @@ describe('packaged runtime size contract', () => {
     expect(() => assertPackageSize(summarizePackageSize([
       { path: 'node_modules/fixture/dist/index.js.map', bytes: 30, unpacked: false },
     ], 100, 'linux', 'x64'))).toThrow('debug source maps')
+  })
+
+  it('uses the final universal budget for both intermediate Mac slices only', () => {
+    const env = { DSH_ELECTRON_BUILDER_TARGET_ARCH: 'universal' }
+    for (const arch of ['x64', 'arm64', 'universal']) {
+      const target = packageSizeTargetArch('darwin', arch, env)
+      expect(target).toBe('universal')
+      expect(() => assertPackageSize(summarizePackageSize([], 2.2 * 1024 ** 3, 'darwin', arch, target))).not.toThrow()
+    }
+    for (const platform of ['win32', 'linux', 'darwin']) {
+      const target = packageSizeTargetArch(platform, 'x64', platform === 'darwin' ? {} : env)
+      expect(target).toBe('x64')
+      expect(() => assertPackageSize(summarizePackageSize([], 2.2 * 1024 ** 3, platform, 'x64', target))).toThrow('budget')
+    }
   })
 
   it('removes hydrated source maps while retaining code, type declarations and data maps', () => {

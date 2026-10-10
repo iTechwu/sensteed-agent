@@ -12,6 +12,8 @@ export interface PayloadFile {
 export interface PackageSizeReport {
   readonly platform: string
   readonly arch: string
+  /** Final delivery target; universal intermediate slices retain both runtimes. */
+  readonly targetArch: string
   readonly archiveBytes: number
   readonly unpackedBytes: number
   readonly payloadBytes: number
@@ -45,6 +47,7 @@ export function summarizePackageSize(
   archiveBytes: number,
   platform: string,
   arch: string,
+  targetArch = arch,
 ): PackageSizeReport {
   const packages = new Map<string, number>()
   let unpackedBytes = 0
@@ -56,7 +59,7 @@ export function summarizePackageSize(
     if (isRuntimeSourceMap(file.path)) sourceMapBytes += file.bytes
   }
   return {
-    platform, arch, archiveBytes, unpackedBytes,
+    platform, arch, targetArch, archiveBytes, unpackedBytes,
     payloadBytes: archiveBytes + unpackedBytes,
     sourceMapBytes, fileCount: files.length,
     largestPackages: [...packages].map(([path, bytes]) => ({ path, bytes }))
@@ -67,13 +70,19 @@ export function summarizePackageSize(
 
 /** Match the payload budget to a single CPU or a universal two-CPU bundle. */
 export function assertPackageSize(report: PackageSizeReport): void {
-  const limit = (report.arch === 'universal' ? 2.5 : 1.5) * 1024 ** 3
+  const limit = (report.targetArch === 'universal' ? 2.5 : 1.5) * 1024 ** 3
   if (report.sourceMapBytes > 0) {
     throw new Error(`packaged runtime contains ${report.sourceMapBytes} bytes of debug source maps`)
   }
   if (report.payloadBytes > limit) {
     throw new Error(`packaged ${report.platform}/${report.arch} payload is ${report.payloadBytes} bytes; budget is ${limit}; see package-size report`)
   }
+}
+
+/** The Mac universal collector intentionally includes both native trees even
+ * during the x64/arm64 slice stages. Other platforms keep single-CPU budgets. */
+export function packageSizeTargetArch(platform: string, arch: string, env: NodeJS.ProcessEnv = process.env): string {
+  return platform === 'darwin' && env.DSH_ELECTRON_BUILDER_TARGET_ARCH === 'universal' ? 'universal' : arch
 }
 
 function collectPhysical(directory: string, prefix: string, files: Map<string, PayloadFile>): void {
@@ -93,6 +102,7 @@ export function writePackageSizeReport(options: {
   readonly unpackedRoot: string
   readonly platform: string
   readonly arch: string
+  readonly targetArch?: string
   readonly outputPath: string
 }): PackageSizeReport {
   const files = new Map<string, PayloadFile>()
@@ -108,9 +118,9 @@ export function writePackageSizeReport(options: {
   walk(getRawHeader(options.archive).header, '')
   if (existsSync(options.unpackedRoot)) collectPhysical(options.unpackedRoot, '', files)
   const report = summarizePackageSize([...files.values()], statSync(options.archive).size,
-    options.platform, options.arch)
+    options.platform, options.arch, options.targetArch ?? options.arch)
   writeFileSync(options.outputPath, `${JSON.stringify(report, null, 2)}\n`)
-  console.log(`package size: ${options.platform}/${options.arch}, payload ${(report.payloadBytes / 1024 ** 2).toFixed(1)} MiB, report ${options.outputPath}`)
+  console.log(`package size: ${options.platform}/${options.arch} (target ${report.targetArch}), payload ${(report.payloadBytes / 1024 ** 2).toFixed(1)} MiB, report ${options.outputPath}`)
   assertPackageSize(report)
   return report
 }

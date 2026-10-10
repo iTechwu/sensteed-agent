@@ -26,7 +26,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, parse, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { extractFile, getRawHeader } from '@electron/asar'
-import { packageSizeReportPath, pruneHydratedSourceMaps, writePackageSizeReport } from './package-size.ts'
+import { packageSizeReportPath, packageSizeTargetArch, pruneHydratedSourceMaps, writePackageSizeReport } from './package-size.ts'
 import { verifyUnusedFrontendRuntime } from './unused-frontend-runtime.ts'
 import {
   disablePackagedMacSshCryptoRuntime,
@@ -1518,6 +1518,7 @@ export async function afterPack(
       archive: resolvePackagedAsarPath(context),
       unpackedRoot: resolvePackagedUnpackedRoot(context),
       platform: context.electronPlatformName, arch,
+      targetArch: packageSizeTargetArch(context.electronPlatformName, arch),
       outputPath: packageSizeReportPath(context.appOutDir, context.electronPlatformName, arch),
     })
   },

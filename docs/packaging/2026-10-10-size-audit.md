@@ -22,7 +22,7 @@ Download size decreased **11.17%**; runtime payload decreased **17.28%**. The ru
 2. Keep only the product's `en-US` and `zh-CN` Electron language resources.
 3. Remove approximately **81.9 MiB** of unused `react-icons` code and declarations, retaining metadata and licenses. Both artifact consumers are `dsh-better-sidebar/lib/client*.js`; selected icons are embedded and package names only occur in bundle comments. Parse artifact syntax trees: future imports, requires, dynamic imports or other real string references stop packaging and request restoring the dependency.
 4. Emit `package-size-*.json` separately from the application. Inventory physical ASAR bytes, physical unpacked files, debug maps, largest packages and files. Count native content once and preserve nested dependency versions as separate locations. CI uploads reports even after failures.
-5. Enforce runtime payload budgets of 1.5 GiB per architecture and 2.5 GiB for universal packages, preserving reports before failing. TOS independently rejects installer files larger than 1 GiB, matching the existing updater download limit.
+5. Enforce runtime payload budgets of 1.5 GiB per architecture and 2.5 GiB for universal packages, preserving reports before failing. Reports distinguish the current stage architecture from the final delivery target: intermediate Mac universal x64/arm64 stages temporarily include both required runtime trees and use the final target budget. TOS independently rejects installer files larger than 1 GiB, matching the existing updater download limit.
 
 ## Required content retained
 
