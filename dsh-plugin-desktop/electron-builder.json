@@ -1,4 +1,8 @@
 {
+  "electronLanguages": [
+    "en-US",
+    "zh-CN"
+  ],
   "asar": {
     "smartUnpack": true
   },
@@ -43,7 +47,8 @@
     "node_modules/got/**",
     "node_modules/turndown/**",
     "!node_modules/koffi-darwin-*-3-1-1/**",
-    "!node_modules/node-pty/build/**"
+    "!node_modules/node-pty/build/**",
+    "!**/*.{js,cjs,mjs,ts,cts,mts,css}.map"
   ],
   "mac": {
     "asarUnpack": [
@@ -96,7 +101,8 @@
       "!node_modules/**/sherpa-onnx-{linux,win32}-*/**",
       "!node_modules/**/@img/sharp-{linux,win32}-*/**",
       "!node_modules/**/@img/sharp-libvips-{linux,win32}-*/**",
-      "!node_modules/**/@koromix/koffi-{linux,win32,freebsd,openbsd}-*/**"
+      "!node_modules/**/@koromix/koffi-{linux,win32,freebsd,openbsd}-*/**",
+      "!**/*.{js,cjs,mjs,ts,cts,mts,css}.map"
     ],
     "target": [
       "dir"
@@ -163,7 +169,8 @@
       "!node_modules/**/sherpa-onnx-{darwin,linux}-*/**",
       "!node_modules/**/@img/sharp-{darwin,linux}-*/**",
       "!node_modules/**/@img/sharp-libvips-{darwin,linux}-*/**",
-      "!node_modules/**/@koromix/koffi-{darwin,linux,freebsd,openbsd}-*/**"
+      "!node_modules/**/@koromix/koffi-{darwin,linux,freebsd,openbsd}-*/**",
+      "!**/*.{js,cjs,mjs,ts,cts,mts,css}.map"
     ],
     "target": [
       {
@@ -211,6 +218,7 @@
       "node_modules/turndown/**",
       "!node_modules/koffi-darwin-*-3-1-1/**",
       "!node_modules/node-pty/build/**",
+      "!**/*.{js,cjs,mjs,ts,cts,mts,css}.map",
       "!node_modules/**/@anthropic-ai/claude-agent-sdk-{darwin,win32}-*/**",
       "!node_modules/**/@dataiku/uv-{darwin,win32}-*/**",
       "!node_modules/**/@deepseek-ai/libreoffice-kit-{darwin,win32}-*/**",

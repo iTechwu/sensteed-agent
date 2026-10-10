@@ -26,6 +26,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, parse, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { extractFile, getRawHeader } from '@electron/asar'
+import { packageSizeReportPath, pruneHydratedSourceMaps, writePackageSizeReport } from './package-size.ts'
 import {
   disablePackagedMacSshCryptoRuntime,
   FORBIDDEN_MACOS_UNIVERSAL_ENTRIES,
@@ -1508,15 +1509,27 @@ export async function afterPack(
   hydrateMac: (context: PackagedRuntimeContext) => void = hydratePackagedMacRuntimeForContext,
   verifyClosure: typeof verifyProfileClosureArtifact = verifyProfileClosureArtifact,
   hydrateLinux: (context: PackagedRuntimeContext) => void = hydratePackagedLinuxFsExtRuntimeForContext,
+  recordSize: (context: PackagedRuntimeContext) => void = (context) => {
+    if (!usesAsarLayout(context)) throw new Error('package size verification requires the standard ASAR layout')
+    const arch = context.arch === 4 ? 'universal' : context.arch === 3 ? 'arm64' : 'x64'
+    writePackageSizeReport({
+      archive: resolvePackagedAsarPath(context),
+      unpackedRoot: resolvePackagedUnpackedRoot(context),
+      platform: context.electronPlatformName, arch,
+      outputPath: packageSizeReportPath(context.appOutDir, context.electronPlatformName, arch),
+    })
+  },
 ): Promise<void> {
   hydrateMac(context)
   hydrateLinux(context)
   hydrateRequiredRuntimePackages(context)
+  pruneHydratedSourceMaps(resolvePackagedUnpackedRoot(context))
   repairPackagedAsarHeader(context)
   const summary = verify(context)
   verifyAa(context)
   verifyClosure(context)
   report(summary)
+  recordSize(context)
   smokeNative(context)
 }
 

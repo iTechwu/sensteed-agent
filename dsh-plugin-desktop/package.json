@@ -286,7 +286,6 @@
     "@deepseek-ai/dsh-experimental-api-speech-to-text": "workspace:*",
     "@deepseek-ai/dsh-experimental-auto-review": "workspace:*",
     "@deepseek-ai/dsh-experimental-browser-use-chrome-devtools-mcp": "workspace:*",
-    "@deepseek-ai/dsh-experimental-badge-skill-bundle": "workspace:*",
     "@deepseek-ai/dsh-experimental-browser-use-playwright-mcp": "workspace:*",
     "@deepseek-ai/dsh-experimental-browser-use-stagehand-native": "workspace:*",
     "@deepseek-ai/dsh-experimental-browser-use-runtime": "workspace:*",
@@ -629,6 +628,7 @@
     "vitest": "4.1.8"
   },
   "optionalDependencies": {
+    "@deepseek-ai/dsh-experimental-badge-skill-bundle": "workspace:*",
     "@deepseek-ai/node-addon-system-darwin-arm64": "0.1.2",
     "@deepseek-ai/node-addon-system-darwin-x64": "0.1.2",
     "@emnapi/runtime": "1.11.3",

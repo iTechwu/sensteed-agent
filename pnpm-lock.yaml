@@ -16681,24 +16681,9 @@ importers:
       '@deepseek-ai/dsh-experimental-computer-use-cua-driver-native':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/experimental/computer-use-cua-driver-native
-      '@deepseek-ai/dsh-experimental-badge-skill-bundle':
-        specifier: workspace:*
-        version: link:../deepseek-harness/packages/experimental/badge-skill-bundle
       '@deepseek-ai/dsh-experimental-cot-translation-bundle':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/experimental/cot-translation-bundle
-      '@deepseek-ai/dsh-experimental-ralph-bundle':
-        specifier: workspace:*
-        version: link:../deepseek-harness/packages/experimental/ralph-bundle
-      '@deepseek-ai/dsh-experimental-session-search':
-        specifier: workspace:*
-        version: link:../deepseek-harness/packages/experimental/session-search
-      '@deepseek-ai/dsh-experimental-session-titles-bundle':
-        specifier: workspace:*
-        version: link:../deepseek-harness/packages/experimental/session-titles-bundle
-      '@deepseek-ai/dsh-experimental-terminal-bundle':
-        specifier: workspace:*
-        version: link:../deepseek-harness/packages/experimental/terminal-bundle
       '@deepseek-ai/dsh-experimental-inspector':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/experimental/inspector
@@ -16708,15 +16693,27 @@ importers:
       '@deepseek-ai/dsh-experimental-ptc-runtime-python':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/experimental/ptc-runtime-python
+      '@deepseek-ai/dsh-experimental-ralph-bundle':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/experimental/ralph-bundle
       '@deepseek-ai/dsh-experimental-session-inspector':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/experimental/session-inspector
+      '@deepseek-ai/dsh-experimental-session-search':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/experimental/session-search
+      '@deepseek-ai/dsh-experimental-session-titles-bundle':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/experimental/session-titles-bundle
       '@deepseek-ai/dsh-experimental-speech-to-text':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/experimental/speech-to-text
       '@deepseek-ai/dsh-experimental-speech-to-text-sensevoice':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/experimental/speech-to-text-sensevoice
+      '@deepseek-ai/dsh-experimental-terminal-bundle':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/experimental/terminal-bundle
       '@deepseek-ai/dsh-experimental-tool-agent-team':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/experimental/tool-agent-team
@@ -17652,6 +17649,9 @@ importers:
         specifier: 4.1.8
         version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@22.20.1)(happy-dom@20.11.15)(jsdom@29.1.1(@noble/hashes@2.4.0))(vite@8.2.1(@types/node@22.20.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0))
     optionalDependencies:
+      '@deepseek-ai/dsh-experimental-badge-skill-bundle':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/experimental/badge-skill-bundle
       '@deepseek-ai/node-addon-system-darwin-arm64':
         specifier: 0.1.2
         version: link:../deepseek-harness/native/system/packages/darwin-arm64

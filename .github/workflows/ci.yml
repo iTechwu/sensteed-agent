@@ -309,6 +309,15 @@ jobs:
           DSH_PACKAGE_CHECK_ALREADY_RAN: '1'
           NODE_OPTIONS: '--max-old-space-size=6144'
         run: pnpm --filter dsh-plugin-desktop dist:win-portable
+      - name: Preserve windows package size report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: package-size-windows
+          path: dsh-plugin-desktop/dist/**/package-size-*.json
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Upload Windows applications
         uses: actions/upload-artifact@v7
         with:
@@ -380,6 +389,15 @@ jobs:
           DSH_PACKAGE_CHECK_ALREADY_RAN: '1'
           NODE_OPTIONS: '--max-old-space-size=6144'
         run: pnpm --filter dsh-plugin-desktop dist:linux
+      - name: Preserve linux package size report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: package-size-linux
+          path: dsh-plugin-desktop/dist/**/package-size-*.json
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Upload Linux applications
         uses: actions/upload-artifact@v7
         with:
@@ -482,6 +500,15 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: pnpm --filter dsh-plugin-desktop dist:mac
+      - name: Preserve macos package size report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: package-size-macos
+          path: dsh-plugin-desktop/dist/**/package-size-*.json
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Upload macOS application
         uses: actions/upload-artifact@v7
         with:

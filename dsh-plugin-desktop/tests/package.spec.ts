@@ -74,6 +74,7 @@ const builderConfig = JSON.parse(readFileSync(new URL('electron-builder.json', p
   asar?: unknown
   asarUnpack?: unknown
   afterPack?: unknown
+  electronLanguages?: readonly string[]
   electronDownload?: { checksums?: Record<string, unknown> }
   electronFuses?: unknown
   toolsets?: Record<string, unknown>
@@ -850,6 +851,7 @@ describe('published package surface', () => {
       resetAdHocDarwinSignature: true,
       runAsNode: true,
     })
+    expect(builderConfig?.electronLanguages).toEqual(['en-US', 'zh-CN'])
     expect(builderConfig?.toolsets).toEqual({ nsis: '1.2.1' })
     expect(manifest.files).toEqual(expect.arrayContaining([
       'build/app-icon.ico',
@@ -880,6 +882,7 @@ describe('published package surface', () => {
       'node_modules/turndown/**',
       '!node_modules/koffi-darwin-*-3-1-1/**',
       '!node_modules/node-pty/build/**',
+      '!**/*.{js,cjs,mjs,ts,cts,mts,css}.map',
     ])
     expect(builderConfig?.mac?.icon).toBe('build/app-icon-mac.png')
     expect(builderConfig?.mac?.asarUnpack).toEqual([

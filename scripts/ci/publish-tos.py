@@ -13,6 +13,9 @@ from urllib.parse import quote, urlsplit, urlunsplit
 from xml.etree import ElementTree
 
 
+# The desktop updater accepts installers up to 1 GiB. Fail before uploads.
+MAX_ARTIFACT_BYTES = 1024 ** 3
+
 VERSION = re.compile(r'(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-beta\.(0|[1-9]\d*))?')
 
 
@@ -103,6 +106,8 @@ def inventory(directory, context, public_url):
             path = matches[0]
             if path.is_symlink() or not path.is_file() or path.stat().st_size == 0:
                 raise ValueError('Artifact must be a nonempty regular file')
+            if path.stat().st_size > MAX_ARTIFACT_BYTES:
+                raise ValueError('Artifact exceeds the 1 GiB updater size limit: ' + path.name)
             # electron-builder uses target-specific names for the same x64 architecture.
             architecture = {'.AppImage': '(?:x64|x86_64)', '.deb': '(?:x64|amd64)'}.get(suffix, 'x64')
             tail = r'(?:-universal)?\.dmg' if platform == 'macos' else '-' + architecture + re.escape(suffix)

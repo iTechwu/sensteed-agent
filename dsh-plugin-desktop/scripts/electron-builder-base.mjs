@@ -58,6 +58,12 @@ const LINUX_UNUSED_PLATFORM_RUNTIMES = [
   '!node_modules/**/dsh-community-market/node_modules/**',
 ]
 
+// Source maps are build/debug artifacts; keep executable code, declarations,
+// native runtimes, manifests, and licenses in the installed product.
+const RUNTIME_DEBUG_EXCLUSIONS = [
+  '!**/*.{js,cjs,mjs,ts,cts,mts,css}.map',
+]
+
 const COMMON_APP_FILES = [
   'build/app-icon.ico',
   'build/app-icon.png',
@@ -79,9 +85,11 @@ const COMMON_APP_FILES = [
   'node_modules/turndown/**',
   '!node_modules/koffi-darwin-*-3-1-1/**',
   '!node_modules/node-pty/build/**',
+  ...RUNTIME_DEBUG_EXCLUSIONS,
 ]
 
 export const ELECTRON_BUILDER_BASE = Object.freeze({
+  electronLanguages: ['en-US', 'zh-CN'],
   asar: {
     smartUnpack: true,
   },
@@ -151,6 +159,7 @@ export const ELECTRON_BUILDER_BASE = Object.freeze({
       // both macOS slices, but never ship Linux/Windows tool runtimes here.
       '!node_modules/koffi-win32-x64-3-1-1/**',
       ...MACOS_UNUSED_PLATFORM_RUNTIMES,
+      ...RUNTIME_DEBUG_EXCLUSIONS,
     ],
     target: [
       'dir',
@@ -211,6 +220,7 @@ export const ELECTRON_BUILDER_BASE = Object.freeze({
       '!node_modules/node-addon-require-builtin-win32-ia32*/**',
       '!node_modules/koffi-darwin-*-3-1-1/**',
       ...WINDOWS_UNUSED_PLATFORM_RUNTIMES,
+      ...RUNTIME_DEBUG_EXCLUSIONS,
     ],
     target: [
       {
