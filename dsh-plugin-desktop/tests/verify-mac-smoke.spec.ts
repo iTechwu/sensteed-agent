@@ -121,12 +121,8 @@ describe('macOS DMG smoke artifact verification', () => {
         ],
       },
       { command: 'plutil', args: ['-lint', value.infoPlist] },
-      {
-        command: 'lipo',
-        args: [value.executable, '-verify_arch', 'x86_64'],
-      },
       { command: 'lipo', args: [value.executable, '-verify_arch', 'arm64'] },
-      ...MACOS_UNIVERSAL_PACKAGED_ENTRIES.map(entry => ({
+      ...MACOS_UNIVERSAL_PACKAGED_ENTRIES.filter(entry => entry.arch === 'arm64').map(entry => ({
         command: 'lipo',
         args: [join(`${value.appAsar}.unpacked`, entry.path), '-verify_arch', entry.arch],
       })),

@@ -89,6 +89,19 @@
       "!node_modules/**/lightningcss-win32*/**",
       "!node_modules/**/@vscode/ripgrep-linux*/**",
       "!node_modules/**/@vscode/ripgrep-win32*/**",
+      "!node_modules/**/@dataiku/uv-darwin-x64/**",
+      "!node_modules/**/@deepseek-ai/node-addon-system-darwin-x64/**",
+      "!node_modules/**/@img/sharp-darwin-x64/**",
+      "!node_modules/**/@img/sharp-libvips-darwin-x64/**",
+      "!node_modules/**/@koromix/koffi-darwin-x64/**",
+      "!node_modules/**/@openai/codex-darwin-x64/**",
+      "!node_modules/**/@anthropic-ai/claude-agent-sdk-darwin-x64/**",
+      "!node_modules/**/@trycua/cua-driver-darwin-x64/**",
+      "!node_modules/**/@ubjs/node-darwin-x64/**",
+      "!node_modules/**/@vscode/ripgrep-darwin-x64/**",
+      "!node_modules/**/node-addon-require-builtin-darwin-x64/**",
+      "!node_modules/**/node-pty/prebuilds/darwin-x64/**",
+      "!node_modules/**/lightningcss-darwin-x64/**",
       "!node_modules/koffi-win32-x64-3-1-1/**",
       "!node_modules/**/@anthropic-ai/claude-agent-sdk-{linux,win32}-*/**",
       "!node_modules/**/@dataiku/uv-{linux,win32}-*/**",
@@ -107,7 +120,12 @@
       "!node_modules/**/react-icons/**/*.{js,cjs,mjs,ts,cts,mts}"
     ],
     "target": [
-      "dir"
+      {
+        "target": "dir",
+        "arch": [
+          "arm64"
+        ]
+      }
     ],
     "category": "public.app-category.developer-tools",
     "extendInfo": {

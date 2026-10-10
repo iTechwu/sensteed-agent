@@ -1033,7 +1033,7 @@ describe('published package surface', () => {
       mergeASARs: true,
       notarize: true,
       signIgnore: ['\\.(?:pak|dat|wasm)$'],
-      target: ['dir'],
+      target: [{ target: 'dir', arch: ['arm64'] }],
       x64ArchFiles: expect.stringContaining('node-pty/prebuilds/darwin-*'),
     }))
     expect(builderConfig?.mac?.x64ArchFiles).toContain('lightningcss-darwin-*')

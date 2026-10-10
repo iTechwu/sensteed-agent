@@ -20,7 +20,7 @@ export interface MacSmokeVerificationOptions {
   readonly distDir: string
   /** Installed application name inside the mounted image. */
   readonly productName: string
-  /** Mach-O slices the main executable must contain; defaults to both CPUs. */
+  /** Mach-O slices the main executable must contain; defaults to Apple Silicon. */
   readonly executableSlices?: readonly MacUniversalArch[]
   /** Return regular DMG files in the distribution directory. */
   readonly listDmgs: (distDir: string) => readonly string[]
@@ -124,7 +124,7 @@ export function verifyMacSmoke(
     ) {
       throw new Error(`packaged application has an invalid main executable: ${executablePath}`)
     }
-    for (const slice of options.executableSlices ?? macSmokeExecutableSlices('universal')) {
+    for (const slice of options.executableSlices ?? macSmokeExecutableSlices('arm64')) {
       options.run('lipo', [executablePath, '-verify_arch', slice])
     }
 
@@ -141,7 +141,7 @@ export function verifyMacSmoke(
     const includesUv = MACOS_UNIVERSAL_PACKAGED_ENTRIES
       .filter(entry => entry.path.endsWith('/bin/uv'))
       .some(entry => options.exists(join(unpackedRoot, entry.path)))
-    const packagedSlices = new Set(options.executableSlices ?? macSmokeExecutableSlices('universal'))
+    const packagedSlices = new Set(options.executableSlices ?? macSmokeExecutableSlices('arm64'))
     for (const entry of selectMacUniversalPackagedEntries(includesUv)
       .filter(candidate => packagedSlices.has(candidate.arch))) {
       const nativePath = join(unpackedRoot, entry.path)

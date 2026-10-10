@@ -40,7 +40,7 @@ sensteed-agent/releases/<beta|stable>/<version>/<run-id>-<attempt>/
 sensteed-agent/channels/<beta|stable>.json
 ```
 
-每个目录包含 `macos/` 下的 universal DMG、`windows/` 下的 x64 Setup EXE 和 Portable ZIP、`linux/` 下的 x64 AppImage 和 DEB，以及 `manifest.json`。清单包含文件大小、SHA-256、下载 URL、签名状态、桌面提交、Harness 提交、运行编号和重试编号。
+每个目录包含 `macos/` 下的 Apple Silicon arm64 DMG、`windows/` 下的 x64 Setup EXE 和 Portable ZIP、`linux/` 下的 x64 AppImage 和 DEB，以及 `manifest.json`。清单包含文件大小、SHA-256、下载 URL、签名状态、桌面提交、Harness 提交、运行编号和重试编号。TOS 发布器只接受带 `-arm64.dmg` 后缀的 Mac 安装包，并在清单中记录 `arch: arm64`。
 
 流程开始时只解析一次 `upstream.json` 所声明分支的提交，各平台下载同一 SHA 并核对 `sourceVersion`。产品检查、三个平台打包检查和 Windows 兄弟仓库检查全部通过后，才允许发布。
 

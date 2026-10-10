@@ -19,7 +19,7 @@ function options(overrides: Partial<MacReleaseVerificationOptions> = {}) {
   const value: MacReleaseVerificationOptions = {
     distDir: '/release/dist',
     productName,
-    listDmgs: () => [`/release/dist/${dmgName}-universal.dmg`],
+    listDmgs: () => [`/release/dist/${dmgName}-arm64.dmg`],
     makeMountPoint: () => '/private/tmp/sensteed-agent-dmg-test',
     run: (command, args) => { calls.push({ command, args: [...args] }) },
     removeMountPoint,
@@ -36,26 +36,22 @@ describe('macOS release artifact verification', () => {
 
     expect(verifyMacRelease(harness.value)).toEqual({
       appPath,
-      dmgPath: `/release/dist/${dmgName}-universal.dmg`,
+      dmgPath: `/release/dist/${dmgName}-arm64.dmg`,
     })
 
     expect(harness.calls).toEqual([
       {
         command: 'hdiutil',
         args: [
-          'attach', `/release/dist/${dmgName}-universal.dmg`,
+          'attach', `/release/dist/${dmgName}-arm64.dmg`,
           '-mountpoint', '/private/tmp/sensteed-agent-dmg-test', '-nobrowse', '-readonly',
         ],
       },
       {
         command: 'lipo',
-          args: [join(appPath, 'Contents', 'MacOS', productName), '-verify_arch', 'x86_64'],
-      },
-      {
-        command: 'lipo',
           args: [join(appPath, 'Contents', 'MacOS', productName), '-verify_arch', 'arm64'],
       },
-      ...MACOS_UNIVERSAL_PACKAGED_ENTRIES.flatMap(entry => [{
+      ...MACOS_UNIVERSAL_PACKAGED_ENTRIES.filter(entry => entry.arch === 'arm64').flatMap(entry => [{
         command: 'lipo',
         args: [
           join(appPath, 'Contents', 'Resources', 'app.asar.unpacked', entry.path),

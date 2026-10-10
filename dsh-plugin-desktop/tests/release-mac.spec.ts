@@ -23,6 +23,7 @@ function baseOptions(
   return {
     env,
     platform: 'darwin',
+    arch: 'arm64',
     desktopRoot: '/repo/dsh-plugin-desktop',
     outputDir: '/repo/dsh-plugin-desktop/dist/mac-release',
     resetOutput: () => undefined,
@@ -78,7 +79,7 @@ describe('macOS release command boundary', () => {
     expect(calls[2]).toEqual({
       command: 'pnpm',
       args: [
-        'exec', 'electron-builder', '--mac', 'dmg', '--universal',
+        'exec', 'electron-builder', '--mac', 'dmg', '--arm64',
         '--config.forceCodeSigning=true', '--config.mac.notarize=true',
         '--config.npmRebuild=false',
         '--config.directories.output=/repo/dsh-plugin-desktop/dist/mac-release',
@@ -92,7 +93,7 @@ describe('macOS release command boundary', () => {
         APPLE_TEAM_ID: 'TEAM123456',
         DSH_ELECTRON_BUILDER_TRAVERSAL_ONLY: '1',
         DSH_ELECTRON_BUILDER_TARGET_PLATFORM: 'darwin',
-        DSH_ELECTRON_BUILDER_TARGET_ARCH: 'universal',
+        DSH_ELECTRON_BUILDER_TARGET_ARCH: 'arm64',
       },
     })
     expect(calls[3]).toEqual({
@@ -139,7 +140,7 @@ describe('macOS release command boundary', () => {
     expect(calls[2]?.env.MACOS_SIGN_IDENTITY).toBeUndefined()
     expect(calls[2]?.env.DSH_ELECTRON_BUILDER_TRAVERSAL_ONLY).toBe('1')
     expect(calls[2]?.env.DSH_ELECTRON_BUILDER_TARGET_PLATFORM).toBe('darwin')
-    expect(calls[2]?.env.DSH_ELECTRON_BUILDER_TARGET_ARCH).toBe('universal')
+    expect(calls[2]?.env.DSH_ELECTRON_BUILDER_TARGET_ARCH).toBe('arm64')
     expect(calls[3]?.env).toEqual({ PATH: '/usr/bin' })
   })
 
@@ -151,6 +152,13 @@ describe('macOS release command boundary', () => {
     }, calls)
 
     expect(() => releaseMac(options)).toThrow('Developer ID Application')
+    expect(calls).toEqual([])
+  })
+
+  it('rejects Intel release hosts before inspecting signing credentials', () => {
+    const calls: CommandCall[] = []
+    const options = baseOptions({ PATH: '/usr/bin' }, calls)
+    expect(() => releaseMac({ ...options, arch: 'x64' })).toThrow('Apple Silicon arm64 Node')
     expect(calls).toEqual([])
   })
 

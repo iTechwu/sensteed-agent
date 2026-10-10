@@ -70,7 +70,7 @@ describe('macOS DMG smoke packaging', () => {
         'electron-builder.json',
         '--mac',
         'dmg',
-        '--universal',
+        '--arm64',
         '--publish',
         'never',
         '--config.mac.notarize=false',
@@ -83,7 +83,7 @@ describe('macOS DMG smoke packaging', () => {
         SAFE_VALUE: 'kept',
         CSC_IDENTITY_AUTO_DISCOVERY: 'false',
         DSH_ELECTRON_BUILDER_TARGET_PLATFORM: 'darwin',
-        DSH_ELECTRON_BUILDER_TARGET_ARCH: 'universal',
+        DSH_ELECTRON_BUILDER_TARGET_ARCH: 'arm64',
         DSH_ELECTRON_BUILDER_TRAVERSAL_ONLY: '1',
       },
     })
@@ -98,6 +98,7 @@ describe('macOS DMG smoke packaging', () => {
     })
     expect(logs).toEqual([
       'Building an unsigned macOS DMG smoke; signing and notarization are release-only steps.',
+      'Packaging only the arm64 application; universal Mac packaging is disabled.',
     ])
   })
 
@@ -121,7 +122,7 @@ describe('macOS DMG smoke packaging', () => {
       'electron-builder.json',
       '--mac',
       'dmg',
-      '--universal',
+      '--arm64',
       '--publish',
       'never',
       '--config.mac.notarize=false',
@@ -130,6 +131,7 @@ describe('macOS DMG smoke packaging', () => {
     ])
     expect(logs).toEqual([
       'Building an unsigned macOS DMG smoke; signing and notarization are release-only steps.',
+      'Packaging only the arm64 application; universal Mac packaging is disabled.',
       'Skipping the macOS package preflight; the package gate already passed.',
     ])
   })
@@ -152,7 +154,7 @@ describe('macOS DMG smoke packaging', () => {
     expect(calls[0]?.args).toContain('--arm64')
     expect(calls[0]?.args).not.toContain('--universal')
     expect(calls[1]?.env.DSH_MAC_SMOKE_ARCH).toBe('arm64')
-    expect(logs).toContain('Packaging only the arm64 application; the universal merge is skipped.')
+    expect(logs).toContain('Packaging only the arm64 application; universal Mac packaging is disabled.')
   })
 
   it('rejects an unknown smoke architecture before running commands', () => {
@@ -162,13 +164,14 @@ describe('macOS DMG smoke packaging', () => {
       env: { ...options(calls).env, DSH_MAC_SMOKE_ARCH: 'ia32' },
     }
 
-    expect(() => packageMacSmoke(value)).toThrow('DSH_MAC_SMOKE_ARCH must be universal, arm64, or x64')
+    expect(() => packageMacSmoke(value)).toThrow('macOS packages support Apple Silicon arm64 only')
     expect(calls).toEqual([])
   })
 
   it.each([
     ['win32', 'arm64', '22.23.2', 'native macOS host'],
-    ['darwin', 'ia32', '22.23.2', 'requires x64 or arm64 Node'],
+    ['darwin', 'x64', '22.23.2', 'requires Apple Silicon arm64 Node'],
+    ['darwin', 'ia32', '22.23.2', 'requires Apple Silicon arm64 Node'],
     ['darwin', 'arm64', '23.0.0', 'Node 22.19+ or Node 24+'],
   ] as const)(
     'rejects unsupported host %s/%s with Node %s before running commands',

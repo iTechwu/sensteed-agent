@@ -158,14 +158,31 @@ export const ELECTRON_BUILDER_BASE = Object.freeze({
       '!node_modules/**/lightningcss-win32*/**',
       '!node_modules/**/@vscode/ripgrep-linux*/**',
       '!node_modules/**/@vscode/ripgrep-win32*/**',
-      // Local stores can retain optional binaries for other platforms. Keep
-      // both macOS slices, but never ship Linux/Windows tool runtimes here.
+      // Local stores can retain optional binaries for other platforms. The
+      // product targets Apple Silicon only, so Intel macOS payloads are also
+      // excluded instead of relying on electron-builder's collector choice.
+      '!node_modules/**/@dataiku/uv-darwin-x64/**',
+      '!node_modules/**/@deepseek-ai/node-addon-system-darwin-x64/**',
+      '!node_modules/**/@img/sharp-darwin-x64/**',
+      '!node_modules/**/@img/sharp-libvips-darwin-x64/**',
+      '!node_modules/**/@koromix/koffi-darwin-x64/**',
+      '!node_modules/**/@openai/codex-darwin-x64/**',
+      '!node_modules/**/@anthropic-ai/claude-agent-sdk-darwin-x64/**',
+      '!node_modules/**/@trycua/cua-driver-darwin-x64/**',
+      '!node_modules/**/@ubjs/node-darwin-x64/**',
+      '!node_modules/**/@vscode/ripgrep-darwin-x64/**',
+      '!node_modules/**/node-addon-require-builtin-darwin-x64/**',
+      '!node_modules/**/node-pty/prebuilds/darwin-x64/**',
+      '!node_modules/**/lightningcss-darwin-x64/**',
       '!node_modules/koffi-win32-x64-3-1-1/**',
       ...MACOS_UNUSED_PLATFORM_RUNTIMES,
       ...RUNTIME_DEBUG_EXCLUSIONS,
     ],
     target: [
-      'dir',
+      {
+        target: 'dir',
+        arch: ['arm64'],
+      },
     ],
     category: 'public.app-category.developer-tools',
     extendInfo: {

@@ -1,4 +1,4 @@
-/** Shared preparation and verification inventory for universal macOS packages. */
+/** Shared native-runtime inventory for Apple Silicon macOS packages. */
 
 import {
   chmodSync,
@@ -27,35 +27,31 @@ import { buildMacSystemRuntime, installedMacSystemPackage } from './mac-system-r
 export type MacUniversalArch = 'arm64' | 'x86_64'
 
 /** Architectures the unsigned macOS smoke can package. */
-export type MacSmokeArchitecture = 'universal' | 'arm64' | 'x64'
+export type MacSmokeArchitecture = 'arm64'
 
 /**
- * Read the smoke architecture from `DSH_MAC_SMOKE_ARCH`, defaulting to the
- * universal application the signed release ships. CI pull requests select one
- * CPU because the universal merge alone dominates the macOS job.
+ * The product ships Apple Silicon only. Refuse obsolete Intel/universal
+ * overrides so CI cannot accidentally reintroduce unused CPU payloads.
  * @param environment - Environment of the packaging or verification process.
  * @returns The electron-builder architecture to package.
  */
 export function macSmokeArchitecture(environment: NodeJS.ProcessEnv): MacSmokeArchitecture {
   const value = environment.DSH_MAC_SMOKE_ARCH
-  if (value === undefined || value === '') return 'universal'
-  if (value === 'universal' || value === 'arm64' || value === 'x64') return value
+  if (value === undefined || value === '' || value === 'arm64') return 'arm64'
   throw new Error(
-    `DSH_MAC_SMOKE_ARCH must be universal, arm64, or x64; received ${JSON.stringify(value)}`,
+    `macOS packages support Apple Silicon arm64 only; received ${JSON.stringify(value)}`,
   )
 }
 
 /**
- * List the Mach-O slices the packaged main executable must contain.
+ * List the Mach-O slice the packaged main executable must contain.
  * @param architecture - Architecture the smoke packaged.
- * @returns `lipo` architecture names, Intel first.
+ * @returns The arm64 `lipo` architecture name.
  */
 export function macSmokeExecutableSlices(
   architecture: MacSmokeArchitecture,
 ): readonly MacUniversalArch[] {
-  if (architecture === 'arm64') return ['arm64']
-  if (architecture === 'x64') return ['x86_64']
-  return ['x86_64', 'arm64']
+  return architecture === 'arm64' ? ['arm64'] : []
 }
 
 /** Thin native files that must be present for each CPU inside the packaged app directory. */
@@ -833,11 +829,14 @@ export function prepareMacUniversalRuntime(
   }
 }
 
-/** Prepare the installed workspace dependency tree for universal packaging. */
-export function prepareInstalledMacUniversalRuntime(desktopRoot: string): void {
-  buildMacSystemRuntime({ desktopRoot, arches: ['arm64', 'x64'] })
+/** Prepare the installed workspace dependency tree for the selected Mac architecture. */
+export function prepareInstalledMacUniversalRuntime(desktopRoot: string,
+  arches: readonly ('arm64' | 'x64')[] = ['arm64', 'x64']): void {
+  buildMacSystemRuntime({ desktopRoot, arches })
   const aaManifest = join(resolve(desktopRoot), 'node_modules/@agents-anywhere/dsh-bridge-next/package.json')
+  const slices = new Set(arches.map(arch => arch === 'x64' ? 'x86_64' : arch))
   const entries = selectMacUniversalNativeEntries(existsSync(aaManifest))
+    .filter(entry => slices.has(entry.arch))
   const root = resolve(desktopRoot)
   const resolveEntry = (path: string): string => {
     if (path.includes('/@dataiku/uv-darwin-')) {
@@ -850,7 +849,7 @@ export function prepareInstalledMacUniversalRuntime(desktopRoot: string): void {
     desktopRoot,
     entries,
     exists: path => {
-      for (const arch of ['arm64', 'x64'] as const) {
+      for (const arch of arches) {
         if (path === join(resolve(desktopRoot), `node_modules/@deepseek-ai/node-addon-system-darwin-${arch}/bin/system.node`)) {
           return existsSync(join(installedMacSystemPackage(desktopRoot, arch), 'bin/system.node'))
         }

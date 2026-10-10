@@ -72,7 +72,7 @@ class PublicationTests(unittest.TestCase):
                         GITHUB_RUN_ID='123', GITHUB_RUN_ATTEMPT='2', RELEASE='false')
         self.config = publisher.settings(self.env)
         self.context = publisher.release_context(self.env)
-        for platform, endings in dict(macos=['universal.dmg'], windows=['x64-Setup.exe', 'x64-Portable.zip'],
+        for platform, endings in dict(macos=['arm64.dmg'], windows=['x64-Setup.exe', 'x64-Portable.zip'],
                                       linux=['x64.AppImage', 'x64.deb']).items():
             folder = self.root / platform
             folder.mkdir()
@@ -115,7 +115,7 @@ class PublicationTests(unittest.TestCase):
 
     def test_publishes_actual_electron_builder_filenames_from_ci(self):
         macos = next((self.root / 'macos').iterdir())
-        macos.rename(macos.with_name('Sensteed-Agent Beta-2.0.11-beta.18-universal.dmg'))
+        macos.rename(macos.with_name('Sensteed-Agent Beta-2.0.11-beta.18-arm64.dmg'))
         for suffix, architecture in [('.AppImage', 'x86_64'), ('.deb', 'amd64')]:
             path = next((self.root / 'linux').glob('*' + suffix))
             path.rename(path.with_name(path.name.replace('-x64', '-' + architecture)))
@@ -127,6 +127,18 @@ class PublicationTests(unittest.TestCase):
                          ['x86_64.AppImage', 'amd64.deb'])
         self.assertIn('Sensteed-Agent%20Beta-', manifest['artifacts'][0]['url'])
         self.assertEqual([call[0] for call in client.calls], ['upload'] * 5 + ['put'])
+
+    def test_mac_artifact_requires_arm64_suffix(self):
+        target = next((self.root / 'macos').iterdir())
+        original = target.name
+        for suffix in ['universal.dmg', 'x64.dmg', '.dmg']:
+            renamed = target.with_name(original.rsplit('-', 1)[0] + '-' + suffix)
+            target.rename(renamed)
+            client = FakeTos()
+            with self.subTest(suffix=suffix), self.assertRaises(ValueError):
+                publisher.publish(client, self.config, self.context, self.root)
+            self.assertEqual([], client.calls)
+            renamed.rename(target)
 
     def test_candidates_and_releases_print_all_download_urls_after_verification(self):
         macos = next((self.root / 'macos').iterdir())

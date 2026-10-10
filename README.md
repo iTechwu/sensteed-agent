@@ -107,7 +107,7 @@ market 包另有独立 `check`（文档 → 构建 → 导出校验 → loader �
 
 | 平台 | 产物 | 说明 |
 | --- | --- | --- |
-| macOS | Universal DMG（另支持 arm64/x64 单架构冒烟） | 未签名冒烟 + 签名发布两条路径 |
+| macOS | Apple Silicon arm64 DMG | 未签名冒烟 + 签名发布两条路径 |
 | Windows | NSIS 安装程序 + 便携版 zip | 辅助安装消息、升级冒烟、运行中检测脚本齐备 |
 | Linux | AppImage / deb | x64，产物名与可执行名走品牌渲染 |
 

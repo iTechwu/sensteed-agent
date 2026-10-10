@@ -19,6 +19,7 @@ export interface MacReleaseOptions {
   readonly env: NodeJS.ProcessEnv
   /** Platform executing the release. */
   readonly platform: NodeJS.Platform
+  readonly arch: string
   /** Desktop package root containing package.json. */
   readonly desktopRoot: string
   /** Dedicated signed-release output directory, isolated from historical artifacts. */
@@ -36,7 +37,7 @@ export interface MacReleaseOptions {
   ) => void
   /** Report non-secret release progress. */
   readonly log: (message: string) => void
-  /** Validate and prepare both architecture-specific runtime trees. */
+  /** Validate and prepare the Apple Silicon runtime tree. */
   readonly prepareRuntime: () => void
 }
 
@@ -66,6 +67,7 @@ function defaultReleaseOptions(): MacReleaseOptions {
   return {
     env: process.env,
     platform: process.platform,
+    arch: process.arch,
     desktopRoot,
     outputDir,
     resetOutput: () => rmSync(outputDir, { recursive: true, force: true }),
@@ -74,8 +76,7 @@ function defaultReleaseOptions(): MacReleaseOptions {
     log: message => console.log(message),
     prepareRuntime: () => {
       prepareFsExtForElectron({ platform: 'darwin', arch: 'arm64', desktopRoot })
-      prepareFsExtForElectron({ platform: 'darwin', arch: 'x64', desktopRoot })
-      prepareInstalledMacUniversalRuntime(desktopRoot)
+      prepareInstalledMacUniversalRuntime(desktopRoot, ['arm64'])
     },
   }
 }
@@ -85,6 +86,7 @@ function defaultReleaseOptions(): MacReleaseOptions {
  * @param options - Injectable process and command boundaries.
  */
 export function releaseMac(options: MacReleaseOptions = defaultReleaseOptions()): void {
+  if (options.arch !== 'arm64') throw new Error('macOS releases require Apple Silicon arm64 Node')
   const releaseEnvironment = adaptMacReleaseEnvironment(options.env)
   const buildEnvironment = withoutMacReleaseSecrets(releaseEnvironment)
   const result = assertMacReleaseReady({
@@ -108,14 +110,14 @@ export function releaseMac(options: MacReleaseOptions = defaultReleaseOptions())
   options.resetOutput()
   options.prepareRuntime()
   options.run('pnpm', [
-    'exec', 'electron-builder', '--mac', 'dmg', '--universal',
+    'exec', 'electron-builder', '--mac', 'dmg', '--arm64',
     '--config.forceCodeSigning=true', '--config.mac.notarize=true',
     '--config.npmRebuild=false',
     `--config.directories.output=${options.outputDir}`,
   ], options.desktopRoot, electronBuilderEnvironment({
     ...releaseEnvironment,
     DSH_ELECTRON_BUILDER_TARGET_PLATFORM: 'darwin',
-    DSH_ELECTRON_BUILDER_TARGET_ARCH: 'universal',
+    DSH_ELECTRON_BUILDER_TARGET_ARCH: 'arm64',
   }))
   options.run(
     process.execPath,

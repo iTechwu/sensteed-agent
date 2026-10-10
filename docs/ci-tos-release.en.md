@@ -40,7 +40,7 @@ sensteed-agent/releases/<beta|stable>/<version>/<run-id>-<attempt>/
 sensteed-agent/channels/<beta|stable>.json
 ```
 
-Each directory contains a universal DMG under `macos/`, x64 Setup EXE and Portable ZIP under `windows/`, x64 AppImage and DEB under `linux/`, and `manifest.json`. The manifest records sizes, SHA-256 hashes, download URLs, signing status, desktop and Harness commits, run ID, and attempt number.
+Each directory contains an Apple Silicon arm64 DMG under `macos/`, x64 Setup EXE and Portable ZIP under `windows/`, x64 AppImage and DEB under `linux/`, and `manifest.json`. The TOS publisher accepts only the `-arm64.dmg` Mac suffix and records `arch: arm64` in the manifest. The manifest also records sizes, SHA-256 hashes, download URLs, signing status, desktop and Harness commits, run ID, and attempt number.
 
 The workflow resolves the branch declared by `upstream.json` once. Every platform downloads that SHA and verifies `sourceVersion`. Publication requires the product gate, all three platform packaging gates, and the Windows sibling-workspace gate to succeed.
 

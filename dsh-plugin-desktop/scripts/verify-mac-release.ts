@@ -86,13 +86,12 @@ export function verifyMacRelease(
     options.run('hdiutil', ['attach', dmgPath, '-mountpoint', mountPoint, '-nobrowse', '-readonly'])
     mounted = true
     const executablePath = join(appPath, 'Contents', 'MacOS', options.productName)
-    options.run('lipo', [executablePath, '-verify_arch', 'x86_64'])
     options.run('lipo', [executablePath, '-verify_arch', 'arm64'])
     const unpackedRoot = join(appPath, 'Contents', 'Resources', 'app.asar.unpacked')
     const includesUv = MACOS_UNIVERSAL_PACKAGED_ENTRIES
       .filter(entry => entry.path.endsWith('/bin/uv'))
       .some(entry => (options.exists ?? existsSync)(join(unpackedRoot, entry.path)))
-    for (const entry of selectMacUniversalPackagedEntries(includesUv)) {
+    for (const entry of selectMacUniversalPackagedEntries(includesUv).filter(entry => entry.arch === 'arm64')) {
       options.run('lipo', [join(unpackedRoot, entry.path), '-verify_arch', entry.arch])
       if (entry.path.endsWith('/bin/uv')) {
         options.run('/bin/test', ['-x', join(unpackedRoot, entry.path)])

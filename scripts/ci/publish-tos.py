@@ -110,7 +110,7 @@ def inventory(directory, context, public_url):
                 raise ValueError('Artifact exceeds the 1 GiB updater size limit: ' + path.name)
             # electron-builder uses target-specific names for the same x64 architecture.
             architecture = {'.AppImage': '(?:x64|x86_64)', '.deb': '(?:x64|amd64)'}.get(suffix, 'x64')
-            tail = r'(?:-universal)?\.dmg' if platform == 'macos' else '-' + architecture + re.escape(suffix)
+            tail = r'-arm64\.dmg' if platform == 'macos' else '-' + architecture + re.escape(suffix)
             if (not re.fullmatch(r'[A-Za-z0-9._ -]+', path.name)
                     or not re.search(r'(?<![0-9.])' + re.escape(context['version']) + tail + '$', path.name)):
                 raise ValueError(
@@ -121,7 +121,7 @@ def inventory(directory, context, public_url):
                 for chunk in iter(lambda: stream.read(1024 * 1024), b''):
                     digest.update(chunk)
             key = f"{context['prefix']}/{platform}/{path.name}"
-            files.append(dict(platform=platform, arch='universal' if platform == 'macos' else 'x64',
+            files.append(dict(platform=platform, arch='arm64' if platform == 'macos' else 'x64',
                               name=path.name, size=path.stat().st_size,
                               sha256=digest.hexdigest(), key=key,
                               url=public_url.rstrip('/') + '/' + quote(key, safe='/'),
