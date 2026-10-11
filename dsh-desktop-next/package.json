@@ -10,7 +10,7 @@
     "node": "^22.19.0 || >=24.0.0"
   },
   "scripts": {
-    "build": "tsdown && vite build --config vite.native-ui.config.ts",
+    "build": "tsdown && tsdown --config tsdown.client.config.ts && vite build --config vite.native-ui.config.ts",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.packaging.json --noEmit",
     "test": "vitest run",
     "verify:host": "node scripts/verify-host.mjs",

@@ -16,6 +16,23 @@ import {
 
 export const name = 'community-market'
 export const inject = ['webServer', 'settings']
+const sharedCapabilitiesKey = Symbol.for('dsh.desktop.next.capabilities')
+
+function optionalService<T>(ctx: Context, name: string): T | undefined {
+  try {
+    const global = globalThis as unknown as Record<symbol, unknown>
+    const globalShared = global[sharedCapabilitiesKey] as Record<string, unknown> | undefined
+    if (globalShared?.[name] !== undefined) return globalShared[name] as T
+    const contextual = ctx.root.get(name) as T | undefined
+    if (contextual !== undefined) return contextual
+    const loader = (ctx as Context & { loader?: { entries(): Iterable<{ fiber?: { ctx: Context } }> } }).loader
+    for (const entry of loader?.entries() ?? []) {
+      const value = entry.fiber?.ctx.get(name) as T | undefined
+      if (value !== undefined) return value
+    }
+  } catch { /* A provider may be unloading while the route is read. */ }
+  return undefined
+}
 
 interface DesktopProfilesCapability {
   readonly current: MarketDesktopProfile
@@ -34,11 +51,32 @@ const npmRegistryHttp = createRestrictedHttpClient({
 export function apply(ctx: Context): void {
   const scope = registerMarketSettings(ctx)
   let installService: MarketInstallService | undefined
+  let installPnpm: MarketDesktopPnpm | undefined
   let desktopActions: DesktopActionsCapability | undefined
   let desktopPlugins: MarketDesktopPlugins | undefined
-  const installProvider = { get: () => installService }
-  const desktopActionsProvider = { get: () => desktopActions }
-  const desktopPluginsProvider = { get: () => desktopPlugins }
+  const createInstallService = (profiles: DesktopProfilesCapability, pnpm: MarketDesktopPnpm): MarketInstallService => {
+    const service = new MarketInstallService(() => profiles.current, pnpm, createMarketPackageVerifier(npmRegistryHttp), {
+      logFailure: message => ctx.logger.error(message),
+    })
+    installService = service
+    installPnpm = pnpm
+    return service
+  }
+  const installProvider = { get: () => {
+    if (installService !== undefined) return installService
+    const profiles = optionalService<DesktopProfilesCapability>(ctx, 'desktopProfiles')
+    const pnpm = optionalService<MarketDesktopPnpm>(ctx, 'desktopPnpm')
+    // The injection callback is authoritative in isolated test hosts and in
+    // child Cordis scopes. Keep its live service usable when the shared lookup
+    // cannot see those values, while cleanup still clears it on disposal.
+    if (profiles === undefined || pnpm === undefined) return undefined
+    return createInstallService(profiles, pnpm)
+  } }
+  // The capability fiber can be published after this plugin's optional
+  // injection callback starts. Read the live service as a fallback so the
+  // first state request does not report desktop actions as unavailable.
+  const desktopActionsProvider = { get: () => desktopActions ?? optionalService<DesktopActionsCapability>(ctx, 'desktopActions') }
+  const desktopPluginsProvider = { get: () => desktopPlugins ?? optionalService<MarketDesktopPlugins>(ctx, 'desktopPlugins') }
   ctx.effect(
     () => registerMarketRoutes(ctx, scope, installProvider, desktopActionsProvider, desktopPluginsProvider),
     'community-market: routes',
@@ -67,17 +105,15 @@ export function apply(ctx: Context): void {
     const profiles = desktopCtx.get('desktopProfiles') as DesktopProfilesCapability
     const pnpm = desktopCtx.get('desktopPnpm') as MarketDesktopPnpm
     desktopCtx.effect(() => {
-      const service = new MarketInstallService(
-        () => profiles.current,
-        pnpm,
-        createMarketPackageVerifier(npmRegistryHttp),
-        {
-          logFailure: message => ctx.logger.error(message),
-        },
-      )
-      installService = service
+      if (installService !== undefined && installPnpm !== pnpm) {
+        void installService.dispose()
+        installService = undefined
+        installPnpm = undefined
+      }
+      const service = installService ?? createInstallService(profiles, pnpm)
       return () => {
         if (installService === service) installService = undefined
+        if (installPnpm === pnpm) installPnpm = undefined
         service.dispose()
       }
     }, 'community-market: desktop package operations')

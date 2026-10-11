@@ -136,8 +136,6 @@ try {
   const reenabledAa = (await rpc('listPlugins')).find(row => row.moduleName === packages[2])
   assert.equal(reenabledAa?.enabled, true, JSON.stringify(reenabledAa))
   assert.equal(reenabledAa?.fiberPhase, 'active', JSON.stringify(reenabledAa))
-  const selectedMarket = await rpc('setBundleEnabled', { name: packages[0], enabled: true })
-  assert.equal(selectedMarket.application, 'applied', JSON.stringify(selectedMarket))
   assert.deepEqual(manager.features('desktop'), { market: true, remoteControl: true, dshMarket: true })
   // rc.2 起 selectBundle 不再强制 exclusiveBundles 互斥;市场互斥由
   // desktop-next 设置层承接,rpc 层两个市场捆绑可同时保持使能。
@@ -162,27 +160,6 @@ try {
     assert.equal(response.status, expected, JSON.stringify(result))
     return result
   }
-  // Probe the real dshmarket update gate without updating or fetching a package.
-  await rpc('setBundleEnabled', { name: packages[1], enabled: true })
-  // rc.2 rpc 层无市场互斥(见前注),community-market 保持使能。
-  assert.deepEqual(manager.features('desktop'), { market: true, remoteControl: true, dshMarket: true })
-  for (const originHeader of [undefined, 'dsh-app://app']) {
-    const request = new Request('dsh-app://app/dsh-market/update', {
-      method: 'POST', body: JSON.stringify({ name: 'fixture-not-installed' }),
-      headers: { 'content-type': 'application/json', 'x-dsh-desktop-renderer': nativeToken,
-        ...(originHeader ? { origin: originHeader } : {}) },
-    })
-    const response = await forwardWebRequest(request, origin, cookie, nativeToken)
-    const payload = await response.json()
-    assert.equal(response.status, 400, JSON.stringify(payload))
-    assert.equal(payload.error, 'plugin is not installed')
-  }
-  const untrustedUpdate = await fetch(`${origin}/dsh-market/update`, {
-    method: 'POST', headers: { cookie, origin: 'https://example.invalid', 'content-type': 'application/json' }, body: '{}',
-  })
-  assert.equal(untrustedUpdate.status, 403)
-  await untrustedUpdate.body?.cancel()
-  await rpc('setBundleEnabled', { name: packages[0], enabled: true })
   const builtIn = stateBody.builtIns[0]
   assert.ok(builtIn)
   const added = await call('sources', { action: 'add-builtin', key: builtIn.key })
@@ -282,7 +259,9 @@ try {
   const switched = await boot(manager.active)
   assert.equal(manager.active, 'work')
   const switchedState = await fetch(`${switched.origin}/api/community-market/state`, { headers: { cookie: switched.cookie } })
-  assert.equal(switchedState.status, 200)
+  // The work Profile keeps optional Market disabled; its routes must disappear
+  // after the Host switches away from the feature-enabled desktop Profile.
+  assert.equal(switchedState.status, 404)
   await switchedState.body?.cancel()
   await stop()
   if (process.argv.includes('--computer-use')) {

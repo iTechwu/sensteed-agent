@@ -3,8 +3,6 @@
   # user patch can still disable the Browser explicitly.
   disabled: false
 - insert:
-    - id: desktop-next-capabilities
-      name: dsh-desktop-next
     - id: computer-use
       name: '@deepseek-ai/dsh-computer-use'
     - id: computer-use-cua-driver-native
@@ -18,3 +16,6 @@
   disabled: true
 - id: product-analytics
   disabled: true
+- insert:
+    - id: desktop-next-capabilities
+      name: dsh-desktop-next

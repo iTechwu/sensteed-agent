@@ -1,3 +1,7 @@
+# Keep the capability bridge at Host scope when the profile patch is reloaded.
+- insert:
+    - id: desktop-next-capabilities
+      name: dsh-desktop-next
 # A private, ephemeral loopback port allows Next to coexist with other editions.
 - id: webserver
   disabled: true
