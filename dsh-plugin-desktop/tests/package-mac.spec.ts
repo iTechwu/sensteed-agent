@@ -36,7 +36,6 @@ function options(calls: CommandCall[], logs: string[] = []): MacSmokePackageOpti
     outputDir: '/repo/dsh-plugin-desktop/dist/mac-smoke',
     resetOutput: () => undefined,
     prepareRuntime: () => undefined,
-    refreshBundled: () => undefined,
     builderCli: '/repo/node_modules/electron-builder/cli.js',
     verifier: '/repo/dsh-plugin-desktop/scripts/verify-mac-smoke.ts',
     nodeExecutable: '/usr/local/bin/node',

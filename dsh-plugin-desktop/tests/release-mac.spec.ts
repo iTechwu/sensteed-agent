@@ -36,7 +36,6 @@ function baseOptions(
     },
     log: message => logs.push(message),
     prepareRuntime: () => undefined,
-    refreshBundled: () => undefined,
     refreshBundled: () => {
       calls.push({ command: 'refresh-bundled', args: ['--offline'], cwd: '/repo', env: {} })
     },
