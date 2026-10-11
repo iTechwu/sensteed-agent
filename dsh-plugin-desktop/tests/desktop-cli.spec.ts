@@ -55,7 +55,10 @@ describe('packaged dsh bootstrap', () => {
     const argv = ['/Applications/Sensteed Agent', '/app.asar/lib/desktop-cli.js', '--dump-config']
     const runCli = vi.fn(async () => {})
     const load = vi.fn(async (url: string) => {
-      expect(environment).toEqual({ KEEP: 'value' })
+      expect(environment).toEqual({
+        KEEP: 'value',
+        DSH_BUNDLED_SKILL_DIR: expect.stringContaining('/dsh-plugin-desktop/bundled/skills'),
+      })
       expect(argv).toEqual([
         '/Applications/Sensteed Agent',
         '/app.asar/lib/desktop-cli.js',
