@@ -79,6 +79,11 @@ const COMMON_APP_FILES = [
   // consumed by the packaged runtime smoke. Written only by
   // scripts/refresh-bundled.mjs; the afterPack verifier asserts the entries.
   'bundled/**',
+  // Huashu's animated showcase is README-only reference material. The skill
+  // runtime uses its engine, fonts, references, and generated assets, but never
+  // loads these demo GIFs; leave them in the repository while keeping them out
+  // of the installed application.
+  '!bundled/skills/huashu-art-motion/assets/showcase/**',
   'package.json',
   // a0a4298b0b 的运行时闭包：这些一方依赖的 pnpm store 拷贝会被
   // 图收集器丢弃，globs 是它们进入 ASAR 的通道。
