@@ -120,6 +120,21 @@ export function createFilesView(ctx) {
     var active = findFileEntry(files.active)
     if (!active) return null
     var close = function () { setFiles({ overlay: false, overlayMax: false, overlayReturn: null }) }
+    var lastTrigger = React.useRef(null)
+    var panelRef = React.useRef(null)
+    React.useEffect(function () {
+      if (!files.overlay) return undefined
+      lastTrigger.current = document.activeElement
+      var onKeyDown = function (event) {
+        if (event.key === 'Escape') { event.preventDefault(); close() }
+      }
+      document.addEventListener('keydown', onKeyDown)
+      requestAnimationFrame(function () { if (panelRef.current) panelRef.current.focus() })
+      return function () {
+        document.removeEventListener('keydown', onKeyDown)
+        requestAnimationFrame(() => lastTrigger?.focus())
+      }
+    }, [files.overlay])
     var closeAndCloseTab = function () {
       if (active.dirty && typeof window !== 'undefined' && !window.confirm(T('files.unsavedConfirm'))) return
       close()
@@ -134,10 +149,10 @@ export function createFilesView(ctx) {
       }
     }
     return create('div', {
-      className: 'dfv-overlay',
+      className: 'dfv-overlay', role: 'dialog', 'aria-modal': true, 'aria-label': '文件预览',
       onClick: function (e) { if (e.target === e.currentTarget) close() },
     },
-      create('div', { className: 'dfv-overlay-panel' + (files.overlayMax ? ' dfv-overlay-max' : '') },
+      create('div', { className: 'dfv-overlay-panel' + (files.overlayMax ? ' dfv-overlay-max' : ''), ref: panelRef, tabIndex: -1 },
         create('div', { className: 'dfv-toolbar' },
           create(FileToolbar, { entry: active }),
           create('button', {

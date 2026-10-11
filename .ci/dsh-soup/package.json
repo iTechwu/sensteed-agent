@@ -6,6 +6,7 @@
   "main": "lib/index.js",
   "scripts": {
     "build": "esbuild lib/client.entry.js --bundle --format=iife --platform=browser --target=es2020 --outfile=lib/client.js",
+    "check": "npm test",
     "prepublishOnly": "npm run build",
     "test": "npm run build && node --test test/client-goal.spec.mjs test/file-address-bridge.spec.mjs test/html-preview.spec.mjs test/host.spec.mjs"
   },

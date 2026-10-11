@@ -402,14 +402,17 @@ for (const name of clientPlugins) {
   const hasThemeAliases = themeAliasCount >= 4
     && /var\(--dsw-alias-bg-base\)/.test(source)
     && /var\(--dsw-alias-label-primary\)/.test(source)
-  const fetchCount = (source.match(/\bfetch\s*\(/g) || []).length
+  // esbuild may rename an injected `fetch` binding (`fetch2`, `fetch3`) to
+  // avoid colliding with the browser global. Count those generated names as
+  // the same network primitive instead of flagging a valid bundled policy.
+  const fetchCount = (source.match(/\bfetch\d*\s*\(/g) || []).length
   const sameOriginCount = (source.match(/credentials:\s*['"]same-origin['"]/g) || []).length
   const rejectRedirectCount = (source.match(/redirect:\s*['"]error['"]/g) || []).length
   // Count the shared bounded-timeout wiring itself: a bare `signal:` also
   // appears on host RPC options, which are not fetches. An AbortSignal.any
   // composition that keeps a caller cancellation signal next to the shared
   // timeout satisfies the same policy.
-  const boundedFetchCount = (source.match(/signal:\s*AbortSignal\.(?:any\(\[[^\]]*?)?timeout\(REQUEST_TIMEOUT_MS\)/g) || []).length
+  const boundedFetchCount = (source.match(/signal:\s*AbortSignal\.(?:any\(\[[^\]]*?)?timeout\(REQUEST_TIMEOUT_MS\d*\)/g) || []).length
   const hasDynamicStatus = /aria-live/.test(source) || /role:\s*[^}\n]*['"](?:status|alert)['"]/.test(source)
   const hasAsyncUiState = /set(?:Loading|Busy)\(/.test(source)
   const exposesAsyncUiState = /aria-busy/.test(source)
