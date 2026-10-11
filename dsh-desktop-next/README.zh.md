@@ -163,7 +163,7 @@ corepack pnpm --filter dsh-desktop-next run dist:mac
 corepack pnpm --filter dsh-desktop-next run dist:win
 ```
 
-打包复用 Beta 的目录构建、macOS universal DMG、签名公证预检和 Windows x64 NSIS 流程；Windows 安装包遵循现有未签名构建策略。运行时保持 `asar: false`、`RunAsNode`、完整依赖和双架构原生文件。Next 无需旧壳的 fs-ext 锁模块。所有入口仅构建产物，不发布、不启动 GUI；正式发布仍须先通过 AA 最新构建和仓库检查。
+打包复用 Beta 的目录构建、Apple Silicon macOS DMG、签名公证预检和 Windows x64 NSIS 流程；Windows 安装包遵循现有未签名构建策略。运行时保持 `asar: false`、`RunAsNode`、完整依赖和 arm64 原生文件。Next 无需旧壳的 fs-ext 锁模块。所有入口仅构建产物，不发布、不启动 GUI；正式发布仍须先通过 AA 最新构建和仓库检查。
 
 桌面设置和托盘均可检查更新。安装版启动后延迟检查，之后每 6 小时检查一次；只有用户点击下载才下载。托盘显示字节数或百分比，完成后点击“安装并重启”。安装前先隐藏窗口并停止 Host。macOS 校验 Next 身份、版本和签名团队，将已下载 DMG 中的应用封装为本地 ZIP，交给 Electron 的 Squirrel.Mac 原生更新器验证和替换；不会改写应用目录或降低签名要求。Windows 校验 Next 安装器身份和版本，交接给 NSIS 静默更新并重新启动。开发运行只允许检查，不替换源码或 Electron 开发运行时。
 

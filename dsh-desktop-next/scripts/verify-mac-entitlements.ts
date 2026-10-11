@@ -16,12 +16,12 @@ const readEntitlements: ReadEntitlements = (path, arch) => {
   return JSON.parse(execFileSync('plutil', ['-convert', 'json', '-o', '-', '-'], { input: xml, encoding: 'utf8' }))
 }
 
-/** Both Universal slices and every Electron Helper must retain microphone access. */
+/** Apple Silicon and every Electron Helper must retain microphone access. */
 export function verifyNextMacEntitlements(appPath: string, read: ReadEntitlements = readEntitlements): void {
   const targets = [appPath, ...['', ' (Renderer)', ' (GPU)', ' (Plugin)']
     .map(suffix => join(appPath, 'Contents', 'Frameworks', `DSH NEXT Helper${suffix}.app`))]
   for (const target of targets) {
-    for (const arch of ['arm64', 'x86_64']) {
+    for (const arch of ['arm64']) {
       const entitlements = read(target, arch)
       for (const key of NEXT_MAC_REQUIRED_ENTITLEMENTS) {
         if (entitlements[key] !== true) throw new Error(`Missing macOS entitlement ${key} in ${target} (${arch})`)
