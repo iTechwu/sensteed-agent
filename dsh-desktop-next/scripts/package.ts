@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { packageDirectory } from '../../dsh-plugin-desktop/scripts/package-dir.mjs'
 import { releaseMac } from '../../dsh-plugin-desktop/scripts/release-mac.ts'
 import { packageMacSmoke } from '../../dsh-plugin-desktop/scripts/package-mac.ts'
+import { refreshBundledForPackaging } from '../../dsh-plugin-desktop/scripts/refresh-bundled-cli.ts'
 import { createWindowsPackageOptions, packageWindowsInstaller } from '../../dsh-plugin-desktop/scripts/package-win.ts'
 import { prepareNextMacRuntime } from './mac-runtime.ts'
 import { runNextPackagingCommand } from './packaging-command.ts'
@@ -28,13 +29,14 @@ if (mode === 'dir') {
   if (process.platform === 'darwin') prepareRuntime()
   packageDirectory({ cwd: desktopRoot, electronBuilderCli: require.resolve('electron-builder/cli.js'), electronDistPath: join(dirname(require.resolve('electron/package.json')), 'dist') })
 } else if (mode === 'mac') {
-  releaseMac({ ...shared, arch: 'arm64', listCodeSigningIdentities: env => {
+  releaseMac({ ...shared, arch: 'arm64', refreshBundled: () => refreshBundledForPackaging('verify', workspaceRoot), listCodeSigningIdentities: env => {
     const result = spawnSync('security', ['find-identity', '-v', '-p', 'codesigning'], { env, encoding: 'utf8' })
     if (result.error || result.status !== 0) throw result.error ?? new Error('Signing identity discovery failed')
     return result.stdout
   } })
 } else if (mode === 'mac-smoke') {
   packageMacSmoke({ ...shared, workspaceRoot, arch: process.arch, nodeVersion: process.versions.node,
+    refreshBundled: () => refreshBundledForPackaging('refresh', workspaceRoot),
     builderCli: require.resolve('electron-builder/cli.js'), verifier: join(desktopRoot, 'scripts/verify-mac-smoke.ts'), nodeExecutable: process.execPath })
 } else if (mode === 'win') {
   packageWindowsInstaller({ ...createWindowsPackageOptions(), desktopRoot, workspaceRoot, run,
