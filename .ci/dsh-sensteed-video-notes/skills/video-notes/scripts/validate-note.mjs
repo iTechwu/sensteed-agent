@@ -4,10 +4,10 @@
 // 用法：validate-note.mjs --input note.json [--offline] [--rendered-md course.md] [--rendered-html course.html]
 // 退出码 0=通过；1=存在 error。输出 JSON {ok, errors[], warnings[]}。
 
-import { existsSync, readFileSync } from 'node:fs'
-import { isAbsolute, resolve } from 'node:path'
+import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs'
+import { dirname, isAbsolute, relative, resolve } from 'node:path'
+import { isPermanentImageUrl } from './note-assets.mjs'
 
-const ALLOWED_IMAGE_PREFIX = 'https://files.ixicai.cn/coursemd/assets/'
 const INJECTION_PATTERNS = [
   /<\s*script/i,
   /javascript\s*:/i,
@@ -27,6 +27,7 @@ export function validateNote(note, { offline = false } = {}) {
   const sections = note.sections || []
   let previousStart = -Infinity
   sections.forEach((section, index) => {
+    if (section.startSeconds == null && section.timingQuality === 'none') return
     const start = Number(section.startSeconds)
     if (!Number.isFinite(start)) errors.push(`sections[${index}].startSeconds 非法`)
     else if (start < previousStart) errors.push(`sections[${index}] 时间倒序（${start} < ${previousStart}）`)
@@ -46,16 +47,19 @@ export function validateNote(note, { offline = false } = {}) {
   if (expected > 0 && covered.length !== expected) {
     errors.push(`segment 覆盖数 ${covered.length} != 证据总数 ${expected}（基线必须不重不漏）`)
   }
+  if (evidence.segmentIds && (evidence.segmentIds.length !== covered.length || evidence.segmentIds.some(id => !coveredSet.has(id)))) {
+    errors.push('segment 引用与原始证据 ID 集合不一致')
+  }
+  if (new Set(sections.map(section => section.sectionId)).size !== sections.length) errors.push('sectionId 存在重复')
 
   // 图片链接安全
   sections.forEach((section, index) => {
     for (const url of section.imageDownloadUrls || []) {
       if (offline) {
-        if (!/^assets\/[\w.-]+\.jpg$/.test(url)) errors.push(`sections[${index}] 离线图片路径非法：${url}`)
-      } else if (!url.startsWith(ALLOWED_IMAGE_PREFIX)) {
+        // note 保留云端证据 URL；相对路径属于渲染产物，不改写证据。
+        if (!isPermanentImageUrl(url)) errors.push(`sections[${index}] 原始图片证据 URL 非法：${url}`)
+      } else if (!isPermanentImageUrl(url)) {
         errors.push(`sections[${index}] 图片非 coursemd/assets 永久地址：${url}`)
-      } else if (/[?&](X-Amz|signature|Expires)=/i.test(url)) {
-        errors.push(`sections[${index}] 图片链接携带签名参数（永久链接不得带签名）：${url}`)
       }
     }
   })
@@ -72,7 +76,7 @@ export function validateNote(note, { offline = false } = {}) {
   textFields.forEach(text => {
     for (const pattern of INJECTION_PATTERNS) {
       if (pattern.test(String(text))) {
-        errors.push(`文本包含可执行内容片段，必须转义或清除：${String(text).slice(0, 60)}…`)
+        warnings.push('原文含代码片段（如 script），渲染时必须作为普通文字转义')
         break
       }
     }
@@ -90,30 +94,34 @@ export function validateNote(note, { offline = false } = {}) {
   return { ok: errors.length === 0, errors, warnings }
 }
 
-export function validateRenderedFiles(markdownPath, htmlPath, { offline = false, rootDir = process.cwd() } = {}) {
+export function validateRenderedFiles(markdownPath, htmlPath, { offline = false, rootDir = dirname(resolve(markdownPath || htmlPath || '.')) } = {}) {
   const errors = []
   const warnings = []
   const markdown = markdownPath && existsSync(markdownPath) ? readFileSync(markdownPath, 'utf8') : null
   const html = htmlPath && existsSync(htmlPath) ? readFileSync(htmlPath, 'utf8') : null
   if (!markdown) errors.push(`course.md 不存在：${markdownPath}`)
   if (!html) errors.push(`course.html 不存在：${htmlPath}`)
+  function checkImage(reference) {
+    if (!offline) {
+      if (!isPermanentImageUrl(reference)) errors.push(`在线模式图片必须为 coursemd/assets 永久链接：${reference}`)
+      return
+    }
+    if (!/^assets\/[A-Za-z0-9_-]+\.jpg$/.test(reference)) {
+      errors.push(`离线图片路径非法：${reference}`)
+      return
+    }
+    const target = resolve(rootDir, reference)
+    if (!existsSync(target)) {
+      errors.push(`离线图片缺失：${reference}`)
+      return
+    }
+    const child = relative(realpathSync(rootDir), realpathSync(target))
+    if (child.startsWith('..') || isAbsolute(child) || !statSync(target).isFile()) errors.push(`离线图片路径越界：${reference}`)
+  }
   if (markdown) {
-    const imageRefs = [...markdown.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map(match => match[1])
+    const imageRefs = [...markdown.matchAll(/!\[(?:\\.|[^\\\]])*\]\(([^)]+)\)/g)].map(match => match[1])
     for (const reference of imageRefs) {
-      if (offline) {
-        if (reference.startsWith('assets/')) {
-          const target = resolve(rootDir, reference)
-          if (!target.startsWith(resolve(rootDir)) || isAbsolute(reference) || reference.includes('..')) {
-            errors.push(`离线图片路径越界：${reference}`)
-          } else if (!existsSync(target)) {
-            warnings.push(`离线图片缺失（可恢复）：${reference}`)
-          }
-        } else if (!reference.startsWith(ALLOWED_IMAGE_PREFIX)) {
-          errors.push(`Markdown 图片引用既非离线相对路径也非永久链接：${reference}`)
-        }
-      } else if (!reference.startsWith(ALLOWED_IMAGE_PREFIX)) {
-        errors.push(`在线模式 Markdown 图片必须为 coursemd/assets 永久链接：${reference}`)
-      }
+      checkImage(reference)
     }
     if (/<\s*script/i.test(markdown)) errors.push('course.md 含 script 标签')
   }
@@ -124,6 +132,9 @@ export function validateRenderedFiles(markdownPath, htmlPath, { offline = false,
       errors.push('在线模式 CSP 未放行 files.ixicai.cn 图片域')
     }
     if (/<\s*script/i.test(html)) errors.push('course.html 含 script 标签（严格无脚本模板）')
+    if (/<[^>]+\s+on[a-z]+\s*=/i.test(html)) errors.push('course.html 含事件属性')
+    const htmlRefs = [...html.matchAll(/<img\b[^>]*\bsrc="([^"]*)"/gi)].map(match => match[1])
+    htmlRefs.forEach(checkImage)
     if (/https?:\/\/(?!files\.ixicai\.cn)[^\s"']+/i.test(html.replace(/<meta[^>]*>/gi, ''))) {
       warnings.push('course.html 存在非 files.ixicai.cn 外链，需人工确认')
     }
@@ -148,7 +159,7 @@ function main() {
   const markdownPath = get('--rendered-md')
   const htmlPath = get('--rendered-html')
   if (markdownPath || htmlPath) {
-    const rendered = validateRenderedFiles(markdownPath, htmlPath, { offline, rootDir: process.cwd() })
+    const rendered = validateRenderedFiles(markdownPath, htmlPath, { offline })
     result.errors.push(...rendered.errors)
     result.warnings.push(...rendered.warnings)
     result.ok = result.errors.length === 0

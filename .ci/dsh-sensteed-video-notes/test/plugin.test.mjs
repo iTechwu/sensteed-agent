@@ -137,7 +137,7 @@ test('validate-note rejects bad urls, duplicates, and injection', async () => {
   assert.equal(result.ok, false)
   assert.ok(result.errors.some(error => error.includes('coursemd/assets')))
   assert.ok(result.errors.some(error => error.includes('重复')))
-  assert.ok(result.errors.some(error => error.includes('script')))
+  assert.ok(result.warnings.some(warning => warning.includes('script')))
 
   const good = {
     ...base,
@@ -148,5 +148,113 @@ test('validate-note rejects bad urls, duplicates, and injection', async () => {
     }],
   }
   assert.equal(validateNote(good, { offline: false }).ok, true)
-  assert.equal(validateNote(good, { offline: true }).ok, false)
+  assert.equal(validateNote(good, { offline: true }).ok, true)
+})
+
+
+test('preserves untimed speech, excludes silence from coverage and propagates gaps', async () => {
+  const { alignTimeline } = await import('../skills/video-notes/scripts/align-timeline.mjs')
+  const { validateNote } = await import('../skills/video-notes/scripts/validate-note.mjs')
+  const input = {
+    transcript: { transcriptId: 'tr_1', timingQuality: 'none', segments: [
+      { segmentId: 's1', startSeconds: null, endSeconds: null, rawText: '未计时原文' },
+      { segmentId: 'silence', status: 'silence' },
+    ] },
+    frames: [{ frameId: 'f', onsetSeconds: 0, captureSeconds: 1,
+      downloadUrl: 'https://files.ixicai.cn/coursemd/assets/a/b/c/f.jpg' }],
+    coverage: { complete: false, truncated: true },
+  }
+  const note = alignTimeline(input)
+  assert.deepEqual(note.sections.at(-1).rawTexts, ['未计时原文'])
+  assert.equal(note.sections.at(-1).startSeconds, null)
+  assert.equal(note.evidence.segmentCount, 1)
+  assert.equal(note.evidence.transcriptId, 'tr_1')
+  assert.equal(note.quality.complete, false)
+  assert.match(note.quality.warnings.join(' '), /截图覆盖不完整/)
+  assert.equal(validateNote(note).ok, true)
+  assert.deepEqual(alignTimeline(input), note)
+  const forged = structuredClone(note)
+  forged.sections.at(-1).segmentIds = ['invented']
+  assert.equal(validateNote(forged).ok, false)
+})
+
+test('offline images agree across sections, manifest, MD and HTML; missing files fail', async () => {
+  const { mkdtemp, mkdir, writeFile, rm, symlink } = await import('node:fs/promises')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const { renderMarkdown, renderHtml, renderNoteOfflineImages } = await import('../skills/video-notes/scripts/render-note.mjs')
+  const { validateRenderedFiles, validateNote } = await import('../skills/video-notes/scripts/validate-note.mjs')
+  const note = { schemaVersion: 'video-notes-v1', source: { title: '课]程' },
+    evidence: { segmentCount: 2 }, sections: [1, 2].map(n => ({
+      sectionId: `sec_${n}`, startSeconds: n, endSeconds: n + 1,
+      frameIds: [`f${n}`], imageDownloadUrls: [`https://files.ixicai.cn/coursemd/assets/a/b/c/f${n}.jpg`],
+      segmentIds: [`s${n}`], rawTexts: ['<script>教学示例</script>'],
+    })) }
+  const dir = await mkdtemp(join(tmpdir(), 'video-note-test-'))
+  try {
+    const md = join(dir, 'course.md'); const html = join(dir, 'course.html')
+    await writeFile(md, renderMarkdown(note, { offline: true }))
+    const renderedHtml = renderHtml(note, { offline: true })
+    await writeFile(html, renderedHtml)
+    const mapping = renderNoteOfflineImages(note)
+    assert.deepEqual(mapping.map(item => item.frameId), ['f1', 'f2'])
+    for (const item of mapping) {
+      assert.ok(renderMarkdown(note, { offline: true }).includes(item.file))
+      assert.ok(renderedHtml.includes(item.file))
+    }
+    assert.match(renderedHtml, /img-src 'self' file:/)
+    assert.equal(validateNote(note, { offline: true }).ok, true)
+    assert.equal(validateRenderedFiles(md, html, { offline: true }).ok, false)
+    await mkdir(join(dir, 'assets'))
+    for (const item of mapping) await writeFile(join(dir, item.file), 'jpeg')
+    assert.equal(validateRenderedFiles(md, html, { offline: true }).ok, true)
+    await rm(join(dir, mapping[1].file))
+    await symlink(md, join(dir, mapping[1].file))
+    // symlinks within the selected output directory are allowed; escaping it fails.
+    await rm(join(dir, mapping[1].file))
+    await symlink('/etc/hosts', join(dir, mapping[1].file))
+    assert.equal(validateRenderedFiles(md, html, { offline: true }).ok, false)
+  } finally { await rm(dir, { recursive: true, force: true }) }
+})
+
+test('untrusted Markdown cannot add images and permanent URLs reject traversal/query strings', async () => {
+  const { renderMarkdown, renderHtml } = await import('../skills/video-notes/scripts/render-note.mjs')
+  const { validateNote } = await import('../skills/video-notes/scripts/validate-note.mjs')
+  const note = { schemaVersion: 'video-notes-v1', source: { title: 'title' }, sections: [{
+    sectionId: 's', startSeconds: 0, imageDownloadUrls: [], segmentIds: [],
+    rawTexts: ['![track](https://evil.test/pixel.jpg)'],
+  }] }
+  assert.ok(renderMarkdown(note).includes('\\!\\[track\\]'))
+  for (const suffix of ['../x.jpg', 'x.jpg?X-Amz-Signature=token', 'x.jpg?foo=1']) {
+    note.sections[0].imageDownloadUrls = [`https://files.ixicai.cn/coursemd/assets/${suffix}`]
+    assert.equal(validateNote(note).ok, false)
+    assert.throws(() => renderHtml(note))
+  }
+})
+
+test('bootstrap exposes installed script paths and rejects lookalike tool names', async () => {
+  const { tools } = await loadHost(['fake_video_capabilities_get_suffix'])
+  const result = await tools.get('sensteed_video_notes_bootstrap').execute({})
+  assert.equal(result.result.tools.video_capabilities_get, false)
+  assert.ok(result.result.scriptPaths['render-note.mjs'].endsWith('/scripts/render-note.mjs'))
+  assert.ok(result.result.scripts['note-assets.mjs'])
+})
+
+test('render CLI refuses to overwrite an existing output directory', async () => {
+  const { mkdtemp, writeFile, rm } = await import('node:fs/promises')
+  const { join } = await import('node:path')
+  const { tmpdir } = await import('node:os')
+  const { spawnSync } = await import('node:child_process')
+  const { fileURLToPath } = await import('node:url')
+  const dir = await mkdtemp(join(tmpdir(), 'video-note-cli-'))
+  try {
+    const input = join(dir, 'note.json')
+    await writeFile(input, JSON.stringify({ sections: [], source: {} }))
+    const script = fileURLToPath(new URL('../skills/video-notes/scripts/render-note.mjs', import.meta.url))
+    const output = join(dir, 'new-version')
+    assert.equal(spawnSync(process.execPath, [script, '--input', input, '--out-dir', output]).status, 0)
+    await writeFile(join(output, 'course.md'), 'user-edited')
+    assert.notEqual(spawnSync(process.execPath, [script, '--input', input, '--out-dir', output]).status, 0)
+    assert.equal(await readFile(join(output, 'course.md'), 'utf8'), 'user-edited')
+  } finally { await rm(dir, { recursive: true, force: true }) }
 })

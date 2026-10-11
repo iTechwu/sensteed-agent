@@ -21,7 +21,7 @@
   ],
   "scripts": {
     "test": "node --test",
-    "check": "node --check index.js && node --check skills/video-notes/scripts/align-timeline.mjs && node --check skills/video-notes/scripts/render-note.mjs && node --check skills/video-notes/scripts/validate-note.mjs && npm test"
+    "check": "node --check index.js && node --check skills/video-notes/scripts/note-assets.mjs && node --check skills/video-notes/scripts/align-timeline.mjs && node --check skills/video-notes/scripts/render-note.mjs && node --check skills/video-notes/scripts/validate-note.mjs && npm test"
   },
   "license": "MIT",
   "private": true

@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 
 const SKILL_URL = new URL('./skills/video-notes/SKILL.md', import.meta.url)
 const REQUIRED_TOOLS = [
@@ -42,25 +43,29 @@ export function apply(ctx) {
       async execute() {
         const schemas = ctx.tools.schemas?.() || []
         const names = schemas.map(item => String(item.name || ''))
-        const tools = Object.fromEntries(REQUIRED_TOOLS.map(name => [name, names.some(candidate => candidate.includes(name))]))
+        const tools = Object.fromEntries(REQUIRED_TOOLS.map(name => [name, names.includes(name) || names.includes(`mcp__video-processing__${name}`)]))
         const missing = Object.entries(tools).filter(([, available]) => !available).map(([name]) => name)
         const scripts = {}
-        for (const script of ['align-timeline.mjs', 'render-note.mjs', 'validate-note.mjs']) {
+        const scriptPaths = {}
+        for (const script of ['align-timeline.mjs', 'render-note.mjs', 'validate-note.mjs', 'note-assets.mjs']) {
           try {
-            readFileSync(new URL(`./skills/video-notes/scripts/${script}`, import.meta.url), 'utf8')
+            const scriptUrl = new URL(`./skills/video-notes/scripts/${script}`, import.meta.url)
+            readFileSync(scriptUrl, 'utf8')
             scripts[script] = true
+            scriptPaths[script] = fileURLToPath(scriptUrl)
           } catch {
             scripts[script] = false
           }
         }
         return {
-          ok: missing.length === 0,
+          ok: missing.length === 0 && Object.values(scripts).every(Boolean),
           result: {
             dataSource: 'local_tool_catalog',
             externalCallMade: false,
             tools,
             missing,
             scripts,
+            scriptPaths,
             usage: 'Call video_capabilities_get first. Resolve the source, reuse subtitles before any ASR (ASR may be unavailable), extract frames per content type, then align/render locally with the bundled scripts. Poll the original jobId; never resubmit with a new idempotency key.',
           },
         }

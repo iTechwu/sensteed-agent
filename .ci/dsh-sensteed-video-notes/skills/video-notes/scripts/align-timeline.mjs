@@ -14,8 +14,9 @@
 // 时不建立句子级精确对应，标注粗粒度。
 
 import { readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 
-export function alignTimeline({ transcript, frames, timingQuality = 'source', source = null }) {
+export function alignTimeline({ transcript, frames, timingQuality = transcript?.timingQuality || 'source', source = null, coverage = null, frameSetId = null }) {
   const segments = (transcript?.segments || []).slice()
   const sortedFrames = (frames || [])
     .slice()
@@ -40,20 +41,36 @@ export function alignTimeline({ transcript, frames, timingQuality = 'source', so
 
   const warnings = []
   const uncovered = []
+  const speechSegments = segments.filter(segment => !segment.status || segment.status === 'speech')
   if (timingQuality !== 'source') {
     warnings.push(`timingQuality=${timingQuality}: 不建立句子级精确时间对应`)
   }
   if (sections.length === 0 && segments.length > 0) {
     warnings.push('no-frames: 文字证据未与截图对齐，输出纯文字时间线')
   }
+  if (coverage?.complete === false || coverage?.truncated) warnings.push('frame-coverage: 截图覆盖不完整')
+  warnings.push(...(coverage?.warnings || []))
 
-  for (const segment of segments) {
-    if (segment.status && segment.status !== 'speech') continue
+  function unalignedSection() {
+    let section = sections.find(item => item.sectionId === 'sec_unaligned')
+    if (!section) {
+      section = { sectionId: 'sec_unaligned', title: '未对齐原文', startSeconds: null, endSeconds: null,
+        timingQuality: 'none', frameIds: [], imageDownloadUrls: [], segmentIds: [], rawTexts: [], displayTexts: [] }
+      sections.push(section)
+    }
+    return section
+  }
+
+  for (const segment of speechSegments) {
     const start = Number(segment.startSeconds)
     const end = Number(segment.endSeconds)
-    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+    if (timingQuality === 'none' || segment.startSeconds == null || segment.endSeconds == null || !Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
       uncovered.push(segment.segmentId)
-      warnings.push(`segment ${segment.segmentId}: 非法时间区间，未归属`)
+      warnings.push(`segment ${segment.segmentId}: 无有效时间，原文保留于未对齐段落`)
+      const target = unalignedSection()
+      target.segmentIds.push(segment.segmentId)
+      target.rawTexts.push(String(segment.rawText ?? ''))
+      target.displayTexts.push(String(segment.rawText ?? ''))
       continue
     }
     const midpoint = (start + end) / 2
@@ -61,13 +78,13 @@ export function alignTimeline({ transcript, frames, timingQuality = 'source', so
     if (sections.length > 0) {
       if (midpoint < sections[0].startSeconds) target = sections[0]
       else {
-        for (const section of sections) {
+        for (const section of sections.filter(item => item.startSeconds != null)) {
           if (midpoint >= section.startSeconds && (section.endSeconds == null || midpoint < section.endSeconds)) {
             target = section
             break
           }
         }
-        if (target == null) target = sections[sections.length - 1]
+        if (target == null) target = sections.filter(item => item.startSeconds != null).at(-1)
       }
     }
     if (target == null) {
@@ -75,7 +92,7 @@ export function alignTimeline({ transcript, frames, timingQuality = 'source', so
       const only = {
         sectionId: 'sec_timeline',
         title: '',
-        startSeconds: Number.isFinite(sections[0]?.startSeconds) ? sections[0].startSeconds : 0,
+        startSeconds: start,
         endSeconds: null,
         frameIds: [],
         imageDownloadUrls: [],
@@ -83,7 +100,7 @@ export function alignTimeline({ transcript, frames, timingQuality = 'source', so
         rawTexts: [],
         displayTexts: [],
       }
-      sections.push(only)
+      sections.unshift(only)
       target = only
     }
     target.segmentIds.push(segment.segmentId)
@@ -94,18 +111,24 @@ export function alignTimeline({ transcript, frames, timingQuality = 'source', so
   const coveredSegmentIds = sections.flatMap(section => section.segmentIds)
   const baseline = {
     schemaVersion: 'video-notes-v1',
-    noteVersion: new Date().toISOString().slice(0, 10).replace(/-/g, ''),
+    noteVersion: createHash('sha256').update(JSON.stringify({ source, segments, frames: sortedFrames, timingQuality, coverage })).digest('hex').slice(0, 16),
     generatorVersion: 'align-timeline.mjs v1',
     source,
     evidence: {
       timingQuality,
+      transcriptId: transcript?.transcriptId || null,
+      frameSetId,
       frameCount: sortedFrames.length,
-      segmentCount: segments.length,
+      segmentCount: speechSegments.length,
+      segmentIds: speechSegments.map(segment => segment.segmentId),
+      sourceSegmentCount: segments.length,
       coveredSegmentCount: coveredSegmentIds.length,
     },
     sections,
     quality: {
-      complete: uncovered.length === 0 && coveredSegmentIds.length === segments.filter(s => !s.status || s.status === 'speech').length,
+      complete: uncovered.length === 0 && sortedFrames.length > 0 && coverage?.complete !== false && !coverage?.truncated,
+      coverage,
+      unalignedSegmentIds: uncovered,
       warnings: Array.from(new Set(warnings)),
       failedStages: [],
     },

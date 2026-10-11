@@ -17,10 +17,11 @@ note
 
 1. 时间单调：sections 按 `startSeconds` 升序、不重叠；帧区间 `[onset,nextOnset)` 连续；`captureSeconds` 落在区间内。
 2. 覆盖：每个 speech segment 恰好出现在一个 section 的 `segmentIds` 中（不重不漏）；摘要引用不改变基线覆盖。
-3. 图片：在线模式所有 `imageDownloadUrls` 必须是 `https://files.ixicai.cn/coursemd/assets/...`（无签名参数）；离线模式必须是 `assets/<file>` 相对路径且文件存在。
-4. 注入安全：rawText/displayText/summary 中不得包含 `<script`、`javascript:`、`data:text/html`、事件属性（`onerror=` 等）；渲染层一律转义。
+3. 图片：note 的 `imageDownloadUrls` 始终是 `https://files.ixicai.cn/coursemd/assets/...`（无任何查询参数/路径穿越）。离线 MD/HTML 的相对图片路径与渲染输出 `images` 映射一致，文件存在且不经 symlink 逃出输出目录；缺图为错误。
+4. 注入安全：原始转写中的 HTML/JavaScript 教学代码保留为证据；渲染层转义 HTML 和 Markdown 控制字符，输出无可执行 script/事件属性，不能额外引入第三方图片。原文字段中的代码只作为提示，不成为删除证据的理由。
 5. 路径安全：输出路径禁止 `..`、绝对路径覆盖、symlink 逃逸；同源重生成写新版本目录，不覆盖用户手改文件。
 6. 缺口显式化：`timingQuality=chunk/none`、`coverage.truncated=true`、`failedStages` 非空时，笔记头部必须有对应说明。
+7. 无时间原文进入 `sec_unaligned`（时间留空）；speech 覆盖 ID 集合必须与证据一致。silence 不计入 speech 数量。noteVersion 由输入摘要产生，相同输入重跑不随日期变化。
 
 ## 写作边界
 
