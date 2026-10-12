@@ -249,6 +249,11 @@ export const ELECTRON_BUILDER_BASE = Object.freeze({
       '!node_modules/@deepseek-ai/dsh-session-persistence-jsonl/node_modules/**',
       '!node_modules/@deepseek-ai/dsh-subprocess-local/node_modules/**',
       '!node_modules/@deepseek-ai/dsh-win32-process/node_modules/**',
+      // 合并新增的平台运行时包同样会被依赖树拷贝丢档，显式 glob 强制去引用。
+      'node_modules/@deepseek-ai/libreoffice-kit-win32-x64/**',
+      // sources/ 是引擎构建期源码（运行时只用 bin/ 与 program/），CI 依赖拷贝
+      // 会丢档该子树并使 NSIS 校验失败；显式剔除，收录与体积双赢。
+      '!node_modules/@deepseek-ai/libreoffice-kit-win32-x64/sources/**',
       '!node_modules/@img/sharp-darwin*/**',
       '!node_modules/@img/sharp-libvips-darwin*/**',
       '!node_modules/@img/sharp-win32-arm64*/**',
