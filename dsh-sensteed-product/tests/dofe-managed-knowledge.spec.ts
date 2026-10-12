@@ -22,13 +22,16 @@ describe('dofe-managed Knowledge route', () => {
 
   it('keeps the Knowledge workspace and Runtime bridge in the Desktop bundle', () => {
     expect(desktopPatch).not.toContain("name: '@dofe/dsh-yootun-knowledge'")
-    expect(desktopPatch).not.toContain("name: '@dofe/dsh-knowledge-capture'")
+    expect(desktopPatch).toContain('id: sensteed-agent-knowledge-capture')
+    expect(desktopPatch).toContain("name: '@dofe/dsh-knowledge-capture'")
     expect(captureSource).toContain("'knowledge.session_checkpoint'")
     expect(captureSource).toContain("'knowledge.context_pack'")
     expect(captureSource).toContain("'knowledge.loadout'")
   })
 
   it('exposes the complete current Knowledge MCP surface and role-key addressing', () => {
-    expect(captureSource).toContain("const RUNTIME_SPACE_KEY = 'user.agent_runtime'")
+    expect(captureSource).toContain("const PERSONAL_SPACE_KEY = 'user.personal'")
+    expect(captureSource).toContain("scope: 'USER'")
+    expect(captureSource).toContain('spaceKey: PERSONAL_SPACE_KEY')
   })
 })
