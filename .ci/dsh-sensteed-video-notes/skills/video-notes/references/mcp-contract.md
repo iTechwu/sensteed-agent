@@ -12,7 +12,7 @@
 | `video_upload_authorize` | `filename,contentType,sizeBytes,sha256,purpose(sourceVideo\|subtitle)`；`idempotencyKey` | 返回 PUT 预签名；URL 过期需换新键重授权 |
 | `video_upload_complete` | `uploadId`；`idempotencyKey` | 实测校验（大小/SHA256/魔数/ffprobe）后才返回 assetId |
 | `video_media_prepare_start` | `sourceId`；`idempotencyKey` | 媒体就绪校验；`MEDIA_NOT_READY` 显式返回 |
-| `video_subtitles_read_start` | `sourceId` + `trackId` 或 `subtitleAssetId`；`idempotencyKey` | 字幕规范化，不调 Models、不计费 |
+| `video_subtitles_read_start` | `sourceId` + `trackId` 或 `subtitleAssetId`，严格二选一；`idempotencyKey` | 平台已发现轨异步下载；旁挂字幕同步规范化；不调 Models、不计费 |
 | `video_transcription_start` | `sourceId,language,confirm=true`；`idempotencyKey` | ASR（潜在收费）；未开闸时 `MODEL_DELEGATION_UNAVAILABLE` |
 | `video_transcript_get` | `transcriptId,cursor,limit≤200` | 分页 segments + timingQuality |
 | `video_frames_extract_start` | `sourceId,strategy(stable_slides\|scene_hybrid\|timestamps)`，`timestampsSeconds?≤50`；`idempotencyKey` | 异步任务；轮询 jobId |
@@ -30,3 +30,5 @@
 - 幂等作用域 = owner + tool + idempotencyKey；同键同输入返回原结果，同键不同输入 `IDEMPOTENCY_CONFLICT`。
 - 轮询遵守 `retryAfterSeconds`（缺失时 30 秒起退避）；超时后继续查原 jobId，不换键重提。
 - 帧集 `coverage.truncated=true` 表示超预算抽稀，笔记必须注明覆盖缺口。
+- 平台字幕返回任务引用时，按原 jobId 轮询，成功后使用 resultRefs.transcriptId；来源轨必须已被 source_get 发现，客户端不能提交字幕 URL/下载器参数。无可解析轨时返回 SUBTITLE_UNAVAILABLE。
+- Bilibili 标准 `/video/BV...` 或 `/video/av...` 链接支持 `partId`（1–9999）或 `?p=N`。冲突/非法值返回 VALIDATION_ERROR；其他平台、本地视频及短链的显式分 P 返回 PART_SELECTION_UNSUPPORTED。无 p 的标准链接是第一 P，不代表下载全集。

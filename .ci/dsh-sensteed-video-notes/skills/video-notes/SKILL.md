@@ -7,12 +7,12 @@ description: 将 YouTube、小红书、抖音、Bilibili 或用户选择的本�
 
 通过 `mcp__video-processing__*` 工具工作。开始时调用 `sensteed_video_notes_bootstrap` 和 `video_capabilities_get`，确认工具目录、各来源可用性与限制（512 MiB / 120 分钟 / 120 帧预算以 capabilities 实际返回为准）。不要把 Cookie、API Key、租户、用户标识、本地路径或对象存储 key 作为工具参数。
 
-本地脚本使用 bootstrap 返回的 `scriptPaths` 绝对路径，不假定当前目录就是插件目录。能力状态仅说明接口配置开启，不代表平台真实样本已通过验收；平台字幕轨当前可能仍返回 `SUBTITLE_UNAVAILABLE`，可以使用用户提供的 SRT/VTT，不能声称已读取平台原生字幕。
+本地脚本使用 bootstrap 返回的 `scriptPaths` 绝对路径，不假定当前目录就是插件目录。能力状态仅说明接口配置开启，不代表平台真实样本已通过验收。平台字幕只选择 source_get 已发现的人工/自动轨；调用字幕读取后，若返回 queued/running，轮询原 jobId，从成功结果的 resultRefs.transcriptId 继续读取。只有取得 transcript 才能声称读到了字幕；SUBTITLE_UNAVAILABLE 时可以使用用户提供的 SRT/VTT。
 
 ## 输入与预检
 
 1. 从用户消息获取视频来源；缺少来源才询问。默认中文、时间顺序、Markdown 与 HTML、真实截图、保留原始转写与来源。
-2. 用户已说出输出格式、语言、目标目录、章节范围时沿用。合集/多 P 必须确认具体条目或批量范围；不默认下载整个合集。
+2. 用户已说出输出格式、语言、目标目录、章节范围时沿用。Bilibili 标准视频链接用 partId 正整数或 URL 的 p 参数选择具体分 P，两者同时出现必须一致；短链接须先取得标准视频链接后再选 P。合集/多 P 必须确认具体条目或批量范围，逐项处理；当前没有合集候选/批量接口，不默认下载整个合集。PART_SELECTION_UNSUPPORTED 时停止该选择，不默认为第一 P。
 3. 本地视频首次上传前说明会传到私有云处理；用户明确要求上传/云端处理则沿用授权。用户要求完全离线时明确当前能力缺口，保留文件不自动上传。
 
 ## 执行流程（A→G）
