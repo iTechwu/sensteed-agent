@@ -1,4 +1,4 @@
-import { lstatSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -79,5 +79,40 @@ describe('nested koffi platform materialization', () => {
     const empty = mkdtempSync(join(tmpdir(), 'koffi-empty-'))
     temporaryRoots.push(empty)
     expect(materializeNestedKoffiPlatformPackages({ desktopRoot: empty, platform: 'win32' })).toBe(0)
+  })
+})
+
+describe('hoisted platform package materialization', () => {
+  it('copies the store instance to the hoisted top-level path when absent', async () => {
+    const { ensureHoistedPlatformPackage } = await import('../scripts/windows-koffi-runtime.ts')
+    const root = fixture()
+    const storePackage = join(root, 'node_modules', '.pnpm', '@deepseek-ai+libreoffice-kit-win32-x64@0.1.5', 'node_modules', '@deepseek-ai', 'libreoffice-kit-win32-x64')
+    mkdirSync(storePackage, { recursive: true })
+    writeFileSync(join(storePackage, 'package.json'), '{"name":"@deepseek-ai/libreoffice-kit-win32-x64","version":"0.1.5"}')
+    writeFileSync(join(storePackage, 'build-identity.mjs'), 'identity')
+
+    const outcome = ensureHoistedPlatformPackage({
+      desktopRoot: root,
+      packageName: '@deepseek-ai/libreoffice-kit-win32-x64',
+    })
+
+    expect(outcome).toBe('materialized')
+    const hoisted = join(root, 'node_modules', '@deepseek-ai', 'libreoffice-kit-win32-x64')
+    expect(existsSync(join(hoisted, 'build-identity.mjs'))).toBe(true)
+    // Idempotent: a second run finds the hoisted copy already present.
+    expect(ensureHoistedPlatformPackage({
+      desktopRoot: root,
+      packageName: '@deepseek-ai/libreoffice-kit-win32-x64',
+    })).toBe('present')
+  })
+
+  it('reports source-missing when the virtual store has no matching package', async () => {
+    const { ensureHoistedPlatformPackage } = await import('../scripts/windows-koffi-runtime.ts')
+    const root = fixture()
+    mkdirSync(join(root, 'node_modules', '.pnpm'), { recursive: true })
+    expect(ensureHoistedPlatformPackage({
+      desktopRoot: root,
+      packageName: '@deepseek-ai/libreoffice-kit-win32-x64',
+    })).toBe('source-missing')
   })
 })

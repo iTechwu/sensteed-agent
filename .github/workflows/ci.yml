@@ -304,6 +304,9 @@ jobs:
           } else { "no unpacked node_modules" }
           $bridge = "$res/app.asar.unpacked/node_modules/@agents-anywhere/dsh-bridge-next"
           if (Test-Path "$bridge/package.json") { "bridge package.json: present physically" } else { "bridge package.json: absent physically" }
+          if (Test-Path "$res/app.asar") {
+            node dsh-plugin-desktop/scripts/diagnose-win-asar.mjs "$res/app.asar" dsh-plugin-desktop
+          }
       - name: Build Windows portable archive
         env:
           CI: 'false'

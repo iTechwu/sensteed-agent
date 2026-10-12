@@ -4,6 +4,7 @@ import {
   cpSync,
   existsSync,
   lstatSync,
+  mkdirSync,
   readFileSync,
   readdirSync,
   realpathSync,
@@ -30,6 +31,13 @@ export interface NestedKoffiMaterializationOptions {
   readonly desktopRoot: string
   /** Injectable platform so non-Windows hosts can exercise the walk in tests. */
   readonly platform?: NodeJS.Platform
+}
+
+export interface HoistedPlatformPackageOptions {
+  /** Desktop package root whose node_modules the package is hoisted into. */
+  readonly desktopRoot: string
+  /** Scoped package name, e.g. `@deepseek-ai/libreoffice-kit-win32-x64`. */
+  readonly packageName: string
 }
 
 function copyPackage(source: string, target: string): void {
@@ -204,4 +212,37 @@ export function smokePackagedWindowsKoffiRuntime(
       )
     }
   }
+}
+
+export type HoistedPlatformPackageOutcome = 'present' | 'materialized' | 'source-missing'
+
+/**
+ * Ensure a pnpm-virtual-store platform package is physically reachable at its
+ * hoisted top-level path before Electron Builder runs.
+ *
+ * Transitive platform packages (e.g. `@deepseek-ai/libreoffice-kit-win32-x64`
+ * under the main LibreOffice kit) stay inside `.pnpm`; pnpm's list view still
+ * reports them hoisted, so the dependency collector records a top-level file
+ * set that the Windows dependency copy cannot satisfy from the absent
+ * top-level path, and NSIS fails with `"…" was not found in this archive`.
+ * A real top-level copy gives both the collector and the copier the same
+ * physical location.
+ */
+export function ensureHoistedPlatformPackage(options: HoistedPlatformPackageOptions): HoistedPlatformPackageOutcome {
+  const desktopRoot = resolve(options.desktopRoot)
+  const hoisted = join(desktopRoot, 'node_modules', ...options.packageName.split('/'))
+  if (existsSync(hoisted)) return 'present'
+
+  const storeDirName = `${options.packageName.replaceAll('/', '+')}@`
+  const storeRoot = join(desktopRoot, 'node_modules', '.pnpm')
+  if (!existsSync(storeRoot)) return 'source-missing'
+  for (const entry of readdirSync(storeRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory() || !entry.name.startsWith(storeDirName)) continue
+    const source = join(storeRoot, entry.name, 'node_modules', ...options.packageName.split('/'))
+    if (!existsSync(source)) continue
+    mkdirSync(dirname(hoisted), { recursive: true })
+    cpSync(source, hoisted, { recursive: true, force: true, dereference: true })
+    return 'materialized'
+  }
+  return 'source-missing'
 }
