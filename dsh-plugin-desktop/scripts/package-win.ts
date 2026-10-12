@@ -185,6 +185,7 @@ export function packageWindowsArtifacts(
   targets: readonly ('nsis' | 'zip')[],
   artifacts: readonly ('installer' | 'portable archive')[],
 ): void {
+  const startedAt = Date.now()
   assertWindowsPackageHost(options, artifacts.join(' + '))
   const compression = windowsCompressionOverride(options.env)
 
@@ -248,6 +249,7 @@ export function packageWindowsArtifacts(
       DSH_ELECTRON_BUILDER_TRAVERSAL_ONLY: '1',
     }),
   )
+  options.log(`Windows ${artifactLabel} builder completed in ${Date.now() - startedAt}ms.`)
   options.run(options.nodeExecutable, [options.verifier], options.desktopRoot, cleanEnvironment)
   for (const extra of options.extraVerifiers ?? []) {
     options.run(options.nodeExecutable, [extra], options.desktopRoot, cleanEnvironment)

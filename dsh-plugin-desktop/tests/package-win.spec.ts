@@ -105,6 +105,7 @@ describe('Windows x64 installer packaging', () => {
     expect(logs).toEqual([
       'Building an unsigned Windows x64 installer; Authenticode is a separate release step.',
       expect.stringContaining('platform package materialization:'),
+      expect.stringContaining('Windows installer builder completed in '),
     ])
   })
 
@@ -137,6 +138,7 @@ describe('Windows x64 installer packaging', () => {
     expect(logs).toEqual([
       'Building an unsigned Windows x64 portable archive; Authenticode is a separate release step.',
       expect.stringContaining('platform package materialization:'),
+      expect.stringContaining('Windows portable archive builder completed in '),
     ])
   })
 
@@ -171,6 +173,7 @@ describe('Windows x64 installer packaging', () => {
       'Building an unsigned Windows x64 installer; Authenticode is a separate release step.',
       'Skipping the Windows package preflight; the package gate already passed.',
       expect.stringContaining('platform package materialization:'),
+      expect.stringContaining('Windows installer builder completed in '),
     ])
   })
 
@@ -284,5 +287,6 @@ describe('Windows x64 bundle packaging', () => {
       env: expect.objectContaining({ CSC_IDENTITY_AUTO_DISCOVERY: 'false' }),
     })
     expect(calls[3]?.args).toEqual(['C:\\repo\\dsh-plugin-desktop\\scripts\\verify-win-installer.ts'])
+    expect(calls[4]?.args).toEqual(['C:\\repo\\dsh-plugin-desktop\\scripts\\verify-win-portable.ts'])
   })
 })

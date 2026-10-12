@@ -297,6 +297,10 @@ jobs:
           CI: 'false'
           npm_config_minimum_release_age: '0'
           DSH_PACKAGE_CHECK_ALREADY_RAN: '1'
+          # Candidate artifacts are unsigned and short lived. Store compression
+          # avoids spending most of the Windows runner budget recompressing the
+          # already packed ASAR; release packaging keeps the configured level.
+          DSH_WINDOWS_PACKAGE_COMPRESSION: store
           NODE_OPTIONS: '--max-old-space-size=6144'
         run: pnpm --filter dsh-plugin-desktop dist:win-bundle
       - name: Inspect packaged output on failure

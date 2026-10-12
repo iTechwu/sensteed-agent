@@ -1044,6 +1044,7 @@ describe('published package surface', () => {
     expect(windowsJob.match(/CI: 'false'/g)?.length).toBeGreaterThanOrEqual(3)
     expect(windowsJob.match(/npm_config_minimum_release_age: '0'/g)?.length).toBeGreaterThanOrEqual(3)
     expect(windowsJob).toContain('DSH_PACKAGE_CHECK_ALREADY_RAN: \'1\'')
+    expect(windowsJob).toContain('DSH_WINDOWS_PACKAGE_COMPRESSION: store')
     expect(macosJob).not.toContain('- run: pnpm check')
     expect(macosJob).toContain('run: pnpm --filter dsh-plugin-desktop check:mac-package')
     expect(macosJob).toContain('run: pnpm --filter dsh-plugin-desktop dist:mac-smoke')
