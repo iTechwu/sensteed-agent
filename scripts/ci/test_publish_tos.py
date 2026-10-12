@@ -59,6 +59,10 @@ class FakeTos:
             raise RuntimeError('precondition failed')
         self.objects[key] = kwargs
 
+    def pre_signed_url(self, method, bucket, key, expires_in):
+        self.calls.append(('presign', key, expires_in))
+        return SimpleNamespace(signed_url=f'https://signed.example/{bucket}/{key}?expires={expires_in}')
+
 
 class PublicationTests(unittest.TestCase):
     def setUp(self):
@@ -108,7 +112,7 @@ class PublicationTests(unittest.TestCase):
         key, manifest = publisher.publish(client, self.config, self.context, self.root)
         self.assertEqual(len(manifest['artifacts']), 5)
         self.assertTrue(key.startswith('sensteed-agent/candidates/' + 'a' * 40 + '/123-2/'))
-        self.assertEqual([call[0] for call in client.calls], ['upload'] * 5 + ['put'])
+        self.assertEqual([call[0] for call in client.calls], ['upload'] * 5 + ['presign'] * 6 + ['put'])
         self.assertTrue(client.calls[-1][2]['forbid_overwrite'])
         self.assertTrue(all(item['signing'] == 'unsigned' for item in manifest['artifacts']))
         self.assertEqual(manifest['upstreamCommit'], 'b' * 40)
@@ -126,7 +130,7 @@ class PublicationTests(unittest.TestCase):
         self.assertEqual([item['name'].split('-')[-1] for item in linux],
                          ['x86_64.AppImage', 'amd64.deb'])
         self.assertIn('Sensteed-Agent%20Beta-', manifest['artifacts'][0]['url'])
-        self.assertEqual([call[0] for call in client.calls], ['upload'] * 5 + ['put'])
+        self.assertEqual([call[0] for call in client.calls], ['upload'] * 5 + ['presign'] * 6 + ['put'])
 
     def test_mac_artifact_requires_arm64_suffix(self):
         target = next((self.root / 'macos').iterdir())

@@ -250,9 +250,20 @@ def publish(client, config, context, directory):
         if head.content_length != item['size'] or head.meta.get('sha256') != item['sha256']:
             raise ValueError('Uploaded artifact verification failed for ' + item['platform'])
         print(f"TOS download: {item['platform']}/{item['name']} -> {item['url']}", flush=True)
+    # candidates/ 不在桶策略的匿名读白名单内：候选模式的下载链接改为限时签名
+    # URL（7 天），正式发布的 releases/ 前缀由桶策略保证公开直链可用。
+    signed_expires = 7 * 24 * 60 * 60
+    if not context['release']:
+        for item in files:
+            item['signedUrl'] = signed_download_url(client, config, item['key'], signed_expires)
+            print(f"TOS signed download: {item['platform']}/{item['name']} (expires in {signed_expires // 3600}h)",
+                  flush=True)
     manifest = {**context, 'formatVersion': 1, 'artifacts': files}
-    body = (json.dumps(manifest, indent=2, ensure_ascii=True) + '\n').encode()
     manifest_key = context['prefix'] + '/manifest.json'
+    if not context['release']:
+        manifest['manifestSignedUrl'] = signed_download_url(client, config, manifest_key, signed_expires)
+        manifest['signedUrlExpiresIn'] = signed_expires
+    body = (json.dumps(manifest, indent=2, ensure_ascii=True) + '\n').encode()
     print('TOS write: version manifest', flush=True)
     client.put_object(bucket, manifest_key, content=body, content_type='application/json',
                       cache_control='public, max-age=31536000, immutable', forbid_overwrite=True)
@@ -289,8 +300,10 @@ def main():
     key, manifest = publish(client, config, context, args.artifacts)
     summary = ['## TOS artifacts', '', f"Version: `{context['version']}`", '',
                f"Manifest: `{key}`", '', '| Platform | File | SHA-256 |', '| --- | --- | --- |']
-    summary += [f"| {item['platform']} | [{item['name']}]({item['url']}) | `{item['sha256']}` |"
+    summary += [f"| {item['platform']} | [{item['name']}]({item.get('signedUrl') or item['url']}) | `{item['sha256']}` |"
                 for item in manifest['artifacts']]
+    if not context['release']:
+        summary += ['', f"候选目录不在匿名读白名单内，以上为 7 天有效签名链接；清单签名地址见 manifest 的 `manifestSignedUrl`。"]
     if os.environ.get('GITHUB_STEP_SUMMARY'):
         with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as output:
             output.write('\n'.join(summary) + '\n')
@@ -303,3 +316,10 @@ if __name__ == '__main__':
     except Exception as error:
         print(diagnostic(error, os.environ), file=sys.stderr)
         sys.exit(1)
+
+def signed_download_url(client, config, key, expires):
+    """Presign a GET for keys that the bucket policy does not serve anonymously."""
+    import tos
+    signed = client.pre_signed_url(tos.HttpMethodType.Http_Method_Get, bucket=config['TOS_BUCKET'], key=key,
+                                   expires_in=expires)
+    return signed.signed_url
