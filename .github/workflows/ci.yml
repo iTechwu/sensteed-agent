@@ -248,6 +248,15 @@ jobs:
         with:
           path: ${{ steps.pnpm-store.outputs.dir }}
           key: pnpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', 'upstream.json') }}
+      - name: Cache Electron downloads
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/electron
+            ~/Library/Caches/electron
+            ~/AppData/Local/electron/Cache
+          key: electron-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('dsh-plugin-desktop/electron-builder.json', 'dsh-plugin-desktop/package.json') }}
+          restore-keys: electron-${{ runner.os }}-${{ runner.arch }}-
       # The following upstream install validates the sibling's own lockfile.
       - run: pnpm install --no-frozen-lockfile --config.minimumReleaseAge=0
       - run: pnpm --dir ../deepseek-harness install --no-frozen-lockfile --config.minimumReleaseAge=0

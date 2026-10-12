@@ -36,4 +36,7 @@ test('TOS publication requires all gates and isolates credentials from PR builds
   const builds = workflow.slice(workflow.indexOf('  check:'), workflow.indexOf('  publish-tos:'))
   assert.doesNotMatch(builds, /secrets\.TOS_/)
   assert.match(builds, /release == 'true' && github.event_name != 'pull_request'/)
+  const upstreamCommand = workflow.slice(workflow.indexOf('  upstream-command-windows:'), workflow.indexOf('  publish-tos:'))
+  assert.match(upstreamCommand, /node scripts\/verify-layout\.mjs/)
+  assert.doesNotMatch(upstreamCommand, /pnpm install|upstream:build|inspector-compat/)
 })
