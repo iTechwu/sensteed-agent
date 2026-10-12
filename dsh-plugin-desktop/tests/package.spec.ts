@@ -880,6 +880,12 @@ describe('published package surface', () => {
     expect(builderConfig?.win?.files).toEqual(expect.arrayContaining([
       'node_modules/@agents-anywhere/dsh-bridge-next/**',
       '!node_modules/@agents-anywhere/dsh-bridge-next/node_modules/**',
+      // workspace koffi 消费方的嵌套 junction 不入档（NSIS 校验会失败），
+      // 包体显式保留，运行时 koffi 走根级 3.1.5 实例。
+      'node_modules/@deepseek-ai/dsh-fs-local/**',
+      'node_modules/@deepseek-ai/dsh-win32-process/**',
+      '!node_modules/@deepseek-ai/dsh-fs-local/node_modules/**',
+      '!node_modules/@deepseek-ai/dsh-win32-process/node_modules/**',
       '!node_modules/@img/sharp-darwin*/**',
       '!node_modules/@img/sharp-libvips-darwin*/**',
       '!node_modules/@img/sharp-win32-arm64*/**',

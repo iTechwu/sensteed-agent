@@ -232,6 +232,23 @@ export const ELECTRON_BUILDER_BASE = Object.freeze({
       // the published tarball's residual nested node_modules out.
       'node_modules/@agents-anywhere/dsh-bridge-next/**',
       '!node_modules/@agents-anywhere/dsh-bridge-next/node_modules/**',
+      // Same junction story for every harness workspace Koffi consumer: the
+      // nested koffi platform junction is dropped by the dependency copy while
+      // the file set still records it, failing NSIS with "was not found in
+      // this archive". Ship the package body; runtime resolves koffi through
+      // the root 3.1.5 instance the desktop already depends on.
+      'node_modules/@deepseek-ai/dsh-fs-local/**',
+      'node_modules/@deepseek-ai/dsh-host-directory-picker-native/**',
+      'node_modules/@deepseek-ai/dsh-sandbox-windows-acl/**',
+      'node_modules/@deepseek-ai/dsh-session-persistence-jsonl/**',
+      'node_modules/@deepseek-ai/dsh-subprocess-local/**',
+      'node_modules/@deepseek-ai/dsh-win32-process/**',
+      '!node_modules/@deepseek-ai/dsh-fs-local/node_modules/**',
+      '!node_modules/@deepseek-ai/dsh-host-directory-picker-native/node_modules/**',
+      '!node_modules/@deepseek-ai/dsh-sandbox-windows-acl/node_modules/**',
+      '!node_modules/@deepseek-ai/dsh-session-persistence-jsonl/node_modules/**',
+      '!node_modules/@deepseek-ai/dsh-subprocess-local/node_modules/**',
+      '!node_modules/@deepseek-ai/dsh-win32-process/node_modules/**',
       '!node_modules/@img/sharp-darwin*/**',
       '!node_modules/@img/sharp-libvips-darwin*/**',
       '!node_modules/@img/sharp-win32-arm64*/**',
