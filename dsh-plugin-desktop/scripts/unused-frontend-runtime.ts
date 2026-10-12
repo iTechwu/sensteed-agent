@@ -1,5 +1,6 @@
 /** Guard a narrowly proven redundant frontend dependency before publishing. */
-import { closeSync, openSync, readSync } from 'node:fs'
+import { closeSync, openSync, readFileSync, readSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { extractFile, getRawHeader } from '@electron/asar'
 import ts from 'typescript'
 
@@ -22,17 +23,20 @@ export function referencesPrunedFrontendPackage(source: string): string | undefi
   return dependency
 }
 
-interface Entry { files?: Record<string, Entry>; size?: number }
+interface Entry { files?: Record<string, Entry>; size?: number; unpacked?: boolean; offset?: string }
 
-function extractFileWithOffsetFallback(archive: string, path: string): Buffer {
+function extractFileWithOffsetFallback(archive: string, path: string, unpacked = false): Buffer {
+  // smartUnpack 条目的内容不在 asar 载荷里（头中无 offset），落在旁边的
+  // app.asar.unpacked 物理目录；从磁盘读取而不是抛「not found」。
+  if (unpacked) return readFileSync(join(dirname(archive), 'app.asar.unpacked', path))
   try {
     return extractFile(archive, path)
   } catch (cause) {
-    let node: Entry & { offset?: string } = getRawHeader(archive).header as Entry & { offset?: string }
+    let node: Entry = getRawHeader(archive).header as Entry
     for (const segment of path.split('/').filter(Boolean)) {
       const child = node.files?.[segment]
       if (child === undefined) throw cause
-      node = child as Entry & { offset?: string }
+      node = child as Entry
     }
     if (typeof node.size !== 'number' || typeof node.offset !== 'string') throw cause
     const sizes = Buffer.alloc(8)
@@ -59,7 +63,7 @@ export function verifyUnusedFrontendRuntime(archive: string): void {
       if (PRUNED_FRONTEND_PACKAGES.some(dependency => path.includes(`node_modules/${dependency}/`))) {
         throw new Error(`unused frontend code remains in the package: ${path}`)
       }
-      const source = extractFileWithOffsetFallback(archive, path).toString('utf8')
+      const source = extractFileWithOffsetFallback(archive, path, child.unpacked === true).toString('utf8')
       // Only parse files mentioning this package, keeping large binary and
       // unrelated source payloads outside the parser.
       if (!source.includes('react') && !source.includes('\\')) continue
