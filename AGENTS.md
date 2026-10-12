@@ -36,6 +36,13 @@ This repository owns the desktop product around an unmodified DeepSeek Harness c
 - Commit before major changes of direction; keep a fork `sourceVersion` bump separate from desktop behavior changes.
 - Keep the repository topology and direct sibling workspace boundary consistent with the [owning Agent Note](.agents/notes/implemented/process/2026-08-31-sibling-fork-direct-workspace.md).
 
+## 打包版本号 (Packaging versioning)
+
+- 每次发起打包（`dist:mac`、`dist:mac-smoke`、`dist:win`、`dist:win-portable`、`dist:linux`、`package:dir`）前，必须先更新 `dsh-plugin-desktop/package.json` 的 `version` 字段（electron-builder 以 `${version}` 生成产物文件名）。
+- 版本号规则：以 DeepSeek Harness 的 release 版本为基准（与 `upstream.json` 的 `sourceVersion` 一致），追加 `-beta.` 与打包发起时刻的时间戳，时间戳格式为 `YYYYMMDDHHmm`（如 `202610120940`）。
+- 示例：DeepSeek release 为 `0.2.1-alpha.2`、2026-10-12 09:40 发起打包 → 版本号为 `0.2.1-alpha.2-beta.202610120940`。
+- 版本号变更先单独提交并 push 到 `origin`，再发起打包；签名发布路径只做离线校验，发布内容必须等于提交内容。
+
 ## 内置 Skills 与 Plugins (Built-in skills and plugins)
 
 - `bundled.json`（仓库根，与 `upstream.json` 同级）是内置内容的机器可读清单：`skills[]` 记录每个 GitHub skill 来源与已提交快照目录；`plugins[]` 记录预装插件（sibling 唯一源）及其 `.ci` 快照，GitHub 源插件额外带 `upstream`/`siblingDir`。
