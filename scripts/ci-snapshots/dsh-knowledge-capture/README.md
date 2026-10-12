@@ -41,7 +41,10 @@ credential store 解析，不要求重启，也不阻塞 Agent 对话。
 - 缺少 Key、MCP 超时或上游错误只降级 Runtime Memory，不影响其它数据源。
 - 队列最多保留 200 条，checkpoint 单批最多 50 条；失败批次按原序回队。
 - 自动候选只在服务端 Loadout 的 `allowCandidateCapture` 为 true 时创建，
-  并使用 `user.agent_runtime`；候选仍需明确确认后才参与普通 recall。
+  仅从用户本人发言生成候选，写入当前团队下的 `user.personal`（`scope=USER`）；
+  模型回答、工具输出和压缩摘要不成为用户事实，候选仍需明确确认后才参与普通 recall。
+- 切换 Models 凭据时重新获取租户策略；策略读取失败不创建候选。会话 checkpoint
+  继续保留模型消息与工具状态，供会话续接使用。
 
 ## 验证
 
