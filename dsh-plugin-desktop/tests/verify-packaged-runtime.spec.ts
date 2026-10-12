@@ -1145,7 +1145,14 @@ describe('packaged desktop runtime verification', () => {
       vi.unstubAllEnvs()
     }
 
-    expect(run).toHaveBeenCalledTimes(6)
+    // Windows 的会话后端免 fs-ext（prepare-fs-ext not-required），冒烟少一次调用。
+    const expectedRuns = runtimeContext.electronPlatformName === 'win32' ? 5 : 6
+    expect(run).toHaveBeenCalledTimes(expectedRuns)
+    if (runtimeContext.electronPlatformName !== 'win32') {
+      expect(run.mock.calls.some(([, args]) => args.some(arg => arg.endsWith('/fs-ext/fs-ext.js')))).toBe(true)
+    } else {
+      expect(run.mock.calls.some(([, args]) => args.some(arg => arg.endsWith('/fs-ext/fs-ext.js')))).toBe(false)
+    }
     for (const [executable, args, environment] of run.mock.calls) {
       expect(executable).toBe(resolvePackagedExecutablePath(runtimeContext))
       expect(args).toContain('--expose-internals')
