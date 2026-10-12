@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { redactHostAuthorizations, registerHostUpload, videoToolName } from './host-upload.js'
 
 const SKILL_URL = new URL('./skills/video-notes/SKILL.md', import.meta.url)
 const REQUIRED_TOOLS = [
@@ -19,10 +20,12 @@ const REQUIRED_TOOLS = [
   'video_asset_download_authorize',
 ]
 
-export const inject = ['tools', 'systemPrompt']
+export const inject = ['tools', 'systemPrompt', 'attachments']
 
 export function apply(ctx) {
   const disposers = []
+  disposers.push(registerHostUpload(ctx))
+  disposers.push(redactHostAuthorizations(ctx))
   if (ctx.systemPrompt?.section) {
     disposers.push(ctx.systemPrompt.section({
       name: 'sensteed:video-notes-skill',
@@ -43,7 +46,7 @@ export function apply(ctx) {
       async execute() {
         const schemas = ctx.tools.schemas?.() || []
         const names = schemas.map(item => String(item.name || ''))
-        const tools = Object.fromEntries(REQUIRED_TOOLS.map(name => [name, names.includes(name) || names.includes(`mcp__video-processing__${name}`)]))
+        const tools = Object.fromEntries(REQUIRED_TOOLS.map(name => [name, names.includes(name) || names.includes(videoToolName(name))]))
         const missing = Object.entries(tools).filter(([, available]) => !available).map(([name]) => name)
         const scripts = {}
         const scriptPaths = {}

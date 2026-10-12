@@ -1,5 +1,9 @@
 # video-processing MCP 契约速查（contractVersion: video-processing-v1）
 
+Host 本地附件使用 `sensteed_video_file_upload`（action=list/upload），只接受当前会话用户附件 attachmentId；视频限制 512 MiB、字幕 5 MiB，需固定幂等键。Host 内部调用 authorize/complete 并完成流式校验及 PUT，不把临时签名地址返回给 Agent。
+
+ASR 仅在 Models/Tools 部署闸门开启后可用。可信网关传递 Models 签发的不透明引用，原 Models key 在 video-processing 路由被消费；worker 通过服务名绑定 HMAC 兑现引用，费用归原 key。引用限一笔 ASR、最长 120 分钟音频、8 小时 TTL；每次提交/查询检查撤销、轮换、配额和租户。提交未知只查 Models 台账，不自动重新创建。
+
 公共入口：`https://ai.hozonauto.com/mcp/tools/video-processing`。所有响应为 camelCase；错误信封 `{"error":{"code","message","retryable","requestId"}}`。
 
 ## 工具

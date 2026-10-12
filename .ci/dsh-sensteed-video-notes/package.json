@@ -17,6 +17,7 @@
   "files": [
     "cordis.patch.yml",
     "index.js",
+    "host-upload.js",
     "skills"
   ],
   "scripts": {
