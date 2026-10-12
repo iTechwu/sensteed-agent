@@ -219,36 +219,48 @@ export function packageWindowsArtifacts(
   const dereferenced = dereferencePlatformPackageLinks({ modulesRoot: join(options.desktopRoot, 'node_modules') })
   const hoisted = ensureHoistedPlatformPackage({ desktopRoot: options.desktopRoot, packageName: '@deepseek-ai/libreoffice-kit-win32-x64' })
   options.log(`platform package materialization: ${dereferenced} link(s) dereferenced, libreoffice kit ${hoisted}, took ${Date.now() - materializeStartedAt}ms`)
-  options.run(
-    options.nodeExecutable,
-    [
-      options.builderCli,
-      '--config',
-      'electron-builder.json',
-      '--win',
-      ...targets,
-      '--x64',
-      '--publish',
-      'never',
-      '--config.win.signExecutable=false',
-      '--config.npmRebuild=false',
-      '--config.electronFuses.onlyLoadAppFromAsar=false',
-      ...(compression === undefined ? [] : [`--config.win.compression=${compression}`]),
-    ],
-    options.desktopRoot,
-    electronBuilderEnvironment({
-      ...cleanEnvironment,
-      DSH_ELECTRON_BUILDER_TARGET_PLATFORM: 'win32',
-      DSH_ELECTRON_BUILDER_TARGET_ARCH: 'x64',
-      CSC_IDENTITY_AUTO_DISCOVERY: 'false',
-      // Traverse the installed tree directly: package-manager graph collection can
-      // stall on the large linked workspace and pnpm v11 drops deduplicated links.
-      // Keep the real pnpm identity: disguising the runner as npm makes the
-      // archive file-set take the npm-layout path, which silently emits
-      // node_modules as directory skeletons without any file payload.
-      DSH_ELECTRON_BUILDER_TRAVERSAL_ONLY: '1',
-    }),
-  )
+  // NSIS 安装包受更新器 1 GiB 上限约束，永远不做 store 免压（免压体积
+  // ~1.6 GB 必然被 publish-tos 拒绝）；ZIP 便携版无此约束，用 store 换取
+  // 打包速度。两个目标各跑一次 builder，收集/物化等昂贵前置只做一次。
+  const targetsAndCompressions = targets.map((target) => ({
+    target,
+    compression: target === 'zip' ? compression : (compression === 'store' ? undefined : compression),
+  }))
+  let builderElapsed = 0
+  for (const { target, compression: targetCompression } of targetsAndCompressions) {
+    const builderStartedAt = Date.now()
+    options.run(
+      options.nodeExecutable,
+      [
+        options.builderCli,
+        '--config',
+        'electron-builder.json',
+        '--win',
+        target,
+        '--x64',
+        '--publish',
+        'never',
+        '--config.win.signExecutable=false',
+        '--config.npmRebuild=false',
+        '--config.electronFuses.onlyLoadAppFromAsar=false',
+        ...(targetCompression === undefined ? [] : [`--config.win.compression=${targetCompression}`]),
+      ],
+      options.desktopRoot,
+      electronBuilderEnvironment({
+        ...cleanEnvironment,
+        DSH_ELECTRON_BUILDER_TARGET_PLATFORM: 'win32',
+        DSH_ELECTRON_BUILDER_TARGET_ARCH: 'x64',
+        CSC_IDENTITY_AUTO_DISCOVERY: 'false',
+        // Traverse the installed tree directly: package-manager graph collection can
+        // stall on the large linked workspace and pnpm v11 drops deduplicated links.
+        // Keep the real pnpm identity: disguising the runner as npm makes the
+        // archive file-set take the npm-layout path, which silently emits
+        // node_modules as directory skeletons without any file payload.
+        DSH_ELECTRON_BUILDER_TRAVERSAL_ONLY: '1',
+      }),
+    )
+    builderElapsed += Date.now() - builderStartedAt
+  }
   options.log(`Windows ${artifactLabel} builder completed in ${Date.now() - startedAt}ms.`)
   options.run(options.nodeExecutable, [options.verifier], options.desktopRoot, cleanEnvironment)
   for (const extra of options.extraVerifiers ?? []) {

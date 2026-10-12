@@ -246,7 +246,7 @@ describe('Windows x64 installer packaging', () => {
 })
 
 describe('Windows x64 bundle packaging', () => {
-  it('runs one builder pass for the NSIS installer and the portable ZIP, then verifies both', () => {
+  it('runs one builder pass per target, then verifies both artifacts', () => {
     const calls: CommandCall[] = []
     const logs: string[] = []
     const value: WindowsPackageOptions = {
@@ -257,7 +257,7 @@ describe('Windows x64 bundle packaging', () => {
 
     packageWindowsBundle(value)
 
-    expect(calls).toHaveLength(5)
+    expect(calls).toHaveLength(6)
     expect(calls[0]).toEqual({
       command: 'refresh-bundled', args: [], cwd: 'C:\\repo', env: {},
     })
@@ -275,6 +275,23 @@ describe('Windows x64 bundle packaging', () => {
         'electron-builder.json',
         '--win',
         'nsis',
+        '--x64',
+        '--publish',
+        'never',
+        '--config.win.signExecutable=false',
+        '--config.npmRebuild=false',
+        '--config.electronFuses.onlyLoadAppFromAsar=false',
+      ],
+      cwd: 'C:\\repo\\dsh-plugin-desktop',
+      env: expect.objectContaining({ CSC_IDENTITY_AUTO_DISCOVERY: 'false' }),
+    })
+    expect(calls[3]).toEqual({
+      command: 'C:\\Program Files\\nodejs\\node.exe',
+      args: [
+        'C:\\repo\\node_modules\\electron-builder\\cli.js',
+        '--config',
+        'electron-builder.json',
+        '--win',
         'zip',
         '--x64',
         '--publish',
@@ -286,7 +303,7 @@ describe('Windows x64 bundle packaging', () => {
       cwd: 'C:\\repo\\dsh-plugin-desktop',
       env: expect.objectContaining({ CSC_IDENTITY_AUTO_DISCOVERY: 'false' }),
     })
-    expect(calls[3]?.args).toEqual(['C:\\repo\\dsh-plugin-desktop\\scripts\\verify-win-installer.ts'])
-    expect(calls[4]?.args).toEqual(['C:\\repo\\dsh-plugin-desktop\\scripts\\verify-win-portable.ts'])
+    expect(calls[4]?.args).toEqual(['C:\\repo\\dsh-plugin-desktop\\scripts\\verify-win-installer.ts'])
+    expect(calls[5]?.args).toEqual(['C:\\repo\\dsh-plugin-desktop\\scripts\\verify-win-portable.ts'])
   })
 })
