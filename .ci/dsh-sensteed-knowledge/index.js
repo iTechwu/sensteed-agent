@@ -221,6 +221,7 @@ const KNOWLEDGE_ROUTING_PROMPT = [
   '5. 只要问题可能涉及企业事实，就先调用 knowledge_search 或 knowledge_recall，不要直接凭模型记忆作答。Knowledge 不可用时明确说明企业知识不可用；只有问题本身是公开信息时才降级到 Web。',
   '6. Knowledge 统一使用本地封装工具 knowledge_search、knowledge_recall、knowledge_loadout、knowledge_context_pack 等；不要调用任何 mcp__knowledge__* 直连工具，也不要给封装工具套用直连 MCP 的参数格式。',
   '7. Knowledge 结果必须保留文档、版本、Memory 或 Session 引用；没有引用不得把推断写成企业事实。',
+  '8. 用户明确要求记住时，调用 knowledge_remember 创建候选，默认使用 user.personal 与 USER 范围；allowCandidateCapture 仅控制自动捕获，为 false 不代表禁止用户主动写入。Access denied 是权限拒绝，Space not found 是空间不可用，不能仅凭自动捕获开关推断这些错误的根因；失败后不得通过改写到团队或企业空间扩大共享范围。本地文件不等于已写入记忆。',
 ].join('\n')
 
 export function apply(ctx, overrides = {}) {
