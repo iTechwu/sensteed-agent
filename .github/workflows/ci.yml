@@ -283,13 +283,13 @@ jobs:
             console.log('store @dataiku/uv:', fs.existsSync(path.join(storeRoot, '@dataiku', 'uv', 'package.json')))
             console.log('app-level @dataiku:', fs.existsSync('dsh-plugin-desktop/node_modules/@dataiku/uv/package.json'))
           "
-      - name: Build Windows installer
+      - name: Build Windows installer and portable archive
         env:
           CI: 'false'
           npm_config_minimum_release_age: '0'
           DSH_PACKAGE_CHECK_ALREADY_RAN: '1'
           NODE_OPTIONS: '--max-old-space-size=6144'
-        run: pnpm --filter dsh-plugin-desktop dist:win
+        run: pnpm --filter dsh-plugin-desktop dist:win-bundle
       - name: Inspect packaged output on failure
         if: failure()
         shell: pwsh
@@ -307,13 +307,6 @@ jobs:
           if (Test-Path "$res/app.asar") {
             node dsh-plugin-desktop/scripts/diagnose-win-asar.mjs "$res/app.asar" dsh-plugin-desktop
           }
-      - name: Build Windows portable archive
-        env:
-          CI: 'false'
-          npm_config_minimum_release_age: '0'
-          DSH_PACKAGE_CHECK_ALREADY_RAN: '1'
-          NODE_OPTIONS: '--max-old-space-size=6144'
-        run: pnpm --filter dsh-plugin-desktop dist:win-portable
       - name: Preserve windows package size report
         if: always()
         uses: actions/upload-artifact@v7

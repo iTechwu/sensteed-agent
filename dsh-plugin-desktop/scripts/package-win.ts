@@ -87,6 +87,8 @@ export interface WindowsPackageOptions {
   readonly prepareRuntime: () => void
   /** Absolute packaged-installer verification script. */
   readonly verifier: string
+  /** Additional per-artifact verifiers run after the shared builder pass. */
+  readonly extraVerifiers?: readonly string[]
   /** Node executable used to run package-local scripts. */
   readonly nodeExecutable: string
   /** Execute one packaging command. */
@@ -177,19 +179,20 @@ function assertWindowsPackageHost(options: WindowsPackageOptions, artifact: stri
   }
 }
 
-/** Run the gates and package one unsigned x64 Windows artifact. */
-export function packageWindowsArtifact(
+/** Run the gates and package unsigned x64 Windows artifacts in one builder pass. */
+export function packageWindowsArtifacts(
   options: WindowsPackageOptions,
-  target: 'nsis' | 'zip',
-  artifact: 'installer' | 'portable archive',
+  targets: readonly ('nsis' | 'zip')[],
+  artifacts: readonly ('installer' | 'portable archive')[],
 ): void {
-  assertWindowsPackageHost(options, artifact)
+  assertWindowsPackageHost(options, artifacts.join(' + '))
   const compression = windowsCompressionOverride(options.env)
 
   const cleanEnvironment = withoutWindowsSigningSecrets(options.env)
-  options.log(`Building an unsigned Windows x64 ${artifact}; Authenticode is a separate release step.`)
+  const artifactLabel = artifacts.length === 1 ? artifacts[0] : artifacts.join(' + ')
+  options.log(`Building ${artifacts.length === 1 ? 'an ' : ''}unsigned Windows x64 ${artifactLabel}; Authenticode is a separate release step.`)
   if (compression !== undefined) {
-    options.log(`Packaging the ${artifact} with ${compression} compression.`)
+    options.log(`Packaging the ${artifactLabel} with ${compression} compression.`)
   }
   if (options.env.DSH_PACKAGE_CHECK_ALREADY_RAN !== '1') {
     options.refreshBundled()
@@ -222,7 +225,7 @@ export function packageWindowsArtifact(
       '--config',
       'electron-builder.json',
       '--win',
-      target,
+      ...targets,
       '--x64',
       '--publish',
       'never',
@@ -245,12 +248,19 @@ export function packageWindowsArtifact(
       DSH_ELECTRON_BUILDER_TRAVERSAL_ONLY: '1',
     }),
   )
-  options.run(
-    options.nodeExecutable,
-    [options.verifier],
-    options.desktopRoot,
-    cleanEnvironment,
-  )
+  options.run(options.nodeExecutable, [options.verifier], options.desktopRoot, cleanEnvironment)
+  for (const extra of options.extraVerifiers ?? []) {
+    options.run(options.nodeExecutable, [extra], options.desktopRoot, cleanEnvironment)
+  }
+}
+
+/** Run the gates and package one unsigned x64 Windows artifact. */
+export function packageWindowsArtifact(
+  options: WindowsPackageOptions,
+  target: 'nsis' | 'zip',
+  artifact: 'installer' | 'portable archive',
+): void {
+  packageWindowsArtifacts(options, [target], [artifact])
 }
 
 /** Run the headless release gates and package one unsigned x64 NSIS installer. */
@@ -260,10 +270,26 @@ export function packageWindowsInstaller(
   packageWindowsArtifact(options, 'nsis', 'installer')
 }
 
+/**
+ * Run the gates once and package both unsigned x64 Windows artifacts in a
+ * single Electron Builder pass: the dependency collection and ASAR packing
+ * dominate the job wall clock, so sharing them keeps the CI job inside its
+ * 60-minute budget (two separate passes cost roughly twice as long).
+ */
+export function packageWindowsBundle(
+  options: WindowsPackageOptions = {
+    ...createWindowsPackageOptions('./verify-win-installer.ts'),
+    extraVerifiers: [fileURLToPath(new URL('./verify-win-portable.ts', import.meta.url))],
+  },
+): void {
+  packageWindowsArtifacts(options, ['nsis', 'zip'], ['installer', 'portable archive'])
+}
+
 const invokedPath = process.argv[1]
 if (invokedPath !== undefined && resolve(invokedPath) === fileURLToPath(import.meta.url)) {
   try {
-    packageWindowsInstaller()
+    if (process.argv.includes('--bundle')) packageWindowsBundle()
+    else packageWindowsInstaller()
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error))
     process.exitCode = 1

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   packageWindowsArtifact,
+  packageWindowsBundle,
   packageWindowsInstaller,
   type WindowsPackageOptions,
 } from '../scripts/package-win.ts'
@@ -238,5 +239,50 @@ describe('Windows x64 installer packaging', () => {
     expect(calls).toHaveLength(2)
     expect(calls[0]?.command).toBe('refresh-bundled')
     expect(calls[1]?.command).toBe('C:\\Windows\\System32\\cmd.exe')
+  })
+})
+
+describe('Windows x64 bundle packaging', () => {
+  it('runs one builder pass for the NSIS installer and the portable ZIP, then verifies both', () => {
+    const calls: CommandCall[] = []
+    const logs: string[] = []
+    const value: WindowsPackageOptions = {
+      ...options(calls, logs),
+      verifier: 'C:\\repo\\dsh-plugin-desktop\\scripts\\verify-win-installer.ts',
+      extraVerifiers: ['C:\\repo\\dsh-plugin-desktop\\scripts\\verify-win-portable.ts'],
+    }
+
+    packageWindowsBundle(value)
+
+    expect(calls).toHaveLength(5)
+    expect(calls[0]).toEqual({
+      command: 'refresh-bundled', args: [], cwd: 'C:\\repo', env: {},
+    })
+    expect(calls[1]).toEqual({
+      command: 'C:\\Windows\\System32\\cmd.exe',
+      args: ['/d', '/s', '/c', 'corepack pnpm --filter dsh-plugin-desktop check:win-package'],
+      cwd: 'C:\\repo',
+      env: { PATH: 'C:\\Windows\\System32', SAFE_VALUE: 'kept' },
+    })
+    expect(calls[2]).toEqual({
+      command: 'C:\\Program Files\\nodejs\\node.exe',
+      args: [
+        'C:\\repo\\node_modules\\electron-builder\\cli.js',
+        '--config',
+        'electron-builder.json',
+        '--win',
+        'nsis',
+        'zip',
+        '--x64',
+        '--publish',
+        'never',
+        '--config.win.signExecutable=false',
+        '--config.npmRebuild=false',
+        '--config.electronFuses.onlyLoadAppFromAsar=false',
+      ],
+      cwd: 'C:\\repo\\dsh-plugin-desktop',
+      env: expect.objectContaining({ CSC_IDENTITY_AUTO_DISCOVERY: 'false' }),
+    })
+    expect(calls[3]?.args).toEqual(['C:\\repo\\dsh-plugin-desktop\\scripts\\verify-win-installer.ts'])
   })
 })
