@@ -6,7 +6,8 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { AppReady } from '@deepseek-ai/dsh-cmdline'
 import type { DesktopPnpmBootstrap } from './pnpm.ts'
 import { findOverlayPackage } from './package-overlay.ts'
-import { withDesktopPnpmPolicy } from './pnpm-policy.ts'
+import { withDesktopPnpmPolicy, withDesktopPnpmStoreDir } from './pnpm-policy.ts'
+import { desktopPnpmStoreDir } from './profile-store-dir.ts'
 import { desktopInstallAnchor, prepareDesktopProfile, type PreparedDesktopProfile } from './profile.ts'
 
 /** Keep package operations and subsequent HMR on the launcher's actual Profile. */
@@ -37,8 +38,13 @@ export function createDesktopProfileBoot(prepared: PreparedDesktopProfile, pnpm:
     telemetryDisabledEnv: options.telemetryDisabled,
     packageManager: {
       command: pnpm.appExecutable,
-      args: ['--import', pathToFileURL(pnpm.clearEnvironmentPath).href, pnpm.pnpmBinPath,
-        ...withDesktopPnpmPolicy([])],
+      get args() {
+        // Repairs and plugin installs can replace metadata after Host boot.
+        // Resolve at each operation, just like the Desktop Market boundary.
+        return ['--import', pathToFileURL(pnpm.clearEnvironmentPath).href, pnpm.pnpmBinPath,
+          ...withDesktopPnpmStoreDir(withDesktopPnpmPolicy([]),
+            desktopPnpmStoreDir(prepared.homeDir, prepared.profile.dir))]
+      },
       env: {
         PATH: [pnpm.nodeBinDir, inheritedPath].filter(Boolean).join(delimiter),
         NODE: pnpm.nodeShimPath,

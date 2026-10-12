@@ -4,11 +4,12 @@ import { readFileSync, realpathSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { dirname, join, resolve } from 'node:path'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
-import { resolveProfileDir } from '@deepseek-ai/dsh-app-boot'
+import { resolveProfileDir, type ProfileContext } from '@deepseek-ai/dsh-app-boot'
 import { packagedDependencyPath } from './packaged-runtime-path.ts'
 import { assertDesktopProfileName } from './profile-manager.ts'
 import { bundledSkillRoot } from './bundled-skill-root.ts'
 import { withoutForwardedDesktopPnpmPolicy } from './pnpm-policy.ts'
+import { desktopPnpmStoreDir } from './profile-store-dir.ts'
 import { installProfilePackageResolver } from './module-resolution.ts'
 import { withAsarModuleResolver } from './asar-module-resolver-state.ts'
 import { disableAsarArchiveView, type AsarArchiveProcess } from './asar-archive-policy.ts'
@@ -18,6 +19,11 @@ const DEFAULT_PROFILE = 'DSH_DESKTOP_DEFAULT_PROFILE'
 const DSH_ENTRY_URL = pathToFileURL(
   packagedDependencyPath(import.meta.url, '@deepseek-ai/dsh/lib/bin.js'),
 ).href
+
+interface DesktopCliOptions {
+  manageDesktopProfile?: boolean
+  packageManager?: ProfileContext['packageManager']
+}
 
 function readDshVersion(): string {
   const manifest = JSON.parse(
@@ -97,7 +103,7 @@ export function desktopCliProfileManifestUrl(
  */
 export async function runDesktopDshCli(
   environment: NodeJS.ProcessEnv = process.env,
-  load: (url: string) => Promise<{ runCli(): Promise<void> }> = url => import(url),
+  load: (url: string) => Promise<{ runCli(options?: DesktopCliOptions): Promise<void> }> = url => import(url),
   argv: string[] = process.argv,
   packagedEntry: boolean = /([\\/])app\.asar\1/u.test(fileURLToPath(DSH_ENTRY_URL)),
   asarProcess: AsarArchiveProcess = process,
@@ -128,7 +134,24 @@ export async function runDesktopDshCli(
   // must explicitly dispatch the exported CLI under the same ASAR scope.
   const runDsh = async (): Promise<void> => {
     const cli = await load(DSH_ENTRY_URL)
-    await cli.runCli()
+    if (argv[2] === 'plugin') {
+      const home = resolveDshHome(undefined, environment)
+      const explicitStore = argv.slice(2).some(argument => argument === '--store-dir' || argument.startsWith('--store-dir='))
+      await cli.runCli({
+        // The installed Desktop carrier is the Harness-supported management
+        // boundary; ordinary CLI boot commands retain the upstream restriction.
+        manageDesktopProfile: true,
+        ...(selectedProfile === undefined || explicitStore ? {} : {
+          packageManager: {
+            command: 'pnpm',
+            args: ['--store-dir', desktopPnpmStoreDir(home, resolveProfileDir(selectedProfile, home))],
+            env: {},
+          },
+        }),
+      })
+    } else {
+      await cli.runCli()
+    }
   }
   const invokeDsh = (): Promise<void> => packagedEntry
     ? withAsarModuleResolver(runDsh)

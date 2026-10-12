@@ -107,6 +107,9 @@ describe('desktop pnpm execution service', () => {
     expect(withDesktopPnpmStoreDir(['--store-dir', '/already/pinned', 'add'], storeDir)).toEqual([
       '--store-dir', '/already/pinned', 'add',
     ])
+    expect(withDesktopPnpmStoreDir(['add', '--store-dir=/already/pinned'], storeDir)).toEqual([
+      'add', '--store-dir=/already/pinned',
+    ])
   })
 
   it('starts packaged pnpm in the active Profile without recovery side effects', async () => {

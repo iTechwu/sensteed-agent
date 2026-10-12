@@ -126,6 +126,52 @@ describe('packaged dsh bootstrap', () => {
     expect(explicit.slice(2)).toEqual(['plugin', '--profile=work', 'update'])
   })
 
+  it.each(['default', 'explicit'])('authorizes installed Desktop plugin management with %s profile selection', async selection => {
+    const home = mkdtempSync(join(tmpdir(), 'desktop-cli-managed-plugin-'))
+    try {
+      const profile = join(home, 'profiles', 'desktop')
+      const store = join(home, 'previous-user-store', 'v11')
+      mkdirSync(join(profile, 'node_modules'), { recursive: true })
+      writeFileSync(join(profile, 'node_modules', '.modules.yaml'), JSON.stringify({ storeDir: store }))
+      const environment = { DSH_HOME: home, ...(selection === 'default' ? { DSH_DESKTOP_DEFAULT_PROFILE: 'desktop' } : {}) }
+      const args = selection === 'default' ? ['plugin', 'add', 'example@1.2.3'] : ['plugin', '--profile=desktop', 'add', 'example@1.2.3']
+      const runCli = vi.fn(async () => {})
+      await runDesktopDshCli(environment, async () => ({ runCli }), ['node', 'desktop-cli', ...args])
+      expect(runCli).toHaveBeenCalledWith({
+        manageDesktopProfile: true,
+        packageManager: { command: 'pnpm', args: ['--store-dir', store], env: {} },
+      })
+    } finally {
+      rmSync(home, { recursive: true, force: true })
+    }
+  })
+
+  it.each([
+    ['--store-dir', '/explicit-store'],
+    ['--store-dir=/explicit-store'],
+  ])('keeps an explicit CLI store override: %j', async (...storeFlags) => {
+    const runCli = vi.fn(async () => {})
+    const argv = ['node', 'desktop-cli', 'plugin', '--profile=desktop', 'add', ...storeFlags, 'example@1.2.3']
+    await runDesktopDshCli({}, async () => ({ runCli }), argv)
+    expect(runCli).toHaveBeenCalledWith({ manageDesktopProfile: true })
+    expect(argv.slice(2)).toEqual(['plugin', '--profile=desktop', 'add', ...storeFlags, 'example@1.2.3'])
+  })
+
+  it('uses the explicit custom Profile for new installs without inheriting the default Profile store', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'desktop-cli-custom-plugin-'))
+    try {
+      const runCli = vi.fn(async () => {})
+      await runDesktopDshCli({ DSH_HOME: home, DSH_DESKTOP_DEFAULT_PROFILE: 'desktop' },
+        async () => ({ runCli }), ['node', 'desktop-cli', 'plugin', '--profile=work', 'add', 'example@1.2.3'])
+      expect(runCli).toHaveBeenCalledWith({
+        manageDesktopProfile: true,
+        packageManager: { command: 'pnpm', args: ['--store-dir', join(home, 'pnpm-store')], env: {} },
+      })
+    } finally {
+      rmSync(home, { recursive: true, force: true })
+    }
+  })
+
   it('defaults profile and plugin commands without overriding explicit or global modes', () => {
     expect(withDefaultDesktopProfile([], 'desktop')).toEqual(['--profile', 'desktop'])
     expect(withDefaultDesktopProfile(['--dump-config'], 'desktop')).toEqual([

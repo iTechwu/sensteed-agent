@@ -32,7 +32,7 @@ main.ts
 | 件 | 位置 | 职责 |
 |---|---|---|
 | 依赖状态分类器 | `src/profile.ts` `classifyProfileDependencyState` | 纯 JS 判定漂移类别，是零 pnpm 校验的核心 |
-| store 选择 | `src/profile-store-dir.ts`、`src/pnpm-policy.ts` | 已安装 Profile 沿用真实 `.modules.yaml` 中的 `storeDir`，避免插件安装时报 `ERR_PNPM_UNEXPECTED_STORE`；新安装使用 `<DSH_HOME>/pnpm-store`。Market、后台修复与 checkpoint 物化采用同一规则 |
+| store 选择 | `src/profile-store-dir.ts`、`src/pnpm-policy.ts` | 已安装 Profile 沿用真实 `.modules.yaml` 中的 `storeDir`，避免插件安装时报 `ERR_PNPM_UNEXPECTED_STORE`；新安装使用 `<DSH_HOME>/pnpm-store`。Market、应用内插件管理器、桌面自带 CLI、后台修复与 checkpoint 物化采用同一规则 |
 | offline-first 物化器 | `src/profile-materializer.ts` | `offline: 'always' \| 'prefer' \| 'never'`（缺省 never=旧行为），prefer 离线失败自动带网重试一次，结果带 `attempt` |
 | 后台修复 | `src/profile-repair.ts` | 数据操作锁串行化 + 复检 + 恢复窗 `repairDependencies` 动作（双语入口在恢复窗诊断页） |
 | 闭包契约 | `scripts/generate-profile-closure.mjs` → `lib/profile-closure.json` → `src/profile-closure.ts` | 打包期冻结一方依赖 name→version 快照并随 app.asar 分发；afterPack 校验钉版一致性；启动期快校验只产出违规清单 |

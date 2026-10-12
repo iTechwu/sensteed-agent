@@ -100,6 +100,18 @@ it('rejects mismatched package-manager and Profile identities', () => {
     .toThrow('identity disagree')
 })
 
+it('shares the Market store policy with the in-app plugin manager and rereads installed metadata', () => {
+  const { ctx, prepared, home } = fixture()
+  const metadata = join(prepared.profile.dir, 'node_modules', '.modules.yaml')
+  const args = () => ctx.profileContext.packageManager!.args!
+  expect(args()).toContain(join(home, 'pnpm-store'))
+  mkdirSync(join(prepared.profile.dir, 'node_modules'), { recursive: true })
+  const store = join(home, 'previous-user-store', 'v11')
+  writeFileSync(metadata, JSON.stringify({ storeDir: store }))
+  expect(args()).toContain(store)
+  expect(args()).not.toContain(join(home, 'pnpm-store'))
+})
+
 // Preflight judges rows against the launcher's resolver selection — mounted as
 // the pluginPackages inventory exactly like host-bootstrap does — and repeats
 // after settings/HMR.
