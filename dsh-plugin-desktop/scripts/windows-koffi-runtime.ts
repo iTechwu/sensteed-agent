@@ -9,6 +9,7 @@ import {
   readdirSync,
   realpathSync,
   rmSync,
+  statSync,
 } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join, relative, resolve, sep } from 'node:path'
@@ -26,9 +27,9 @@ export interface LoadedKoffiModule {
 
 export type PackagedKoffiLoader = (koffiRoot: string) => LoadedKoffiModule
 
-export interface NestedKoffiMaterializationOptions {
-  /** Desktop package root containing the complete installed dependency tree. */
-  readonly desktopRoot: string
+export interface PlatformLinkDereferenceOptions {
+  /** Dependency tree root whose links are materialized in place. */
+  readonly modulesRoot: string
   /** Injectable platform so non-Windows hosts can exercise the walk in tests. */
   readonly platform?: NodeJS.Platform
 }
@@ -147,45 +148,61 @@ export function hydratePackagedWindowsKoffiRuntime(
 }
 
 /**
- * Replace the workspace packages' nested `@koromix/koffi-win32-x64` junctions
- * with real directory copies before Electron Builder runs.
+ * Dereference platform-gated packages (package.json declaring `os`/`cpu`)
+ * that pnpm installs as junctions/symlinks, replacing each link with a real
+ * directory copy before Electron Builder runs.
  *
- * pnpm materializes the platform package of every workspace Koffi consumer
- * (fs-local, subprocess-local, win32-process, sandbox-windows-acl) as a
- * junction into the virtual store. The dependency-tree copy drops junctioned
- * entries from app.asar while its file set still records them, so the NSIS
- * stage fails with `"…@koromix/koffi-win32-x64/index.js" was not found in
- * this archive`. A dereferenced real copy keeps the archive self-consistent;
- * smartUnpack moves the native binary beside it.
+ * The Windows dependency-tree copy drops link entries from app.asar while
+ * its file set still records them, so every archived platform package
+ * (koffi, sharp, LibreOffice kit, …) must be physically materialized or the
+ * NSIS stage fails with `"…" was not found in this archive`. Regular
+ * packages are left alone: their links archive correctly and dereferencing
+ * them would duplicate the store needlessly. `.pnpm` is not descended into —
+ * it is the dereference source, not an archive surface.
  *
- * @returns how many nested junctions were materialized.
+ * @returns how many links were dereferenced.
  */
-export function materializeNestedKoffiPlatformPackages(
-  options: NestedKoffiMaterializationOptions,
+export function dereferencePlatformPackageLinks(
+  options: PlatformLinkDereferenceOptions,
 ): number {
   if ((options.platform ?? process.platform) !== 'win32') return 0
-  const desktopRoot = resolve(options.desktopRoot)
-  const scopeDir = join(desktopRoot, 'node_modules', '@deepseek-ai')
-  const aliasSource = join(desktopRoot, 'node_modules', 'koffi-win32-x64-3-1-1')
-  if (!existsSync(scopeDir)) return 0
-
-  let materialized = 0
-  for (const entry of readdirSync(scopeDir, { withFileTypes: true })) {
-    if (!entry.isDirectory() && !entry.isSymbolicLink()) continue
-    const nestedKoromix = join(scopeDir, entry.name, 'node_modules', '@koromix')
-    if (!existsSync(nestedKoromix)) continue
-    for (const platformEntry of readdirSync(nestedKoromix, { withFileTypes: true })) {
-      if (platformEntry.name !== 'koffi-win32-x64') continue
-      const nestedPackage = join(nestedKoromix, platformEntry.name)
-      if (!lstatSync(nestedPackage).isSymbolicLink()) continue
-      // The canonical 3.1.1 platform copy is the root alias dependency; fall
-      // back to the junction's own store target when the alias is absent.
-      const source = existsSync(aliasSource) ? aliasSource : realpathSync(nestedPackage)
-      copyPackage(source, nestedPackage)
-      materialized += 1
+  const root = resolve(options.modulesRoot)
+  let dereferenced = 0
+  const pending = [root]
+  while (pending.length > 0) {
+    const dir = pending.pop()!
+    let entries
+    try {
+      entries = readdirSync(dir, { withFileTypes: true })
+    } catch {
+      continue
+    }
+    for (const entry of entries) {
+      const full = join(dir, entry.name)
+      const info = lstatSync(full, { throwIfNoEntry: false })
+      if (info === undefined) continue
+      if (info.isSymbolicLink()) {
+        const manifestPath = join(full, 'package.json')
+        const manifest = existsSync(manifestPath)
+          ? JSON.parse(readFileSync(manifestPath, 'utf8')) as { os?: unknown, cpu?: unknown }
+          : undefined
+        if (manifest?.os === undefined && manifest?.cpu === undefined) {
+          // 常规包的链接在依赖拷贝中本来就能正确归档；只需继续下钻，
+          // 平台门控链接才是被丢档的那类。
+          const target = statSync(full, { throwIfNoEntry: false })
+          if (target?.isDirectory()) pending.push(full)
+          continue
+        }
+        const source = realpathSync(full)
+        rmSync(full, { recursive: true, force: true })
+        cpSync(source, full, { recursive: true, force: true, dereference: true })
+        dereferenced += 1
+        continue
+      }
+      if (info.isDirectory() && entry.name !== '.pnpm') pending.push(full)
     }
   }
-  return materialized
+  return dereferenced
 }
 
 function loadPackagedKoffi(koffiRoot: string): LoadedKoffiModule {
