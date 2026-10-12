@@ -211,10 +211,10 @@ export function packageWindowsArtifact(
   pruneBridgeDependencyResidue(options.desktopRoot)
   // 平台门控包（package.json 带 os/cpu）的 pnpm junction 会被依赖树拷贝丢弃，
   // 而 NSIS 校验仍按文件清单查档；统一解引用为真实拷贝后 asar 自洽。
-  dereferencePlatformPackageLinks({ modulesRoot: join(options.desktopRoot, 'node_modules') })
-  // 传递依赖的平台包（LibreOffice kit 等）只存在于虚拟仓库、无顶层链接可解
-  // 引用；物化为顶层真实目录后收集器与拷贝器指向同一位置。
-  ensureHoistedPlatformPackage({ desktopRoot: options.desktopRoot, packageName: '@deepseek-ai/libreoffice-kit-win32-x64' })
+  const materializeStartedAt = Date.now()
+  const dereferenced = dereferencePlatformPackageLinks({ modulesRoot: join(options.desktopRoot, 'node_modules') })
+  const hoisted = ensureHoistedPlatformPackage({ desktopRoot: options.desktopRoot, packageName: '@deepseek-ai/libreoffice-kit-win32-x64' })
+  options.log(`platform package materialization: ${dereferenced} link(s) dereferenced, libreoffice kit ${hoisted}, took ${Date.now() - materializeStartedAt}ms`)
   options.run(
     options.nodeExecutable,
     [

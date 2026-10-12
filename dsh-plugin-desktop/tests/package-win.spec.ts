@@ -103,6 +103,7 @@ describe('Windows x64 installer packaging', () => {
     expect(calls.flatMap(call => call.args).join(' ')).not.toContain('@electron+rebuild')
     expect(logs).toEqual([
       'Building an unsigned Windows x64 installer; Authenticode is a separate release step.',
+      'platform package materialization: 0 link(s) dereferenced, libreoffice kit source-missing, took 0ms',
     ])
   })
 
@@ -134,6 +135,7 @@ describe('Windows x64 installer packaging', () => {
     ])
     expect(logs).toEqual([
       'Building an unsigned Windows x64 portable archive; Authenticode is a separate release step.',
+      'platform package materialization: 0 link(s) dereferenced, libreoffice kit source-missing, took 0ms',
     ])
   })
 
@@ -167,6 +169,7 @@ describe('Windows x64 installer packaging', () => {
     expect(logs).toEqual([
       'Building an unsigned Windows x64 installer; Authenticode is a separate release step.',
       'Skipping the Windows package preflight; the package gate already passed.',
+      'platform package materialization: 0 link(s) dereferenced, libreoffice kit source-missing, took 0ms',
     ])
   })
 

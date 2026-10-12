@@ -1,8 +1,10 @@
 /** Restore Windows Koffi platform packages omitted by Electron Builder's npm collector. */
 
 import {
+  copyFileSync,
   cpSync,
   existsSync,
+  linkSync,
   lstatSync,
   mkdirSync,
   readFileSync,
@@ -47,6 +49,28 @@ function copyPackage(source: string, target: string): void {
   }
   rmSync(target, { recursive: true, force: true })
   cpSync(source, target, { recursive: true, force: true, dereference: true })
+}
+
+/**
+ * Materialize `source` at `target` through same-volume hardlinks: the archive
+ * reads hardlinked files like any other, while thousands-of-files package
+ * trees (LibreOffice kit) cost milliseconds instead of minutes of NTFS
+ * copying. Falls back to per-file copies across volume boundaries (EXDEV).
+ */
+function hardlinkTree(source: string, target: string): void {
+  const info = lstatSync(source)
+  if (info.isFile()) {
+    try {
+      linkSync(source, target)
+    } catch {
+      copyFileSync(source, target)
+    }
+    return
+  }
+  mkdirSync(target, { recursive: true })
+  for (const entry of readdirSync(source, { withFileTypes: true })) {
+    hardlinkTree(join(source, entry.name), join(target, entry.name))
+  }
 }
 
 function findPackagedKoffiPackages(nodeModulesRoot: string): string[] {
@@ -221,7 +245,7 @@ export function dereferencePlatformPackageLinks(
           continue
         }
         rmSync(full, { recursive: true, force: true })
-        cpSync(source, full, { recursive: true, force: true, dereference: true })
+        hardlinkTree(source, full)
         dereferenced += 1
         continue
       }
@@ -284,7 +308,7 @@ export function ensureHoistedPlatformPackage(options: HoistedPlatformPackageOpti
     const source = join(storeRoot, entry.name, 'node_modules', ...options.packageName.split('/'))
     if (!existsSync(source)) continue
     mkdirSync(dirname(hoisted), { recursive: true })
-    cpSync(source, hoisted, { recursive: true, force: true, dereference: true })
+    hardlinkTree(source, hoisted)
     return 'materialized'
   }
   return 'source-missing'
