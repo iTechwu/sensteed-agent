@@ -652,12 +652,15 @@ export function smokePackagedElectronRuntime(
       args: ['--version'],
       accepts: (stdout: string) => stdout.trim() === PNPM_RUNTIME_VERSION,
     },
-    {
+    // Windows 的会话后端走命名信号量，prepare-fs-ext 在 win32 明确
+    // not-required；包内 fs-ext 是 Node-ABI 构建，在 Electron 下必然
+    // ABI 不符，故此检查仅适用于确实准备 Electron-ABI 绑定的平台。
+    ...(context.electronPlatformName === 'win32' ? [] : [{
       label: 'fs-ext native ABI',
       entry: join(runtimeRoot, 'node_modules', 'fs-ext', 'fs-ext.js'),
       args: [],
       accepts: (stdout: string) => stdout.trim() === '',
-    },
+    }]),
     {
       label: 'ASAR/Profile/CJS/ripgrep',
       entry: join(runtimeRoot, 'lib', 'packaged-runtime-smoke.js'),
