@@ -254,6 +254,15 @@ export const ELECTRON_BUILDER_BASE = Object.freeze({
       // sources/ 是引擎构建期源码（运行时只用 bin/ 与 program/），CI 依赖拷贝
       // 会丢档该子树并使 NSIS 校验失败；显式剔除，收录与体积双赢。
       '!node_modules/@deepseek-ai/libreoffice-kit-win32-x64/sources/**',
+      // 上游合并引入的 workspace 循环链接（cordis ↔ cordis-plugin-loader 等）
+      // 让 Windows 依赖拷贝在 ELOOP 处中止、其后所有条目按遍历序丢档
+      // （koffi/libreoffice/sharp 依次报错即此因）。把循环链从档中剔除；
+      // 运行时模块解析沿目录树上溯到顶层 workspace 副本。
+      '!node_modules/dsh-community-market/node_modules/**/@deepseek-ai/cordis/**',
+      '!node_modules/dsh-community-market/node_modules/**/@deepseek-ai/cordis-plugin-loader/**',
+      '!node_modules/dsh-community-market/node_modules/**/@deepseek-ai/dsh-brand/**',
+      '!node_modules/dsh-community-market/node_modules/**/@deepseek-ai/dsh-typert-protocol/**',
+      '!node_modules/dsh-community-market/node_modules/**/@deepseek-ai/dsh-workspace/**',
       '!node_modules/@img/sharp-darwin*/**',
       '!node_modules/@img/sharp-libvips-darwin*/**',
       '!node_modules/@img/sharp-win32-arm64*/**',

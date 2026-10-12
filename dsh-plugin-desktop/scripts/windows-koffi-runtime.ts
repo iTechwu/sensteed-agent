@@ -168,9 +168,20 @@ export function dereferencePlatformPackageLinks(
   if ((options.platform ?? process.platform) !== 'win32') return 0
   const root = resolve(options.modulesRoot)
   let dereferenced = 0
+  // workspace 循环链接（如 cordis ↔ cordis-plugin-loader）会让不加防护的
+  // 下钻撞上 ELOOP；以 realpath 已访集合剪枝。
+  const visited = new Set<string>()
   const pending = [root]
   while (pending.length > 0) {
     const dir = pending.pop()!
+    let realDir
+    try {
+      realDir = realpathSync(dir)
+    } catch {
+      continue
+    }
+    if (visited.has(realDir)) continue
+    visited.add(realDir)
     let entries
     try {
       entries = readdirSync(dir, { withFileTypes: true })
@@ -182,18 +193,33 @@ export function dereferencePlatformPackageLinks(
       const info = lstatSync(full, { throwIfNoEntry: false })
       if (info === undefined) continue
       if (info.isSymbolicLink()) {
-        const manifestPath = join(full, 'package.json')
-        const manifest = existsSync(manifestPath)
-          ? JSON.parse(readFileSync(manifestPath, 'utf8')) as { os?: unknown, cpu?: unknown }
-          : undefined
+        let manifest
+        try {
+          const manifestPath = join(full, 'package.json')
+          manifest = existsSync(manifestPath)
+            ? JSON.parse(readFileSync(manifestPath, 'utf8')) as { os?: unknown, cpu?: unknown }
+            : undefined
+        } catch {
+          continue
+        }
         if (manifest?.os === undefined && manifest?.cpu === undefined) {
           // 常规包的链接在依赖拷贝中本来就能正确归档；只需继续下钻，
           // 平台门控链接才是被丢档的那类。
-          const target = statSync(full, { throwIfNoEntry: false })
+          let target
+          try {
+            target = statSync(full, { throwIfNoEntry: false })
+          } catch {
+            continue
+          }
           if (target?.isDirectory()) pending.push(full)
           continue
         }
-        const source = realpathSync(full)
+        let source
+        try {
+          source = realpathSync(full)
+        } catch {
+          continue
+        }
         rmSync(full, { recursive: true, force: true })
         cpSync(source, full, { recursive: true, force: true, dereference: true })
         dereferenced += 1
