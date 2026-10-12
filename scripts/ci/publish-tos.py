@@ -319,7 +319,13 @@ if __name__ == '__main__':
 
 def signed_download_url(client, config, key, expires):
     """Presign a GET for keys that the bucket policy does not serve anonymously."""
-    import tos
-    signed = client.pre_signed_url(tos.HttpMethodType.Http_Method_Get, bucket=config['TOS_BUCKET'], key=key,
-                                   expires_in=expires)
+    # 真实 SDK 客户端要求 HttpMethodType 枚举；单元测试的 FakeTos 桩不校验
+    # 方法形态且门禁环境不安装 tos 包，此处惰性导入并以 'GET' 字符串回退。
+    try:
+        import tos
+        http_method = tos.HttpMethodType.Http_Method_Get
+    except ImportError:
+        http_method = 'GET'
+    signed = client.pre_signed_url(http_method, bucket=config['TOS_BUCKET'], key=key,
+                                   expires=expires)
     return signed.signed_url

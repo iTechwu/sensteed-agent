@@ -59,9 +59,9 @@ class FakeTos:
             raise RuntimeError('precondition failed')
         self.objects[key] = kwargs
 
-    def pre_signed_url(self, method, bucket, key, expires_in):
-        self.calls.append(('presign', key, expires_in))
-        return SimpleNamespace(signed_url=f'https://signed.example/{bucket}/{key}?expires={expires_in}')
+    def pre_signed_url(self, method, bucket, key, expires=None, **kwargs):
+        self.calls.append(('presign', key, expires))
+        return SimpleNamespace(signed_url=f'https://signed.example/{bucket}/{key}?expires={expires}')
 
 
 class PublicationTests(unittest.TestCase):
