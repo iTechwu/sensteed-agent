@@ -32,7 +32,7 @@ main.ts
 | 件 | 位置 | 职责 |
 |---|---|---|
 | 依赖状态分类器 | `src/profile.ts` `classifyProfileDependencyState` | 纯 JS 判定漂移类别，是零 pnpm 校验的核心 |
-| 钉版 store | `src/profile-store-dir.ts`、`src/pnpm-policy.ts` | 全部 Desktop 驱动的 pnpm 共用 `<DSH_HOME>/pnpm-store`，Market 下载的内容可被离线物化复用 |
+| store 选择 | `src/profile-store-dir.ts`、`src/pnpm-policy.ts` | 已安装 Profile 沿用真实 `.modules.yaml` 中的 `storeDir`，避免插件安装时报 `ERR_PNPM_UNEXPECTED_STORE`；新安装使用 `<DSH_HOME>/pnpm-store`。Market、后台修复与 checkpoint 物化采用同一规则 |
 | offline-first 物化器 | `src/profile-materializer.ts` | `offline: 'always' \| 'prefer' \| 'never'`（缺省 never=旧行为），prefer 离线失败自动带网重试一次，结果带 `attempt` |
 | 后台修复 | `src/profile-repair.ts` | 数据操作锁串行化 + 复检 + 恢复窗 `repairDependencies` 动作（双语入口在恢复窗诊断页） |
 | 闭包契约 | `scripts/generate-profile-closure.mjs` → `lib/profile-closure.json` → `src/profile-closure.ts` | 打包期冻结一方依赖 name→version 快照并随 app.asar 分发；afterPack 校验钉版一致性；启动期快校验只产出违规清单 |
@@ -44,7 +44,7 @@ main.ts
 1. **启动解析从不依赖迁移完成**——`prepareDesktopProfile` 的 bundle 解析在迁移判定之前完成，迁移只服务后续 pnpm 操作的元数据一致性。
 2. **启动路径上的失败不再现场重装**——元数据失配进后台修复；三方 bundle 损坏降级跳过；闭包违规只取证。需要现场安装的场景只剩两类用户显式动作：Market 插件安装与恢复窗"修复依赖元数据"。
 3. **`.modules.yaml` 永不伪造**——它必须由真实 pnpm 写入，打包期不可预生成；校验保留在运行期分类器中。
-4. **checkpoint 快照不含 `.modules.yaml`**——恢复后由 offline-first 物化按钉版 store 重建。
+4. **checkpoint 快照不含 `.modules.yaml`**——恢复后由 offline-first 物化重建；现存依赖有有效 store 元数据时沿用该目录，否则使用应用内 store。
 5. **回退开关**——`DSH_DESKTOP_LEGACY_MIGRATION=1` 恢复启动中迁移旧语义，无需重新构建。
 
 ## Phase 2（未实施，需产品签字）

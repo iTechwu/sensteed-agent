@@ -57,7 +57,7 @@ export async function runDesktopProfileRepair(
   try {
     const rechecked = classifyProfileDependencyState(options.profileDir, false, options.platform)
     if (rechecked.status === 'compatible') return 'not-required'
-    const storeDir = ensureDesktopPnpmStoreDir(options.homeDir)
+    const storeDir = ensureDesktopPnpmStoreDir(options.homeDir, options.profileDir)
     await materializeProfile({
       appExecutable: options.appExecutable,
       clearEnvironmentPath: options.clearEnvironmentPath,

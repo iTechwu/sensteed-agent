@@ -82,9 +82,14 @@ describe('desktop profile dependency repair', () => {
     expect(spawn).not.toHaveBeenCalled()
   })
 
-  it('repairs drifted metadata offline-first through the pinned store', async () => {
+  it.each([false, true])('repairs drifted metadata offline-first with an existing store: %s', async existingStore => {
     const home = temporaryHome()
     seedIncompatibleProfile(home)
+    const storeDir = existingStore ? join(home, 'previous-user-store', 'v11') : join(home, 'pnpm-store')
+    if (existingStore) {
+      writeFileSync(join(home, 'profiles', 'desktop', 'node_modules', '.modules.yaml'),
+        `nodeLinker: isolated\npackageManager: pnpm@11.7.0\nstoreDir: ${JSON.stringify(storeDir)}\n`)
+    }
     const child = fakeChild()
     const argvs: readonly (readonly string[])[] = []
     const spawn = vi.fn((_command: string, selectedArgs: readonly string[]) => {
@@ -106,7 +111,7 @@ virtualStoreDirMaxLength: ${process.platform === 'win32' ? 60 : 120}
     expect(await outcome).toBe('repaired')
     expect(argvs).toHaveLength(1)
     expect(argvs[0]).toContain('--offline')
-    expect(argvs[0]).toContain(join(home, 'pnpm-store'))
+    expect(argvs[0]).toContain(storeDir)
   })
 
   it('returns deferred when another desktop data operation holds the lock', async () => {

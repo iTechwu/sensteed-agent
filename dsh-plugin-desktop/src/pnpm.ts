@@ -154,7 +154,7 @@ class DesktopPnpmService extends Service implements DesktopPnpm {
   run(argv: readonly string[], signal?: AbortSignal): DesktopPnpmHandle {
     const args = withDesktopPnpmStoreDir(
       withDesktopPnpmPolicy(validatedArgv(argv)),
-      desktopPnpmStoreDir(this.bootstrap.homeDir),
+      desktopPnpmStoreDir(this.bootstrap.homeDir, this.bootstrap.activeProfileDir),
     )
     return this.start({
       argv: [

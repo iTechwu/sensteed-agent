@@ -1361,8 +1361,8 @@ async function start(): Promise<void> {
               homeDir,
               profileDir: activeProfileDir,
               electronVersion,
-              storeDir: ensureDesktopPnpmStoreDir(homeDir),
-              // Restored checkpoints pin their lockfile, so the pinned store
+              storeDir: ensureDesktopPnpmStoreDir(homeDir, activeProfileDir),
+              // Restored checkpoints pin their lockfile, so the selected store
               // usually holds every tarball already; go online only on a miss.
               offline: 'prefer',
             })
