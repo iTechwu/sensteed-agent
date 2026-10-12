@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { prepareFsExtForElectron } from './prepare-fs-ext.ts'
 import { electronBuilderEnvironment } from './electron-builder-environment.ts'
 import { refreshBundledForPackaging } from './refresh-bundled-cli.ts'
+import { materializeNestedKoffiPlatformPackages } from './windows-koffi-runtime.ts'
 
 /**
  * Remove the published tarball's residual nested `node_modules/.bin` from the
@@ -208,6 +209,9 @@ export function packageWindowsArtifact(
   }
   options.prepareRuntime()
   pruneBridgeDependencyResidue(options.desktopRoot)
+  // pnpm 为 workspace koffi 消费方生成的嵌套 junction 会被依赖树拷贝丢弃，
+  // 而 NSIS 校验仍按文件清单查档；物化为真实拷贝后 asar 自洽。
+  materializeNestedKoffiPlatformPackages({ desktopRoot: options.desktopRoot })
   options.run(
     options.nodeExecutable,
     [

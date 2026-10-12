@@ -3,6 +3,7 @@
 import {
   cpSync,
   existsSync,
+  lstatSync,
   readFileSync,
   readdirSync,
   realpathSync,
@@ -23,6 +24,13 @@ export interface LoadedKoffiModule {
 }
 
 export type PackagedKoffiLoader = (koffiRoot: string) => LoadedKoffiModule
+
+export interface NestedKoffiMaterializationOptions {
+  /** Desktop package root containing the complete installed dependency tree. */
+  readonly desktopRoot: string
+  /** Injectable platform so non-Windows hosts can exercise the walk in tests. */
+  readonly platform?: NodeJS.Platform
+}
 
 function copyPackage(source: string, target: string): void {
   if (!existsSync(source)) {
@@ -128,6 +136,48 @@ export function hydratePackagedWindowsKoffiRuntime(
       join(dirname(packagedKoffi), '@koromix', 'koffi-win32-x64'),
     )
   }
+}
+
+/**
+ * Replace the workspace packages' nested `@koromix/koffi-win32-x64` junctions
+ * with real directory copies before Electron Builder runs.
+ *
+ * pnpm materializes the platform package of every workspace Koffi consumer
+ * (fs-local, subprocess-local, win32-process, sandbox-windows-acl) as a
+ * junction into the virtual store. The dependency-tree copy drops junctioned
+ * entries from app.asar while its file set still records them, so the NSIS
+ * stage fails with `"…@koromix/koffi-win32-x64/index.js" was not found in
+ * this archive`. A dereferenced real copy keeps the archive self-consistent;
+ * smartUnpack moves the native binary beside it.
+ *
+ * @returns how many nested junctions were materialized.
+ */
+export function materializeNestedKoffiPlatformPackages(
+  options: NestedKoffiMaterializationOptions,
+): number {
+  if ((options.platform ?? process.platform) !== 'win32') return 0
+  const desktopRoot = resolve(options.desktopRoot)
+  const scopeDir = join(desktopRoot, 'node_modules', '@deepseek-ai')
+  const aliasSource = join(desktopRoot, 'node_modules', 'koffi-win32-x64-3-1-1')
+  if (!existsSync(scopeDir)) return 0
+
+  let materialized = 0
+  for (const entry of readdirSync(scopeDir, { withFileTypes: true })) {
+    if (!entry.isDirectory() && !entry.isSymbolicLink()) continue
+    const nestedKoromix = join(scopeDir, entry.name, 'node_modules', '@koromix')
+    if (!existsSync(nestedKoromix)) continue
+    for (const platformEntry of readdirSync(nestedKoromix, { withFileTypes: true })) {
+      if (platformEntry.name !== 'koffi-win32-x64') continue
+      const nestedPackage = join(nestedKoromix, platformEntry.name)
+      if (!lstatSync(nestedPackage).isSymbolicLink()) continue
+      // The canonical 3.1.1 platform copy is the root alias dependency; fall
+      // back to the junction's own store target when the alias is absent.
+      const source = existsSync(aliasSource) ? aliasSource : realpathSync(nestedPackage)
+      copyPackage(source, nestedPackage)
+      materialized += 1
+    }
+  }
+  return materialized
 }
 
 function loadPackagedKoffi(koffiRoot: string): LoadedKoffiModule {
