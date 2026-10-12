@@ -1051,7 +1051,10 @@ function loadRecoveryFilteredProfile(
     profile: {
       name: profileName,
       dir: profileDir,
-      layers,
+      // The product now owns capture activation. Historical profiles may also
+      // select its standalone bundle: do not attach the same listeners twice.
+      // Keep that standalone fallback when the product layer is unavailable.
+      layers: productFailure ? layers : layers.filter(layer => layer.packageName !== '@dofe/dsh-knowledge-capture'),
       patchPath,
       patches: existsSync(patchPath) ? loadOverlayPatches(BIN_NAME, patchPath) : [],
       skippedBundles,

@@ -1548,6 +1548,21 @@ describe('desktop profile composition and the recovery deselection ledger', () =
     expect(manifest.dsh.profile.bundles).not.toContain('@dofe/dsh-sensteed-product')
   })
 
+  it('loads personal memory capture for existing profiles without a manually selected bundle', () => {
+    const home = temporaryHome()
+    const prepared = prepareDesktopProfile(undefined, home, 'darwin')
+    expect(composeEntries([prepared.patches]).filter(row => row.name === '@dofe/dsh-knowledge-capture')).toEqual([
+      expect.objectContaining({ id: 'sensteed-agent-knowledge-capture' }),
+    ])
+  })
+
+  it('loads capture once when a historical profile also selected its standalone bundle', () => {
+    const home = temporaryHome()
+    declareBundle(home, '@dofe/dsh-knowledge-capture')
+    const prepared = prepareDesktopProfile(undefined, home, 'darwin')
+    expect(composeEntries([prepared.patches]).filter(row => row.name === '@dofe/dsh-knowledge-capture')).toHaveLength(1)
+  })
+
   it('degrades a selected bundle with an unparseable patch instead of failing startup', async () => {
     const home = temporaryHome()
     const packageName = 'broken-plugin'
