@@ -66,4 +66,13 @@ describe('maskSecrets', () => {
   it('leaves ordinary prose untouched', () => {
     expect(maskSecrets('hello world, profile "desktop"')).toBe('hello world, profile "desktop"')
   })
+
+  it('masks digit-bearing bare tokens but leaves letter-only identifiers intact', () => {
+    const stack = '    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:714:38)'
+    expect(maskSecrets(stack)).toBe(stack)
+    const token = `Bearer-less bare token ${'aB9x'.repeat(10)} end`
+    const maskedToken = maskSecrets(token)
+    expect(maskedToken).toContain('****')
+    expect(maskedToken).not.toContain('aB9x'.repeat(10))
+  })
 })

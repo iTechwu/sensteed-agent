@@ -18,7 +18,10 @@ const NAMED_SECRET = new RegExp(
 /** Secret-shaped patterns applied in order to a rendered log line. */
 const SECRET_PATTERNS: readonly RegExp[] = [
   /\bsk-[A-Za-z0-9]{12,}/gu, // OpenAI/DeepSeek-style sk- keys
-  /\b[a-zA-Z0-9]{32,}\b/gu, // long hex/base64 tokens
+  // Long hex/base64 tokens. The digit requirement keeps long identifier-shaped
+  // runs (camelCase stack-frame method names like `resolveAndMaybeBlockOnLoaderThread`)
+  // intact; random tokens of this length virtually always contain digits.
+  /\b(?=[a-zA-Z0-9]*\d)[a-zA-Z0-9]{32,}\b/gu,
   /Bearer\s+[A-Za-z0-9._-]+/giu, // Authorization bearer tokens
   /Basic\s+[A-Za-z0-9+/]+={0,2}/giu, // Authorization basic credentials
 ]
