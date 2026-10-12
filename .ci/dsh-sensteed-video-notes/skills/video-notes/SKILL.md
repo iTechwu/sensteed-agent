@@ -22,7 +22,7 @@ description: 将 YouTube、小红书、抖音、Bilibili 或用户选择的本�
 | --- | --- | --- |
 | A 来源 | 链接调用 `video_source_resolve_start`；本地附件通过 `sensteed_video_file_upload` 上传，取得 assetId 后以 `uploadedAsset` resolve。按原 jobId 轮询 `video_job_get` | sourceId、幂等键、assetId |
 | B 媒体 | `video_media_prepare_start` 取真实时长/音轨；`video_source_get` 复核 | sourceVersion、probe |
-| C 文字 | 人工字幕轨优先，其次自动字幕/用户旁挂字幕（`video_upload_authorize` purpose=subtitle → `video_subtitles_read_start`）。字幕不可用且用户允许时才 `video_transcription_start`（可能计费；`MODEL_DELEGATION_UNAVAILABLE` 时停止并说明） | trackId/transcriptId、timingQuality |
+| C 文字 | 人工字幕轨优先，其次自动字幕/用户旁挂字幕（Host 上传 SRT/VTT 取得 assetId → `video_subtitles_read_start`）。字幕不可用且用户允许时才 `video_transcription_start`（可能计费；`MODEL_DELEGATION_UNAVAILABLE` 时停止并说明） | trackId/transcriptId、timingQuality |
 | D 图片 | 课程/演示选 `stable_slides`，快节奏选 `scene_hybrid`，用户指定段落用 `timestamps`。`video_frames_extract_start` 后按 `retryAfterSeconds` 轮询；`video_frames_list` 分页取每张永久 `downloadUrl` | frameSetId、每张 URL/摘要 |
 | E 对齐 | 运行 `scripts/align-timeline.mjs`：segment 按中点归属帧区间 `[onset,nextOnset)`，保留全部原始 segment 与图片证据 | 基线 note.json |
 | F 写作 | 分批组织章节（长视频按时间窗分批读 transcript，每批约 10 分钟并记录 coveredSegmentIds）；润色/总结经本地 Agent 完成；不改动证据中的数值、公式、时间 | 章节结构、证据引用 |
