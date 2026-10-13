@@ -53,6 +53,15 @@ const NOTICE_LICENSES = new Set([
   // trycua computer-use drivers: MPL-2.0 is file-level copyleft; binary
   // redistribution with the required notices satisfies both licenses.
   'MIT AND MPL-2.0',
+  // sensteed-im's official QQ QR connector publishes no license expression;
+  // its package notice is retained in the bundled plugin and no connector
+  // source is copied into the Desktop distribution.
+  'UNLICENSED',
+  // External mail/QR runtimes bundled by sensteed-im retain their package
+  // license files in the installer.
+  'MIT-0',
+  'Apache 2.0',
+  '(MIT OR EUPL-1.1+)',
 ])
 
 /**

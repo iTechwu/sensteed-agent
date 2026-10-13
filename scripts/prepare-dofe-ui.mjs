@@ -11,6 +11,7 @@ const preinstalledPlugins = [
   'dsh-sensteed-knowledge',
   'dsh-sensteed-supplier-intelligence',
   'dsh-sensteed-video-notes',
+  'dsh-sensteed-im',
   'dsh-soup',
   'dsh-tools-mcp',
 ]

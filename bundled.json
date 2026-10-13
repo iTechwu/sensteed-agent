@@ -72,6 +72,12 @@
       "snapshotDir": ".ci/dsh-sensteed-video-notes"
     },
     {
+      "name": "dsh-sensteed-im",
+      "package": "sensteed-im",
+      "source": "sibling",
+      "snapshotDir": ".ci/dsh-sensteed-im"
+    },
+    {
       "name": "dsh-tools-mcp",
       "package": "@dofe/dsh-tools-mcp",
       "source": "sibling",
