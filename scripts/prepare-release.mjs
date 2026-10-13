@@ -2,7 +2,7 @@
 import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { packagingVersion } from './release-contract.mjs'
+import { assertHarnessReleaseManifest, packagingVersion } from './release-contract.mjs'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim()
@@ -25,6 +25,13 @@ if (!args.includes('--execute')) {
   if (!repository) throw new Error('Invalid Harness repository')
   const commit = git('ls-remote', '--exit-code', `https://github.com/${repository}.git`, `refs/heads/${upstream.branch}`).split(/\s+/u)[0]
   if (!/^[a-f0-9]{40}$/u.test(commit)) throw new Error('Could not pin Harness commit')
+  // Validate source and mergeability before any branch or manifest mutation.
+  const response = await fetch(`https://raw.githubusercontent.com/${repository}/${commit}/package.json`, {
+    signal: AbortSignal.timeout(30_000),
+  })
+  if (!response.ok) throw new Error(`Could not read pinned Harness manifest: HTTP ${response.status}`)
+  assertHarnessReleaseManifest(await response.json(), upstream.sourceVersion)
+  git('merge-tree', '--write-tree', 'origin/main', 'dev')
   if (main) git('checkout', 'main')
   else git('checkout', '-b', 'main', 'origin/main')
   git('merge', '--no-ff', 'dev', '-m', 'chore: 合并开发分支准备发布')

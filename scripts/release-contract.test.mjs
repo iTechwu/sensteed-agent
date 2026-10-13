@@ -4,7 +4,13 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { assertPackagingRelease, assertPackagingVersion, packagingVersion } from './release-contract.mjs'
+import { assertHarnessReleaseManifest, assertPackagingRelease, assertPackagingVersion, packagingVersion } from './release-contract.mjs'
+
+test('release preparation rejects a moved Harness branch with a different source version', () => {
+  assertHarnessReleaseManifest({ name: '@deepseek-ai/dsh-root', version: '0.2.1-alpha.2' }, '0.2.1-alpha.2')
+  assert.throws(() => assertHarnessReleaseManifest({ name: '@deepseek-ai/dsh-root', version: '0.2.2' }, '0.2.1-alpha.2'), /sourceVersion/)
+  assert.throws(() => assertHarnessReleaseManifest({ name: 'other', version: '0.2.1-alpha.2' }, '0.2.1-alpha.2'), /Harness/)
+})
 
 test('version uses Harness release and Shanghai packaging minute', () => {
   assert.equal(packagingVersion('0.2.1-alpha.2', new Date('2026-10-13T08:00:00Z')), '0.2.1-alpha.2-beta.202610131600')

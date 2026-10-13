@@ -7,6 +7,12 @@ import { fileURLToPath } from 'node:url'
 const NUMBER = '(0|[1-9][0-9]*)'
 const SOURCE = new RegExp(`^${NUMBER}\\.${NUMBER}\\.${NUMBER}(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$`, 'u')
 
+export function assertHarnessReleaseManifest(manifest, sourceVersion) {
+  if (manifest?.name !== '@deepseek-ai/dsh-root' || manifest.version !== sourceVersion) {
+    throw new Error(`Pinned Harness package version must equal sourceVersion ${sourceVersion}`)
+  }
+}
+
 export function packagingVersion(sourceVersion, date = new Date()) {
   if (!SOURCE.test(sourceVersion) || sourceVersion.split('-')[1]?.split('.').some(p => /^0[0-9]+$/u.test(p))) {
     throw new Error('Invalid Harness sourceVersion')
