@@ -206,7 +206,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.product == 'true'
     runs-on: windows-2022
-    timeout-minutes: 60
+    timeout-minutes: 90
     env:
       # node-gyp 11 cannot parse the VS 18 metadata on windows-latest yet.
       # Keep native fs-ext builds on the supported VS 2022 toolchain.
