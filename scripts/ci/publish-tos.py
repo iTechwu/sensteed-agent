@@ -273,6 +273,20 @@ def publish(client, config, context, directory):
     return manifest_key, manifest
 
 
+def signed_download_url(client, config, key, expires):
+    """Presign a GET for keys that the bucket policy does not serve anonymously."""
+    # 真实 SDK 客户端要求 HttpMethodType 枚举；单元测试的 FakeTos 桩不校验
+    # 方法形态且门禁环境不安装 tos 包，此处惰性导入并以 'GET' 字符串回退。
+    try:
+        import tos
+        http_method = tos.HttpMethodType.Http_Method_Get
+    except ImportError:
+        http_method = 'GET'
+    signed = client.pre_signed_url(http_method, bucket=config['TOS_BUCKET'], key=key,
+                                   expires=expires)
+    return signed.signed_url
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--check-config', action='store_true')
@@ -311,16 +325,3 @@ if __name__ == '__main__':
     except Exception as error:
         print(diagnostic(error, os.environ), file=sys.stderr)
         sys.exit(1)
-
-def signed_download_url(client, config, key, expires):
-    """Presign a GET for keys that the bucket policy does not serve anonymously."""
-    # 真实 SDK 客户端要求 HttpMethodType 枚举；单元测试的 FakeTos 桩不校验
-    # 方法形态且门禁环境不安装 tos 包，此处惰性导入并以 'GET' 字符串回退。
-    try:
-        import tos
-        http_method = tos.HttpMethodType.Http_Method_Get
-    except ImportError:
-        http_method = 'GET'
-    signed = client.pre_signed_url(http_method, bucket=config['TOS_BUCKET'], key=key,
-                                   expires=expires)
-    return signed.signed_url

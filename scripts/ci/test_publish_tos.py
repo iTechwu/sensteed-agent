@@ -91,6 +91,10 @@ class PublicationTests(unittest.TestCase):
         publisher.publish(client, self.config, self.context, self.root)
         self.assertEqual(len(client.calls), 12)
 
+    def test_signed_url_helper_is_defined_before_script_entrypoint(self):
+        source = Path(__file__).with_name('publish-tos.py').read_text()
+        self.assertLess(source.index('def signed_download_url('), source.index("if __name__ == '__main__':"))
+
     def test_config_supports_endpoint_hostname_and_requires_secrets(self):
         self.assertEqual(self.config['TOS_ENDPOINT'], 'https://tos.example.com')
         self.assertEqual(self.config['TOS_BUCKET'], 'dofe-public')
