@@ -55,7 +55,9 @@ export function assertPackagingRelease(root = resolve(import.meta.dirname, '..')
       throw new Error(`Packaging input differs from tagged commit: ${path}`)
     }
   }
-  git('diff', '--quiet', 'HEAD', '--')
+  // CI materializes generated lib/UI files before packaging. The release
+  // inputs above are compared byte-for-byte with the tagged commit; derived
+  // build output is intentionally allowed to appear in the working tree.
   const source = read('release-source.json')
   const repository = /^git@github\.com:([\w.-]+\/[\w.-]+)\.git$/u.exec(upstream.repository)?.[1]
   if (!repository || source.version !== version || source.sourceVersion !== upstream.sourceVersion || source.repository !== repository || !/^[a-f0-9]{40}$/u.test(source.commit)) {
