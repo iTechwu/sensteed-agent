@@ -292,7 +292,7 @@ jobs:
             console.log('store @dataiku/uv:', fs.existsSync(path.join(storeRoot, '@dataiku', 'uv', 'package.json')))
             console.log('app-level @dataiku:', fs.existsSync('dsh-plugin-desktop/node_modules/@dataiku/uv/package.json'))
           "
-      - name: Build Windows installer and portable archive
+      - name: Prepare Windows packaged directory
         env:
           CI: 'false'
           npm_config_minimum_release_age: '0'
@@ -302,7 +302,23 @@ jobs:
           # already packed ASAR; release packaging keeps the configured level.
           DSH_WINDOWS_PACKAGE_COMPRESSION: store
           NODE_OPTIONS: '--max-old-space-size=6144'
-        run: pnpm --filter dsh-plugin-desktop dist:win-bundle
+        run: pnpm --filter dsh-plugin-desktop dist:win-prepare
+      - name: Build Windows installer
+        env:
+          CI: 'false'
+          npm_config_minimum_release_age: '0'
+          DSH_PACKAGE_CHECK_ALREADY_RAN: '1'
+          DSH_WINDOWS_PACKAGE_COMPRESSION: store
+          NODE_OPTIONS: '--max-old-space-size=6144'
+        run: pnpm --filter dsh-plugin-desktop dist:win-installer
+      - name: Build Windows portable archive
+        env:
+          CI: 'false'
+          npm_config_minimum_release_age: '0'
+          DSH_PACKAGE_CHECK_ALREADY_RAN: '1'
+          DSH_WINDOWS_PACKAGE_COMPRESSION: store
+          NODE_OPTIONS: '--max-old-space-size=6144'
+        run: pnpm --filter dsh-plugin-desktop dist:win-portable-prepared
       - name: Inspect packaged output on failure
         if: failure()
         shell: pwsh
@@ -326,6 +342,14 @@ jobs:
         with:
           name: package-size-windows
           path: dsh-plugin-desktop/dist/**/package-size-*.json
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Preserve Windows packaging phase timings
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-package-timings
+          path: dsh-plugin-desktop/dist/windows-package-timings.json
           if-no-files-found: ignore
           retention-days: 14
 

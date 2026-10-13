@@ -1,7 +1,7 @@
 /** Build an unsigned Windows x64 artifact on a native Windows host. */
 
 import { spawnSync } from 'node:child_process'
-import { realpathSync, rmSync } from 'node:fs'
+import { mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -102,6 +102,8 @@ export interface WindowsPackageOptions {
   readonly log: (message: string) => void
   /** Refresh the bundled skills/plugins before the check gate. */
   readonly refreshBundled: () => void
+  /** Optional JSON report used by CI to retain phase timings after the job. */
+  readonly timingReportPath?: string
 }
 
 /**
@@ -133,6 +135,61 @@ function run(
   }
 }
 
+type WindowsPackagingPhase = 'prepare-dir' | 'installer' | 'portable'
+
+function recordPhaseTiming(
+  options: WindowsPackageOptions,
+  phase: WindowsPackagingPhase,
+  status: 'success' | 'failed',
+  startedAt: number,
+): void {
+  const reportPath = options.timingReportPath
+  if (reportPath === undefined) return
+  const finishedAt = Date.now()
+  let entries: Array<Record<string, unknown>> = []
+  try {
+    const current = JSON.parse(readFileSync(reportPath, 'utf8'))
+    if (Array.isArray(current)) entries = current
+  } catch {
+    // The first phase has no report yet, and a partial report must not mask a
+    // packaging failure.
+  }
+  entries.push({
+    phase,
+    status,
+    elapsedMs: finishedAt - startedAt,
+    startedAt: new Date(startedAt).toISOString(),
+    finishedAt: new Date(finishedAt).toISOString(),
+  })
+  try {
+    mkdirSync(dirname(reportPath), { recursive: true })
+    writeFileSync(reportPath, `${JSON.stringify(entries, null, 2)}\n`)
+  } catch (error) {
+    options.log(`Unable to persist Windows packaging timing report: ${error instanceof Error ? error.message : String(error)}`)
+  }
+}
+
+function runTimedPhase(
+  options: WindowsPackageOptions,
+  phase: WindowsPackagingPhase,
+  action: () => void,
+): void {
+  const startedAt = Date.now()
+  if (phase === 'prepare-dir' && options.timingReportPath !== undefined) {
+    rmSync(options.timingReportPath, { force: true })
+  }
+  options.log(`[windows-packaging] ${phase} started`)
+  try {
+    action()
+    recordPhaseTiming(options, phase, 'success', startedAt)
+    options.log(`[windows-packaging] ${phase} completed in ${Date.now() - startedAt}ms`)
+  } catch (error) {
+    recordPhaseTiming(options, phase, 'failed', startedAt)
+    options.log(`[windows-packaging] ${phase} failed after ${Date.now() - startedAt}ms`)
+    throw error
+  }
+}
+
 /** Create the native packaging options for a verifier entry point. */
 export function createWindowsPackageOptions(verifier = './verify-win-installer.ts'): WindowsPackageOptions {
   const desktopRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -158,6 +215,7 @@ export function createWindowsPackageOptions(verifier = './verify-win-installer.t
     run,
     log: message => console.log(message),
     refreshBundled: () => refreshBundledForPackaging('refresh', workspaceRoot),
+    timingReportPath: join(desktopRoot, 'dist', 'windows-package-timings.json'),
   }
 }
 
@@ -179,32 +237,64 @@ function assertWindowsPackageHost(options: WindowsPackageOptions, artifact: stri
   }
 }
 
-/** Run the gates and package unsigned x64 Windows artifacts in one builder pass. */
-export function packageWindowsArtifacts(
-  options: WindowsPackageOptions,
-  targets: readonly ('nsis' | 'zip')[],
-  artifacts: readonly ('installer' | 'portable archive')[],
-): void {
-  const startedAt = Date.now()
-  assertWindowsPackageHost(options, artifacts.join(' + '))
-  const compression = windowsCompressionOverride(options.env)
+function builderEnvironment(cleanEnvironment: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const debugNamespaces = new Set(
+    (cleanEnvironment.DEBUG ?? '').split(',').map(value => value.trim()).filter(Boolean),
+  )
+  debugNamespaces.add('electron-builder')
+  debugNamespaces.add('app-builder-lib')
+  return electronBuilderEnvironment({
+    ...cleanEnvironment,
+    DEBUG: [...debugNamespaces].join(','),
+    DSH_ELECTRON_BUILDER_TARGET_PLATFORM: 'win32',
+    DSH_ELECTRON_BUILDER_TARGET_ARCH: 'x64',
+    CSC_IDENTITY_AUTO_DISCOVERY: 'false',
+    // Traverse the installed tree directly: package-manager graph collection can
+    // stall on the large linked workspace and pnpm v11 drops deduplicated links.
+    // Keep the real pnpm identity so the archive contains the dependency payload.
+    DSH_ELECTRON_BUILDER_TRAVERSAL_ONLY: '1',
+  })
+}
 
+function runBuilder(
+  options: WindowsPackageOptions,
+  cleanEnvironment: NodeJS.ProcessEnv,
+  target: 'dir' | 'nsis' | 'zip',
+  prepackagedDir?: string,
+): void {
+  const compression = windowsCompressionOverride(options.env)
+  const targetCompression = target === 'zip' ? compression : target === 'nsis' && compression !== 'store' ? compression : undefined
+  options.run(
+    options.nodeExecutable,
+    [
+      options.builderCli,
+      '--config',
+      'electron-builder.json',
+      '--win',
+      target,
+      '--x64',
+      '--publish',
+      'never',
+      '--config.win.signExecutable=false',
+      '--config.npmRebuild=false',
+      '--config.electronFuses.onlyLoadAppFromAsar=false',
+      ...(prepackagedDir === undefined ? [] : ['--prepackaged', prepackagedDir]),
+      ...(targetCompression === undefined ? [] : [`--config.win.compression=${targetCompression}`]),
+    ],
+    options.desktopRoot,
+    builderEnvironment(cleanEnvironment),
+  )
+}
+
+function prepareWindowsPackage(options: WindowsPackageOptions): void {
+  assertWindowsPackageHost(options, 'packaging')
   const cleanEnvironment = withoutWindowsSigningSecrets(options.env)
-  const artifactLabel = artifacts.length === 1 ? artifacts[0] : artifacts.join(' + ')
-  options.log(`Building ${artifacts.length === 1 ? 'an ' : ''}unsigned Windows x64 ${artifactLabel}; Authenticode is a separate release step.`)
-  if (compression !== undefined) {
-    options.log(`Packaging the ${artifactLabel} with ${compression} compression.`)
-  }
+  options.log('Preparing an unsigned Windows x64 packaged directory; Authenticode is a separate release step.')
   if (options.env.DSH_PACKAGE_CHECK_ALREADY_RAN !== '1') {
     options.refreshBundled()
     options.run(
       options.commandShell,
-      [
-        '/d',
-        '/s',
-        '/c',
-        'corepack pnpm --filter dsh-plugin-desktop check:win-package',
-      ],
+      ['/d', '/s', '/c', 'corepack pnpm --filter dsh-plugin-desktop check:win-package'],
       options.workspaceRoot,
       cleanEnvironment,
     )
@@ -213,59 +303,56 @@ export function packageWindowsArtifacts(
   }
   options.prepareRuntime()
   pruneBridgeDependencyResidue(options.desktopRoot)
-  // 平台门控包（package.json 带 os/cpu）的 pnpm junction 会被依赖树拷贝丢弃，
-  // 而 NSIS 校验仍按文件清单查档；统一解引用为真实拷贝后 asar 自洽。
   const materializeStartedAt = Date.now()
   const dereferenced = dereferencePlatformPackageLinks({ modulesRoot: join(options.desktopRoot, 'node_modules') })
   const hoisted = ensureHoistedPlatformPackage({ desktopRoot: options.desktopRoot, packageName: '@deepseek-ai/libreoffice-kit-win32-x64' })
   options.log(`platform package materialization: ${dereferenced} link(s) dereferenced, libreoffice kit ${hoisted}, took ${Date.now() - materializeStartedAt}ms`)
-  // NSIS 安装包受更新器 1 GiB 上限约束，永远不做 store 免压（免压体积
-  // ~1.6 GB 必然被 publish-tos 拒绝）；ZIP 便携版无此约束，用 store 换取
-  // 打包速度。两个目标各跑一次 builder，收集/物化等昂贵前置只做一次。
-  const targetsAndCompressions = targets.map((target) => ({
-    target,
-    compression: target === 'zip' ? compression : (compression === 'store' ? undefined : compression),
-  }))
-  let builderElapsed = 0
-  for (const { target, compression: targetCompression } of targetsAndCompressions) {
-    const builderStartedAt = Date.now()
-    options.run(
-      options.nodeExecutable,
-      [
-        options.builderCli,
-        '--config',
-        'electron-builder.json',
-        '--win',
-        target,
-        '--x64',
-        '--publish',
-        'never',
-        '--config.win.signExecutable=false',
-        '--config.npmRebuild=false',
-        '--config.electronFuses.onlyLoadAppFromAsar=false',
-        ...(targetCompression === undefined ? [] : [`--config.win.compression=${targetCompression}`]),
-      ],
-      options.desktopRoot,
-      electronBuilderEnvironment({
-        ...cleanEnvironment,
-        DSH_ELECTRON_BUILDER_TARGET_PLATFORM: 'win32',
-        DSH_ELECTRON_BUILDER_TARGET_ARCH: 'x64',
-        CSC_IDENTITY_AUTO_DISCOVERY: 'false',
-        // Traverse the installed tree directly: package-manager graph collection can
-        // stall on the large linked workspace and pnpm v11 drops deduplicated links.
-        // Keep the real pnpm identity: disguising the runner as npm makes the
-        // archive file-set take the npm-layout path, which silently emits
-        // node_modules as directory skeletons without any file payload.
-        DSH_ELECTRON_BUILDER_TRAVERSAL_ONLY: '1',
-      }),
-    )
-    builderElapsed += Date.now() - builderStartedAt
-  }
-  options.log(`Windows ${artifactLabel} builder completed in ${Date.now() - startedAt}ms.`)
-  options.run(options.nodeExecutable, [options.verifier], options.desktopRoot, cleanEnvironment)
-  for (const extra of options.extraVerifiers ?? []) {
-    options.run(options.nodeExecutable, [extra], options.desktopRoot, cleanEnvironment)
-  }
+  runBuilder(options, cleanEnvironment, 'dir')
+}
+
+function packagePreparedWindowsArtifact(
+  options: WindowsPackageOptions,
+  target: 'nsis' | 'zip',
+  artifact: 'installer' | 'portable archive',
+  verifier: string,
+): void {
+  assertWindowsPackageHost(options, artifact)
+  const cleanEnvironment = withoutWindowsSigningSecrets(options.env)
+  const compression = windowsCompressionOverride(options.env)
+  options.log(`Building an unsigned Windows x64 ${artifact} from the prepared directory; Authenticode is a separate release step.`)
+  if (compression !== undefined && target === 'zip') options.log(`Packaging the ${artifact} with ${compression} compression.`)
+  const prepackagedDir = join(options.desktopRoot, 'dist', 'win-unpacked')
+  runBuilder(options, cleanEnvironment, target, prepackagedDir)
+  options.run(options.nodeExecutable, [verifier], options.desktopRoot, cleanEnvironment)
+}
+
+/** Run the gates and package unsigned x64 Windows artifacts. */
+export function packageWindowsArtifacts(
+  options: WindowsPackageOptions,
+  targets: readonly ('nsis' | 'zip')[],
+  artifacts: readonly ('installer' | 'portable archive')[],
+): void {
+  windowsCompressionOverride(options.env)
+  prepareWindowsPackage(options)
+  targets.forEach((target, index) => {
+    const artifact = artifacts[index] ?? (target === 'nsis' ? 'installer' : 'portable archive')
+    const verifier = target === 'nsis' ? options.verifier : (options.extraVerifiers?.[0] ?? options.verifier)
+    packagePreparedWindowsArtifact(options, target, artifact, verifier)
+  })
+}
+
+export function prepareWindowsDirectory(options: WindowsPackageOptions = createWindowsPackageOptions()): void {
+  runTimedPhase(options, 'prepare-dir', () => prepareWindowsPackage(options))
+}
+
+export function packagePreparedWindowsInstaller(options: WindowsPackageOptions = createWindowsPackageOptions()): void {
+  runTimedPhase(options, 'installer', () => packagePreparedWindowsArtifact(options, 'nsis', 'installer', options.verifier))
+}
+
+export function packagePreparedWindowsPortable(options: WindowsPackageOptions = {
+  ...createWindowsPackageOptions('./verify-win-portable.ts'),
+}): void {
+  runTimedPhase(options, 'portable', () => packagePreparedWindowsArtifact(options, 'zip', 'portable archive', options.verifier))
 }
 
 /** Run the gates and package one unsigned x64 Windows artifact. */
@@ -286,9 +373,9 @@ export function packageWindowsInstaller(
 
 /**
  * Run the gates once and package both unsigned x64 Windows artifacts in a
- * single Electron Builder pass: the dependency collection and ASAR packing
- * dominate the job wall clock, so sharing them keeps the CI job inside its
- * 60-minute budget (two separate passes cost roughly twice as long).
+ * shared preparation followed by separate prepackaged target passes. The
+ * dependency collection and ASAR packing dominate the job wall clock, so they
+ * run once while installer and portable packaging remain independently visible.
  */
 export function packageWindowsBundle(
   options: WindowsPackageOptions = {
@@ -302,7 +389,10 @@ export function packageWindowsBundle(
 const invokedPath = process.argv[1]
 if (invokedPath !== undefined && resolve(invokedPath) === fileURLToPath(import.meta.url)) {
   try {
-    if (process.argv.includes('--bundle')) packageWindowsBundle()
+    if (process.argv.includes('--prepare')) prepareWindowsDirectory()
+    else if (process.argv.includes('--installer')) packagePreparedWindowsInstaller()
+    else if (process.argv.includes('--portable')) packagePreparedWindowsPortable()
+    else if (process.argv.includes('--bundle')) packageWindowsBundle()
     else packageWindowsInstaller()
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error))

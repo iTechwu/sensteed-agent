@@ -51,7 +51,7 @@ describe('Windows x64 installer packaging', () => {
 
     packageWindowsInstaller({ ...options(calls, logs), prepareRuntime })
 
-    expect(calls).toHaveLength(4)
+    expect(calls).toHaveLength(5)
     expect(calls[0]).toEqual({
       command: 'refresh-bundled',
       args: [],
@@ -76,7 +76,7 @@ describe('Windows x64 installer packaging', () => {
         '--config',
         'electron-builder.json',
         '--win',
-        'nsis',
+        'dir',
         '--x64',
         '--publish',
         'never',
@@ -92,9 +92,22 @@ describe('Windows x64 installer packaging', () => {
         DSH_ELECTRON_BUILDER_TARGET_PLATFORM: 'win32',
         DSH_ELECTRON_BUILDER_TARGET_ARCH: 'x64',
         DSH_ELECTRON_BUILDER_TRAVERSAL_ONLY: '1',
+        DEBUG: 'electron-builder,app-builder-lib',
       },
     })
     expect(calls[3]).toEqual({
+      command: 'C:\\Program Files\\nodejs\\node.exe',
+      args: [
+        'C:\\repo\\node_modules\\electron-builder\\cli.js',
+        '--config', 'electron-builder.json', '--win', 'nsis', '--x64', '--publish', 'never',
+        '--config.win.signExecutable=false', '--config.npmRebuild=false',
+        '--config.electronFuses.onlyLoadAppFromAsar=false', '--prepackaged',
+        'C:\\repo\\dsh-plugin-desktop/dist/win-unpacked',
+      ],
+      cwd: 'C:\\repo\\dsh-plugin-desktop',
+      env: expect.objectContaining({ DEBUG: 'electron-builder,app-builder-lib' }),
+    })
+    expect(calls[4]).toEqual({
       command: 'C:\\Program Files\\nodejs\\node.exe',
       args: ['C:\\repo\\dsh-plugin-desktop\\scripts\\verify-win-installer.ts'],
       cwd: 'C:\\repo\\dsh-plugin-desktop',
@@ -103,9 +116,9 @@ describe('Windows x64 installer packaging', () => {
     expect(prepareRuntime).toHaveBeenCalledOnce()
     expect(calls.flatMap(call => call.args).join(' ')).not.toContain('@electron+rebuild')
     expect(logs).toEqual([
-      'Building an unsigned Windows x64 installer; Authenticode is a separate release step.',
+      'Preparing an unsigned Windows x64 packaged directory; Authenticode is a separate release step.',
       expect.stringContaining('platform package materialization:'),
-      expect.stringContaining('Windows installer builder completed in '),
+      'Building an unsigned Windows x64 installer from the prepared directory; Authenticode is a separate release step.',
     ])
   })
 
@@ -119,26 +132,26 @@ describe('Windows x64 installer packaging', () => {
 
     packageWindowsArtifact(value, 'zip', 'portable archive')
 
-    expect(calls[2]?.args).toEqual([
+    expect(calls[3]?.args).toEqual([
       'C:\\repo\\node_modules\\electron-builder\\cli.js',
       '--config',
       'electron-builder.json',
-      '--win',
-      'zip',
+      '--win', 'zip',
       '--x64',
       '--publish',
       'never',
       '--config.win.signExecutable=false',
       '--config.npmRebuild=false',
       '--config.electronFuses.onlyLoadAppFromAsar=false',
+      '--prepackaged', 'C:\\repo\\dsh-plugin-desktop/dist/win-unpacked',
     ])
-    expect(calls[3]?.args).toEqual([
+    expect(calls[4]?.args).toEqual([
       'C:\\repo\\dsh-plugin-desktop\\scripts\\verify-win-portable.ts',
     ])
     expect(logs).toEqual([
-      'Building an unsigned Windows x64 portable archive; Authenticode is a separate release step.',
+      'Preparing an unsigned Windows x64 packaged directory; Authenticode is a separate release step.',
       expect.stringContaining('platform package materialization:'),
-      expect.stringContaining('Windows portable archive builder completed in '),
+      'Building an unsigned Windows x64 portable archive from the prepared directory; Authenticode is a separate release step.',
     ])
   })
 
@@ -155,13 +168,13 @@ describe('Windows x64 installer packaging', () => {
 
     packageWindowsInstaller(value)
 
-    expect(calls).toHaveLength(2)
+    expect(calls).toHaveLength(3)
     expect(calls[0]?.args).toEqual([
       'C:\\repo\\node_modules\\electron-builder\\cli.js',
       '--config',
       'electron-builder.json',
       '--win',
-      'nsis',
+      'dir',
       '--x64',
       '--publish',
       'never',
@@ -170,10 +183,10 @@ describe('Windows x64 installer packaging', () => {
       '--config.electronFuses.onlyLoadAppFromAsar=false',
     ])
     expect(logs).toEqual([
-      'Building an unsigned Windows x64 installer; Authenticode is a separate release step.',
+      'Preparing an unsigned Windows x64 packaged directory; Authenticode is a separate release step.',
       'Skipping the Windows package preflight; the package gate already passed.',
       expect.stringContaining('platform package materialization:'),
-      expect.stringContaining('Windows installer builder completed in '),
+      'Building an unsigned Windows x64 installer from the prepared directory; Authenticode is a separate release step.',
     ])
   })
 
@@ -192,11 +205,11 @@ describe('Windows x64 installer packaging', () => {
     packageWindowsArtifact(value, 'zip', 'portable archive')
 
     // Builder, then the packaged-runtime verifier that follows every build.
-    expect(calls).toHaveLength(2)
-    expect(calls[0]?.command).toBe(options(calls).nodeExecutable)
-    expect(calls[0]?.args.at(-1)).toBe('--config.win.compression=store')
+    expect(calls).toHaveLength(3)
     expect(calls[1]?.command).toBe(options(calls).nodeExecutable)
-    expect(calls[1]?.args).toEqual([options(calls).verifier])
+    expect(calls[1]?.args.at(-1)).toBe('--config.win.compression=store')
+    expect(calls[2]?.command).toBe(options(calls).nodeExecutable)
+    expect(calls[2]?.args).toEqual([options(calls).verifier])
     expect(logs).toContain('Packaging the portable archive with store compression.')
   })
 
@@ -257,7 +270,7 @@ describe('Windows x64 bundle packaging', () => {
 
     packageWindowsBundle(value)
 
-    expect(calls).toHaveLength(6)
+    expect(calls).toHaveLength(7)
     expect(calls[0]).toEqual({
       command: 'refresh-bundled', args: [], cwd: 'C:\\repo', env: {},
     })
@@ -274,7 +287,7 @@ describe('Windows x64 bundle packaging', () => {
         '--config',
         'electron-builder.json',
         '--win',
-        'nsis',
+        'dir',
         '--x64',
         '--publish',
         'never',
@@ -292,18 +305,21 @@ describe('Windows x64 bundle packaging', () => {
         '--config',
         'electron-builder.json',
         '--win',
-        'zip',
+        'nsis',
         '--x64',
         '--publish',
         'never',
         '--config.win.signExecutable=false',
         '--config.npmRebuild=false',
         '--config.electronFuses.onlyLoadAppFromAsar=false',
+        '--prepackaged', 'C:\\repo\\dsh-plugin-desktop/dist/win-unpacked',
       ],
       cwd: 'C:\\repo\\dsh-plugin-desktop',
       env: expect.objectContaining({ CSC_IDENTITY_AUTO_DISCOVERY: 'false' }),
     })
     expect(calls[4]?.args).toEqual(['C:\\repo\\dsh-plugin-desktop\\scripts\\verify-win-installer.ts'])
-    expect(calls[5]?.args).toEqual(['C:\\repo\\dsh-plugin-desktop\\scripts\\verify-win-portable.ts'])
+    expect(calls[5]?.args).toContain('zip')
+    expect(calls[5]?.args).toContain('--prepackaged')
+    expect(calls[6]?.args).toEqual(['C:\\repo\\dsh-plugin-desktop\\scripts\\verify-win-portable.ts'])
   })
 })
