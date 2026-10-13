@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-desktop",
-  "version": "2.0.11-beta.21",
+  "version": "0.2.1-alpha.2-beta.202610131707",
   "description": "Yootun-Agent: an Electron shell composed as a DeepSeek Harness Cordis plugin",
   "license": "MIT",
   "publishConfig": {
