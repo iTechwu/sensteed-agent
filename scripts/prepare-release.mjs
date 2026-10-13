@@ -26,11 +26,15 @@ if (!args.includes('--execute')) {
   const commit = git('ls-remote', '--exit-code', upstream.repository, `refs/heads/${upstream.branch}`).split(/\s+/u)[0]
   if (!/^[a-f0-9]{40}$/u.test(commit)) throw new Error('Could not pin Harness commit')
   // Validate source and mergeability before any branch or manifest mutation.
-  const response = await fetch(`https://raw.githubusercontent.com/${repository}/${commit}/package.json`, {
-    signal: AbortSignal.timeout(30_000),
-  })
-  if (!response.ok) throw new Error(`Could not read pinned Harness manifest: HTTP ${response.status}`)
-  assertHarnessReleaseManifest(await response.json(), upstream.sourceVersion)
+  // The sibling checkout is the repository prerequisite and avoids a second,
+  // fragile HTTPS request after the SSH ref resolution above.
+  let manifest
+  try {
+    manifest = JSON.parse(git('-C', '../deepseek-harness', 'show', `${commit}:package.json`))
+  } catch {
+    throw new Error(`Pinned Harness commit ${commit} is not available in ../deepseek-harness`)
+  }
+  assertHarnessReleaseManifest(manifest, upstream.sourceVersion)
   git('merge-tree', '--write-tree', 'origin/main', 'dev')
   if (main) git('checkout', 'main')
   else git('checkout', '-b', 'main', 'origin/main')
