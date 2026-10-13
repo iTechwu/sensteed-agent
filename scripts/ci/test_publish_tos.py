@@ -83,14 +83,13 @@ class PublicationTests(unittest.TestCase):
             for ending in endings:
                 (folder / ('Sensteed-Agent-Beta-2.0.11-beta.18-' + ending)).write_bytes(b'installer payload')
 
-    def test_rejects_oversized_installer_before_hashing_or_uploading(self):
+    def test_accepts_installer_larger_than_one_gibibyte(self):
         path = next((self.root / 'macos').iterdir())
         with path.open('wb') as stream:
-            stream.truncate(publisher.MAX_ARTIFACT_BYTES + 1)
+            stream.truncate(1024 ** 3 + 1)
         client = FakeTos()
-        with self.assertRaisesRegex(ValueError, '1 GiB updater size limit'):
-            publisher.publish(client, self.config, self.context, self.root)
-        self.assertEqual(client.calls, [])
+        publisher.publish(client, self.config, self.context, self.root)
+        self.assertEqual(len(client.calls), 12)
 
     def test_config_supports_endpoint_hostname_and_requires_secrets(self):
         self.assertEqual(self.config['TOS_ENDPOINT'], 'https://tos.example.com')

@@ -7,7 +7,6 @@ import { DESKTOP_RELEASE_CHANNEL_HEADER } from '../src/update-checker.ts'
 import {
   DESKTOP_DOWNLOAD_URLS,
   DESKTOP_TARGET_VERSION_HEADER,
-  MAX_UPDATE_DOWNLOAD_BYTES,
   UpdateDownloadError,
   desktopUpdateFilename,
   downloadDesktopUpdate,
@@ -332,17 +331,19 @@ describe('desktop update installer download', () => {
     await expectNoPartialFiles(directory)
   })
 
-  it('rejects a declared body above the fixed 1 GiB limit before writing it', async () => {
+  it('accepts a declared body above 1 GiB and validates the streamed artifact', async () => {
     const directory = await temporaryDirectory()
-    await expectFailure(downloadDesktopUpdate({
+    const path = await downloadDesktopUpdate({
       platform: 'darwin',
       version: '2.5.0',
       destinationPath: destinationPath(directory, 'darwin', '2.5.0'),
       request: async () => chunkedResponse(
         [dmgArtifact()],
-        { 'content-length': String(MAX_UPDATE_DOWNLOAD_BYTES + 1) },
+        { 'content-length': String(1024 ** 3 + 1) },
       ),
-    }), 'response-too-large')
+    })
+    expect(path).toContain('2.5.0')
+    expect(await readFile(path)).toEqual(Buffer.from(dmgArtifact()))
     await expectNoPartialFiles(directory)
   })
 

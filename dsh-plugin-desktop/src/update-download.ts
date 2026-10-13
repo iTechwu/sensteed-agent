@@ -24,9 +24,6 @@ export const DESKTOP_DOWNLOAD_URLS: Readonly<Record<DesktopDownloadPlatform, str
 /** Header pinning a download request and response to the checked release. */
 export const DESKTOP_TARGET_VERSION_HEADER = 'X-Sensteed-Agent-Target-Version'
 
-/** Maximum accepted installer size, in bytes. */
-export const MAX_UPDATE_DOWNLOAD_BYTES = 1024 * 1024 * 1024
-
 /** Failure categories exposed to the update coordinator. */
 export type UpdateDownloadErrorCode =
   | 'aborted'
@@ -36,7 +33,6 @@ export type UpdateDownloadErrorCode =
   | 'invalid-options'
   | 'network'
   | 'redirect-origin'
-  | 'response-too-large'
 
 /**
  * One settled download response plus the URL the redirect chain landed on.
@@ -104,7 +100,6 @@ export class UpdateDownloadError extends Error {
 
 const PRIVATE_DIRECTORY_MODE = 0o700
 const PRIVATE_FILE_MODE = 0o600
-const DECIMAL_BYTES = /^(0|[1-9][0-9]*)$/u
 const DMG_TRAILER_BYTES = 512
 const DMG_TRAILER_MAGIC = Buffer.from('koly', 'ascii')
 const DOS_HEADER_BYTES = 64
@@ -175,7 +170,6 @@ export async function downloadDesktopUpdate(options: DownloadDesktopUpdateOption
   }
   try {
     assertSecureDownloadUrl(finalUrl)
-    assertDeclaredSize(response)
   } catch (cause) {
     await discardResponseBody(response)
     throw cause
@@ -435,17 +429,6 @@ async function discardResponseBody(response: Response): Promise<void> {
   await response.body?.cancel().catch(() => undefined)
 }
 
-function assertDeclaredSize(response: Response): void {
-  const declared = response.headers.get('content-length')
-  if (declared === null || !DECIMAL_BYTES.test(declared)) return
-  if (BigInt(declared) > BigInt(MAX_UPDATE_DOWNLOAD_BYTES)) {
-    throw new UpdateDownloadError(
-      'response-too-large',
-      `The update installer exceeds ${String(MAX_UPDATE_DOWNLOAD_BYTES)} bytes.`,
-    )
-  }
-}
-
 /** Require a usable HTTPS URL even when an update channel permits external artifact hosts. */
 export function assertSecureDownloadUrl(finalUrl: string): URL {
   let parsed: URL
@@ -515,12 +498,6 @@ async function writeResponseBody(
       const chunk = await reader.read()
       throwIfAborted(signal)
       if (chunk.done) break
-      if (chunk.value.byteLength > MAX_UPDATE_DOWNLOAD_BYTES - bytesWritten) {
-        throw new UpdateDownloadError(
-          'response-too-large',
-          `The update installer exceeds ${String(MAX_UPDATE_DOWNLOAD_BYTES)} bytes.`,
-        )
-      }
       await writeAll(handle, chunk.value)
       bytesWritten += chunk.value.byteLength
       onProgress?.(bytesWritten)
@@ -554,7 +531,7 @@ async function validateArtifact(filename: string, platform: DesktopDownloadPlatf
   const handle = await open(filename, 'r')
   try {
     const stat = await handle.stat()
-    if (!stat.isFile() || stat.size <= 0 || stat.size > MAX_UPDATE_DOWNLOAD_BYTES) {
+    if (!stat.isFile() || stat.size <= 0) {
       throw invalidArtifact(platform)
     }
     if (platform === 'darwin') {

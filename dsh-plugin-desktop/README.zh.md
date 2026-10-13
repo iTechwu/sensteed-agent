@@ -238,7 +238,7 @@ npx dsh-plugin-desktop
 <!-- brand:plugin-update-endpoint:start -->
 打包后的 macOS 与 Windows 应用会在启动 60 秒后查询 `https://ai.hozonauto.com/api/desktop/version`，并在每次检查完成六小时后再次查询。每次 no-cache 请求的期限为 15 秒，会携带 `X-Sensteed-Agent-Channel: beta` 和 X-Sensteed-Agent-Version 请求头中的当前安装版本，并与托盘中的 **Check for Updates…** 命令共用一个 in-flight operation。<!-- brand:plugin-update-endpoint:end -->稳定版只接受规范的正式 SemVer，绝不会发现 Beta 响应。后台失败和非更新版本保持静默；手工检查一定会显示原生结果对话框。开发运行、未打包启动与 Linux 不会下载安装包。
 
-选择 **Download** 后，应用会先重新确认服务端版本没有变化，然后打开原生保存对话框。默认位置是 Downloads，但用户可以选择其他绝对路径和文件名；取消对话框不会发起下载请求。Sensteed Agent 使用 Electron 网络跟随 service redirect，把不超过 1 GiB 的文件流式写入用户选择的路径，记录安装包位置用于升级交接，并在交付前拒绝不完整的 DMG 或 Windows PE。macOS 会打开下载好的 DMG，并提示用户替换 `Applications` 中的应用后重新打开。Windows 会在 NSIS 安装器准备完成后再次确认；选择 **Restart and Install** 会启动安装器，并在当前进程退出前请求 Cordis 有序 teardown。升级后的应用启动时会询问删除已记录的安装包，或保留它；任一选择都会消费 pending cleanup state。下载、文件系统与安装器打开失败都会保持静默，同时保留托盘中的可重试版本操作。
+选择 **Download** 后，应用会先重新确认服务端版本没有变化，然后打开原生保存对话框。默认位置是 Downloads，但用户可以选择其他绝对路径和文件名；取消对话框不会发起下载请求。Sensteed Agent 使用 Electron 网络跟随 service redirect，把安装包流式写入用户选择的路径，不设置人工大小上限，记录安装包位置用于升级交接，并在交付前拒绝不完整的 DMG 或 Windows PE。macOS 会打开下载好的 DMG，并提示用户替换 `Applications` 中的应用后重新打开。Windows 会在 NSIS 安装器准备完成后再次确认；选择 **Restart and Install** 会启动安装器，并在当前进程退出前请求 Cordis 有序 teardown。升级后的应用启动时会询问删除已记录的安装包，或保留它；任一选择都会消费 pending cleanup state。下载、文件系统与安装器打开失败都会保持静默，同时保留托盘中的可重试版本操作。
 
 Release operator 必须先发布两个平台产物，再让稳定版本可被发现。版本与下载服务在通道 header 为 `stable` 或缺失时必须选择稳定版产物，并在下载响应中回显所选通道和目标版本。值缺失、服务不可用、响应不匹配或格式无效时，Desktop 不会显示任何提示。
 
