@@ -242,7 +242,6 @@ function builderEnvironment(cleanEnvironment: NodeJS.ProcessEnv): NodeJS.Process
     (cleanEnvironment.DEBUG ?? '').split(',').map(value => value.trim()).filter(Boolean),
   )
   debugNamespaces.add('electron-builder')
-  debugNamespaces.add('app-builder-lib')
   return electronBuilderEnvironment({
     ...cleanEnvironment,
     DEBUG: [...debugNamespaces].join(','),
@@ -263,7 +262,7 @@ function runBuilder(
   prepackagedDir?: string,
 ): void {
   const compression = windowsCompressionOverride(options.env)
-  const targetCompression = target === 'zip' ? compression : target === 'nsis' && compression !== 'store' ? compression : undefined
+  const targetCompression = target === 'dir' ? undefined : compression
   options.run(
     options.nodeExecutable,
     [

@@ -95,7 +95,7 @@ describe('Windows x64 installer packaging', () => {
         DSH_ELECTRON_BUILDER_TARGET_PLATFORM: 'win32',
         DSH_ELECTRON_BUILDER_TARGET_ARCH: 'x64',
         DSH_ELECTRON_BUILDER_TRAVERSAL_ONLY: '1',
-        DEBUG: 'electron-builder,app-builder-lib',
+        DEBUG: 'electron-builder',
       },
     })
     expect(calls[3]).toEqual({
@@ -108,7 +108,7 @@ describe('Windows x64 installer packaging', () => {
         preparedDirectory,
       ],
       cwd: 'C:\\repo\\dsh-plugin-desktop',
-      env: expect.objectContaining({ DEBUG: 'electron-builder,app-builder-lib' }),
+      env: expect.objectContaining({ DEBUG: 'electron-builder' }),
     })
     expect(calls[4]).toEqual({
       command: 'C:\\Program Files\\nodejs\\node.exe',
@@ -267,6 +267,7 @@ describe('Windows x64 bundle packaging', () => {
     const logs: string[] = []
     const value: WindowsPackageOptions = {
       ...options(calls, logs),
+      env: { ...options(calls).env, DSH_WINDOWS_PACKAGE_COMPRESSION: 'store' },
       verifier: 'C:\\repo\\dsh-plugin-desktop\\scripts\\verify-win-installer.ts',
       extraVerifiers: ['C:\\repo\\dsh-plugin-desktop\\scripts\\verify-win-portable.ts'],
     }
@@ -281,7 +282,7 @@ describe('Windows x64 bundle packaging', () => {
       command: 'C:\\Windows\\System32\\cmd.exe',
       args: ['/d', '/s', '/c', 'corepack pnpm --filter dsh-plugin-desktop check:win-package'],
       cwd: 'C:\\repo',
-      env: { PATH: 'C:\\Windows\\System32', SAFE_VALUE: 'kept' },
+      env: { PATH: 'C:\\Windows\\System32', SAFE_VALUE: 'kept', DSH_WINDOWS_PACKAGE_COMPRESSION: 'store' },
     })
     expect(calls[2]).toEqual({
       command: 'C:\\Program Files\\nodejs\\node.exe',
@@ -316,6 +317,7 @@ describe('Windows x64 bundle packaging', () => {
         '--config.npmRebuild=false',
         '--config.electronFuses.onlyLoadAppFromAsar=false',
         '--prepackaged', preparedDirectory,
+        '--config.win.compression=store',
       ],
       cwd: 'C:\\repo\\dsh-plugin-desktop',
       env: expect.objectContaining({ CSC_IDENTITY_AUTO_DISCOVERY: 'false' }),
@@ -323,6 +325,7 @@ describe('Windows x64 bundle packaging', () => {
     expect(calls[4]?.args).toEqual(['C:\\repo\\dsh-plugin-desktop\\scripts\\verify-win-installer.ts'])
     expect(calls[5]?.args).toContain('zip')
     expect(calls[5]?.args).toContain('--prepackaged')
+    expect(calls[5]?.args.at(-1)).toBe('--config.win.compression=store')
     expect(calls[6]?.args).toEqual(['C:\\repo\\dsh-plugin-desktop\\scripts\\verify-win-portable.ts'])
   })
 })
