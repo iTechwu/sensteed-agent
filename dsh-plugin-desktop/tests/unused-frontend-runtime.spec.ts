@@ -1,8 +1,8 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, statSync, truncateSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { finished } from 'node:stream/promises'
-import { createPackage, uncache } from '@electron/asar'
+import { createPackage, createPackageWithOptions, extractFile, uncache } from '@electron/asar'
 import { describe, expect, it } from 'vitest'
 import { referencesPrunedFrontendPackage, verifyUnusedFrontendRuntime } from '../scripts/unused-frontend-runtime.ts'
 
@@ -15,7 +15,42 @@ describe('unused frontend dependency artifact guard', () => {
       'require("react-icons")',
       'import(`react-icons/${family}`)',
       'resolve("react-\\x69cons/si")',
+      'require("\\u0072eact-icons")',
     ]) expect(referencesPrunedFrontendPackage(source)).toBe('react-icons')
+  })
+
+  it('reads nested packed and unpacked sources from a fresh header, including escaped references', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'sensteed-frontend-offsets-'))
+    try {
+      const source = join(root, 'source')
+      mkdirSync(join(source, 'nested/client'), { recursive: true })
+      mkdirSync(join(source, 'native'), { recursive: true })
+      const client = join(source, 'nested/client/index.js')
+      const unpacked = join(source, 'native/index.cjs')
+      writeFileSync(client, 'export const Icon = 1')
+      writeFileSync(unpacked, 'module.exports = 1')
+      const archive = join(root, 'custom.asar')
+      const pack = async (): Promise<void> => {
+        await finished(await createPackageWithOptions(source, archive, { unpack: 'native/*' }))
+      }
+      await pack()
+      // Seed asar's cache, then replace the archive. The guard must inspect the
+      // current artifact, independently of cached headers or OS path lookup.
+      extractFile(archive, join('nested', 'client', 'index.js'))
+      expect(() => verifyUnusedFrontendRuntime(archive)).not.toThrow()
+      writeFileSync(client, 'require("\\u0072eact-icons/si")')
+      await pack()
+      expect(() => verifyUnusedFrontendRuntime(archive)).toThrow('nested/client/index.js references pruned')
+      writeFileSync(client, 'export const Icon = 1')
+      writeFileSync(unpacked, 'require("react-icons")')
+      await pack()
+      expect(() => verifyUnusedFrontendRuntime(archive)).toThrow('native/index.cjs references pruned')
+      writeFileSync(unpacked, 'module.exports = 1')
+      await pack()
+      truncateSync(archive, statSync(archive).size - 1)
+      expect(() => verifyUnusedFrontendRuntime(archive)).toThrow('invalid packaged source range')
+      uncache(archive)
+    } finally { rmSync(root, { recursive: true, force: true }) }
   })
 
   it('checks real archive bytes and rejects new externalization or retained unused code', async () => {
