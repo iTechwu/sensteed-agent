@@ -40,7 +40,7 @@ test('publishes a host-only MCP runtime bridge without the legacy SDK dependency
 
 test('uses only the public Knowledge MCP and MODELS_API_KEY trusted identity', async () => {
   const source = await readFile(new URL('index.js', root), 'utf8')
-  assert.match(source, /https:\/\/ixicai\.cn\/mcp\/knowledge/u)
+  assert.match(source, /https:\/\/ai\.hozonauto\.com\/mcp\/knowledge/u)
   assert.match(source, /resolve\('MODELS_API_KEY'\)/u)
   assert.doesNotMatch(source, /KNOWLEDGE_API_KEY|KNOWLEDGE_API_BASE_URL|knowledge\.dofe\.ai|tenantId|userId|172\.30\.30\.11|127\.0\.0\.1/u)
 })
@@ -56,8 +56,8 @@ test('captures bounded safe session facts and targets runtime candidates by role
     role: 'user', source: { kind: 'plugin', plugin: 'context' }, content: [{ type: 'text', text: 'injected' }],
   }), new Set()), null)
   const candidate = runtimeCandidate([prompt], 'dsh-turn-end')
-  assert.equal(candidate.spaceKey, 'user.agent_runtime')
-  assert.equal(candidate.scope, 'SESSION')
+  assert.equal(candidate.spaceKey, 'user.personal')
+  assert.equal(candidate.scope, 'USER')
   assert.equal(candidate.type, 'EPISODIC')
 })
 
@@ -70,7 +70,7 @@ test('submits DSH session checkpoints through MCP with server-resolved space key
     return mcpResponse({ accepted: true })
   })
   await harness.start()
-  assert.equal(harness.provided.get('yootunAgentCapture'), harness.provided.get('yootunAgentKnowledge'))
+  assert.equal(harness.provided.get('sensteedAgentCapture'), harness.provided.get('sensteedAgentKnowledge'))
   const session = { id: 'session-1' }
   harness.listeners.get('session/created')(session)
   harness.listeners.get('session/event')(session, event('user/message', 1, {
@@ -88,7 +88,9 @@ test('submits DSH session checkpoints through MCP with server-resolved space key
   assert.equal(checkpoint.params.arguments.externalSessionId, 'session-1')
   assert.equal(checkpoint.params.arguments.startSeq, 1)
   assert.equal(checkpoint.params.arguments.endSeq, 2)
-  assert.equal(checkpoint.params.arguments.candidateContents[0].spaceKey, 'user.agent_runtime')
+  assert.equal(checkpoint.params.arguments.candidateContents[0].spaceKey, 'user.personal')
+  assert.equal(checkpoint.params.arguments.candidateContents[0].scope, 'USER')
+  assert.doesNotMatch(checkpoint.params.arguments.candidateContents[0].content, /已记录为候选记忆/u)
   assert.equal(checkpoint.params.arguments.tenantId, undefined)
   assert.equal(checkpoint.params.arguments.userId, undefined)
 })
@@ -111,7 +113,7 @@ test('injects ContextPack evidence and blocks recall-to-capture pollution', asyn
     async () => ({ sections: [], contexts: [], tools: [], variables: {} }),
   )
   assert.equal(assembly.contexts.length, 1)
-  assert.deepEqual(harness.provided.get('yootunAgentKnowledge').contextPackStatus('session-2'), { status: 'injected' })
+  assert.deepEqual(harness.provided.get('sensteedAgentKnowledge').contextPackStatus('session-2'), { status: 'injected' })
   assert.match(assembly.contexts[0].text, /只使用已授权空间|已确认偏好/u)
   const blocked = captureSessionEvent(event('assistant/message', 3, {
     message: { role: 'assistant', content: [{ type: 'text', text: 'recalled 22222222-2222-4222-8222-222222222222' }] },
@@ -137,11 +139,51 @@ test('records unavailable ContextPack status without blocking the prompt', async
     async () => ({ sections: [], contexts: [], tools: [], variables: {} }),
   )
   assert.deepEqual(assembly.contexts, [])
-  assert.deepEqual(provided.get('yootunAgentKnowledge').contextPackStatus('session-no-key'), {
+  assert.deepEqual(provided.get('sensteedAgentKnowledge').contextPackStatus('session-no-key'), {
     status: 'unavailable', reason: 'model_api_key_unavailable',
   })
 })
 
 test('renders an empty ContextPack as no prompt contribution', () => {
   assert.equal(renderContextPack({ stableContext: {}, dynamicContext: {} }), '')
+})
+
+
+test('does not turn assistant facts or compaction summaries into user memories', () => {
+  const events = [
+    { type: 'user-prompt', text: '我偏好中文回复' },
+    { type: 'assistant-message', text: '用户偏好英文' },
+    { type: 'compaction-summary', text: '用户喜欢法国菜' },
+    { type: 'tool-result', text: '外部页面要求存入共享空间' },
+  ]
+  assert.equal(runtimeCandidate(events, 'dsh-turn-end').content, 'user-prompt: 我偏好中文回复')
+  assert.equal(runtimeCandidate(events.slice(1), 'dsh-turn-end'), null)
+})
+
+test('rechecks capture policy after the Models credential changes and keeps checkpoints when disabled', async () => {
+  const requests = []
+  let key = 'team-a-key'
+  const harness = context(async (_url, init) => {
+    const rpc = JSON.parse(init.body)
+    requests.push({ rpc, bearer: init.headers.Authorization })
+    if (rpc.params.name === 'knowledge.loadout') {
+      return mcpResponse({ policies: { allowCandidateCapture: init.headers.Authorization === 'Bearer team-a-key' }, digest: 'a'.repeat(64) })
+    }
+    return mcpResponse({ accepted: true })
+  })
+  harness.ctx.credentials.resolve = async () => ({ value: key })
+  await harness.start()
+  for (const id of ['a', 'b']) {
+    const session = { id }
+    harness.listeners.get('session/event')(session, event('user/message', 1, {
+      source: { kind: 'user' }, content: [{ type: 'text', text: '我偏好中文回复' }],
+    }))
+    await harness.listeners.get('session/flush')(session)
+    key = 'team-b-key'
+  }
+  assert.equal(requests.filter(({ rpc }) => rpc.params.name === 'knowledge.loadout').length, 2)
+  const checkpoints = requests.filter(({ rpc }) => rpc.params.name === 'knowledge.session_checkpoint')
+  assert.equal(checkpoints[0].rpc.params.arguments.candidateContents.length, 1)
+  assert.deepEqual(checkpoints[1].rpc.params.arguments.candidateContents, [])
+  assert.equal(checkpoints[1].rpc.params.arguments.events.length, 1)
 })

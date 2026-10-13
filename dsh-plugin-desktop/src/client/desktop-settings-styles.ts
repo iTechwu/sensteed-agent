@@ -1,4 +1,5 @@
 /** Desktop settings section styles, installed independently of presentation mode. */
+import { DESKTOP_PACKAGE_NAME } from '../product-identity.ts'
 
 const STYLE_ID = 'sensteed-agent-settings-styles'
 
@@ -300,6 +301,12 @@ const CSS = `
 .sensteedAgentSettingsNotice { background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-secondary); }
 .sensteedAgentSettingsError { color: var(--dsw-alias-state-error-primary); background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 10%, transparent); }
 .sensteedAgentSettingsSuccess { color: var(--dsw-alias-state-success-primary); background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 10%, transparent); }
+.sensteedAgentSettingsRestartStatus {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  box-shadow: 0 6px 18px color-mix(in srgb, #000 14%, transparent);
+}
 .sensteedAgentSettingsToggle {
   flex: 0 0 auto;
   position: relative;
@@ -455,12 +462,16 @@ const CSS = `
 `
 
 /** Install one scoped stylesheet; tolerate headless Client boot. */
-export function installDesktopSettingsStyles(): () => void {
+export function installDesktopSettingsStyles(owner: string = DESKTOP_PACKAGE_NAME): () => void {
   if (typeof document === 'undefined') return () => {}
   const existing = document.getElementById(STYLE_ID)
   if (existing !== null) return () => {}
   const style = document.createElement('style')
   style.id = STYLE_ID
+  // The upstream loader claims every untagged stylesheet for the next module
+  // it materializes, then removes it when that unrelated plugin is unloaded.
+  style.dataset.plugin = owner
+  style.dataset.pluginCss = `${owner}/desktop-settings`
   style.textContent = CSS
   document.head.appendChild(style)
   return () => { style.remove() }

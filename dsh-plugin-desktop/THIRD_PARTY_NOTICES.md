@@ -313,10 +313,8 @@ the package names, versions, and licenses for transparency.
 | @iconify/types | 2.0.0 | MIT |
 | @iconify/utils | 3.1.4 | MIT |
 | @img/colour | 1.1.0 | MIT |
-| @img/sharp-darwin-arm64 | 0.35.3 | Apache-2.0 |
-| @img/sharp-darwin-x64 | 0.35.3 | Apache-2.0 |
-| @img/sharp-libvips-darwin-arm64 | 1.3.2 | LGPL-3.0-or-later |
-| @img/sharp-libvips-darwin-x64 | 1.3.2 | LGPL-3.0-or-later |
+| @img/sharp-win32-arm64 | 0.35.5 | Apache-2.0 AND LGPL-3.0-or-later |
+| @img/sharp-win32-x64 | 0.35.5 | Apache-2.0 AND LGPL-3.0-or-later |
 | @joplin/turndown-plugin-gfm | 1.0.67 | MIT |
 | @koromix/koffi-darwin-arm64 | 3.1.1 | MIT |
 | @koromix/koffi-darwin-arm64 | 3.1.5 | MIT |
@@ -390,7 +388,6 @@ the package names, versions, and licenses for transparency.
 | @opentelemetry/api-logs | 0.220.0 | Apache-2.0 |
 | @opentelemetry/core | 2.10.0 | Apache-2.0 |
 | @opentelemetry/core | 2.9.0 | Apache-2.0 |
-| @opentelemetry/exporter-logs-otlp-http | 0.220.0 | Apache-2.0 |
 | @opentelemetry/otlp-exporter-base | 0.220.0 | Apache-2.0 |
 | @opentelemetry/otlp-transformer | 0.220.0 | Apache-2.0 |
 | @opentelemetry/resources | 2.10.0 | Apache-2.0 |
@@ -493,7 +490,7 @@ the package names, versions, and licenses for transparency.
 | @xterm/xterm | 6.0.0 | MIT |
 | accepts | 2.0.0 | MIT |
 | adm-zip | 0.6.0 | MIT |
-| agent-base | 7.1.4 | MIT |
+| agent-base | 9.0.0 | MIT |
 | ajv | 8.20.0 | MIT |
 | ajv-formats | 3.0.1 | MIT |
 | anser | 2.3.5 | MIT |
@@ -504,15 +501,16 @@ the package names, versions, and licenses for transparency.
 | base64-js | 1.5.1 | MIT |
 | bcrypt-pbkdf | 1.0.2 | BSD-3-Clause |
 | bignumber.js | 9.3.1 | MIT |
-| body-parser | 2.3.0 | MIT |
 | bowser | 2.14.1 | MIT |
+| brotli | 1.3.3 | MIT |
 | buffer-equal-constant-time | 1.0.1 | BSD-3-Clause |
 | buildcheck | 0.0.7 | MIT |
 | bundle-name | 4.1.0 | MIT |
+| byte-counter | 0.1.0 | MIT |
 | bytes | 3.1.2 | MIT |
 | bytestreamjs | 2.0.1 | BSD-3-Clause |
-| call-bind-apply-helpers | 1.0.2 | MIT |
-| call-bound | 1.0.4 | MIT |
+| cacheable-lookup | 7.0.0 | MIT |
+| cacheable-request | 13.0.19 | MIT |
 | camelcase | 5.3.1 | MIT |
 | chokidar | 4.0.3 | MIT |
 | chokidar | 5.0.0 | MIT |
@@ -588,6 +586,7 @@ the package names, versions, and licenses for transparency.
 | delaunator | 5.1.0 | ISC |
 | depd | 2.0.0 | MIT |
 | detect-libc | 2.1.2 | Apache-2.0 |
+| dfa | 1.2.0 | MIT |
 | diff | 9.0.0 | BSD-3-Clause |
 | dompurify | 3.4.14 | (MPL-2.0 OR Apache-2.0) |
 | drizzle-orm | 1.0.0-rc.5-ab785fc | Apache-2.0 |
@@ -596,7 +595,6 @@ the package names, versions, and licenses for transparency.
 | dshmarket | 1.39.0 | MIT |
 | dunder-proto | 1.0.1 | MIT |
 | ecdsa-sig-formatter | 1.0.11 | Apache-2.0 |
-| ee-first | 1.1.1 | MIT |
 | emoji-regex | 8.0.0 | MIT |
 | encodeurl | 2.0.0 | MIT |
 | es-define-property | 1.0.1 | MIT |
@@ -618,11 +616,11 @@ the package names, versions, and licenses for transparency.
 | fastdom | 1.0.12 | MIT |
 | fetch-blob | 3.2.0 | MIT |
 | fflate | 0.8.3 | MIT |
-| finalhandler | 2.1.1 | MIT |
+| figures | 6.1.0 | MIT |
 | find-up | 4.1.0 | MIT |
+| fontkit | 2.0.4 | MIT |
+| form-data-encoder | 4.1.0 | MIT |
 | formdata-polyfill | 4.0.10 | MIT |
-| forwarded | 0.2.0 | MIT |
-| fresh | 2.0.0 | MIT |
 | fs-ext | 2.1.1 | MIT |
 | function-bind | 1.1.2 | MIT |
 | gaxios | 7.1.5 | Apache-2.0 |
@@ -656,7 +654,9 @@ the package names, versions, and licenses for transparency.
 | is-fullwidth-code-point | 3.0.0 | MIT |
 | is-in-ssh | 1.0.0 | MIT |
 | is-inside-container | 1.0.0 | MIT |
-| is-promise | 4.0.0 | MIT |
+| is-plain-obj | 4.1.0 | MIT |
+| is-stream | 4.0.1 | MIT |
+| is-unicode-supported | 2.1.0 | MIT |
 | is-wsl | 3.1.1 | MIT |
 | isexe | 2.0.0 | ISC |
 | jose | 6.2.3 | MIT |
@@ -665,10 +665,10 @@ the package names, versions, and licenses for transparency.
 | js-tokens | 4.0.0 | MIT |
 | js-yaml | 4.2.0 | MIT |
 | js-yaml | 4.3.1 | MIT |
+| jsbi | 4.3.2 | Apache-2.0 |
 | json-bigint | 1.0.0 | MIT |
 | json-schema-to-ts | 3.1.1 | MIT |
 | json-schema-traverse | 1.0.0 | MIT |
-| json-schema-typed | 8.0.2 | BSD-2-Clause |
 | jwa | 2.0.1 | MIT |
 | jws | 4.0.1 | MIT |
 | katex | 0.16.47 | MIT |
@@ -721,6 +721,7 @@ the package names, versions, and licenses for transparency.
 | micromark-util-types | 2.0.2 | MIT |
 | mime-db | 1.54.0 | MIT |
 | mime-types | 3.0.2 | MIT |
+| mimic-response | 4.0.0 | MIT |
 | ms | 2.0.0 | MIT |
 | ms | 2.1.3 | MIT |
 | nan | 2.28.0 | MIT |
@@ -739,13 +740,12 @@ the package names, versions, and licenses for transparency.
 | node-fetch | 3.3.2 | MIT |
 | node-pty | 1.1.0 | MIT |
 | node-pty | 1.2.0-beta.15 | MIT |
-| object-assign | 4.1.1 | MIT |
-| object-inspect | 1.13.4 | MIT |
-| on-finished | 2.4.1 | MIT |
+| normalize-url | 8.1.1 | MIT |
+| npm-run-path | 6.0.0 | MIT |
 | on-headers | 1.1.0 | MIT |
-| once | 1.4.0 | ISC |
 | open | 11.0.1 | MIT |
 | openai | 6.40.0 | Apache-2.0 |
+| p-cancelable | 4.0.1 | MIT |
 | p-limit | 2.3.0 | MIT |
 | p-locate | 4.1.0 | MIT |
 | p-retry | 4.6.2 | MIT |
@@ -797,7 +797,10 @@ the package names, versions, and licenses for transparency.
 | require-directory | 2.1.1 | MIT |
 | require-from-string | 2.0.2 | MIT |
 | require-main-filename | 2.0.0 | ISC |
+| resolve-alpn | 1.2.1 | MIT |
 | resolve.exports | 2.0.3 | MIT |
+| responselike | 4.0.2 | MIT |
+| restructure | 3.0.2 | MIT |
 | retry | 0.13.1 | MIT |
 | robust-predicates | 3.0.3 | Unlicense |
 | roughjs | 4.6.6 | MIT |
@@ -811,11 +814,8 @@ the package names, versions, and licenses for transparency.
 | schemastery | 3.18.0 | MIT |
 | selfsigned | 5.5.0 | MIT |
 | semver | 7.8.5 | ISC |
-| send | 1.2.1 | MIT |
-| serve-static | 2.2.1 | MIT |
 | set-blocking | 2.0.0 | ISC |
-| setprototypeof | 1.2.0 | ISC |
-| sharp | 0.35.3 | Apache-2.0 |
+| sharp | 0.35.5 | Apache-2.0 |
 | shebang-command | 2.0.0 | MIT |
 | shebang-regex | 3.0.0 | MIT |
 | shiki | 4.3.1 | MIT |
@@ -862,6 +862,7 @@ the package names, versions, and licenses for transparency.
 | w3c-keyname | 2.2.8 | MIT |
 | web-streams-polyfill | 3.3.3 | MIT |
 | which | 2.0.2 | ISC |
+| which-command | 0.1.0 | MIT |
 | which-module | 2.0.1 | ISC |
 | wrap-ansi | 6.2.0 | MIT |
 | wrappy | 1.0.2 | ISC |
@@ -872,6 +873,7 @@ the package names, versions, and licenses for transparency.
 | yaml | 2.9.0 | ISC |
 | yargs | 15.4.1 | MIT |
 | yargs-parser | 18.1.3 | ISC |
+| yoctocolors | 2.2.0 | MIT |
 | zod | 4.4.3 | MIT |
 | zod | 4.5.4 | MIT |
 | zod-to-json-schema | 3.25.2 | ISC |

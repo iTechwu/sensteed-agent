@@ -3,6 +3,10 @@ import { desktopSetupWizardCopy } from '../setup-wizard-copy.ts'
 import { BRAND_DISPLAY_NAME } from '../generated-product-identity.ts'
 
 export const zh = {
+  loggingTitle: '日志',
+  developerLogging: '开发者日志',
+  developerLoggingBody: '立即记录模型、工具、重试、HTTP、进程通信和界面诊断的元数据，不主动采集提示词、工具参数或响应正文；日志会随诊断 ZIP 导出。会话事件可按序号与官方 Session Log 对照。',
+  logLevel: '日志级别',
   remoteControl: '远程控制',
   remoteControlNew: '新功能',
   aaSaving: '正在保存手机连接设置…',
@@ -107,9 +111,9 @@ export const zh = {
   switchPresentationModeError: '未能切换窗口模式。请重试。',
   windowMaterial: '窗口材质',
   windowMaterialBody: '设置窗口背景效果。更改后需重启应用才能生效。',
+  windowMaterialBodyHot: '设置窗口背景效果。更改后立即生效，无需重启。',
   windowMaterialOff: '纯色背景',
   windowMaterialTransparent: '玻璃背景',
-  windowMaterialMica: 'Mica',
   webTitle: '浏览器与局域网',
   webIntro: '允许在浏览器中打开当前 Profile，并选择可访问的设备范围。',
   openBrowser: '允许在浏览器中打开',
@@ -140,11 +144,17 @@ export const zh = {
   turnFailure: '本轮任务失败',
   jobCompletion: '后台任务完成',
   jobFailure: '后台任务失败',
+  scheduleCompletion: '自动化任务完成',
+  scheduleFailure: '自动化任务失败',
 } as const
 
 export type DesktopSettingsLocaleKey = keyof typeof zh
 
 export const en: Record<DesktopSettingsLocaleKey, string> = {
+  loggingTitle: 'Logging',
+  developerLogging: 'Developer logging',
+  developerLoggingBody: 'Trace model, tool, retry, HTTP, IPC and UI metadata immediately. Prompts, tool arguments and response bodies are not collected by these observers. Logs are included in diagnostic ZIP exports. Match session events to the official Session Log by sequence number.',
+  logLevel: 'Log level',
   remoteControl: 'Remote control',
   remoteControlNew: 'New feature',
   aaSaving: 'Saving phone connection settings…',
@@ -249,9 +259,9 @@ export const en: Record<DesktopSettingsLocaleKey, string> = {
   switchPresentationModeError: 'Could not switch window mode. Please try again.',
   windowMaterial: 'Window material',
   windowMaterialBody: `Choose the window transparency or glass effect. After a change, ${BRAND_DISPLAY_NAME.locale} asks whether to restart now.`,
+  windowMaterialBodyHot: 'Choose the window transparency or glass effect. Changes apply immediately, without a restart.',
   windowMaterialOff: 'No Window Material',
   windowMaterialTransparent: 'Transparent',
-  windowMaterialMica: 'Mica',
   webTitle: 'Browser and local network',
   webIntro: 'Allow browser access to the current Profile and choose which devices can reach it.',
   openBrowser: 'Allow opening this Profile in a browser',
@@ -282,4 +292,6 @@ export const en: Record<DesktopSettingsLocaleKey, string> = {
   turnFailure: 'Current turn failed',
   jobCompletion: 'Background job completed',
   jobFailure: 'Background job failed',
+  scheduleCompletion: 'Automation task completed',
+  scheduleFailure: 'Automation task failed',
 }

@@ -17,6 +17,7 @@ import type {
 } from './profile-checkpoint.ts'
 import { maskSecrets } from './mask-secrets.ts'
 import { assertDesktopProfileName } from './profile-manager.ts'
+import type { DesktopProfileRepairOutcome } from './profile-repair.ts'
 
 const BIN_NAME = 'dsh-plugin-desktop'
 const PREVIEW_TTL_MS = 5 * 60 * 1000
@@ -103,6 +104,11 @@ export interface DesktopStartupRecoveryCheckpointResult {
   readonly changedFiles: readonly string[]
 }
 
+export interface DesktopStartupRecoveryRepairResult {
+  readonly action: 'repair-dependencies'
+  readonly outcome: DesktopProfileRepairOutcome
+}
+
 export type DesktopStartupRecoveryControllerErrorCode =
   | 'generation-changed'
   | 'immutable-target'
@@ -148,6 +154,8 @@ export interface DesktopStartupRecoveryControllerOptions {
   readonly checkpoints: DesktopStartupRecoveryCheckpointStore
   /** Synchronize dependency metadata after an explicit checkpoint restore. */
   readonly afterCheckpointRestore?: (result: RestoreResult) => void | Promise<void>
+  /** Run the deferred offline-first Profile dependency repair for this generation. */
+  readonly repairDependencies?: () => DesktopProfileRepairOutcome | Promise<DesktopProfileRepairOutcome>
   /** Main-process-only browser action, normally Electron shell.openPath. */
   readonly openCheckpointDirectory: (path: string) => void | Promise<void>
   readonly now?: () => number
@@ -390,6 +398,29 @@ export class DesktopStartupRecoveryController {
       this.assertCurrentGeneration()
     } catch (cause) {
       throw this.safeReadError(cause)
+    }
+  }
+
+  /** Run the deferred Profile dependency repair under this generation's operation gate. */
+  async repairDependencies(): Promise<DesktopStartupRecoveryRepairResult> {
+    this.assertCurrentGeneration()
+    if (this.options.repairDependencies === undefined) {
+      throw new DesktopStartupRecoveryControllerError(
+        'state-unavailable',
+        'Desktop dependency repair is unavailable at this startup stage.',
+        { operationStage: 'dependency-materialization' },
+      )
+    }
+    this.assertOperationAvailable()
+    this.operationActive = true
+    try {
+      const outcome = await this.options.repairDependencies()
+      this.assertCurrentGeneration()
+      return { action: 'repair-dependencies', outcome }
+    } catch (cause) {
+      throw this.safeMutationError(cause, 'dependency-materialization')
+    } finally {
+      this.operationActive = false
     }
   }
 

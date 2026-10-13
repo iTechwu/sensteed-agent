@@ -1,13 +1,15 @@
 /** Private RunAsNode bootstrap for the packaged DeepSeek Harness CLI. */
 
-import { readFileSync } from 'node:fs'
+import { readFileSync, realpathSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
-import { resolveProfileDir } from '@deepseek-ai/dsh-app-boot'
+import { resolveProfileDir, type ProfileContext } from '@deepseek-ai/dsh-app-boot'
 import { packagedDependencyPath } from './packaged-runtime-path.ts'
 import { assertDesktopProfileName } from './profile-manager.ts'
+import { bundledSkillRoot } from './bundled-skill-root.ts'
 import { withoutForwardedDesktopPnpmPolicy } from './pnpm-policy.ts'
+import { desktopPnpmStoreDir } from './profile-store-dir.ts'
 import { installProfilePackageResolver } from './module-resolution.ts'
 import { withAsarModuleResolver } from './asar-module-resolver-state.ts'
 import { disableAsarArchiveView, type AsarArchiveProcess } from './asar-archive-policy.ts'
@@ -17,6 +19,11 @@ const DEFAULT_PROFILE = 'DSH_DESKTOP_DEFAULT_PROFILE'
 const DSH_ENTRY_URL = pathToFileURL(
   packagedDependencyPath(import.meta.url, '@deepseek-ai/dsh/lib/bin.js'),
 ).href
+
+interface DesktopCliOptions {
+  manageDesktopProfile?: boolean
+  packageManager?: ProfileContext['packageManager']
+}
 
 function readDshVersion(): string {
   const manifest = JSON.parse(
@@ -96,13 +103,17 @@ export function desktopCliProfileManifestUrl(
  */
 export async function runDesktopDshCli(
   environment: NodeJS.ProcessEnv = process.env,
-  load: (url: string) => Promise<{ runCli(): Promise<void> }> = url => import(url),
+  load: (url: string) => Promise<{ runCli(options?: DesktopCliOptions): Promise<void> }> = url => import(url),
   argv: string[] = process.argv,
   packagedEntry: boolean = /([\\/])app\.asar\1/u.test(fileURLToPath(DSH_ENTRY_URL)),
   asarProcess: AsarArchiveProcess = process,
 ): Promise<void> {
   const profileName = takeDefaultProfile(environment)
   clearElectronRunAsNode(environment)
+  // Same bundled-skills contract as the Host entries: packaged CLI runs see
+  // the app-bundled skill root as well.
+  const bundledSkills = bundledSkillRoot(import.meta.url)
+  if (bundledSkills !== undefined) environment.DSH_BUNDLED_SKILL_DIR = bundledSkills
   // The CLI's agent lists and reads user workspaces; see asar-archive-policy.ts.
   disableAsarArchiveView(DSH_ENTRY_URL, asarProcess)
   const selected = profileName === undefined
@@ -123,7 +134,24 @@ export async function runDesktopDshCli(
   // must explicitly dispatch the exported CLI under the same ASAR scope.
   const runDsh = async (): Promise<void> => {
     const cli = await load(DSH_ENTRY_URL)
-    await cli.runCli()
+    if (argv[2] === 'plugin') {
+      const home = resolveDshHome(undefined, environment)
+      const explicitStore = argv.slice(2).some(argument => argument === '--store-dir' || argument.startsWith('--store-dir='))
+      await cli.runCli({
+        // The installed Desktop carrier is the Harness-supported management
+        // boundary; ordinary CLI boot commands retain the upstream restriction.
+        manageDesktopProfile: true,
+        ...(selectedProfile === undefined || explicitStore ? {} : {
+          packageManager: {
+            command: 'pnpm',
+            args: ['--store-dir', desktopPnpmStoreDir(home, resolveProfileDir(selectedProfile, home))],
+            env: {},
+          },
+        }),
+      })
+    } else {
+      await cli.runCli()
+    }
   }
   const invokeDsh = (): Promise<void> => packagedEntry
     ? withAsarModuleResolver(runDsh)
@@ -147,12 +175,19 @@ export async function runDesktopDshCli(
   }
 }
 
-function isDirectExecution(): boolean {
-  const entry = process.argv[1]
-  return entry !== undefined && fileURLToPath(import.meta.url) === entry
+/** Recognize direct execution even through aliases such as /tmp -> /private/tmp. */
+export function isDirectDesktopCliExecution(moduleUrl: string, entry: string | undefined = process.argv[1]): boolean {
+  if (entry === undefined) return false
+  const filename = fileURLToPath(moduleUrl)
+  if (filename === entry) return true
+  try {
+    return realpathSync(filename) === realpathSync(resolve(entry))
+  } catch {
+    return filename === resolve(entry)
+  }
 }
 
-if (isDirectExecution()) {
+if (isDirectDesktopCliExecution(import.meta.url)) {
   void runDesktopDshCli().catch((cause: unknown) => {
     process.stderr.write(`sensteed-agent: failed to start packaged dsh: ${cause instanceof Error ? cause.stack ?? cause.message : String(cause)}\n`)
     process.exitCode = 1

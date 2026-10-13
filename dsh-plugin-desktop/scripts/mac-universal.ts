@@ -1,4 +1,4 @@
-/** Shared preparation and verification inventory for universal macOS packages. */
+/** Shared native-runtime inventory for Apple Silicon macOS packages. */
 
 import {
   chmodSync,
@@ -19,6 +19,7 @@ import {
 import { randomUUID } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
+import { fileURLToPath } from 'node:url'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { buildMacSystemRuntime, installedMacSystemPackage } from './mac-system-runtime.ts'
@@ -26,35 +27,31 @@ import { buildMacSystemRuntime, installedMacSystemPackage } from './mac-system-r
 export type MacUniversalArch = 'arm64' | 'x86_64'
 
 /** Architectures the unsigned macOS smoke can package. */
-export type MacSmokeArchitecture = 'universal' | 'arm64' | 'x64'
+export type MacSmokeArchitecture = 'arm64'
 
 /**
- * Read the smoke architecture from `DSH_MAC_SMOKE_ARCH`, defaulting to the
- * universal application the signed release ships. CI pull requests select one
- * CPU because the universal merge alone dominates the macOS job.
+ * The product ships Apple Silicon only. Refuse obsolete Intel/universal
+ * overrides so CI cannot accidentally reintroduce unused CPU payloads.
  * @param environment - Environment of the packaging or verification process.
  * @returns The electron-builder architecture to package.
  */
 export function macSmokeArchitecture(environment: NodeJS.ProcessEnv): MacSmokeArchitecture {
   const value = environment.DSH_MAC_SMOKE_ARCH
-  if (value === undefined || value === '') return 'universal'
-  if (value === 'universal' || value === 'arm64' || value === 'x64') return value
+  if (value === undefined || value === '' || value === 'arm64') return 'arm64'
   throw new Error(
-    `DSH_MAC_SMOKE_ARCH must be universal, arm64, or x64; received ${JSON.stringify(value)}`,
+    `macOS packages support Apple Silicon arm64 only; received ${JSON.stringify(value)}`,
   )
 }
 
 /**
- * List the Mach-O slices the packaged main executable must contain.
+ * List the Mach-O slice the packaged main executable must contain.
  * @param architecture - Architecture the smoke packaged.
- * @returns `lipo` architecture names, Intel first.
+ * @returns The arm64 `lipo` architecture name.
  */
 export function macSmokeExecutableSlices(
   architecture: MacSmokeArchitecture,
 ): readonly MacUniversalArch[] {
-  if (architecture === 'arm64') return ['arm64']
-  if (architecture === 'x64') return ['x86_64']
-  return ['x86_64', 'arm64']
+  return architecture === 'arm64' ? ['arm64'] : []
 }
 
 /** Thin native files that must be present for each CPU inside the packaged app directory. */
@@ -324,6 +321,23 @@ export function hydrateInstalledMacCloudflaredRuntime(
   unpackedRoot: string,
   electronBuilderArch: number | undefined,
 ): void {
+  const packagedTarget = join(resolve(unpackedRoot), CLOUDFLARED_RELATIVE_PATH)
+  if (!existsSync(packagedTarget)) {
+    // The electron-builder destination mapping can silently drop the unpacked
+    // cloudflared placeholder from thin packages (same writer family as the
+    // Windows skeleton omissions). Restore it from the installed dependency so
+    // hydration can proceed to swap the per-arch binary; a genuinely absent
+    // dependency still fails the install-anchor check below.
+    const installed = join(
+      resolve(dirname(fileURLToPath(import.meta.url)), '..', 'node_modules', 'cloudflared', 'bin', 'cloudflared'),
+    )
+    if (!existsSync(installed)) {
+      throw new Error(`packaged cloudflared is missing at ${packagedTarget} and the dependency ships no binary at ${installed}`)
+    }
+    mkdirSync(dirname(packagedTarget), { recursive: true })
+    copyBinaryContents(installed, packagedTarget)
+    chmodSync(packagedTarget, 0o755)
+  }
   hydratePackagedMacCloudflaredRuntime({
     unpackedRoot,
     electronBuilderArch,
@@ -561,7 +575,12 @@ export function hydrateInstalledMacFsExtRuntime(
 
 /** Disable SSH2's Node/OpenSSL accelerator; Electron uses the built-in JS crypto fallback. */
 export function disablePackagedMacSshCryptoRuntime(unpackedRoot: string): void {
-  writeFileSync(join(resolve(unpackedRoot), SSH_CRYPTO_RELATIVE_PATH), '')
+  const target = join(resolve(unpackedRoot), SSH_CRYPTO_RELATIVE_PATH)
+  // The writer can drop the whole ssh2 unpacked subtree and a source tree
+  // without the accelerator build has nothing to truncate; an empty file at
+  // the canonical path is the disabled state either way.
+  mkdirSync(dirname(target), { recursive: true })
+  writeFileSync(target, '')
 }
 
 /** Generated host-architecture files that must never shadow the prebuilt pair. */
@@ -599,6 +618,16 @@ const ROOT_MACOS_NATIVE_PACKAGES = [
 
 function packageArch(arch: MacUniversalArch): 'arm64' | 'x64' {
   return arch === 'x86_64' ? 'x64' : arch
+}
+
+function resolveInstalledOptionalPackage(desktopRoot: string, packageName: string): string {
+  const direct = join(resolve(desktopRoot), 'node_modules', packageName)
+  if (existsSync(direct)) return direct
+  const workspaceStore = join(resolve(desktopRoot), '..', 'node_modules', '.pnpm')
+  const encoded = packageName.replace('/', '+')
+  const storeEntry = readdirSync(workspaceStore).find(name => name.startsWith(`${encoded}@`))
+  if (storeEntry === undefined) return direct
+  return join(workspaceStore, storeEntry, 'node_modules', packageName)
 }
 
 function copyPackage(source: string, target: string): void {
@@ -648,7 +677,11 @@ function findNestedKoffiPackages(nodeModulesRoot: string): string[] {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue
       const child = join(directory, entry.name)
-      if (entry.name === 'koffi' && directory.endsWith(`${sep}node_modules`)) {
+      if (
+        entry.name === 'koffi' &&
+        directory.endsWith(`${sep}node_modules`) &&
+        existsSync(join(child, 'package.json'))
+      ) {
         found.push(child)
         continue
       }
@@ -761,6 +794,12 @@ export function hydratePackagedMacRuntime(
       )
     }
   }
+
+  for (const entry of MACOS_UNIVERSAL_NATIVE_ENTRIES) {
+    if (!options.arches.includes(entry.arch) || !entry.path.endsWith('/bin/uv') && !entry.path.endsWith('/spawn-helper')) continue
+    const target = join(unpackedRoot, entry.path)
+    if (existsSync(target)) chmodSync(target, 0o755)
+  }
 }
 
 /**
@@ -790,22 +829,33 @@ export function prepareMacUniversalRuntime(
   }
 }
 
-/** Prepare the installed workspace dependency tree for universal packaging. */
-export function prepareInstalledMacUniversalRuntime(desktopRoot: string): void {
-  buildMacSystemRuntime({ desktopRoot, arches: ['arm64', 'x64'] })
+/** Prepare the installed workspace dependency tree for the selected Mac architecture. */
+export function prepareInstalledMacUniversalRuntime(desktopRoot: string,
+  arches: readonly ('arm64' | 'x64')[] = ['arm64', 'x64']): void {
+  buildMacSystemRuntime({ desktopRoot, arches })
   const aaManifest = join(resolve(desktopRoot), 'node_modules/@agents-anywhere/dsh-bridge-next/package.json')
+  const slices = new Set(arches.map(arch => arch === 'x64' ? 'x86_64' : arch))
   const entries = selectMacUniversalNativeEntries(existsSync(aaManifest))
+    .filter(entry => slices.has(entry.arch))
+  const root = resolve(desktopRoot)
+  const resolveEntry = (path: string): string => {
+    if (path.includes('/@dataiku/uv-darwin-')) {
+      const packageName = path.slice(path.indexOf('node_modules/') + 'node_modules/'.length, path.indexOf('/bin/uv'))
+      return join(resolveInstalledOptionalPackage(desktopRoot, packageName), 'bin/uv')
+    }
+    return path.startsWith(`${root}/`) ? path : join(root, path)
+  }
   prepareMacUniversalRuntime({
     desktopRoot,
     entries,
     exists: path => {
-      for (const arch of ['arm64', 'x64'] as const) {
+      for (const arch of arches) {
         if (path === join(resolve(desktopRoot), `node_modules/@deepseek-ai/node-addon-system-darwin-${arch}/bin/system.node`)) {
           return existsSync(join(installedMacSystemPackage(desktopRoot, arch), 'bin/system.node'))
         }
       }
-      return existsSync(path)
+      return existsSync(resolveEntry(path))
     },
-    chmod: chmodSync,
+    chmod: (path, mode) => chmodSync(resolveEntry(path), mode),
   })
 }

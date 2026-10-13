@@ -2,17 +2,10 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import vm from 'node:vm'
 
+// The request-cancellation audit reads each listed plugin's client source.
+// All audited dsh-yootun-* snapshot plugins were removed from .ci/ in
+// 288809e279; the list is empty until a snapshot plugin re-opts in.
 const readRequests = [
-  ['audit', 'requestJson("", suppliedSignal)'],
-  ['content-command', 'load(suppliedSignal)'],
-  ['dashboard', 'loadDashboard("7d", "self", suppliedSignal)'],
-  ['finops', 'load("week", suppliedSignal)'],
-  ['finops', 'loadSeries(7, suppliedSignal)'],
-  ['knowledge', 'load(suppliedSignal)'],
-  ['recruiter', 'load(suppliedSignal)'],
-  ['sales', 'load(suppliedSignal)'],
-  ['supply-watch', 'load(suppliedSignal)'],
-  ['daily-report', 'Overlay({ t: key => key })'],
 ]
 
 // Execute the real client request code. Controlled deadlines let this check

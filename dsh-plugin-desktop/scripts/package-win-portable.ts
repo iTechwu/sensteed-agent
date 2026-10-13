@@ -1,3 +1,4 @@
+import { assertPackagingRelease } from '../../scripts/release-contract.mjs'
 /** Build an unsigned Windows x64 portable ZIP archive on a native Windows host. */
 
 import { fileURLToPath } from 'node:url'
@@ -9,6 +10,7 @@ import {
 const invokedPath = process.argv[1]
 if (invokedPath !== undefined && invokedPath === fileURLToPath(import.meta.url)) {
   try {
+    assertPackagingRelease()
     packageWindowsArtifact(
       createWindowsPackageOptions('./verify-win-portable.ts'),
       'zip',

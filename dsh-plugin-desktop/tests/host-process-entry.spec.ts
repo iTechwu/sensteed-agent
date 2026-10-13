@@ -48,6 +48,22 @@ it('reads user workspaces physically once the Host utility process starts', asyn
   expect(parentPort.on).toHaveBeenCalledWith('message', expect.any(Function))
 })
 
+it('announces the app-bundled skill root to the harness provider', async () => {
+  const { parentPort } = fakeParentPort()
+  entryProcess.parentPort = parentPort
+  delete entryProcess.noAsar
+  delete process.env.DSH_BUNDLED_SKILL_DIR
+
+  try {
+    await import('../src/host-process-entry.ts')
+    const { bundledSkillRoot } = await import('../src/bundled-skill-root.ts')
+    const expected = bundledSkillRoot()
+    expect(process.env.DSH_BUNDLED_SKILL_DIR).toBe(expected)
+  } finally {
+    delete process.env.DSH_BUNDLED_SKILL_DIR
+  }
+})
+
 it('fails loud on an unhandled rejection instead of serving on in a broken state', async () => {
   // A utility process only prints a warning for an unhandled rejection and keeps running.
   const { parentPort, send } = fakeParentPort()

@@ -94,10 +94,3 @@ export function decideDesktopBrowserAccess(
   if (!access.ordinaryBrowserEnabled || desktopBrowserUrlHasRendererMarkers(request.url)) return 'denied'
   return 'browser'
 }
-
-declare module '@deepseek-ai/cordis' {
-  interface Context {
-    /** Launcher-owned request gate present only in a Desktop Host generation. */
-    desktopBrowserAccess: DesktopBrowserAccess
-  }
-}

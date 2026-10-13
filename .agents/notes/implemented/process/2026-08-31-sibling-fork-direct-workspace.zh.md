@@ -14,7 +14,7 @@ Status: implemented
 
 `upstream.json` 恰好声明 `repository`(SSH fork 地址)、`branch`、`localCheckout`、`sourceVersion` 四个键;不钉 commit——真源是兄弟工作区,`sourceVersion` 必须等于兄弟根版本。CI 在 `pnpm install` 前把 fork 克隆到 `../deepseek-harness`(SSH,`--depth 1 --branch dev`),`scripts/upstream-workspace-link.mjs` 在任何安装之前物化 Windows junction。
 
-桌面自有行为是 fork 的原生提交。原 `patches/` 下的 DSH 行为补丁与 `scripts/apply-upstream-patches.mjs` 已删除;`patches/` 只保留三条 toolchain 补丁(`app-builder-lib`、`dshmarket`、`open`),由 `patchedDependencies` 管辖。`dsh-plugin-desktop/tests/package.spec.ts` 直接对 fork 源码断言这些移植行为。
+桌面自有行为是 fork 的原生提交。原 `patches/` 下的 DSH 行为补丁与 `scripts/apply-upstream-patches.mjs` 已删除;`patches/` 只保留 toolchain 补丁(`app-builder-lib`、`@electron/universal`、`dshmarket`、`open`),由 `patchedDependencies` 管辖。`dsh-plugin-desktop/tests/package.spec.ts` 直接对 fork 源码断言这些移植行为。
 
 ## 后果
 

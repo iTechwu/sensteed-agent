@@ -20,15 +20,15 @@ const market = readJson('dsh-community-market/package.json')
 const upstreamDir = resolve(root, upstream.localCheckout)
 const upstreamPackage = readJson(resolve(upstreamDir, 'package.json'))
 
-if (workspace.packageManager !== 'pnpm@11.7.0') {
-  fail('the product workspace must pin pnpm@11.7.0')
+if (workspace.packageManager !== 'pnpm@11.28.5') {
+  fail('the product workspace must pin pnpm@11.28.5')
 }
 // 两个工作区合并为一个依赖图,必须共用同一个 pnpm 发布版。
 if (upstreamPackage.packageManager !== workspace.packageManager) {
   fail('the sibling checkout must pin the same pnpm release as the product workspace')
 }
 const workspaceFile = readFileSync(resolve(root, 'pnpm-workspace.yaml'), 'utf8')
-for (const entry of ['dsh-plugin-desktop', 'dsh-community-fabric', 'dsh-community-market', 'deepseek-harness/packages/**']) {
+for (const entry of ['dsh-sensteed-product', 'dsh-plugin-desktop', 'dsh-community-fabric', 'dsh-community-market', 'deepseek-harness/packages/**']) {
   if (!workspaceFile.includes(`- ${entry}`)) fail(`pnpm-workspace.yaml must include ${entry}`)
 }
 // 反 vendored 回归:仓库不再内嵌上游 tarball、不再重写 dsh 依赖解析。

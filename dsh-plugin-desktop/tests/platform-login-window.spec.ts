@@ -18,11 +18,13 @@ afterEach(async () => {
 
 it.each([
   [`${HOST}/oauth/callback?code=c&state=s`, 'mainFrame', 'callback'],
+  ['http://localhost:43123/oauth/callback?code=c&state=s', 'mainFrame', 'callback'],
+  ['http://[::1]:43123/oauth/callback?code=c&state=s', 'mainFrame', 'callback'],
   [`${HOST}/oauth/callback?code=c&state=s`, 'subFrame', 'cancel'],
   [`${HOST}/oauth/callback?code=c&state=s`, 'xhr', 'cancel'],
   [`${HOST}/api/account`, 'mainFrame', 'cancel'],
   [`${HOST}/api/account`, 'xhr', 'cancel'],
-  ['http://localhost:43123/oauth/callback?code=c&state=s', 'mainFrame', 'cancel'],
+  ['http://localhost:43124/oauth/callback?code=c&state=s', 'mainFrame', 'cancel'],
   ['http://127.0.0.1:9222/json', 'xhr', 'cancel'],
   ['https://127.0.0.2/', 'image', 'cancel'],
   ['https://[::1]/', 'mainFrame', 'cancel'],

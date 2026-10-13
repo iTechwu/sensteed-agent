@@ -1,12 +1,17 @@
 /** Restore Windows Koffi platform packages omitted by Electron Builder's npm collector. */
 
 import {
+  copyFileSync,
   cpSync,
   existsSync,
+  linkSync,
+  lstatSync,
+  mkdirSync,
   readFileSync,
   readdirSync,
   realpathSync,
   rmSync,
+  statSync,
 } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join, relative, resolve, sep } from 'node:path'
@@ -24,12 +29,48 @@ export interface LoadedKoffiModule {
 
 export type PackagedKoffiLoader = (koffiRoot: string) => LoadedKoffiModule
 
+export interface PlatformLinkDereferenceOptions {
+  /** Dependency tree root whose links are materialized in place. */
+  readonly modulesRoot: string
+  /** Injectable platform so non-Windows hosts can exercise the walk in tests. */
+  readonly platform?: NodeJS.Platform
+}
+
+export interface HoistedPlatformPackageOptions {
+  /** Desktop package root whose node_modules the package is hoisted into. */
+  readonly desktopRoot: string
+  /** Scoped package name, e.g. `@deepseek-ai/libreoffice-kit-win32-x64`. */
+  readonly packageName: string
+}
+
 function copyPackage(source: string, target: string): void {
   if (!existsSync(source)) {
     throw new Error(`cannot find installed Windows Koffi package at ${source}`)
   }
   rmSync(target, { recursive: true, force: true })
   cpSync(source, target, { recursive: true, force: true, dereference: true })
+}
+
+/**
+ * Materialize `source` at `target` through same-volume hardlinks: the archive
+ * reads hardlinked files like any other, while thousands-of-files package
+ * trees (LibreOffice kit) cost milliseconds instead of minutes of NTFS
+ * copying. Falls back to per-file copies across volume boundaries (EXDEV).
+ */
+function hardlinkTree(source: string, target: string): void {
+  const info = lstatSync(source)
+  if (info.isFile()) {
+    try {
+      linkSync(source, target)
+    } catch {
+      copyFileSync(source, target)
+    }
+    return
+  }
+  mkdirSync(target, { recursive: true })
+  for (const entry of readdirSync(source, { withFileTypes: true })) {
+    hardlinkTree(join(source, entry.name), join(target, entry.name))
+  }
 }
 
 function findPackagedKoffiPackages(nodeModulesRoot: string): string[] {
@@ -130,6 +171,90 @@ export function hydratePackagedWindowsKoffiRuntime(
   }
 }
 
+/**
+ * Dereference platform-gated packages (package.json declaring `os`/`cpu`)
+ * that pnpm installs as junctions/symlinks, replacing each link with a real
+ * directory copy before Electron Builder runs.
+ *
+ * The Windows dependency-tree copy drops link entries from app.asar while
+ * its file set still records them, so every archived platform package
+ * (koffi, sharp, LibreOffice kit, …) must be physically materialized or the
+ * NSIS stage fails with `"…" was not found in this archive`. Regular
+ * packages are left alone: their links archive correctly and dereferencing
+ * them would duplicate the store needlessly. `.pnpm` is not descended into —
+ * it is the dereference source, not an archive surface.
+ *
+ * @returns how many links were dereferenced.
+ */
+export function dereferencePlatformPackageLinks(
+  options: PlatformLinkDereferenceOptions,
+): number {
+  if ((options.platform ?? process.platform) !== 'win32') return 0
+  const root = resolve(options.modulesRoot)
+  let dereferenced = 0
+  // workspace 循环链接（如 cordis ↔ cordis-plugin-loader）会让不加防护的
+  // 下钻撞上 ELOOP；以 realpath 已访集合剪枝。
+  const visited = new Set<string>()
+  const pending = [root]
+  while (pending.length > 0) {
+    const dir = pending.pop()!
+    let realDir
+    try {
+      realDir = realpathSync(dir)
+    } catch {
+      continue
+    }
+    if (visited.has(realDir)) continue
+    visited.add(realDir)
+    let entries
+    try {
+      entries = readdirSync(dir, { withFileTypes: true })
+    } catch {
+      continue
+    }
+    for (const entry of entries) {
+      const full = join(dir, entry.name)
+      const info = lstatSync(full, { throwIfNoEntry: false })
+      if (info === undefined) continue
+      if (info.isSymbolicLink()) {
+        let manifest
+        try {
+          const manifestPath = join(full, 'package.json')
+          manifest = existsSync(manifestPath)
+            ? JSON.parse(readFileSync(manifestPath, 'utf8')) as { os?: unknown, cpu?: unknown }
+            : undefined
+        } catch {
+          continue
+        }
+        if (manifest?.os === undefined && manifest?.cpu === undefined) {
+          // 常规包的链接在依赖拷贝中本来就能正确归档；只需继续下钻，
+          // 平台门控链接才是被丢档的那类。
+          let target
+          try {
+            target = statSync(full, { throwIfNoEntry: false })
+          } catch {
+            continue
+          }
+          if (target?.isDirectory()) pending.push(full)
+          continue
+        }
+        let source
+        try {
+          source = realpathSync(full)
+        } catch {
+          continue
+        }
+        rmSync(full, { recursive: true, force: true })
+        hardlinkTree(source, full)
+        dereferenced += 1
+        continue
+      }
+      if (info.isDirectory() && entry.name !== '.pnpm') pending.push(full)
+    }
+  }
+  return dereferenced
+}
+
 function loadPackagedKoffi(koffiRoot: string): LoadedKoffiModule {
   const require = createRequire(join(koffiRoot, 'package.json'))
   return require('koffi') as LoadedKoffiModule
@@ -154,4 +279,37 @@ export function smokePackagedWindowsKoffiRuntime(
       )
     }
   }
+}
+
+export type HoistedPlatformPackageOutcome = 'present' | 'materialized' | 'source-missing'
+
+/**
+ * Ensure a pnpm-virtual-store platform package is physically reachable at its
+ * hoisted top-level path before Electron Builder runs.
+ *
+ * Transitive platform packages (e.g. `@deepseek-ai/libreoffice-kit-win32-x64`
+ * under the main LibreOffice kit) stay inside `.pnpm`; pnpm's list view still
+ * reports them hoisted, so the dependency collector records a top-level file
+ * set that the Windows dependency copy cannot satisfy from the absent
+ * top-level path, and NSIS fails with `"…" was not found in this archive`.
+ * A real top-level copy gives both the collector and the copier the same
+ * physical location.
+ */
+export function ensureHoistedPlatformPackage(options: HoistedPlatformPackageOptions): HoistedPlatformPackageOutcome {
+  const desktopRoot = resolve(options.desktopRoot)
+  const hoisted = join(desktopRoot, 'node_modules', ...options.packageName.split('/'))
+  if (existsSync(hoisted)) return 'present'
+
+  const storeDirName = `${options.packageName.replaceAll('/', '+')}@`
+  const storeRoot = join(desktopRoot, 'node_modules', '.pnpm')
+  if (!existsSync(storeRoot)) return 'source-missing'
+  for (const entry of readdirSync(storeRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory() || !entry.name.startsWith(storeDirName)) continue
+    const source = join(storeRoot, entry.name, 'node_modules', ...options.packageName.split('/'))
+    if (!existsSync(source)) continue
+    mkdirSync(dirname(hoisted), { recursive: true })
+    hardlinkTree(source, hoisted)
+    return 'materialized'
+  }
+  return 'source-missing'
 }

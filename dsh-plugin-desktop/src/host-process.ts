@@ -1,4 +1,5 @@
 /** Electron owns the child lifetime; the child owns the unchanged DSH Web server. */
+import { createProcessOutputLogging } from './process-output-logging.ts'
 import { serializeHostEnvironment } from './host-launch-environment.ts'
 import { utilityProcess } from 'electron'
 import { fileURLToPath } from 'node:url'
@@ -18,6 +19,10 @@ export interface IsolatedHostOptions {
   prepareCertificate: NonNullable<DesktopLanHttpsRuntimeOptions['prepareCertificate']>
   bindHost(host: DesktopStartupGenerationHost): void
   requestQuit(code: number): void
+  /** Receive the Host-side quit inspection probe once the generation mounts (undefined when absent). */
+  registerQuitInspection(impl: (() => Promise<DesktopQuitInspectionAnswer>) | undefined): void
+  /** Receive the Host-side download trigger for the mandatory target release. */
+  registerMandatoryDownload(impl: (() => Promise<void>) | undefined): void
   onFailure(error: Error, exit: IsolatedHostExit): void
 }
 
@@ -33,6 +38,17 @@ export interface IsolatedHostExit {
    */
   readonly stderrTail: string
 }
+
+/** Wire shape of the Host's quitInspection answer (mirrors dsh-desktop-next's protocol). */
+export interface DesktopQuitInspectionAnswer {
+  readonly available: boolean
+  readonly activeTasks?: boolean
+  readonly scheduledTasks?: boolean
+  readonly error?: string
+}
+
+/** The quit inspection RPC must answer quickly; a slow Host maps to unknown upstream. */
+export const QUIT_INSPECTION_DEADLINE_MS = 2_000
 
 /** Enough for a fail-loud diagnostic with its inspected cause chain, small enough for one log entry. */
 export const HOST_STDERR_TAIL_CHARS = 16 * 1024
@@ -52,11 +68,16 @@ export async function startIsolatedDesktopHost(options: IsolatedHostOptions): Pr
     execArgv: ['--expose-internals'],
   })
   // Keep normal Host logs in its own files; stderr includes bootstrap failures.
-  child.stdout?.on('data', (data: Buffer) => { process.stdout.write(data) })
+  const stdoutLog = createProcessOutputLogging('stdout', () => child.pid)
+  const stderrLog = createProcessOutputLogging('stderr', () => child.pid)
+  child.stdout?.on('data', (data: Buffer) => { process.stdout.write(data); stdoutLog.write(data) })
+  child.stdout?.once('end', () => stdoutLog.end())
+  child.stderr?.once('end', () => stderrLog.end())
   const stderrDecoder = new StringDecoder('utf8')
   let stderrTail = ''
   child.stderr?.on('data', (data: Buffer) => {
     process.stderr.write(data)
+    stderrLog.write(data)
     stderrTail = (stderrTail + stderrDecoder.write(data)).slice(-HOST_STDERR_TAIL_CHARS)
   })
   const rpc = new HostRpc({
@@ -65,6 +86,22 @@ export async function startIsolatedDesktopHost(options: IsolatedHostOptions): Pr
   }, 120_000)
   const releaseNative = bindNativeRuntime(rpc, options.runtime)
   rpc.handle('certificate', () => options.prepareCertificate())
+  options.registerMandatoryDownload?.(async () => await Promise.race([
+    rpc.call<{ available: boolean; error?: string }>('mandatoryUpdateDownload', [], undefined, 120_000),
+    new Promise<never>((_, reject) => {
+      const timer = setTimeout(() => reject(new Error('mandatory download timed out')), 120_000)
+      timer.unref?.()
+    }),
+  ]).then(answer => {
+    if (answer.available !== true) throw new Error(answer.error ?? 'mandatory download is unavailable')
+  }))
+  options.registerQuitInspection?.(async () => await Promise.race([
+    rpc.call<DesktopQuitInspectionAnswer>('quitInspection', [], undefined, QUIT_INSPECTION_DEADLINE_MS),
+    new Promise<never>((_, reject) => {
+      const timer = setTimeout(() => reject(new Error('quit inspection timed out')), QUIT_INSPECTION_DEADLINE_MS)
+      timer.unref?.()
+    }),
+  ]))
   rpc.handle('quit', ([code]) => { setImmediate(() => options.requestQuit(code)) })
   let stopping = false
   let exited = false
@@ -72,6 +109,7 @@ export async function startIsolatedDesktopHost(options: IsolatedHostOptions): Pr
   let resolveExit!: () => void
   const exit = new Promise<void>(resolve => { resolveExit = resolve })
   child.once('exit', (code) => {
+    stdoutLog.end(); stderrLog.end()
     exited = true
     rpc.close(`DSH Host exited (${code})`)
     resolveExit()

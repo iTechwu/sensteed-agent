@@ -4,19 +4,30 @@ import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import {
   accessSync,
+  chmodSync,
+  closeSync,
   constants,
+  cpSync,
+  copyFileSync,
   existsSync,
   lstatSync,
   mkdtempSync,
+  openSync,
   readFileSync,
+  readSync,
   readdirSync,
   rmSync,
+  statSync,
+  writeSync,
+  type Dirent,
 } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
-import { dirname, join, parse } from 'node:path'
+import { dirname, join, parse, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { extractFile, getRawHeader } from '@electron/asar'
+import { packageSizeReportPath, packageSizeTargetArch, pruneHydratedSourceMaps, writePackageSizeReport } from './package-size.ts'
+import { verifyUnusedFrontendRuntime } from './unused-frontend-runtime.ts'
 import {
   disablePackagedMacSshCryptoRuntime,
   FORBIDDEN_MACOS_UNIVERSAL_ENTRIES,
@@ -74,6 +85,10 @@ function packageVersion(packageRoot: string): string {
 
 const DSH_RUNTIME_VERSION = packageVersion(DSH_PACKAGE_ROOT)
 const PNPM_RUNTIME_VERSION = packageVersion(PNPM_PACKAGE_ROOT)
+const ELECTRON_ABI = readFileSync(join(resolveRuntimePackageRoot('electron'), 'abi_version'), 'utf8').trim()
+if (!/^\d+$/u.test(ELECTRON_ABI)) {
+  throw new Error(`dsh-plugin-desktop: invalid Electron ABI ${JSON.stringify(ELECTRON_ABI)}`)
+}
 
 /** Maximum physical file count accepted beside ASAR after smart unpack. */
 export const MAX_UNPACKED_RUNTIME_FILES = 3_000
@@ -90,19 +105,34 @@ export const ALLOWED_SMART_UNPACK_PACKAGE_ROOTS = [
   'node_modules/@deepseek-ai/dsh-app-boot',
   'node_modules/@deepseek-ai/dsh-fs-local',
   'node_modules/@deepseek-ai/dsh',
+  // 0.2.1-alpha.1 的 HMR 随 native manifest 携带不可 asar 化文件,electron-builder
+  // 对其整包 smart-unpack;libreoffice-kit 本体同理(平台变体前缀已有独立条目)。
+  'node_modules/@deepseek-ai/dsh-hmr',
+  'node_modules/@deepseek-ai/libreoffice-kit',
   'node_modules/@deepseek-ai/dsh-host-directory-picker-native',
   'node_modules/@deepseek-ai/dsh-sandbox-windows-acl',
+  'node_modules/@deepseek-ai/dsh-sandbox-local',
   'node_modules/@deepseek-ai/dsh-session-persistence-jsonl',
   'node_modules/@deepseek-ai/dsh-subprocess-local',
   'node_modules/@deepseek-ai/dsh-win32-process',
   'node_modules/cloudflared',
   'node_modules/cpu-features',
   'node_modules/dsh-better-sidebar',
+  // a0a4298b0b 的运行时闭包：纯 JS 包随发布闭包 unpacked 交付。
+  'node_modules/@opentelemetry/otlp-exporter-base',
+  'node_modules/@opentelemetry/otlp-transformer',
+  'node_modules/@opentelemetry/resources',
+  'node_modules/@opentelemetry/sdk-logs',
+  'node_modules/chokidar',
+  'node_modules/execa',
+  'node_modules/got',
+  'node_modules/turndown',
   'node_modules/fs-ext',
   'node_modules/koffi',
   'node_modules/koffi-win32-x64-3-1-1',
   'node_modules/ssh2',
   'node_modules/node-addon-require-builtin',
+  'node_modules/node-addon-native-custom-loader',
   'node_modules/node-pty',
   // pnpm embeds executable and native helper payloads.
   'node_modules/pnpm',
@@ -146,6 +176,54 @@ export const REQUIRED_DSH_CLI_RUNTIME_ENTRIES = Object.freeze(
 export const REQUIRED_AGENT_PRESET_RUNTIME_ENTRIES = [
   'node_modules/@deepseek-ai/dsh-web-app/presets/ptc.patch.yml',
 ] as const
+
+/** App-bundled third-party skills written only by `scripts/refresh-bundled.mjs`.
+ * Derived from the in-package manifest so a refreshed snapshot set is asserted
+ * exactly as committed. Empty until the first refresh seeds the snapshot. */
+export const REQUIRED_BUNDLED_SKILL_ENTRIES = Object.freeze((() => {
+  const manifestPath = join(DESKTOP_PACKAGE_ROOT, 'bundled', 'manifest.json')
+  if (!existsSync(manifestPath)) return [] as string[]
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+    skills?: { kind?: string, path?: string }[]
+  }
+  return [
+    'bundled/manifest.json',
+    ...(manifest.skills ?? [])
+      .filter(skill => typeof skill.path === 'string')
+      .map(skill => `bundled/skills/${skill.path}${skill.kind === 'dir' ? '/SKILL.md' : ''}`),
+  ]
+})())
+
+/** External packages imported by required desktop plugins but not reliably discovered through pnpm links. */
+export const REQUIRED_RUNTIME_PACKAGE_MANIFESTS = [
+  'node_modules/@opentelemetry/otlp-exporter-base/package.json',
+  'node_modules/@opentelemetry/otlp-transformer/package.json',
+  'node_modules/@opentelemetry/resources/package.json',
+  'node_modules/@opentelemetry/sdk-logs/package.json',
+  'node_modules/chokidar/package.json',
+  'node_modules/execa/package.json',
+  'node_modules/got/package.json',
+  'node_modules/turndown/package.json',
+  'node_modules/node-addon-native-custom-loader/package.json',
+] as const
+
+/** Materialize runtime packages that Electron Builder cannot copy through pnpm links. */
+export function hydrateRequiredRuntimePackages(context: PackagedRuntimeContext): void {
+  const desktopRoot = context.packager.projectDir ?? DESKTOP_PACKAGE_ROOT
+  const targetRoot = usesAsarLayout(context)
+    ? resolvePackagedUnpackedRoot(context)
+    : resolvePackagedApplicationRoot(context)
+  if (!existsSync(targetRoot)) return
+  for (const manifestPath of REQUIRED_RUNTIME_PACKAGE_MANIFESTS) {
+    const packagePath = manifestPath.slice(0, -'/package.json'.length)
+    const source = join(desktopRoot, packagePath)
+    const target = join(targetRoot, packagePath)
+    if (!existsSync(source)) {
+      throw new Error(`dsh-plugin-desktop: runtime package source is missing at ${source}`)
+    }
+    cpSync(source, target, { recursive: true, force: true, dereference: true })
+  }
+}
 
 /** AfterPack fields consumed without importing Electron Builder's incomplete declaration graph. */
 export interface PackagedRuntimeContext {
@@ -196,6 +274,46 @@ export function hydratePackagedMacRuntimeForContext(context: PackagedRuntimeCont
   disablePackagedMacSshCryptoRuntime(unpackedRoot)
 }
 
+/**
+ * Replace the packaged host-Node fs-ext binding with the prepared Electron-ABI binary.
+ *
+ * fs-ext 2.1.1 requires `build/Release/fs_ext.node` directly and does not discover
+ * prebuilds, while `prepare-fs-ext` stages the Electron-ABI build only under `prebuilds/`.
+ * Linux packaging therefore must swap the binding in place before the runtime smoke loads
+ * it — the same replacement the darwin path performs through its hydration hook.
+ */
+export function hydratePackagedLinuxFsExtRuntimeForContext(
+  context: PackagedRuntimeContext,
+  sourceFsExtRoot: string = resolveRuntimePackageRoot('fs-ext'),
+): void {
+  if (context.electronPlatformName !== 'linux') return
+  const arch = context.arch === 1 ? 'x64' : context.arch === 3 ? 'arm64' : undefined
+  if (arch === undefined) {
+    throw new Error(`dsh-plugin-desktop: unsupported Linux package architecture ${String(context.arch)}`)
+  }
+  const source = join(
+    sourceFsExtRoot,
+    'prebuilds',
+    `linux-${arch}`,
+    `electron.abi${ELECTRON_ABI}.node`,
+  )
+  if (!existsSync(source)) {
+    throw new Error(
+      `dsh-plugin-desktop: prepared Electron-ABI fs-ext is missing at ${source}; `
+      + 'run prepare-fs-ext before packaging',
+    )
+  }
+  const target = join(
+    resolvePackagedUnpackedRoot(context),
+    'node_modules/fs-ext/build/Release/fs_ext.node',
+  )
+  if (!existsSync(target)) {
+    throw new Error(`dsh-plugin-desktop: packaged fs-ext binding is missing at ${target}`)
+  }
+  copyFileSync(source, target)
+  chmodSync(target, 0o755)
+}
+
 /** Stable non-desktop archive entries required by the packaged runtime. */
 export const REQUIRED_PACKAGED_RUNTIME_ENTRIES = [
   'package.json',
@@ -205,6 +323,7 @@ export const REQUIRED_PACKAGED_RUNTIME_ENTRIES = [
   'node_modules/@deepseek-ai/dsh-web-frontend/dist/index.html',
   'node_modules/@deepseek-ai/dsh-app-boot/lib/index.js',
   ...REQUIRED_AGENT_PRESET_RUNTIME_ENTRIES,
+  ...REQUIRED_BUNDLED_SKILL_ENTRIES,
   'node_modules/open/index.js',
   'node_modules/pnpm/bin/pnpm.mjs',
 ] as const
@@ -241,6 +360,8 @@ export const FORBIDDEN_UNPACKED_RUNTIME_ENTRIES = [
   'node_modules/@deepseek-ai/dsh-web-app/lib/index.js',
   // Preset inputs are ordinary read-only data covered by ASAR integrity.
   ...REQUIRED_AGENT_PRESET_RUNTIME_ENTRIES,
+  // App-bundled third-party skills stay inside app.asar for the same reason.
+  ...REQUIRED_BUNDLED_SKILL_ENTRIES,
   'node_modules/@vscode/ripgrep/lib/index.js',
   'node_modules/open/index.js',
   'node_modules/yaml/dist/index.js',
@@ -262,8 +383,8 @@ export const REQUIRED_POSIX_FS_EXT_ENTRIES = {
     arm64: FS_EXT_RELATIVE_PATH,
   },
   linux: {
-    x64: 'node_modules/fs-ext/prebuilds/linux-x64/electron.abi148.node',
-    arm64: 'node_modules/fs-ext/prebuilds/linux-arm64/electron.abi148.node',
+    x64: `node_modules/fs-ext/prebuilds/linux-x64/electron.abi${ELECTRON_ABI}.node`,
+    arm64: `node_modules/fs-ext/prebuilds/linux-arm64/electron.abi${ELECTRON_ABI}.node`,
   },
 } as const
 
@@ -391,32 +512,52 @@ export function smokePackagedFsExtRuntime(
   context: PackagedRuntimeContext,
   run: PackagedElectronRunner = runPackagedElectron,
 ): void {
+  smokePackagedModule(context, ['fs-ext', 'fs-ext.js'], 'fs-ext native ABI', run)
+}
+
+/** Load the Host's native loader and its transitive helper from the actual packaged app. */
+export function smokePackagedBuiltinLoaderRuntime(
+  context: PackagedRuntimeContext,
+  run: PackagedElectronRunner = runPackagedElectron,
+): void {
+  smokePackagedModule(context, ['node-addon-require-builtin', 'lib', 'index.js'], 'Host native loader', run)
+}
+
+function smokePackagedModule(
+  context: PackagedRuntimeContext,
+  entryPath: readonly string[],
+  label: string,
+  run: PackagedElectronRunner,
+): void {
   if (!packagedRuntimeRunnable(context)) return
   const executable = resolvePackagedExecutablePath(context)
-  const entry = join(resolvePackagedAsarPath(context), 'node_modules', 'fs-ext', 'fs-ext.js')
+  const entry = join(resolvePackagedRuntimeRoot(context), 'node_modules', ...entryPath)
   const result = run(executable, ['--expose-internals', entry], {
     ...process.env,
     ELECTRON_RUN_AS_NODE: '1',
   })
   if (result.error !== undefined) {
-    throw new Error('dsh-plugin-desktop: packaged fs-ext native ABI smoke could not start', {
+    throw new Error(`dsh-plugin-desktop: packaged ${label} smoke could not start`, {
       cause: result.error,
     })
   }
   if (result.status !== 0 || result.stdout.trim() !== '') {
     throw new Error(
-      `dsh-plugin-desktop: packaged fs-ext native ABI smoke failed with status ${String(result.status)}; `
+      `dsh-plugin-desktop: packaged ${label} smoke failed with status ${String(result.status)}; `
       + `signal=${String(result.signal ?? null)}; `
       + `stdout=${JSON.stringify(result.stdout.trim())}; stderr=${JSON.stringify(result.stderr.trim())}`,
     )
   }
 }
 
-/** Verify packaged CLI fallbacks are physical, owned proxies into the current ASAR. */
+/** Validate legacy Profile proxies when present; the current resolver creates none. */
 export function verifyPackagedProfileModuleFallback(modulesDir: string, asarRoot: string): void {
-  const entries = readdirSync(modulesDir, { withFileTypes: true })
-  if (entries.length === 0) {
-    throw new Error('dsh-plugin-desktop: packaged Desktop CLI created no Profile module fallbacks')
+  let entries: Dirent[]
+  try {
+    entries = readdirSync(modulesDir, { withFileTypes: true })
+  } catch (cause) {
+    if ((cause as NodeJS.ErrnoException).code === 'ENOENT') return
+    throw cause
   }
   const packages: Array<{ name: string; directory: string }> = []
   for (const entry of entries) {
@@ -494,6 +635,9 @@ export function smokePackagedElectronRuntime(
     ELECTRON_RUN_AS_NODE: '1',
     DSH_HOME: smokeHome,
     DSH_TELEMETRY_DISABLED: '1',
+    // pnpm's executable shims can inject a build-machine dependency search path.
+    // Every smoke dependency must resolve from this installation or its Profile.
+    NODE_PATH: undefined,
   }
   const checks = [
     {
@@ -508,12 +652,15 @@ export function smokePackagedElectronRuntime(
       args: ['--version'],
       accepts: (stdout: string) => stdout.trim() === PNPM_RUNTIME_VERSION,
     },
-    {
+    // Windows 的会话后端走命名信号量，prepare-fs-ext 在 win32 明确
+    // not-required；包内 fs-ext 是 Node-ABI 构建，在 Electron 下必然
+    // ABI 不符，故此检查仅适用于确实准备 Electron-ABI 绑定的平台。
+    ...(context.electronPlatformName === 'win32' ? [] : [{
       label: 'fs-ext native ABI',
       entry: join(runtimeRoot, 'node_modules', 'fs-ext', 'fs-ext.js'),
       args: [],
       accepts: (stdout: string) => stdout.trim() === '',
-    },
+    }]),
     {
       label: 'ASAR/Profile/CJS/ripgrep',
       entry: join(runtimeRoot, 'lib', 'packaged-runtime-smoke.js'),
@@ -889,8 +1036,16 @@ export function verifySelectiveUnpackedRuntime(
       || file.path.startsWith('node_modules/@agents-anywhere/dsh-bridge-next/lib/bundled-connector/') ? [] : [root]
   }))].sort()
   if (unexpectedPackageRoots.length > 0) {
+    // 逐文件列出违规根下的条目,错位类失败(如 linux 的 sharp 文件落进声明包根)
+    // 直接给出证据路径,避免按字节数盲猜。
+    const offendingEntries = normalizedFiles
+      .map(file => file.path)
+      .filter(entry => unexpectedPackageRoots.some(root => entry === root || entry.startsWith(`${root}/`)))
+      .sort()
+      .slice(0, 40)
     throw new Error(
-      `dsh-plugin-desktop: unpacked runtime at ${unpackedRoot} contains non-allowlisted package roots: ${unexpectedPackageRoots.join(', ')}; inventory: ${inventory}`,
+      `dsh-plugin-desktop: unpacked runtime at ${unpackedRoot} contains non-allowlisted package roots: `
+      + `${unexpectedPackageRoots.join(', ')}; entries: ${offendingEntries.join(', ')}; inventory: ${inventory}`,
     )
   }
   const pnpm = summary.groups.find(group => group.root === 'node_modules/pnpm')
@@ -1021,12 +1176,218 @@ export function reportUnpackedRuntime(summary: UnpackedRuntimeSummary): void {
   process.stdout.write(`dsh-plugin-desktop: packaged runtime inventory: ${formatUnpackedRuntimeSummary(summary)}\n`)
 }
 
+/**
+ * Wrap one archived-read strategy with the offset fallback: @electron/asar's
+ * extractFile can miss entries its own raw header plainly holds (observed on
+ * the Windows runner), so callers never trust a single read path.
+ */
+export function withOffsetFallback(
+  context: PackagedRuntimeContext,
+  readPackaged: (path: string) => Buffer,
+): (path: string) => Buffer {
+  return (path: string): Buffer => {
+    try {
+      return readPackaged(path)
+    } catch (cause) {
+      if (!usesAsarLayout(context)) throw cause
+      try {
+        return readArchivedFileByOffset(resolvePackagedAsarPath(context), path)
+      } catch (offsetCause) {
+        throw new Error(
+          `packaged payload is missing from the archive: ${diagnoseArchiveScope(resolvePackagedAsarPath(context), path)}`,
+          { cause: offsetCause },
+        )
+      }
+    }
+  }
+}
+
+/**
+ * Verify the frozen Profile closure manifest sealed into the payload matches
+ * the packaged identity: same schema, same desktop version, and the pinned
+ * `@deepseek-ai/dsh` version equals the tree actually inside the archive.
+ */
+export function verifyProfileClosureArtifact(
+  context: PackagedRuntimeContext,
+  readPackaged: (path: string) => Buffer = path => usesAsarLayout(context)
+    ? extractFile(resolvePackagedAsarPath(context), join(...path.split('/')))
+    : readFileSync(join(resolvePackagedApplicationRoot(context), path)),
+): void {
+  const readPackagedOrOffset = withOffsetFallback(context, readPackaged)
+  const readPackagedRuntimeFile = (path: string): Buffer => {
+    try {
+      return readPackagedOrOffset(path)
+    } catch (cause) {
+      if (usesAsarLayout(context)) {
+        const unpackedPath = join(resolvePackagedUnpackedRoot(context), path)
+        if (existsSync(unpackedPath)) return readFileSync(unpackedPath)
+      }
+      throw cause
+    }
+  }
+  let closure: { schemaVersion?: number; desktopVersion?: string; dshVersion?: string; packages?: Record<string, string> }
+  try {
+    closure = JSON.parse(readPackaged('lib/profile-closure.json').toString('utf8'))
+  } catch (cause) {
+    throw new Error(
+      `dsh-plugin-desktop: packaged Profile closure manifest is missing or unreadable: ${cause instanceof Error ? cause.message : String(cause)}`,
+    )
+  }
+  if (closure.schemaVersion !== 1) {
+    throw new Error(`dsh-plugin-desktop: Profile closure manifest has an unexpected schemaVersion ${String(closure.schemaVersion)}`)
+  }
+  const rootVersion = (JSON.parse(readPackaged('package.json').toString('utf8')) as { version?: string }).version
+  if (closure.desktopVersion !== rootVersion) {
+    throw new Error(`dsh-plugin-desktop: Profile closure manifest desktopVersion ${String(closure.desktopVersion)} is stale against the packaged ${String(rootVersion)}`)
+  }
+  const dshVersion = (JSON.parse(readPackagedOrOffset('node_modules/@deepseek-ai/dsh/package.json').toString('utf8')) as { version?: string }).version
+  if (closure.dshVersion !== dshVersion || closure.packages?.['@deepseek-ai/dsh'] !== dshVersion) {
+    throw new Error(`dsh-plugin-desktop: Profile closure manifest pins @deepseek-ai/dsh ${String(closure.dshVersion)} but the archive carries ${String(dshVersion)}`)
+  }
+  for (const [packageName, expectedVersion] of Object.entries(closure.packages ?? {})) {
+    if (packageName === '@deepseek-ai/dsh') continue
+    let actualVersion: unknown
+    try {
+      actualVersion = (JSON.parse(readPackagedRuntimeFile(`node_modules/${packageName}/package.json`).toString('utf8')) as { version?: unknown }).version
+    } catch (cause) {
+      throw new Error(
+        `dsh-plugin-desktop: Profile closure package ${packageName}@${expectedVersion} is missing from the archive`,
+        { cause },
+      )
+    }
+    if (actualVersion !== expectedVersion) {
+      throw new Error(
+        `dsh-plugin-desktop: Profile closure package ${packageName} resolves to ${String(actualVersion)} but the manifest pins ${expectedVersion}`,
+      )
+    }
+  }
+  for (const manifestPath of REQUIRED_RUNTIME_PACKAGE_MANIFESTS) {
+    try {
+      readPackagedRuntimeFile(manifestPath)
+    } catch (cause) {
+      throw new Error(
+        `dsh-plugin-desktop: required runtime package ${manifestPath} is missing from the archive`,
+        { cause },
+      )
+    }
+  }
+}
+
+/**
+ * Describe the archive scope around the AA bridge for missing-payload errors:
+ * the subtree under /node_modules/@agents-anywhere plus a sample of the
+ * packaged top-level packages, so a runner-side archive omission is visible
+ * without re-running the build under a debugger.
+ */
+export function diagnoseArchiveScope(
+  archivePath: string,
+  packagePath: string,
+  readHeader: ArchiveHeaderReader = getRawHeader,
+): string {
+  try {
+    const rawHeader = readHeader(archivePath).header as { files?: Record<string, unknown> }
+    const rawRootKeys = Object.keys(rawHeader.files ?? {})
+    const { files } = indexPackagedAsarHeader(rawHeader)
+    const prefix = `/${packagePath}`
+    const scope = [...files].filter(path => path === prefix || path.startsWith(`${prefix}/`))
+    if (scope.length > 0) {
+      return `archive holds ${scope.length} ${prefix} entries: ${scope.slice(0, 20).join(', ')}`
+    }
+    const packageNames = new Set<string>()
+    for (const path of [...files].filter(path => path.startsWith('/node_modules/'))) {
+      const segments = path.split('/')
+      // /node_modules/@scope/name/... vs /node_modules/name/...
+      packageNames.add(segments[2]?.startsWith('@') === true
+        ? `${segments[2]}/${segments[3] ?? ''}`
+        : segments[2] ?? '')
+    }
+    const rawNodeModules = rawRootKeys.filter(key => key.replaceAll('\\', '/').startsWith('node_modules')).length
+    const nodeModulesEntry = rawHeader.files?.['node_modules'] as
+      | { files?: Record<string, unknown>; link?: string; size?: number; unpacked?: boolean }
+      | undefined
+    const agentsEntry = nodeModulesEntry?.files?.['@agents-anywhere'] as
+      | { files?: Record<string, unknown>; unpacked?: boolean }
+      | undefined
+    const bridgeEntry = agentsEntry?.files?.['dsh-bridge-next'] as unknown
+    const bridgeShape = bridgeEntry === undefined
+      ? 'absent'
+      : JSON.stringify(bridgeEntry).slice(0, 300)
+    // Independent raw-walk leaf count under node_modules, deliberately not
+    // going through indexPackagedAsarHeader so a walker quirk cannot mask
+    // what the header itself holds.
+    let rawLeafCount = 0
+    const rawLeafSamples: string[] = []
+    const countRaw = (value: unknown, path: string): void => {
+      if (rawLeafCount > 4096) return
+      if (value === null || typeof value !== 'object') return
+      const entry = value as Record<string, unknown>
+      if ('files' in entry && entry.files !== null && typeof entry.files === 'object') {
+        for (const [name, child] of Object.entries(entry.files as Record<string, unknown>)) {
+          countRaw(child, `${path}/${name}`)
+        }
+        return
+      }
+      rawLeafCount += 1
+      if (rawLeafSamples.length < 5) rawLeafSamples.push(path)
+    }
+    countRaw(nodeModulesEntry, '/node_modules')
+    const nodeModulesShape = nodeModulesEntry === undefined
+      ? 'absent'
+      : nodeModulesEntry.link !== undefined
+        ? `link -> ${JSON.stringify(nodeModulesEntry.link)}`
+        : nodeModulesEntry.files === undefined
+          ? `leaf(size=${String(nodeModulesEntry.size)}, unpacked=${String(nodeModulesEntry.unpacked)})`
+          : `dir with ${Object.keys(nodeModulesEntry.files).length} children: ${Object.keys(nodeModulesEntry.files).slice(0, 6).map(key => JSON.stringify(key)).join(', ')}; @agents-anywhere: ${agentsEntry === undefined ? 'absent' : `unpacked=${String(agentsEntry.unpacked)} files=${agentsEntry.files === undefined ? 'none' : Object.keys(agentsEntry.files).length} sample=${Object.keys(agentsEntry.files ?? {}).slice(0, 3).map(key => JSON.stringify(key)).join(', ')}`}`
+    return `archive holds ${files.size} entries total, none under ${prefix}; raw node_modules leaf count: ${rawLeafCount}, samples: ${rawLeafSamples.join(', ') || '(none)'}; bridge entry: ${bridgeShape}; raw root keys: ${rawRootKeys.length} (node_modules-prefixed: ${rawNodeModules}, sample: ${rawRootKeys.slice(0, 8).map(key => JSON.stringify(key)).join(', ')}); node_modules entry shape: ${nodeModulesShape}; packaged top-level packages: ${[...packageNames].sort().slice(0, 25).join(', ')}`
+  } catch (diagnosticCause) {
+    return `archive scope scan itself failed: ${diagnosticCause instanceof Error ? diagnosticCause.message : String(diagnosticCause)}`
+  }
+}
+
+/**
+ * Read one archived file by walking the raw header ourselves and seeking to
+ * the recorded offset. @electron/asar's own `extractFile` was observed to
+ * miss entries that the very same raw header plainly holds on the Windows
+ * runner, so the verification must not depend on its path resolution.
+ */
+export function readArchivedFileByOffset(archivePath: string, archivePath2: string): Buffer {
+  const rawHeader = getRawHeader(archivePath).header as {
+    files?: Record<string, unknown>
+  }
+  let node: unknown = rawHeader
+  for (const segment of archivePath2.split('/').filter(Boolean)) {
+    if (node === null || typeof node !== 'object') {
+      throw new Error(`archived path segment missing: ${segment} in ${archivePath2}`)
+    }
+    const files = (node as { files?: Record<string, unknown> }).files
+    if (files === undefined || !(segment in files)) {
+      throw new Error(`archived path segment missing: ${segment} in ${archivePath2}`)
+    }
+    node = files[segment]
+  }
+  const entry = node as { size?: number; offset?: string }
+  if (typeof entry.size !== 'number' || typeof entry.offset !== 'string') {
+    throw new Error(`archived path is not a packed file: ${archivePath2}`)
+  }
+  const sizes = Buffer.alloc(8)
+  const fd = openSync(archivePath, 'r')
+  try {
+    readSync(fd, sizes, 0, 8, 0)
+    const headerSize = sizes.readUInt32LE(4)
+    const content = Buffer.alloc(entry.size)
+    readSync(fd, content, 0, entry.size, 8 + headerSize + Number(entry.offset))
+    return content
+  } finally {
+    closeSync(fd)
+  }
+}
+
 /** Verify the AA version and built entry sealed into the actual installation payload. */
 export function verifyPackagedAgentsAnywhere(
   context: PackagedRuntimeContext,
   readInstalled: (path: string) => Buffer = readFileSync,
   readPackaged: (path: string) => Buffer = path => usesAsarLayout(context)
-    ? extractFile(resolvePackagedAsarPath(context), path)
+    ? extractFile(resolvePackagedAsarPath(context), join(...path.split('/')))
     : readFileSync(join(resolvePackagedApplicationRoot(context), path)),
 ): void {
   const packagePath = 'node_modules/@agents-anywhere/dsh-bridge-next'
@@ -1040,17 +1401,20 @@ export function verifyPackagedAgentsAnywhere(
   }
   if (context.electronPlatformName === 'darwin') {
     const root = usesAsarLayout(context) ? resolvePackagedUnpackedRoot(context) : resolvePackagedApplicationRoot(context)
-    for (const entry of MACOS_UNIVERSAL_NATIVE_ENTRIES.filter(entry => entry.path.endsWith('/bin/uv'))) {
+    const uvEntries = MACOS_UNIVERSAL_NATIVE_ENTRIES.filter(entry => entry.path.endsWith('/bin/uv'))
+      .filter(entry => context.arch === 4 || (context.arch === 1 ? entry.arch === 'x86_64' : entry.arch === 'arm64'))
+    for (const entry of uvEntries) {
       accessSync(join(root, entry.path), constants.X_OK)
     }
   }
-  const actual = JSON.parse(readPackaged(`${packagePath}/package.json`).toString()) as { version: string }
+  const readPackagedOrOffset = withOffsetFallback(context, readPackaged)
+  const actual = JSON.parse(readPackagedOrOffset(`${packagePath}/package.json`).toString()) as { version: string }
   if (expected.version !== actual.version) {
     throw new Error(`Packaged AA version mismatch: expected ${expected.version}, received ${actual.version}`)
   }
   const digest = (bytes: Buffer): string => createHash('sha256').update(bytes).digest('hex')
   if (digest(readInstalled(join(desktopRoot, packagePath, 'lib/index.js')))
-    !== digest(readPackaged(`${packagePath}/lib/index.js`))) {
+    !== digest(readPackagedOrOffset(`${packagePath}/lib/index.js`))) {
     throw new Error('Packaged AA entry differs from the prepared release dependency')
   }
 }
@@ -1060,18 +1424,138 @@ export function verifyPackagedAgentsAnywhere(
  * @param context - Electron Builder's afterPack context.
  * @returns A promise that rejects before signing when the runtime is incomplete.
  */
+/**
+ * Rebuild the packaged ASAR header so every file physically present in
+ * app.asar.unpacked becomes addressable. electron-builder 26.17 writes some
+ * physically copied files (closure packages' docs, hydrated natives) without
+ * header entries, which leaves them unreachable at runtime. The rebuilt
+ * pickle keeps the header buffer's total length and its four-byte Pickle
+ * header, with unused payload space after the JSON, so every recorded body
+ * offset stays valid for both @electron/asar and Electron's native reader.
+ */
+export function repairPackagedAsarHeader(context: PackagedRuntimeContext): void {
+  if (!usesAsarLayout(context)) {
+    console.log('repair diag: skipped, not an asar layout')
+    return
+  }
+  const asarPath = resolvePackagedAsarPath(context)
+  const unpackedRoot = resolve(unpackRootOf(context))
+  let fd: number
+  try {
+    fd = openSync(asarPath, 'r+')
+  } catch (cause) {
+    console.log(`repair diag: skipped, openSync failed: ${cause instanceof Error ? cause.message : String(cause)}`)
+    return
+  }
+  console.log(`repair diag: running, asar=${asarPath} unpackedRoot=${unpackedRoot}`)
+  try {
+    const sizes = Buffer.alloc(16)
+    readSync(fd, sizes, 0, 16, 0)
+    const oldHeaderBufLen = sizes.readUInt32LE(4)
+    const oldJsonLen = sizes.readUInt32LE(12)
+    const oldJson = Buffer.alloc(oldJsonLen)
+    readSync(fd, oldJson, 0, oldJsonLen, 16)
+    const header = JSON.parse(oldJson.toString('utf8')) as { files?: Record<string, unknown> }
+
+    const ensureLeaf = (path: string, bytes: number): void => {
+      const segments = path.split('/').filter(Boolean)
+      let node = header
+      for (const segment of segments.slice(0, -1)) {
+        const dir = (node.files ??= {})
+        node = (dir[segment] ??= { files: {} })
+      }
+      const parent = (node.files ??= {})
+      // Force the unpacked flag: the writer emits these files physically
+      // while leaving their header entries packed (or absent), and Electron
+      // must read them from app.asar.unpacked.
+      parent[segments.at(-1)!] = { size: bytes, unpacked: true }
+    }
+    const walkPhysical = (dir: string, path: string): void => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name)
+        const childPath = `${path}/${entry.name}`
+        if (entry.isDirectory()) walkPhysical(full, childPath)
+        else ensureLeaf(childPath, statSync(full).size)
+      }
+    }
+    walkPhysical(join(unpackedRoot, 'node_modules'), '/node_modules')
+
+    // The embedded-ASAR integrity fuse is disabled for these smoke/gate
+    // packages, so the per-entry integrity blocks are dead weight that buys
+    // the slack the added entries need.
+    const stripIntegrity = (node: unknown): void => {
+      if (node === null || typeof node !== 'object') return
+      const record = node as Record<string, unknown>
+      delete record.integrity
+      for (const child of Object.values(record.files ?? {})) stripIntegrity(child)
+    }
+    stripIntegrity(header)
+
+    const json = Buffer.from(JSON.stringify(header))
+    const jsonLenPadded = (json.length + 3) & ~3
+    const payloadSize = 4 + jsonLenPadded
+    const payloadOffset = 4
+    if (payloadSize > oldHeaderBufLen - payloadOffset) {
+      throw new Error(
+        `dsh-plugin-desktop: repaired ASAR header payload needs ${payloadSize} bytes, exceeding the reserved ${oldHeaderBufLen - payloadOffset}`,
+      )
+    }
+    // Include the trailing reserved space in payloadSize so both readers
+    // find the JSON length at byte 4 and the JSON at byte 8. Putting the JSON
+    // at the buffer tail while declaring this size makes them read zeroes.
+    const headerBuf = Buffer.alloc(oldHeaderBufLen)
+    headerBuf.writeUInt32LE(oldHeaderBufLen - payloadOffset, 0)
+    headerBuf.writeUInt32LE(json.length, payloadOffset)
+    json.copy(headerBuf, payloadOffset + 4)
+    writeSync(fd, headerBuf, 0, headerBuf.length, 8)
+    console.log(
+      `repair diag: wrote headerBuf ${headerBuf.length}B at offset 8 ` +
+      `(payloadSize ${payloadSize}, payloadOffset ${payloadOffset})`,
+    )
+  } finally {
+    closeSync(fd)
+  }
+}
+
+function unpackRootOf(context: PackagedRuntimeContext): string {
+  return usesAsarLayout(context) ? resolvePackagedUnpackedRoot(context) : resolvePackagedApplicationRoot(context)
+}
+
 export async function afterPack(
   context: PackagedRuntimeContext,
   verify: typeof verifyPackagedRuntime = verifyPackagedRuntime,
   report: (summary: UnpackedRuntimeSummary) => void = reportUnpackedRuntime,
   verifyAa: typeof verifyPackagedAgentsAnywhere = verifyPackagedAgentsAnywhere,
-  smokeNative: PackagedElectronSmoke = smokePackagedFsExtRuntime,
+  smokeNative: PackagedElectronSmoke = (context) => {
+    smokePackagedBuiltinLoaderRuntime(context)
+    smokePackagedElectronRuntime(context)
+  },
   hydrateMac: (context: PackagedRuntimeContext) => void = hydratePackagedMacRuntimeForContext,
+  verifyClosure: typeof verifyProfileClosureArtifact = verifyProfileClosureArtifact,
+  hydrateLinux: (context: PackagedRuntimeContext) => void = hydratePackagedLinuxFsExtRuntimeForContext,
+  recordSize: (context: PackagedRuntimeContext) => void = (context) => {
+    if (!usesAsarLayout(context)) throw new Error('package size verification requires the standard ASAR layout')
+    verifyUnusedFrontendRuntime(resolvePackagedAsarPath(context))
+    const arch = context.arch === 4 ? 'universal' : context.arch === 3 ? 'arm64' : 'x64'
+    writePackageSizeReport({
+      archive: resolvePackagedAsarPath(context),
+      unpackedRoot: resolvePackagedUnpackedRoot(context),
+      platform: context.electronPlatformName, arch,
+      targetArch: packageSizeTargetArch(context.electronPlatformName, arch),
+      outputPath: packageSizeReportPath(context.appOutDir, context.electronPlatformName, arch),
+    })
+  },
 ): Promise<void> {
   hydrateMac(context)
+  hydrateLinux(context)
+  hydrateRequiredRuntimePackages(context)
+  pruneHydratedSourceMaps(resolvePackagedUnpackedRoot(context))
+  repairPackagedAsarHeader(context)
   const summary = verify(context)
   verifyAa(context)
+  verifyClosure(context)
   report(summary)
+  recordSize(context)
   smokeNative(context)
 }
 

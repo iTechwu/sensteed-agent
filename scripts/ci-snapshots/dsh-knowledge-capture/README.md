@@ -1,7 +1,7 @@
 # @dofe/dsh-knowledge-capture
 
-Yootun-Agent 的 Runtime Knowledge bridge。它监听 DSH 的真实 Session 事件，
-通过 `https://ixicai.cn/mcp/knowledge` 提交 `knowledge.session_checkpoint`，
+Sensteed-Agent 的 Runtime Knowledge bridge。它监听 DSH 的真实 Session 事件，
+通过 `https://ai.hozonauto.com/mcp/knowledge` 提交 `knowledge.session_checkpoint`，
 并在每次模型请求前获取 `knowledge.context_pack`。
 
 私有插件，不发布到 npmjs。身份只由公共 MCP 网关根据
@@ -10,9 +10,9 @@ Yootun-Agent 的 Runtime Knowledge bridge。它监听 DSH 的真实 Session 事�
 ## 接入面
 
 - 包名：`@dofe/dsh-knowledge-capture`
-- Cordis `name`：`yootun-agent-knowledge-capture`
+- Cordis `name`：`sensteed-agent-knowledge-capture`
 - Cordis `inject`：`['credentials', 'systemPrompt']`
-- 暴露到 `ctx.yootunAgentCapture` 与 `ctx.yootunAgentKnowledge`：
+- 暴露到 `ctx.sensteedAgentCapture` 与 `ctx.sensteedAgentKnowledge`：
   `{ sdkVersion, pendingCount(), droppedCount(), loadout(), contextPack(), flush(), shutdown() }`
 
 ## 运行时依赖
@@ -41,7 +41,10 @@ credential store 解析，不要求重启，也不阻塞 Agent 对话。
 - 缺少 Key、MCP 超时或上游错误只降级 Runtime Memory，不影响其它数据源。
 - 队列最多保留 200 条，checkpoint 单批最多 50 条；失败批次按原序回队。
 - 自动候选只在服务端 Loadout 的 `allowCandidateCapture` 为 true 时创建，
-  并使用 `user.agent_runtime`；候选仍需明确确认后才参与普通 recall。
+  仅从用户本人发言生成候选，写入当前团队下的 `user.personal`（`scope=USER`）；
+  模型回答、工具输出和压缩摘要不成为用户事实，候选仍需明确确认后才参与普通 recall。
+- 切换 Models 凭据时重新获取租户策略；策略读取失败不创建候选。会话 checkpoint
+  继续保留模型消息与工具状态，供会话续接使用。
 
 ## 验证
 

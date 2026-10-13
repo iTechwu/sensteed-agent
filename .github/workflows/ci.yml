@@ -2,18 +2,24 @@ name: CI
 
 on:
   pull_request:
-    branches: [master]
+    branches: [main]
   push:
-    branches: [master, dev]
+    branches: [main, dev]
+    tags: ['*-beta.*']
   workflow_dispatch:
     inputs:
+      publish_kind:
+        description: 'Candidate artifacts or a signed release that advances the TOS channel'
+        type: choice
+        options: [candidate, release]
+        default: candidate
+        required: true
       brand:
         description: 'White-label brand variant for the packaged applications'
         type: choice
         options:
-          - yootun
           - sensteed
-        default: yootun
+        default: sensteed
         required: false
 
 permissions:
@@ -39,12 +45,16 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       product: ${{ steps.scope.outputs.product }}
+      upstream_sha: ${{ steps.source.outputs.upstream_sha }}
+      upstream_repository: ${{ steps.source.outputs.upstream_repository }}
+      version: ${{ steps.source.outputs.version }}
+      release: ${{ steps.source.outputs.release }}
+      channel: ${{ steps.source.outputs.channel }}
+      packaging: ${{ steps.source.outputs.packaging }}
     steps:
       - uses: actions/checkout@v6
         with:
-          # GitHub's pull-request merge ref can retain the base branch's
-          # submodule gitlink when the PR advances it to a descendant. Check
-          # out the actual PR head so pinned submodules match upstream.json.
+          # Validate the actual PR head; all jobs share one resolved sibling commit.
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
@@ -64,13 +74,57 @@ jobs:
           node scripts/verify-bilingual-docs.mjs
           node --test scripts/market-dependency-direction.test.mjs
           node scripts/verify-market-dependency-direction.mjs
-          if [[ "$EVENT_NAME" == "workflow_dispatch" || -z "$BASE_SHA" || "$BASE_SHA" =~ ^0+$ ]]; then
+          if [[ "$EVENT_NAME" == "workflow_dispatch" || "$GITHUB_REF" == refs/tags/* || -z "$BASE_SHA" || "$BASE_SHA" =~ ^0+$ ]]; then
             product=true
           else
             git diff --check "$BASE_SHA" "$HEAD_SHA"
             product="$(git diff --name-only -z "$BASE_SHA" "$HEAD_SHA" | node scripts/classify-ci-changes.mjs)"
           fi
           echo "product=$product" >> "$GITHUB_OUTPUT"
+
+      - name: Test CI publication contracts
+        run: |
+          node --test scripts/ci/resolve-source.test.mjs scripts/release-contract.test.mjs
+          python3 -B -m unittest discover -s scripts/ci -p 'test_*.py'
+      - name: Resolve one Harness commit for every platform
+        if: steps.scope.outputs.product == 'true'
+        id: source
+        env:
+          PUBLISH_KIND: ${{ inputs.publish_kind || 'candidate' }}
+        run: node scripts/ci/resolve-source.mjs
+
+  publish-config:
+    needs: changes
+    if: >-
+      needs.changes.outputs.product == 'true' && github.event_name != 'pull_request' &&
+      needs.changes.outputs.packaging == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install official TOS SDK for preflight
+        run: python -m pip install -r scripts/ci/tos-requirements.txt
+      - name: Validate TOS upload and optional release signing configuration
+        env:
+          RELEASE: ${{ needs.changes.outputs.release }}
+          TOS_ACCESS_KEY_ID: ${{ secrets.TOS_ACCESS_KEY_ID }}
+          TOS_SECRET_ACCESS_KEY: ${{ secrets.TOS_SECRET_ACCESS_KEY }}
+          TOS_BUCKET: ${{ vars.TOS_BUCKET || secrets.TOS_BUCKET || 'dofe-public' }}
+          TOS_REGION: ${{ vars.TOS_REGION || secrets.TOS_REGION }}
+          TOS_ENDPOINT: ${{ vars.TOS_ENDPOINT || secrets.TOS_ENDPOINT }}
+          TOS_PUBLIC_BASE_URL: ${{ vars.TOS_PUBLIC_BASE_URL || secrets.TOS_PUBLIC_BASE_URL }}
+          MAC_CERT_P12_BASE64: ${{ secrets.MAC_CERT_P12_BASE64 }}
+          MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: python -B scripts/ci/publish-tos.py --check-config --probe
 
   # Product gate: AA profile smoke is temporarily paused below.
   # A documentation-only change already passed diff validation in `changes`.
@@ -86,25 +140,41 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@v6
         if: needs.changes.outputs.product == 'true'
         with:
           node-version: 22.23.2
       - if: needs.changes.outputs.product == 'true'
         run: corepack enable
+      # pnpm store 缓存 miss 时 fs-ext 等原生依赖会在 install 中现场编译,
+      # corepack 解包的 node-gyp 启动器缺执行位会以 Permission denied 失败
+      # (与 desktop-macos 的同名步骤对齐)。
+      - name: Prepare node-gyp launcher permissions
+        if: needs.changes.outputs.product == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm --version
+          find "$HOME/.cache/node/corepack" -path '*/node-gyp/gyp/gyp_main.py' -type f -exec chmod +x {} +
       - name: Fetch sibling DeepSeek Harness checkout
         if: needs.changes.outputs.product == 'true'
         shell: bash
+        env:
+          UPSTREAM_SHA: ${{ needs.changes.outputs.upstream_sha }}
+          UPSTREAM_REPOSITORY: ${{ needs.changes.outputs.upstream_repository }}
         run: |
           set -euo pipefail
           upstream_dir="$GITHUB_WORKSPACE/../deepseek-harness"
           if command -v cygpath >/dev/null 2>&1; then upstream_dir="$(cygpath -u "$upstream_dir")"; fi
           mkdir -p "$upstream_dir"
-          curl --fail --location --retry 3 https://github.com/iTechwu/deepseek-harness/archive/refs/heads/dev.tar.gz | tar -xz --strip-components=1 -C "$upstream_dir"
+          curl --fail --location --retry 3 "https://github.com/$UPSTREAM_REPOSITORY/archive/$UPSTREAM_SHA.tar.gz" | tar -xz --strip-components=1 -C "$upstream_dir"
           git -C "$upstream_dir" init --quiet
           git -C "$upstream_dir" -c user.name=CI -c user.email=ci@localhost commit --allow-empty --quiet -m "CI source archive"
+          node -e "const fs=require('node:fs'); const u=require('./upstream.json'); if(JSON.parse(fs.readFileSync('../deepseek-harness/package.json')).version!==u.sourceVersion) throw Error('Harness sourceVersion mismatch')"
           node scripts/upstream-workspace-link.mjs
           node scripts/prepare-dofe-ui.mjs
+          node scripts/refresh-bundled.mjs --offline
           node scripts/build-dofe-ui.mjs
       - name: Resolve pnpm store path
         if: needs.changes.outputs.product == 'true'
@@ -139,35 +209,41 @@ jobs:
     needs: changes
     if: needs.changes.outputs.product == 'true'
     runs-on: windows-2022
-    timeout-minutes: 60
+    timeout-minutes: 90
     env:
       # node-gyp 11 cannot parse the VS 18 metadata on windows-latest yet.
       # Keep native fs-ext builds on the supported VS 2022 toolchain.
       GYP_MSVS_VERSION: '2022'
       npm_config_msvs_version: '2022'
-      # Dispatch selects the white-label variant; pushes and PRs stay yootun.
-      BRAND: ${{ inputs.brand || 'yootun' }}
+      # Dispatch selects the white-label variant; pushes and PRs stay sensteed.
+      BRAND: ${{ inputs.brand || 'sensteed' }}
     steps:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@v6
         with:
           node-version: 22.23.2
       - run: corepack enable
       - name: Fetch sibling DeepSeek Harness checkout
         shell: bash
+        env:
+          UPSTREAM_SHA: ${{ needs.changes.outputs.upstream_sha }}
+          UPSTREAM_REPOSITORY: ${{ needs.changes.outputs.upstream_repository }}
         run: |
           set -euo pipefail
           upstream_dir="$GITHUB_WORKSPACE/../deepseek-harness"
           if command -v cygpath >/dev/null 2>&1; then upstream_dir="$(cygpath -u "$upstream_dir")"; fi
           mkdir -p "$upstream_dir"
-          curl --fail --location --retry 3 https://github.com/iTechwu/deepseek-harness/archive/refs/heads/dev.tar.gz | tar -xz --strip-components=1 -C "$upstream_dir"
+          curl --fail --location --retry 3 "https://github.com/$UPSTREAM_REPOSITORY/archive/$UPSTREAM_SHA.tar.gz" | tar -xz --strip-components=1 -C "$upstream_dir"
           git -C "$upstream_dir" init --quiet
           git -C "$upstream_dir" -c user.name=CI -c user.email=ci@localhost commit --allow-empty --quiet -m "CI source archive"
+          node -e "const fs=require('node:fs'); const u=require('./upstream.json'); if(JSON.parse(fs.readFileSync('../deepseek-harness/package.json')).version!==u.sourceVersion) throw Error('Harness sourceVersion mismatch')"
           node scripts/upstream-workspace-link.mjs
           node scripts/prepare-dofe-ui.mjs
+          node scripts/refresh-bundled.mjs --offline
           node scripts/build-dofe-ui.mjs
       - name: Resolve pnpm store path
         id: pnpm-store
@@ -176,6 +252,15 @@ jobs:
         with:
           path: ${{ steps.pnpm-store.outputs.dir }}
           key: pnpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', 'upstream.json') }}
+      - name: Cache Electron downloads
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/electron
+            ~/Library/Caches/electron
+            ~/AppData/Local/electron/Cache
+          key: electron-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('dsh-plugin-desktop/electron-builder.json', 'dsh-plugin-desktop/package.json') }}
+          restore-keys: electron-${{ runner.os }}-${{ runner.arch }}-
       # The following upstream install validates the sibling's own lockfile.
       - run: pnpm install --no-frozen-lockfile --config.minimumReleaseAge=0
       - run: pnpm --dir ../deepseek-harness install --no-frozen-lockfile --config.minimumReleaseAge=0
@@ -189,32 +274,104 @@ jobs:
           CI: 'false'
           npm_config_minimum_release_age: '0'
         run: pnpm --filter dsh-plugin-desktop check:win-package
+      - name: Install headless Chromium
+        run: pnpm --dir ../deepseek-harness/apps/web exec playwright install chromium
+      - name: Verify Windows renderer startup
+        run: pnpm --filter dsh-plugin-desktop verify:renderer
+      - name: Probe installed AA bridge layout
+        shell: pwsh
+        run: |
+          node -e "
+            const fs = require('node:fs')
+            const path = require('node:path')
+            const p = 'dsh-plugin-desktop/node_modules/@agents-anywhere/dsh-bridge-next'
+            const st = fs.lstatSync(p)
+            const real = fs.realpathSync(p)
+            const storeRoot = path.dirname(path.dirname(real))
+            console.log('isLink:', st.isSymbolicLink())
+            console.log('realpath:', real)
+            console.log('package.json:', fs.existsSync(p + '/package.json'))
+            console.log('entries:', fs.readdirSync(p).sort().join(','))
+            console.log('storeRoot:', storeRoot)
+            console.log('store @dataiku/uv:', fs.existsSync(path.join(storeRoot, '@dataiku', 'uv', 'package.json')))
+            console.log('app-level @dataiku:', fs.existsSync('dsh-plugin-desktop/node_modules/@dataiku/uv/package.json'))
+          "
+      - name: Prepare Windows packaged directory
+        if: needs.changes.outputs.packaging == 'true'
+        env:
+          CI: 'false'
+          npm_config_minimum_release_age: '0'
+          DSH_PACKAGE_CHECK_ALREADY_RAN: '1'
+          # Candidate artifacts are unsigned and short lived. Store compression
+          # avoids spending most of the Windows runner budget recompressing the
+          # already packed ASAR; release packaging keeps the configured level.
+          DSH_WINDOWS_PACKAGE_COMPRESSION: store
+          NODE_OPTIONS: '--max-old-space-size=6144'
+        run: pnpm --filter dsh-plugin-desktop dist:win-prepare
       - name: Build Windows installer
+        if: needs.changes.outputs.packaging == 'true'
         env:
           CI: 'false'
           npm_config_minimum_release_age: '0'
           DSH_PACKAGE_CHECK_ALREADY_RAN: '1'
-        run: pnpm --filter dsh-plugin-desktop dist:win
+          DSH_WINDOWS_PACKAGE_COMPRESSION: store
+          NODE_OPTIONS: '--max-old-space-size=6144'
+        run: pnpm --filter dsh-plugin-desktop dist:win-installer
       - name: Build Windows portable archive
+        if: needs.changes.outputs.packaging == 'true'
         env:
           CI: 'false'
           npm_config_minimum_release_age: '0'
           DSH_PACKAGE_CHECK_ALREADY_RAN: '1'
-        run: pnpm --filter dsh-plugin-desktop dist:win-portable
-      - name: Upload Windows applications
+          DSH_WINDOWS_PACKAGE_COMPRESSION: store
+          NODE_OPTIONS: '--max-old-space-size=6144'
+        run: pnpm --filter dsh-plugin-desktop dist:win-portable-prepared
+      - name: Inspect packaged output on failure
+        if: failure()
+        shell: pwsh
+        run: |
+          $res = "dsh-plugin-desktop/dist/win-unpacked/resources"
+          if (Test-Path "$res/app.asar") {
+            "app.asar bytes: $((Get-Item "$res/app.asar").Length)"
+          } else { "no app.asar" }
+          $un = "$res/app.asar.unpacked/node_modules"
+          if (Test-Path $un) {
+            "unpacked node_modules files: $((Get-ChildItem $un -Recurse -File | Measure-Object).Count)"
+          } else { "no unpacked node_modules" }
+          $bridge = "$res/app.asar.unpacked/node_modules/@agents-anywhere/dsh-bridge-next"
+          if (Test-Path "$bridge/package.json") { "bridge package.json: present physically" } else { "bridge package.json: absent physically" }
+          if (Test-Path "$res/app.asar") {
+            node dsh-plugin-desktop/scripts/diagnose-win-asar.mjs "$res/app.asar" dsh-plugin-desktop
+          }
+      - name: Preserve windows package size report
+        if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ inputs.brand || 'yootun' }}-agent-windows-x64
-          path: |
-            dsh-plugin-desktop/dist/*-Agent-Beta-*-Setup.exe
-            dsh-plugin-desktop/dist/*-Agent-Beta-*-Portable.zip
-          if-no-files-found: error
-          retention-days: 7
+          name: package-size-windows
+          path: dsh-plugin-desktop/dist/**/package-size-*.json
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Preserve Windows packaging phase timings
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-package-timings
+          path: dsh-plugin-desktop/dist/windows-package-timings.json
+          if-no-files-found: ignore
+          retention-days: 14
 
-  # macOS-only universal packaging smoke on a real macOS runner: the signed
-  # release is built manually on a credentialed machine, so an unsigned DMG
-  # here catches Intel and Apple Silicon packaging regressions before a manual
-  # release. No signing secrets ever reach this job.
+      - name: Upload Windows applications
+        if: needs.changes.outputs.packaging == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-windows
+          path: |
+            dsh-plugin-desktop/dist/*-Agent-*-Setup.exe
+            dsh-plugin-desktop/dist/*-Agent-*-Portable.zip
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
   # Linux x64 distribution artifacts: unsigned AppImage and Debian package
   # built on a stock ubuntu runner, mirroring the Windows packaging job.
   desktop-linux:
@@ -222,33 +379,93 @@ jobs:
     if: needs.changes.outputs.product == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix:
-        workspace: [dsh-plugin-desktop, dsh-plugin-desktop-beta]
     steps:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
-          submodules: recursive
+          fetch-depth: 0
       - uses: actions/setup-node@v6
         with:
           node-version: 22.23.2
       - run: corepack enable
-      - name: Resolve Yarn cache folder
-        id: yarn-cache
-        run: echo "dir=$(yarn config get cacheFolder)" >> "$GITHUB_OUTPUT"
+      - name: Fetch sibling DeepSeek Harness checkout
+        shell: bash
+        env:
+          UPSTREAM_SHA: ${{ needs.changes.outputs.upstream_sha }}
+          UPSTREAM_REPOSITORY: ${{ needs.changes.outputs.upstream_repository }}
+        run: |
+          set -euo pipefail
+          upstream_dir="$GITHUB_WORKSPACE/../deepseek-harness"
+          if command -v cygpath >/dev/null 2>&1; then upstream_dir="$(cygpath -u "$upstream_dir")"; fi
+          mkdir -p "$upstream_dir"
+          curl --fail --location --retry 3 "https://github.com/$UPSTREAM_REPOSITORY/archive/$UPSTREAM_SHA.tar.gz" | tar -xz --strip-components=1 -C "$upstream_dir"
+          git -C "$upstream_dir" init --quiet
+          git -C "$upstream_dir" -c user.name=CI -c user.email=ci@localhost commit --allow-empty --quiet -m "CI source archive"
+          node -e "const fs=require('node:fs'); const u=require('./upstream.json'); if(JSON.parse(fs.readFileSync('../deepseek-harness/package.json')).version!==u.sourceVersion) throw Error('Harness sourceVersion mismatch')"
+          node scripts/upstream-workspace-link.mjs
+          node scripts/prepare-dofe-ui.mjs
+          node scripts/refresh-bundled.mjs --offline
+          node scripts/build-dofe-ui.mjs
+      - name: Resolve pnpm store path
+        id: pnpm-store
+        run: echo "dir=$(pnpm store path)" >> "$GITHUB_OUTPUT"
       - uses: actions/cache@v6
         with:
-          path: ${{ steps.yarn-cache.outputs.dir }}
-          key: yarn-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('yarn.lock', '.yarnrc.yml') }}
-      - run: yarn install --immutable
-      - run: yarn workspace ${{ matrix.workspace }} check:linux-package
-      - name: Build Linux AppImage and Debian package
+          path: ${{ steps.pnpm-store.outputs.dir }}
+          key: pnpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', 'upstream.json') }}
+      # The following upstream install validates the sibling's own lockfile.
+      - run: pnpm install --no-frozen-lockfile --config.minimumReleaseAge=0
+      - run: pnpm --dir ../deepseek-harness install --no-frozen-lockfile --config.minimumReleaseAge=0
+      - name: Build upstream Harness
         env:
+          CI: 'false'
+          npm_config_minimum_release_age: '0'
+        run: pnpm upstream:build
+      - name: Run Linux package gate
+        env:
+          CI: 'false'
+          npm_config_minimum_release_age: '0'
+        run: pnpm --filter dsh-plugin-desktop check:linux-package
+      - name: Build Linux AppImage and Debian package
+        if: needs.changes.outputs.packaging == 'true'
+        env:
+          CI: 'false'
+          npm_config_minimum_release_age: '0'
           DSH_PACKAGE_CHECK_ALREADY_RAN: '1'
-        run: yarn workspace ${{ matrix.workspace }} dist:linux
+          NODE_OPTIONS: '--max-old-space-size=6144'
+        run: pnpm --filter dsh-plugin-desktop dist:linux
+      - name: Preserve linux package size report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: package-size-linux
+          path: dsh-plugin-desktop/dist/**/package-size-*.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload Linux applications
+        if: needs.changes.outputs.packaging == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.brand || 'sensteed' }}-agent-linux-x64
+          path: |
+            dsh-plugin-desktop/dist/*-Agent-Beta-*.AppImage
+            dsh-plugin-desktop/dist/*-Agent-Beta-*.deb
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Stage Linux applications for publication
+        if: needs.changes.outputs.packaging == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-linux
+          path: |
+            dsh-plugin-desktop/dist/*.AppImage
+            dsh-plugin-desktop/dist/*.deb
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
 
   desktop-macos:
     needs: changes
@@ -256,13 +473,14 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 60
     env:
-      # Dispatch selects the white-label variant; pushes and PRs stay yootun.
-      BRAND: ${{ inputs.brand || 'yootun' }}
+      # Dispatch selects the white-label variant; pushes and PRs stay sensteed.
+      BRAND: ${{ inputs.brand || 'sensteed' }}
     steps:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@v6
         with:
           node-version: 22.23.2
@@ -275,16 +493,21 @@ jobs:
           find "$HOME/.cache/node/corepack" -path '*/node-gyp/gyp/gyp_main.py' -type f -exec chmod +x {} +
       - name: Fetch sibling DeepSeek Harness checkout
         shell: bash
+        env:
+          UPSTREAM_SHA: ${{ needs.changes.outputs.upstream_sha }}
+          UPSTREAM_REPOSITORY: ${{ needs.changes.outputs.upstream_repository }}
         run: |
           set -euo pipefail
           upstream_dir="$GITHUB_WORKSPACE/../deepseek-harness"
           if command -v cygpath >/dev/null 2>&1; then upstream_dir="$(cygpath -u "$upstream_dir")"; fi
           mkdir -p "$upstream_dir"
-          curl --fail --location --retry 3 https://github.com/iTechwu/deepseek-harness/archive/refs/heads/dev.tar.gz | tar -xz --strip-components=1 -C "$upstream_dir"
+          curl --fail --location --retry 3 "https://github.com/$UPSTREAM_REPOSITORY/archive/$UPSTREAM_SHA.tar.gz" | tar -xz --strip-components=1 -C "$upstream_dir"
           git -C "$upstream_dir" init --quiet
           git -C "$upstream_dir" -c user.name=CI -c user.email=ci@localhost commit --allow-empty --quiet -m "CI source archive"
+          node -e "const fs=require('node:fs'); const u=require('./upstream.json'); if(JSON.parse(fs.readFileSync('../deepseek-harness/package.json')).version!==u.sourceVersion) throw Error('Harness sourceVersion mismatch')"
           node scripts/upstream-workspace-link.mjs
           node scripts/prepare-dofe-ui.mjs
+          node scripts/refresh-bundled.mjs --offline
           node scripts/build-dofe-ui.mjs
       - name: Resolve pnpm store path
         id: pnpm-store
@@ -304,21 +527,49 @@ jobs:
       - name: Run macOS package gate
         env:
           CI: 'false'
+          DSH_MAC_SMOKE_ARCH: 'arm64'
           npm_config_minimum_release_age: '0'
         run: pnpm --filter dsh-plugin-desktop check:mac-package
       - name: Build macOS smoke artifact
+        if: needs.changes.outputs.packaging == 'true' && needs.changes.outputs.release != 'true'
+        env:
+          CI: 'false'
+          DSH_MAC_SMOKE_ARCH: 'arm64'
+          npm_config_minimum_release_age: '0'
+          DSH_PACKAGE_CHECK_ALREADY_RAN: '1'
+          NODE_OPTIONS: '--max-old-space-size=6144'
+        run: pnpm --filter dsh-plugin-desktop dist:mac-smoke
+      - name: Build signed and notarized macOS release
+        if: needs.changes.outputs.packaging == 'true' && needs.changes.outputs.release == 'true' && github.event_name != 'pull_request'
         env:
           CI: 'false'
           npm_config_minimum_release_age: '0'
-          DSH_PACKAGE_CHECK_ALREADY_RAN: '1'
-        run: pnpm --filter dsh-plugin-desktop dist:mac-smoke
-      - name: Upload macOS application
+          NODE_OPTIONS: '--max-old-space-size=6144'
+          MAC_CERT_P12_BASE64: ${{ secrets.MAC_CERT_P12_BASE64 }}
+          MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: pnpm --filter dsh-plugin-desktop dist:mac
+      - name: Preserve macos package size report
+        if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ inputs.brand || 'yootun' }}-agent-macos-universal
-          path: dsh-plugin-desktop/dist/mac-smoke/*.dmg
+          name: package-size-macos
+          path: dsh-plugin-desktop/dist/**/package-size-*.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload macOS application
+        if: needs.changes.outputs.packaging == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-macos
+          path: dsh-plugin-desktop/dist/${{ needs.changes.outputs.release == 'true' && 'mac-release' || 'mac-smoke' }}/*.dmg
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
+          compression-level: 0
 
   # Sibling link smoke: the Windows junction materialization plus the
   # portable-shell scripts that must resolve the sibling checkout's own
@@ -332,22 +583,28 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@v6
         with:
           node-version: 22.23.2
       - run: corepack enable
       - name: Fetch sibling DeepSeek Harness checkout
         shell: bash
+        env:
+          UPSTREAM_SHA: ${{ needs.changes.outputs.upstream_sha }}
+          UPSTREAM_REPOSITORY: ${{ needs.changes.outputs.upstream_repository }}
         run: |
           set -euo pipefail
           upstream_dir="$GITHUB_WORKSPACE/../deepseek-harness"
           if command -v cygpath >/dev/null 2>&1; then upstream_dir="$(cygpath -u "$upstream_dir")"; fi
           mkdir -p "$upstream_dir"
-          curl --fail --location --retry 3 https://github.com/iTechwu/deepseek-harness/archive/refs/heads/dev.tar.gz | tar -xz --strip-components=1 -C "$upstream_dir"
+          curl --fail --location --retry 3 "https://github.com/$UPSTREAM_REPOSITORY/archive/$UPSTREAM_SHA.tar.gz" | tar -xz --strip-components=1 -C "$upstream_dir"
           git -C "$upstream_dir" init --quiet
           git -C "$upstream_dir" -c user.name=CI -c user.email=ci@localhost commit --allow-empty --quiet -m "CI source archive"
+          node -e "const fs=require('node:fs'); const u=require('./upstream.json'); if(JSON.parse(fs.readFileSync('../deepseek-harness/package.json')).version!==u.sourceVersion) throw Error('Harness sourceVersion mismatch')"
           node scripts/upstream-workspace-link.mjs
           node scripts/prepare-dofe-ui.mjs
+          node scripts/refresh-bundled.mjs --offline
           node scripts/build-dofe-ui.mjs
       - name: Probe the materialized workspace link
         shell: bash
@@ -356,3 +613,50 @@ jobs:
           node -e "const p=require('node:fs').realpathSync('deepseek-harness'); if(!p.endsWith('deepseek-harness')) process.exit(1); console.log('link ->', p)"
       - run: node scripts/verify-layout.mjs
       - run: corepack pnpm --dir ../deepseek-harness --version
+
+  publish-tos:
+    needs: [changes, publish-config, check, desktop-windows, desktop-linux, desktop-macos, upstream-command-windows]
+    if: >-
+      github.event_name != 'pull_request' &&
+      needs.changes.outputs.packaging == 'true'
+    runs-on: ubuntu-latest
+    # Downloading five installers and uploading them across regions can exceed 30 minutes.
+    timeout-minutes: 120
+    concurrency:
+      group: tos-sensteed-agent-${{ needs.changes.outputs.channel }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install official TOS SDK
+        run: python -m pip install -r scripts/ci/tos-requirements.txt
+      - uses: actions/download-artifact@v8
+        with:
+          name: desktop-windows
+          path: artifacts/windows
+      - uses: actions/download-artifact@v8
+        with:
+          name: desktop-macos
+          path: artifacts/macos
+      - uses: actions/download-artifact@v8
+        with:
+          name: desktop-linux
+          path: artifacts/linux
+      - name: Publish installers and checksum manifest to TOS
+        timeout-minutes: 120
+        env:
+          TOS_ACCESS_KEY_ID: ${{ secrets.TOS_ACCESS_KEY_ID }}
+          TOS_SECRET_ACCESS_KEY: ${{ secrets.TOS_SECRET_ACCESS_KEY }}
+          TOS_BUCKET: ${{ vars.TOS_BUCKET || secrets.TOS_BUCKET || 'dofe-public' }}
+          TOS_REGION: ${{ vars.TOS_REGION || secrets.TOS_REGION }}
+          TOS_ENDPOINT: ${{ vars.TOS_ENDPOINT || secrets.TOS_ENDPOINT }}
+          TOS_PUBLIC_BASE_URL: ${{ vars.TOS_PUBLIC_BASE_URL || secrets.TOS_PUBLIC_BASE_URL }}
+          DESKTOP_VERSION: ${{ needs.changes.outputs.version }}
+          UPSTREAM_SHA: ${{ needs.changes.outputs.upstream_sha }}
+          RELEASE: ${{ needs.changes.outputs.release }}
+        run: python -B scripts/ci/publish-tos.py --artifacts artifacts

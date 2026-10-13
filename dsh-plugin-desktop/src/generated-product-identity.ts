@@ -41,8 +41,8 @@ export const BRAND_SHORTCUT_NAME = "Sensteed-Agent Beta"
 
 /** Display names shown in chrome that is identical across release channels. */
 export const BRAND_DISPLAY_NAME = Object.freeze({
-  titlebar: "山子Agent",
-  locale: "山子Agent",
+  titlebar: "哪吒Agent",
+  locale: "哪吒Agent",
 })
 
 /** Brand mission shown by the client brand surfaces. */
@@ -53,7 +53,7 @@ export const BRAND_MISSION = Object.freeze({
 
 /** Update service contract served by the release infrastructure. */
 export const BRAND_UPDATE_SERVICE = Object.freeze({
-  endpoint: "https://ixicai.cn/api/desktop/version",
+  endpoint: "https://ai.hozonauto.com/api/desktop/version",
   versionHeader: "X-Sensteed-Agent-Version",
   channelHeader: "X-Sensteed-Agent-Channel",
 })

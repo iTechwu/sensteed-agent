@@ -5,6 +5,39 @@ import { bindNativeRuntime, createHostRuntime, runtimeSnapshot } from '../src/ho
 import { desktopTrayLabel } from '../src/tray-locale.ts'
 import type { DesktopLocale, DesktopRuntime, DesktopShellSpec, DesktopTrayItem } from '../src/runtime.ts'
 
+it('carries SSO request bodies, responses and cancellation through the native transport', async () => {
+  const { port1, port2 } = new MessageChannel()
+  const [parent, child] = [port1, port2].map(port => new HostRpc({
+    send: value => port.postMessage(value),
+    listen: receive => { port.on('message', receive); return () => { port.off('message', receive) } },
+  })) as [HostRpc, HostRpc]
+  let nativeSignal: AbortSignal | undefined
+  const requestDofeAuth = vi.fn(async (_url: string, init: RequestInit) => {
+    nativeSignal = init.signal ?? undefined
+    return new Response('{"access_token":"fixture"}', { status: 200, headers: { 'content-type': 'application/json' } })
+  })
+  const native = { platform: 'darwin', locale: 'zh', updates: {}, requestDofeAuth } as unknown as DesktopRuntime
+  const release = bindNativeRuntime(parent, native)
+  try {
+    const runtime = createHostRuntime(child, runtimeSnapshot(native))
+    const url = 'https://user.hozonauto.com/api/oauth/token'
+    const response = await runtime.requestDofeAuth!(url, { method: 'POST', body: 'code=fixture', headers: { accept: 'application/json' } })
+    expect(await response.json()).toEqual({ access_token: 'fixture' })
+    expect(requestDofeAuth).toHaveBeenCalledWith(url, expect.objectContaining({ body: 'code=fixture', method: 'POST', headers: [['accept', 'application/json']] }))
+    requestDofeAuth.mockImplementationOnce(async (_url, init) => {
+      nativeSignal = init.signal ?? undefined
+      return new Promise((_resolve, reject) => { init.signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true }) })
+    })
+    const controller = new AbortController()
+    const pending = runtime.requestDofeAuth!(url, { method: 'POST', signal: controller.signal })
+    const rejected = expect(pending).rejects.toThrow('cancelled')
+    await vi.waitFor(() => expect(requestDofeAuth).toHaveBeenCalledTimes(2))
+    controller.abort()
+    await rejected
+    await vi.waitFor(() => expect(nativeSignal?.aborted).toBe(true))
+  } finally { await release(); parent.close(); child.close(); port1.close(); port2.close() }
+})
+
 it.each(['zh', undefined] as const)('synchronizes tray language at boot and on changes (preference: %s)', async initialPreference => {
   const { port1, port2 } = new MessageChannel()
   const [parent, child] = [port1, port2].map(port => new HostRpc({
@@ -17,7 +50,7 @@ it.each(['zh', undefined] as const)('synchronizes tray language at boot and on c
   const disposeTray = vi.fn()
   let nativeLocale: DesktopLocale = 'en'
   const native = {
-    platform: 'win32', windowsBuild: 22631, get locale() { return nativeLocale },
+    platform: 'win32', get locale() { return nativeLocale },
     setLocalePreference: (preference: DesktopLocale | undefined) => { nativeLocale = preference ?? 'zh' },
     updates: { isPackaged: true, canDownload: true, currentVersion: '2.0.7-beta.1', statePath: '/tmp/update',
       request: vi.fn(async () => new Response('{"version":"2.0.8-beta.1"}', { headers: { 'x-test': 'yes' } })),
@@ -39,6 +72,7 @@ it.each(['zh', undefined] as const)('synchronizes tray language at boot and on c
     } as unknown as DesktopShellSpec
     spec.readRemoteControl = vi.fn(async () => false)
     spec.enableRemoteControl = vi.fn(async () => {})
+    spec.applySetupSettings = vi.fn(async () => {})
     const stopShell = runtime.schedule(spec)
     runtime.registerTrayItem({ group: 'tools', order: 1, label: () => desktopTrayLabel(runtime.locale, 'openTerminal'), invoke,
       submenu: () => [{ label: () => desktopTrayLabel(runtime.locale, 'checkForUpdates'), invoke }] })
@@ -53,6 +87,12 @@ it.each(['zh', undefined] as const)('synchronizes tray language at boot and on c
     expect(shell.readLocalePreference()).toBe(initialPreference)
     await shell.requestModeChange('extended')
     expect(mode).toHaveBeenCalledWith('extended')
+    const setup = { mode: 'extended', macosMaterial: 'transparent', windowsMaterial: 'off', openBrowser: false,
+      networkExposure: 'loopback', notifications: { enabled: true, notifyOnTurnCompletion: true,
+        notifyOnTurnFailure: true, notifyOnJobCompletion: true, notifyOnJobFailure: true,
+        notifyOnScheduleCompletion: true, notifyOnScheduleFailure: true } } as const
+    await shell.applySetupSettings?.(setup)
+    expect(spec.applySetupSettings).toHaveBeenCalledWith(setup)
     expect(runtime.locale).toBe('zh')
     expect(native.locale).toBe('zh')
     expect(tray.label()).toBe('打开 DSH 终端')

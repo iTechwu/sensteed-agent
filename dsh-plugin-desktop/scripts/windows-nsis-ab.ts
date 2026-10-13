@@ -13,7 +13,7 @@ import {
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 
 export const WINDOWS_NSIS_AB_SCHEMA_VERSION = 2
-export const WINDOWS_NSIS_AB_BUILDER_VERSION = '26.15.7'
+export const WINDOWS_NSIS_AB_BUILDER_VERSION = '26.17.0'
 
 export type WindowsNsisAbSkipCheckSource =
   | 'none'

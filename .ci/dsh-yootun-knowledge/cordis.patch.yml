@@ -1,4 +1,0 @@
-# Yootun enterprise knowledge, Memory, and graph MCP route.
-- insert:
-    - id: yootun-knowledge-tools
-      name: '@dofe/dsh-yootun-knowledge'

@@ -52,6 +52,7 @@ function stubDocument() {
 
 function makeCtx() {
   return {
+    inject: vi.fn(),
     reflect: { provide: vi.fn(), get: vi.fn() },
     // Cordis runs effect factories eagerly during the apply walk — mirror
     // that here so registration assertions observe real calls.
@@ -118,7 +119,7 @@ describe('claimDesktopLayout', () => {
 })
 
 function environmentFor(mode: 'advanced' | 'extended') {
-  return { mode, platform: 'win32', material: 'off', micaSupported: false, version: '2.0.2' }
+  return { mode, platform: 'win32', material: 'off', version: '2.0.2' }
 }
 
 describe('applyAdvancedShell presentation ownership', () => {

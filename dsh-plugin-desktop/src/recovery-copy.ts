@@ -114,6 +114,11 @@ export interface DesktopRecoveryCopy {
   readonly dataOperationFailedTitle: string
   readonly dataOperationFailedMessage: string
   readonly openTerminal: string
+  readonly repairDependencies: string
+  readonly repairDependenciesBody: string
+  readonly repairDependenciesUpToDate: string
+  readonly repairDependenciesSuccess: string
+  readonly repairDependenciesUnavailable: string
   readonly emptySlot: string
   readonly availableSlot: string
   readonly noHealthyStartup: string
@@ -268,6 +273,11 @@ const COPY: Record<DesktopLocale, DesktopRecoveryCopy> = {
     dataOperationFailedTitle: 'Data operation failed',
     dataOperationFailedMessage: 'The data directory operation did not complete. Check the error details and the current directory state before retrying.',
     openTerminal: 'Open DSH Terminal',
+    repairDependencies: 'Repair dependency metadata',
+    repairDependenciesBody: 'Rebuilds Profile dependency metadata offline-first, usually without network access; restart afterwards to apply it.',
+    repairDependenciesUpToDate: 'Dependency metadata is already current; no repair needed.',
+    repairDependenciesSuccess: 'Dependency metadata repaired. Restart to apply it.',
+    repairDependenciesUnavailable: 'Dependency repair is unavailable at this startup stage.',
     emptySlot: 'No checkpoint yet',
     availableSlot: 'Ready to restore',
     noHealthyStartup: 'No configuration from a successful startup has been saved here yet.',
@@ -425,6 +435,11 @@ const COPY: Record<DesktopLocale, DesktopRecoveryCopy> = {
     dataOperationFailedTitle: '数据操作失败',
     dataOperationFailedMessage: '未能完成数据目录操作。请查看错误详情，确认当前目录状态后再重试。',
     openTerminal: '打开 DSH 终端',
+    repairDependencies: '修复依赖元数据',
+    repairDependenciesBody: '离线优先地重建 Profile 依赖元数据，通常无需联网即可完成；完成后重启生效。',
+    repairDependenciesUpToDate: '依赖元数据已是最新，无需修复。',
+    repairDependenciesSuccess: '依赖元数据已修复，重启后生效。',
+    repairDependenciesUnavailable: '当前启动阶段无法执行依赖修复。',
     emptySlot: '尚无检查点',
     availableSlot: '可恢复',
     noHealthyStartup: '此位置尚未保存成功启动时的配置。',

@@ -1,6 +1,6 @@
 /** Official publishing pages opened as stable OpenCLI AgentRuntime sessions. */
 import { execFile } from 'node:child_process'
-import type { ContentPlatformId } from './yootun-content-command-route.ts'
+type ContentPlatformId = 'website' | 'toutiao' | 'baidu' | 'xiaohongshu' | 'sohu'
 
 const RULES: Record<Exclude<ContentPlatformId, 'website'>, { host: string; session: string }> = {
   toutiao: { host: 'toutiao.com', session: 'yootun-content-toutiao' },

@@ -16,6 +16,7 @@ const cordisPluginLoaderPackage = fileURLToPath(new URL('node_modules/@deepseek-
 const dshHomePathsPackage = fileURLToPath(new URL('node_modules/@deepseek-ai/dsh-home-paths/', packageRoot))
 const dshPackage = fileURLToPath(new URL('node_modules/@deepseek-ai/dsh/', packageRoot))
 const semverPackage = fileURLToPath(new URL('node_modules/semver/', packageRoot))
+const yamlPackage = fileURLToPath(new URL('node_modules/yaml/', packageRoot))
 const pnpmCli = fileURLToPath(new URL('node_modules/pnpm/bin/pnpm.mjs', packageRoot))
 const dshVersion = JSON.parse(readFileSync(new URL('node_modules/@deepseek-ai/dsh/package.json', packageRoot), 'utf8')).version
 const pnpmVersion = JSON.parse(readFileSync(new URL('node_modules/pnpm/package.json', packageRoot), 'utf8')).version
@@ -135,6 +136,34 @@ function verifyLifecycleEnvironment(stateRoot, installation, env) {
   }
 }
 
+function verifyDesktopPluginInstall(stateRoot, env) {
+  const home = join(stateRoot, 'home')
+  const profile = join(home, 'profiles', 'desktop')
+  const previousStore = join(stateRoot, 'previous-store')
+  const plugin = join(stateRoot, 'fixture-plugin')
+  mkdirSync(profile, { recursive: true })
+  mkdirSync(plugin)
+  writeFileSync(join(profile, 'package.json'), JSON.stringify({ name: 'desktop', private: true }) + '\n')
+  writeFileSync(join(profile, 'pnpm-workspace.yaml'), 'packages:\n  - .\nnodeLinker: hoisted\nautoInstallPeers: false\n')
+  writeFileSync(join(plugin, 'package.json'), JSON.stringify({
+    name: 'desktop-cli-store-smoke', version: '1.0.0', dsh: { bundle: { patch: './cordis.patch.yml' } },
+  }) + '\n')
+  writeFileSync(join(plugin, 'cordis.patch.yml'), '[]\n')
+  verifyResult('existing Desktop Profile store', runPnpm(env, [
+    'install', '--offline', '--ignore-scripts', `--store-dir=${process.platform === 'win32' ? `"${previousStore}"` : previousStore}`,
+  ], profile))
+  const metadata = join(profile, 'node_modules', '.modules.yaml')
+  // pnpm 11 writes JSON-compatible YAML; this is pnpm-owned metadata, not a fixture forgery.
+  const before = JSON.parse(readFileSync(metadata, 'utf8')).storeDir
+  runElectronEntry('installed Desktop plugin add', [], desktopCli, [
+    'plugin', 'add', '--offline', '--ignore-scripts', '--save-exact', `file:${plugin}`,
+  ], undefined, { ...env, DSH_HOME: home, DSH_DESKTOP_DEFAULT_PROFILE: 'desktop' })
+  const after = JSON.parse(readFileSync(metadata, 'utf8')).storeDir
+  if (after !== before) throw new Error('Desktop plugin install changed the existing pnpm store')
+  const installed = JSON.parse(readFileSync(join(profile, 'node_modules', 'desktop-cli-store-smoke', 'package.json'), 'utf8'))
+  if (installed.version !== '1.0.0') throw new Error('Desktop plugin install did not install the fixture')
+}
+
 function runPackagedPnpmShim() {
   const stateRoot = mkdtempSync(join(tmpdir(), 'sensteed-agent-pnpm-smoke-'))
   const env = cleanEnvironment()
@@ -152,6 +181,7 @@ function runPackagedPnpmShim() {
     const result = runPnpm(env, ['--version'])
     verifyResult('pnpm PATH shim', result, pnpmVersion)
     verifyLifecycleEnvironment(stateRoot, installation, env)
+    verifyDesktopPluginInstall(stateRoot, env)
     assertNoRunnerEnvironment('pnpm Host PATH after child exit', env)
   } finally {
     try {
@@ -172,6 +202,7 @@ function runFlatProfileDshEntry() {
   const linkedDshHomePathsPackage = join(root, 'node_modules', '@deepseek-ai', 'dsh-home-paths')
   const linkedDshPackage = join(root, 'node_modules', '@deepseek-ai', 'dsh')
   const linkedSemverPackage = join(root, 'node_modules', 'semver')
+  const linkedYamlPackage = join(root, 'node_modules', 'yaml')
   try {
     mkdirSync(join(root, 'node_modules', '@deepseek-ai'), { recursive: true })
     cpSync(fileURLToPath(new URL('lib/', packageRoot)), join(desktopPackage, 'lib'), { recursive: true })
@@ -182,13 +213,20 @@ function runFlatProfileDshEntry() {
     symlinkSync(dshHomePathsPackage, linkedDshHomePathsPackage, process.platform === 'win32' ? 'junction' : 'dir')
     symlinkSync(dshPackage, linkedDshPackage, process.platform === 'win32' ? 'junction' : 'dir')
     symlinkSync(semverPackage, linkedSemverPackage, process.platform === 'win32' ? 'junction' : 'dir')
+    symlinkSync(yamlPackage, linkedYamlPackage, process.platform === 'win32' ? 'junction' : 'dir')
+    // dsh 0.2.0-rc.2 only manages the reserved Desktop Profile after Desktop
+    // has initialized it, so give the smoke a private, initialized home.
+    const home = join(root, 'home')
+    const profile = join(home, 'profiles', 'desktop')
+    mkdirSync(profile, { recursive: true })
+    writeFileSync(join(profile, 'package.json'), JSON.stringify({ name: 'dsh-profile-desktop', private: true }) + '\n')
     runElectronEntry(
       'flat profile dsh plugin help',
       ['--expose-internals'],
       join(desktopPackage, 'lib', 'desktop-cli.js'),
       ['plugin', '--help'],
       undefined,
-      { DSH_DESKTOP_DEFAULT_PROFILE: 'desktop' },
+      { DSH_DESKTOP_DEFAULT_PROFILE: 'desktop', DSH_HOME: home },
     )
   } finally {
     rmSync(root, { recursive: true, force: true })

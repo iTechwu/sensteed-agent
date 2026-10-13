@@ -88,5 +88,7 @@ describe('macOS system binding package preparation', () => {
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
-  })
+  // Two compiler targets plus a bounded 20-second Electron child need more than
+  // the unit runner's five-second default when the full gate runs under load.
+  }, 60_000)
 })

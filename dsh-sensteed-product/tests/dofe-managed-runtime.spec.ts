@@ -1,0 +1,140 @@
+import { describe, expect, it, vi } from 'vitest'
+import { apply, DOFE_MCP_BASE_URL } from '../src/dofe-managed.ts'
+import { DOFE_ACCESS_VALIDATION_VERSION, DEFAULT_DOFE_PLUGIN_IDS, normalizeDofePluginIds, type DofeAccessSettings } from '../src/dofe-plugins.ts'
+import { BRAND_VARIANT } from '../src/generated-product-identity.ts'
+
+// The first three clients created before the simulated fourth route failure.
+const BRAND_LEADING_SERVER_NAMES = ['knowledge', 'openmontage', 'media']
+
+function createHarness(settings: DofeAccessSettings, failAt = Number.POSITIVE_INFINITY) {
+  const clients: Array<{ config: Record<string, unknown>; dispose: ReturnType<typeof vi.fn> }> = []
+  const errors: unknown[][] = []
+  let pluginCalls = 0
+  const access = {
+    get: () => settings,
+    watch: vi.fn(),
+  }
+  const ctx = {
+    settings: { register: vi.fn(() => access), update: vi.fn(async () => {}) },
+    // The sensteed branch builds its SSO service on the credential store; this
+    // harness holds no saved grant, so the periodic restore stays idle.
+    credentials: { resolve: vi.fn(async () => ({ value: 'test-managed-key' })), readRecord: vi.fn(async () => undefined) },
+    systemPrompt: { section: vi.fn() },
+    desktopRuntime: {
+      registerTrayItem: vi.fn(() => ({ refresh: vi.fn(), dispose: vi.fn() })),
+      openOpenMontage: vi.fn(async () => {}),
+    },
+    plugin: vi.fn(async (_plugin: unknown, config: Record<string, unknown>) => {
+      pluginCalls += 1
+      if (pluginCalls === failAt) throw new Error('transport failed with test-managed-key')
+      const client = { config, dispose: vi.fn() }
+      clients.push(client)
+      return client
+    }),
+    on: vi.fn(),
+    effect: vi.fn(),
+    // The sensteed brand branch provides the SSO auth service; production
+    // hands it to the Host plugin through this seam.
+    provide: vi.fn(),
+    logger: { error: vi.fn((...args: unknown[]) => errors.push(args)) },
+  }
+  return { ctx, access, clients, errors }
+}
+
+describe('dofe-managed MCP runtime', () => {
+  it.skipIf(BRAND_VARIANT !== 'sensteed')('uses the native network even during the initial saved-session restore', async () => {
+    const harness = createHarness({ setupComplete: false, validationVersion: 0, enabledPlugins: [], modelId: '', protocol: 'chat-completions', authMode: 'feishu' })
+    harness.ctx.credentials.readRecord.mockResolvedValue({ kind: 'grant', payload: { refreshToken: 'fixture' } } as never)
+    const requestDofeAuth = vi.fn(async () => { throw new Error('net::ERR_PROXY_CONNECTION_FAILED') })
+    Object.assign(harness.ctx.desktopRuntime, { requestDofeAuth })
+    const nodeFetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('stale Node proxy'))
+    try {
+      await apply(harness.ctx as never)
+      expect(requestDofeAuth).toHaveBeenCalledWith('https://user.hozonauto.com/api/.well-known/openid-configuration', expect.objectContaining({ redirect: 'error' }))
+      expect(nodeFetch).not.toHaveBeenCalled()
+      // A transport failure must not invalidate the user's saved setup.
+      expect(harness.ctx.settings.update).not.toHaveBeenCalledWith(expect.anything(), { setupComplete: false })
+    } finally { nodeFetch.mockRestore() }
+  })
+  it('creates only enabled routes and keeps wrapper capabilities out of MCP clients', async () => {
+    const harness = createHarness({
+      setupComplete: true,
+      validationVersion: DOFE_ACCESS_VALIDATION_VERSION,
+      // openmontage is the dedicated-route plugin shared by every brand.
+      enabledPlugins: ['openmontage'],
+      modelId: 'deepseek-chat',
+      protocol: 'chat-completions',
+      // The sensteed brand additionally requires a bound SSO identity.
+      authMode: 'feishu',
+      identity: { ssoSub: 'test-user', name: 'Test User' },
+      entitlements: { plugins: ['openmontage'], defaultModel: 'deepseek-chat', allowedProtocols: ['chat-completions'] },
+    })
+
+    await apply(harness.ctx as never)
+
+    expect(harness.clients).toHaveLength(1)
+    expect(harness.clients[0]?.config).toMatchObject({
+      serverName: 'openmontage',
+      url: DOFE_MCP_BASE_URL + '/montage',
+      toolCallTimeoutMs: 600_000,
+      transport: 'streamable-http',
+      failOnStartupError: false,
+    })
+    expect(harness.clients[0]?.config).not.toHaveProperty('plugin', 'opencli')
+    expect(harness.clients[0]?.config).not.toHaveProperty('serverName', 'knowledge')
+
+    const accessWatcher = harness.access.watch.mock.calls[0]?.[0] as (() => void) | undefined
+    accessWatcher?.()
+    await vi.waitFor(() => expect(harness.ctx.plugin).toHaveBeenCalledTimes(1))
+  })
+
+  it('publishes the shared Knowledge and Memory permission gate from live access settings', async () => {
+    const settings: DofeAccessSettings = {
+      setupComplete: true,
+      validationVersion: DOFE_ACCESS_VALIDATION_VERSION,
+      enabledPlugins: ['knowledge'],
+      modelId: 'deepseek-chat',
+      protocol: 'chat-completions',
+      authMode: 'feishu',
+      identity: { ssoSub: 'test-user', name: 'Test User' },
+      entitlements: { plugins: ['knowledge'], defaultModel: 'deepseek-chat', allowedProtocols: ['chat-completions'] },
+    }
+    const harness = createHarness(settings)
+
+    await apply(harness.ctx as never)
+
+    const provideCall = harness.ctx.provide.mock.calls.find(([name]) => name === 'dofeAccess')
+    const getGate = provideCall?.[1] as (() => { ready: boolean; enabledPlugins?: readonly string[]; entitlements?: { plugins: string[]; knowledge?: { permissionVersion: number; accesses: string[] } } }) | undefined
+    expect(getGate).toBeDefined()
+    expect(getGate?.()).toMatchObject({
+      ready: true,
+      enabledPlugins: ['knowledge'],
+      entitlements: { plugins: ['knowledge'], knowledge: { permissionVersion: 1, accesses: ['read', 'write'] } },
+    })
+
+    settings.setupComplete = false
+    expect(getGate?.().ready).toBe(false)
+  })
+
+  it('disposes partial clients after activation failure without logging the managed key', async () => {
+    const harness = createHarness({
+      setupComplete: true,
+      validationVersion: DOFE_ACCESS_VALIDATION_VERSION,
+      enabledPlugins: DEFAULT_DOFE_PLUGIN_IDS,
+      modelId: 'deepseek-chat',
+      protocol: 'chat-completions',
+      // The sensteed brand additionally requires a bound SSO identity.
+      authMode: 'feishu',
+      identity: { ssoSub: 'test-user', name: 'Test User' },
+      entitlements: { plugins: normalizeDofePluginIds(DEFAULT_DOFE_PLUGIN_IDS, BRAND_VARIANT), defaultModel: 'deepseek-chat', allowedProtocols: ['chat-completions'] },
+    }, 4)
+
+    await apply(harness.ctx as never)
+
+    expect(harness.clients).toHaveLength(3)
+    // A failure on the fourth route must release all three earlier clients.
+    expect(harness.clients.map(client => client.config.serverName)).toEqual(BRAND_LEADING_SERVER_NAMES)
+    expect(harness.errors).toEqual([['dofe-managed: failed to activate one or more MCP clients']])
+    for (const client of harness.clients) expect(client.dispose).toHaveBeenCalledOnce()
+  })
+})

@@ -6,7 +6,6 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-app-boot'
 import type {} from '@deepseek-ai/dsh-cmdline'
 import type {} from '@deepseek-ai/dsh-credentials'
-import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-client-connection'
 import type {} from '@deepseek-ai/dsh-session-persistence'
@@ -16,40 +15,6 @@ import {
   RENDERER_BOOT_REPORT_PATH,
 } from './renderer-boot.ts'
 import {
-  DOFE_ACCESS_MODELS_PATH,
-  DOFE_ACCESS_VALIDATE_PATH,
-  handleDofeAccessValidationRequest,
-  handleDofeModelCatalogRequest,
-} from './dofe-access-route.ts'
-import { DOFE_AUTH_PATHS, handleDofeAuthRequest } from './dofe-auth-route.ts'
-import type {} from './dofe-managed.ts'
-import { watchDofeAuthAudit } from './dofe-auth-audit.ts'
-import { BRAND_VARIANT } from './generated-product-identity.ts'
-import {
-  handleYootunRecruiterRequest,
-  YOOTUN_RECRUITER_PATH,
-} from './yootun-recruiter-route.ts'
-import {
-  createRecruiterKnowledgePublisher,
-} from './yootun-recruiter-integrations.ts'
-import {
-  handleYootunSalesRequest,
-  YOOTUN_SALES_PATH,
-} from './yootun-sales-route.ts'
-import {
-  handleYootunSupplyWatchRequest,
-  YOOTUN_SUPPLY_WATCH_PATH,
-} from './yootun-supply-watch-route.ts'
-import {
-  handleYootunContentCommandRequest,
-  YOOTUN_CONTENT_COMMAND_PATH,
-} from './yootun-content-command-route.ts'
-import { createYootunWebsitePublisher } from './yootun-website-publisher.ts'
-import { YootunAuditModelsClient } from './yootun-audit-models-client.ts'
-import { handleYootunAuditRequest, YOOTUN_AUDIT_PATH } from './yootun-audit-route.ts'
-import { YootunAuditService } from './yootun-audit-service.ts'
-import { YootunAuditStore } from './yootun-audit-store.ts'
-import {
   DESKTOP_DIRECTORY_PICKER_PATH,
   DESKTOP_DIRECTORY_VALIDATOR_PATH,
 } from './directory-picker-contract.ts'
@@ -57,6 +22,8 @@ import {
   handleDesktopDirectoryPickerRequest,
   handleDesktopDirectoryValidationRequest,
 } from './directory-picker-route.ts'
+import { rejectDesktopMandatoryUpdate } from './desktop-mandatory-gate.ts'
+import type {} from '@dofe/dsh-sensteed-product/update-policy'
 import {
   DESKTOP_DIAGNOSTICS_EXPORT_PATH,
   DESKTOP_DEVELOPER_TOOLS_TOGGLE_PATH,
@@ -100,12 +67,13 @@ import { DESKTOP_FRAME_HEIGHT } from './window-chrome.ts'
 import {
   effectiveDesktopWindowMaterial,
   type DesktopWindowMaterial,
-  windowsSupportsMica,
 } from './window-material.ts'
 import { DESKTOP_PRODUCT_NAME } from './product-identity.ts'
 import { watchPlatformLogin, type PlatformLoginAccount } from './platform-login.ts'
+import type { DesktopSetupWizardSettings } from './setup-wizard-settings.ts'
 import {
   createDesktopSettingsPort,
+  DESKTOP_NOTIFICATIONS_SETTINGS_ENTRY_ID,
   readUiLocalePreference,
   readUiThemeSource,
   resolveDesktopConfig,
@@ -118,8 +86,11 @@ import {
 export const name = 'desktop-shell'
 
 /** Services required before the shell can register its renderer generation. */
-/** Services required by the desktop shell; `desktopRuntime` is probed, not required. */
-export const inject = ['webServer', 'webRuntime', 'appExit', 'settings', 'connection', 'tools', 'credentials', ...(BRAND_VARIANT === 'sensteed' ? ['dofeAuth'] : [])]
+/** Services required by the desktop shell; `desktopRuntime` is probed, not required.
+ * `webStartup` 取代了上游已删除的 `webRuntime`(见 fork 升级指南
+ * v0.2.1-alpha.1/web-listener-trust-config):它由 web-startup 行提供,承载
+ * invocation trust 与监听地址事实。 */
+export const inject = ['webServer', 'webStartup', 'appExit', 'settings', 'connection', 'tools', 'credentials']
 
 /**
  * Standard settings namespace shared by tray and configuration surfaces, the
@@ -133,8 +104,6 @@ export {
   DesktopShellConfig as Config,
   type DesktopSettings,
 } from './settings-bridge.ts'
-
-const MODELS_API_KEY_REF = credentialRef('MODELS_API_KEY')
 
 /** Apply the official Connection trust and browser-auth fence before a private Desktop route. */
 function rejectDesktopRequest(
@@ -167,7 +136,6 @@ export function desktopRendererUrl(
   platform: Context['desktopRuntime']['platform'],
   appVersion: string,
   material: DesktopWindowMaterial = 'off',
-  windowsBuild?: number,
 ): string {
   const url = new URL(`http://127.0.0.1:${String(port)}/`)
   url.searchParams.set('sensteed-agent-mode', mode)
@@ -178,9 +146,6 @@ export function desktopRendererUrl(
     // Body-level plugin portals do not inherit the framed root's geometry.
     // Publish the exact content boundary so they can yield Desktop chrome.
     url.searchParams.set('sensteed-agent-titlebar-inset', String(DESKTOP_FRAME_HEIGHT))
-  }
-  if (platform === 'win32') {
-    url.searchParams.set('sensteed-agent-mica', windowsSupportsMica(windowsBuild) ? '1' : '0')
   }
   return url.href
 }
@@ -226,57 +191,11 @@ export function apply(ctx: Context, config: DesktopShellConfig): void {
     bluePath: fileURLToPath(new URL('../build/tray-icon-blue.png', import.meta.url)),
   }
   const settings = createDesktopSettingsPort(ctx, config, runtime.platform)
+  // Choices first-run Setup saved into this generation's settings. Setup's own
+  // continuation offers the restart that applies them, after its account step.
+  let setupSettings: DesktopSetupWizardSettings | undefined
+  let setupSaved = false
   const rendererOrigin = `http://127.0.0.1:${String(ctx.webServer.port)}`
-  if (BRAND_VARIANT === 'sensteed') {
-    const dofeAuth = ctx.dofeAuth
-    for (const path of DOFE_AUTH_PATHS) {
-      ctx.effect(
-        () => ctx.webServer.register({
-          kind: 'exact',
-          path,
-          handler: (req, res) => {
-            if (rejectDesktopRequest(ctx, req, res)) return
-            return handleDofeAuthRequest(path, req, res, rendererOrigin, dofeAuth)
-          },
-        }),
-        `dsh-plugin-desktop: private Sensteed auth route ${path}`,
-      )
-    }
-  }
-  const publishYootunWebsite = createYootunWebsitePublisher()
-  const dshHomePath = ctx.get('dshHomePath')
-  if (dshHomePath === undefined) {
-    throw new Error('dsh-plugin-desktop: dshHomePath is required for the audit outbox')
-  }
-  const audit = new YootunAuditService({
-    store: new YootunAuditStore(dshHomePath('storages', 'yootun-audit')),
-    remote: new YootunAuditModelsClient(),
-    resolveApiKey: async () => (await ctx.credentials.resolve(MODELS_API_KEY_REF))?.value,
-    enabled: resolved.auditSyncEnabled,
-    logger: ctx.logger,
-  })
-  ctx.provide('sensteedAudit', audit)
-  if (BRAND_VARIANT === 'sensteed') {
-    ctx.effect(() => watchDofeAuthAudit(ctx.dofeAuth, audit), 'dsh-plugin-desktop: SSO audit binding')
-  }
-  ctx.effect(() => {
-    void audit.start()
-    return () => { audit.dispose() }
-  }, 'dsh-plugin-desktop: yootun audit service lifetime')
-  ctx.on('credentials/reference-updated', (ref) => {
-    if (ref === 'MODELS_API_KEY') void audit.credentialUpdated()
-  })
-  ctx.effect(
-    () => ctx.webServer.register({
-      kind: 'exact',
-      path: YOOTUN_AUDIT_PATH,
-      handler: (req, res) => {
-        if (rejectDesktopRequest(ctx, req, res)) return
-        return handleYootunAuditRequest(req, res, rendererOrigin, audit)
-      },
-    }),
-    `dsh-plugin-desktop: private Yootun audit route ${YOOTUN_AUDIT_PATH}`,
-  )
   ctx.effect(
     () => ctx.webServer.register({
       kind: 'exact',
@@ -338,6 +257,9 @@ export function apply(ctx: Context, config: DesktopShellConfig): void {
           path,
           handler: (req, res) => {
             if (rejectDesktopRequest(ctx, req, res)) return
+            // Mandatory update phases refuse profile/plugin mutations; reads,
+            // restart and diagnostics stay reachable so the user is never trapped.
+            if (rejectDesktopMandatoryUpdate(ctx, req, res, 'zh')) return
             return handler(
               req,
               res,
@@ -366,92 +288,6 @@ export function apply(ctx: Context, config: DesktopShellConfig): void {
       },
     }),
     'dsh-plugin-desktop: renderer boot report route',
-  )
-  const dofeAccessRoutes = [
-    [DOFE_ACCESS_MODELS_PATH, handleDofeModelCatalogRequest],
-    [DOFE_ACCESS_VALIDATE_PATH, handleDofeAccessValidationRequest],
-  ] as const
-  // Lets the catalog route honor { useStored: true } without the renderer ever seeing the key.
-  const resolveStoredModelsKey = async (): Promise<string | undefined> =>
-    (await ctx.credentials.resolve(MODELS_API_KEY_REF))?.value
-  for (const [path, handler] of dofeAccessRoutes) {
-    ctx.effect(
-      () => ctx.webServer.register({
-        kind: 'exact',
-        path,
-        handler: (req, res) => {
-          if (rejectDesktopRequest(ctx, req, res)) return
-          return handler(req, res, rendererOrigin, globalThis.fetch, resolveStoredModelsKey)
-        },
-      }),
-      `dsh-plugin-desktop: private DoFe access route ${path}`,
-    )
-  }
-  ctx.effect(
-    () => ctx.webServer.register({
-      kind: 'exact',
-      path: YOOTUN_RECRUITER_PATH,
-      handler: async (req, res) => {
-        if (rejectDesktopRequest(ctx, req, res)) return
-        return handleYootunRecruiterRequest(req, res, rendererOrigin, {
-          statePath: ctx.get('dshHomePath')?.('storages', 'yootun-recruiter', 'state.json'),
-          credentials: ctx.credentials,
-          knowledgePublisher: createRecruiterKnowledgePublisher(ctx.tools),
-          openBossWeb: async url => { await ctx.get('desktopRuntime')?.openBossWeb(url) },
-          audit: ctx.sensteedAudit,
-        })
-      },
-    }),
-    `dsh-plugin-desktop: private Yootun recruiter route ${YOOTUN_RECRUITER_PATH}`,
-  )
-  ctx.effect(
-    () => ctx.webServer.register({
-      kind: 'exact',
-      path: YOOTUN_SALES_PATH,
-      handler: (req, res) => {
-        if (rejectDesktopRequest(ctx, req, res)) return
-        return handleYootunSalesRequest(req, res, rendererOrigin, {
-          statePath: ctx.get('dshHomePath')?.('storages', 'yootun-sales', 'state.json'),
-          tools: ctx.tools,
-          audit: ctx.sensteedAudit,
-        })
-      },
-    }),
-    `dsh-plugin-desktop: private Yootun sales route ${YOOTUN_SALES_PATH}`,
-  )
-  ctx.effect(
-    () => ctx.webServer.register({
-      kind: 'exact',
-      path: YOOTUN_SUPPLY_WATCH_PATH,
-      handler: (req, res) => {
-        if (rejectDesktopRequest(ctx, req, res)) return
-        return handleYootunSupplyWatchRequest(req, res, rendererOrigin, {
-          statePath: ctx.get('dshHomePath')?.('storages', 'yootun-supply-watch', 'state.json'),
-          audit: ctx.sensteedAudit,
-        })
-      },
-    }),
-    `dsh-plugin-desktop: private Yootun supply watch route ${YOOTUN_SUPPLY_WATCH_PATH}`,
-  )
-  ctx.effect(
-    () => ctx.webServer.register({
-      kind: 'exact',
-      path: YOOTUN_CONTENT_COMMAND_PATH,
-      handler: (req, res) => {
-        if (rejectDesktopRequest(ctx, req, res)) return
-        return handleYootunContentCommandRequest(req, res, rendererOrigin, {
-          statePath: ctx.get('dshHomePath')?.('storages', 'yootun-content-command', 'state.json'),
-          tools: ctx.tools,
-          publishWebsite: publishYootunWebsite,
-          audit: ctx.sensteedAudit,
-          openPlatformWeb: async (platform, url) => {
-            if (platform === 'website') return
-            await ctx.get('desktopRuntime')?.openContentPlatformWeb(platform, url)
-          },
-        })
-      },
-    }),
-    `dsh-plugin-desktop: private Yootun content command route ${YOOTUN_CONTENT_COMMAND_PATH}`,
   )
   if (runtime.platform === 'win32') {
     ctx.effect(
@@ -524,11 +360,28 @@ export function apply(ctx: Context, config: DesktopShellConfig): void {
         next.networkExposure,
       )
       updateLiveWebAccess(nextBrowserAccess, nextNetworkExposure)
+      const matchesSetup = setupSettings !== undefined
+        && next.mode === setupSettings.mode
+        && next.port === resolved.port
+        && next.macosMaterial === setupSettings.macosMaterial
+        && next.linuxMaterial === resolved.linuxMaterial
+      // Once saved, any other value supersedes Setup's choice for this generation;
+      // a later return to it is a new change and asks for its restart.
+      if (!matchesSetup && setupSaved) {
+        setupSettings = undefined
+        setupSaved = false
+      }
       if (next.mode === resolved.mode
         && next.port === resolved.port
         && next.macosMaterial === resolved.macosMaterial
-        && next.windowsMaterial === resolved.windowsMaterial
         && next.linuxMaterial === resolved.linuxMaterial) {
+        if (pending !== undefined) clearImmediate(pending)
+        pending = undefined
+        return
+      }
+      // A native restart prompt here would interrupt the official login that
+      // follows Setup; only a later, different choice asks for its own restart.
+      if (matchesSetup) {
         if (pending !== undefined) clearImmediate(pending)
         pending = undefined
         return
@@ -579,8 +432,6 @@ export function apply(ctx: Context, config: DesktopShellConfig): void {
         resolved.mode,
         runtime.platform,
         resolved.macosMaterial,
-        resolved.windowsMaterial,
-        runtime.windowsBuild,
         resolved.linuxMaterial,
       )
       const url = desktopRendererUrl(
@@ -589,12 +440,10 @@ export function apply(ctx: Context, config: DesktopShellConfig): void {
         runtime.platform,
         runtime.updates.currentVersion,
         material,
-        runtime.windowsBuild,
       )
       return runtime.schedule({
         ...resolved,
         material,
-        ...(runtime.windowsBuild === undefined ? {} : { windowsBuild: runtime.windowsBuild }),
         url,
         authenticationUrl: ctx.connection.authenticatedUrl(new URL(url).origin),
         rendererAccessHeader: browserAccess.rendererHeader,
@@ -623,6 +472,26 @@ export function apply(ctx: Context, config: DesktopShellConfig): void {
           await settings.update(mode !== 'compatibility' && storedBrowserCapability
             ? { mode, openBrowser: false, networkExposure: 'loopback' }
             : { mode })
+        },
+        applySetupSettings: async next => {
+          setupSettings = next
+          setupSaved = false
+          try {
+            await settings.update({
+              mode: next.mode,
+              macosMaterial: next.macosMaterial,
+              windowsMaterial: next.windowsMaterial,
+              openBrowser: next.openBrowser,
+              networkExposure: next.networkExposure,
+            })
+          } catch (cause) {
+            setupSettings = undefined
+            throw cause
+          }
+          // The mode is saved; a failed notifications write must not bring back
+          // the native prompt for it.
+          setupSaved = true
+          await ctx.settings.update(DESKTOP_NOTIFICATIONS_SETTINGS_ENTRY_ID, { ...next.notifications })
         },
       })
     },

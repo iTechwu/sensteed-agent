@@ -1,4 +1,0 @@
-# Add the enterprise dashboard to a DSH browser bundle.
-- insert:
-    - id: dofe-yootun-dashboard
-      name: '@dofe/dsh-yootun-dashboard'

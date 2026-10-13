@@ -1,3 +1,4 @@
+import { assertPackagingRelease } from '../../scripts/release-contract.mjs'
 /** Build an unsigned macOS DMG smoke artifact on a native macOS host. */
 
 import { spawnSync } from 'node:child_process'
@@ -9,6 +10,7 @@ import { withoutMacReleaseSecrets } from './release-preflight.ts'
 import { macSmokeArchitecture, prepareInstalledMacUniversalRuntime } from './mac-universal.ts'
 import { prepareFsExtForElectron } from './prepare-fs-ext.ts'
 import { electronBuilderEnvironment } from './electron-builder-environment.ts'
+import { refreshBundledForPackaging } from './refresh-bundled-cli.ts'
 
 /** Injectable native macOS packaging boundary used by focused tests. */
 export interface MacSmokePackageOptions {
@@ -45,6 +47,8 @@ export interface MacSmokePackageOptions {
   ) => void
   /** Report non-secret packaging progress. */
   readonly log: (message: string) => void
+  /** Refresh the bundled skills/plugins before the check gate. */
+  readonly refreshBundled: () => void
 }
 
 function run(
@@ -76,14 +80,14 @@ function defaultOptions(): MacSmokePackageOptions {
     resetOutput: () => rmSync(outputDir, { recursive: true, force: true }),
     prepareRuntime: () => {
       prepareFsExtForElectron({ platform: 'darwin', arch: 'arm64', desktopRoot })
-      prepareFsExtForElectron({ platform: 'darwin', arch: 'x64', desktopRoot })
-      prepareInstalledMacUniversalRuntime(desktopRoot)
+      prepareInstalledMacUniversalRuntime(desktopRoot, ['arm64'])
     },
     builderCli: require.resolve('electron-builder/cli.js'),
     verifier: fileURLToPath(new URL('./verify-mac-smoke.ts', import.meta.url)),
     nodeExecutable: process.execPath,
     run,
     log: message => console.log(message),
+    refreshBundled: () => refreshBundledForPackaging('refresh', workspaceRoot),
   }
 }
 
@@ -92,17 +96,15 @@ function defaultOptions(): MacSmokePackageOptions {
  *
  * The signed and notarized release stays a manual step on a credentialed
  * machine; this smoke exists so macOS packaging regressions fail in CI before
- * a manual release. The universal target exercises both Intel and Apple
- * Silicon packaging in one artifact; `DSH_MAC_SMOKE_ARCH=arm64` or `x64`
- * packages a single CPU instead and skips the slow universal merge.
+ * a manual release. Both smoke and signed release target Apple Silicon arm64.
  * @param options - Injectable process and command boundaries.
  */
 export function packageMacSmoke(options: MacSmokePackageOptions = defaultOptions()): void {
   if (options.platform !== 'darwin') {
     throw new Error('macOS DMG smoke must be built on a native macOS host')
   }
-  if (options.arch !== 'x64' && options.arch !== 'arm64') {
-    throw new Error(`macOS DMG smoke requires x64 or arm64 Node; received ${options.arch}`)
+  if (options.arch !== 'arm64') {
+    throw new Error(`macOS DMG smoke requires Apple Silicon arm64 Node; received ${options.arch}`)
   }
   const versionMatch = /^(\d+)\.(\d+)\./u.exec(options.nodeVersion)
   const major = Number(versionMatch?.[1])
@@ -116,10 +118,9 @@ export function packageMacSmoke(options: MacSmokePackageOptions = defaultOptions
   const architecture = macSmokeArchitecture(options.env)
   const cleanEnvironment = withoutMacReleaseSecrets(options.env)
   options.log('Building an unsigned macOS DMG smoke; signing and notarization are release-only steps.')
-  if (architecture !== 'universal') {
-    options.log(`Packaging only the ${architecture} application; the universal merge is skipped.`)
-  }
+  options.log(`Packaging only the ${architecture} application; universal Mac packaging is disabled.`)
   if (options.env.DSH_PACKAGE_CHECK_ALREADY_RAN !== '1') {
+    options.refreshBundled()
     options.run(
       'corepack',
       ['pnpm', '--filter', 'dsh-plugin-desktop', 'check:mac-package'],
@@ -149,6 +150,8 @@ export function packageMacSmoke(options: MacSmokePackageOptions = defaultOptions
     options.desktopRoot,
     electronBuilderEnvironment({
       ...cleanEnvironment,
+      DSH_ELECTRON_BUILDER_TARGET_PLATFORM: 'darwin',
+      DSH_ELECTRON_BUILDER_TARGET_ARCH: architecture,
       CSC_IDENTITY_AUTO_DISCOVERY: 'false',
       // Preserve pnpm metadata so Electron Builder selects its v11 collector.
     }),
@@ -164,6 +167,7 @@ export function packageMacSmoke(options: MacSmokePackageOptions = defaultOptions
 const invokedPath = process.argv[1]
 if (invokedPath !== undefined && resolve(invokedPath) === fileURLToPath(import.meta.url)) {
   try {
+    assertPackagingRelease()
     packageMacSmoke()
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error))

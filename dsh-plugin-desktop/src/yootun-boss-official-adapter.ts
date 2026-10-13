@@ -3,7 +3,7 @@ import type {
   RecruiterAdapterResult,
   RecruiterBossAdapter,
   RecruiterBossSyncResult,
-} from './yootun-recruiter-route.ts'
+} from '@dofe/dsh-sensteed-product/yootun-recruiter-route'
 
 /** Boundary implemented only by a BOSS-approved SDK or partner integration. */
 export interface BossOfficialClient {

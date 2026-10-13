@@ -1,4 +1,0 @@
-# Register the FinOps host endpoint plugin into the DSH bundle.
-- insert:
-    - id: dofe-yootun-finops
-      name: '@dofe/dsh-yootun-finops'

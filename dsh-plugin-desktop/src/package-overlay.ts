@@ -2,7 +2,8 @@
 
 import { findPackageJSON } from 'node:module'
 import { readFileSync, statSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { dirname, isAbsolute, join, relative, sep } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { compare, valid } from 'semver'
 
 const BIN_NAME = 'dsh-plugin-desktop'
@@ -55,6 +56,26 @@ function missingManifest(cause: unknown): boolean {
   return (cause as NodeJS.ErrnoException | null)?.code === 'ENOENT'
 }
 
+/**
+ * Electron's ASAR virtual filesystem is not visible to every Node resolver.
+ * Walk the dependency graph explicitly so packaged Desktop builds can resolve
+ * install-owned overlays from `app.asar` as well as normal filesystem paths.
+ */
+function findPackagedManifest(packageName: string, packageUrl: string): string | undefined {
+  let currentDir = dirname(fileURLToPath(packageUrl))
+  while (true) {
+    const manifestPath = join(currentDir, 'node_modules', packageName, 'package.json')
+    try {
+      if (statSync(manifestPath).isFile()) return manifestPath
+    } catch (cause) {
+      if (!missingManifest(cause)) throw cause
+    }
+    const parentDir = dirname(currentDir)
+    if (parentDir === currentDir) return undefined
+    currentDir = parentDir
+  }
+}
+
 function readCandidate(
   packageName: string,
   packageUrl: string,
@@ -67,7 +88,17 @@ function readCandidate(
     if (missingPackage(cause)) return undefined
     throw cause
   }
+  if (manifestPath === undefined) {
+    manifestPath = findPackagedManifest(packageName, packageUrl)
+  }
   if (manifestPath === undefined) return undefined
+  if (source === 'profile') {
+    // Only the active Profile owns overrides. Node's ancestor walk can find
+    // projections left by older Desktop installs in profiles/node_modules.
+    const modules = join(dirname(fileURLToPath(packageUrl)), 'node_modules')
+    const offset = relative(modules, manifestPath)
+    if (offset === '..' || offset.startsWith(`..${sep}`) || isAbsolute(offset)) return undefined
+  }
   let size: number
   try {
     size = statSync(manifestPath).size

@@ -10,6 +10,7 @@ import {
   selectMacUniversalPackagedEntries,
 } from './mac-universal.ts'
 import { DESKTOP_PRODUCT_NAME } from '../src/product-identity.ts'
+import { verifyMacEntitlements } from './verify-mac-entitlements.ts'
 
 /** Injectable filesystem and command boundaries for release verification. */
 export interface MacReleaseVerificationOptions {
@@ -25,6 +26,8 @@ export interface MacReleaseVerificationOptions {
   readonly makeMountPoint: () => string
   /** Execute one macOS verification command. */
   readonly run: (command: string, args: readonly string[]) => void
+  /** Inspect signed main/Helper entitlements; custom verifiers may own this check. */
+  readonly verifyEntitlements?: (appPath: string, productName: string) => void
   /** Remove the detached empty mount point. */
   readonly removeMountPoint: (mountPoint: string) => void
   /** Probe a physical path inside the mounted application. */
@@ -56,6 +59,7 @@ function defaultOptions(): MacReleaseVerificationOptions {
     listDmgs,
     makeMountPoint: () => mkdtempSync(join(tmpdir(), 'sensteed-agent-dmg-')),
     run,
+    verifyEntitlements: verifyMacEntitlements,
     removeMountPoint: mountPoint => rmdirSync(mountPoint),
     exists: existsSync,
   }
@@ -86,13 +90,12 @@ export function verifyMacRelease(
     options.run('hdiutil', ['attach', dmgPath, '-mountpoint', mountPoint, '-nobrowse', '-readonly'])
     mounted = true
     const executablePath = join(appPath, 'Contents', 'MacOS', options.productName)
-    options.run('lipo', [executablePath, '-verify_arch', 'x86_64'])
     options.run('lipo', [executablePath, '-verify_arch', 'arm64'])
     const unpackedRoot = join(appPath, 'Contents', 'Resources', 'app.asar.unpacked')
     const includesUv = MACOS_UNIVERSAL_PACKAGED_ENTRIES
       .filter(entry => entry.path.endsWith('/bin/uv'))
       .some(entry => (options.exists ?? existsSync)(join(unpackedRoot, entry.path)))
-    for (const entry of selectMacUniversalPackagedEntries(includesUv)) {
+    for (const entry of selectMacUniversalPackagedEntries(includesUv).filter(entry => entry.arch === 'arm64')) {
       options.run('lipo', [join(unpackedRoot, entry.path), '-verify_arch', entry.arch])
       if (entry.path.endsWith('/bin/uv')) {
         options.run('/bin/test', ['-x', join(unpackedRoot, entry.path)])
@@ -102,6 +105,7 @@ export function verifyMacRelease(
       }
     }
     options.run('codesign', ['--verify', '--deep', '--strict', '--verbose=2', appPath])
+    options.verifyEntitlements?.(appPath, options.productName)
     options.run('spctl', ['--assess', '--type', 'execute', '--verbose=4', appPath])
     options.run('xcrun', ['stapler', 'validate', appPath])
   } catch (cause) {

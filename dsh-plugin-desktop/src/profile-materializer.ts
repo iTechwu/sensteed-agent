@@ -28,6 +28,14 @@ export interface ProfileMaterializerOptions {
   readonly maxOutputBytes?: number
   /** Permit a one-time Profile migration to reconcile stale lockfile settings. */
   readonly updateLockfile?: boolean
+  /** Pin the pnpm content store to this directory for the install subprocess. */
+  readonly storeDir?: string
+  /**
+   * Connectivity policy for the install. `'always'` runs pnpm once with
+   * `--offline`; `'prefer'` retries online once after an offline failure;
+   * unset keeps the previous always-online behavior.
+   */
+  readonly offline?: 'always' | 'prefer' | 'never'
   /** Confirm durable migration output before treating a non-exiting pnpm process as complete. */
   readonly completionCheck?: () => boolean
   /** Test seam for the official parent-environment scrub. */
@@ -51,6 +59,8 @@ export interface ProfileMaterializationResult {
   readonly signal: NodeJS.Signals | null
   readonly stdout: string
   readonly stderr: string
+  /** Which connectivity attempt produced this result. */
+  readonly attempt: 'offline' | 'online'
 }
 
 /** Error raised when profile materialization cannot complete successfully. */
@@ -80,7 +90,7 @@ export function formatProfileMaterializationFailure(cause: unknown): string {
   }
   const result = cause.result
   if (result === undefined) return cause.stack ?? cause.message
-  const pnpmCommand = `pnpm ${result.argv.slice(4).join(' ')}`
+  const pnpmCommand = `pnpm ${result.argv.slice(3).join(' ')}`
   const sections = [
     'Profile dependency materialization failed.',
     `Command: ${pnpmCommand}`,
@@ -233,15 +243,46 @@ export async function materializeProfile(
   assertPositiveFinite('maximum output', maxOutputBytes)
   options.signal?.throwIfAborted()
 
-  const argv = [
-    options.appExecutable,
+  if (options.offline === 'always') {
+    return await spawnMaterialization(options, true, 'offline')
+  }
+  if (options.offline === 'prefer') {
+    try {
+      return await spawnMaterialization(options, true, 'offline')
+    } catch {
+      // An offline miss only proves the pinned store lacked content or the
+      // sandbox blocked a fetch. The retried online run owns the outcome the
+      // caller should see, including its fresh stderr diagnostics.
+      options.signal?.throwIfAborted()
+      return await spawnMaterialization(options, false, 'online')
+    }
+  }
+  return await spawnMaterialization(options, false, 'online')
+}
+
+/** Compose the fixed pnpm argv for one connectivity attempt. */
+function materializerArgv(options: ProfileMaterializerOptions, offline: boolean): string[] {
+  return [
     '--import',
     pathToFileURL(options.clearEnvironmentPath).href,
     options.pnpmBinPath,
     PNPM_IGNORE_MINIMUM_RELEASE_AGE,
+    ...(options.storeDir === undefined ? [] : ['--store-dir', options.storeDir]),
+    ...(offline ? ['--offline'] : []),
     'install',
     options.updateLockfile === true ? '--no-frozen-lockfile' : '--frozen-lockfile',
-  ] as const
+  ]
+}
+
+/** Run one pnpm install attempt for the profile and await its bounded outcome. */
+async function spawnMaterialization(
+  options: ProfileMaterializerOptions,
+  offline: boolean,
+  attempt: 'offline' | 'online',
+): Promise<ProfileMaterializationResult> {
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
+  const maxOutputBytes = options.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES
+  const argv = materializerArgv(options, offline)
   const path = inheritedPath()
   const environment: NodeJS.ProcessEnv = {
     ...materializerParentEnv(options.scrubParent ?? scrubbedParentEnv),
@@ -255,7 +296,7 @@ export async function materializeProfile(
     npm_config_disturl: ELECTRON_HEADERS_URL,
   }
   const spawn = options.spawn ?? childSpawn
-  const child = spawn(options.appExecutable, argv.slice(1), {
+  const child = spawn(options.appExecutable, argv, {
     cwd: options.profileDir,
     env: environment,
     shell: false,
@@ -317,6 +358,7 @@ export async function materializeProfile(
             signal: null,
             stdout: Buffer.concat(stdoutChunks).toString('utf8'),
             stderr: Buffer.concat(stderrChunks).toString('utf8'),
+            attempt,
           })
           return
         }
@@ -339,6 +381,7 @@ export async function materializeProfile(
         signal,
         stdout: Buffer.concat(stdoutChunks).toString('utf8'),
         stderr: Buffer.concat(stderrChunks).toString('utf8'),
+        attempt,
       }
       if (failure !== undefined) {
         reject(new ProfileMaterializationError(failure.message, result))

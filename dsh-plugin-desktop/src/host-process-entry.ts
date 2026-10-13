@@ -11,9 +11,22 @@ import { DesktopLanHttpsRuntime } from './lan-https-runtime.ts'
 import type { DesktopStartupGenerationHost } from './startup-generation.ts'
 import { disableAsarArchiveView } from './asar-archive-policy.ts'
 import { DESKTOP_PACKAGE_NAME } from './product-identity.ts'
+import { dshProductVersion } from './dsh-product-version.ts'
+import { bundledSkillRoot } from './bundled-skill-root.ts'
 
 // The Host lists and reads user workspaces; see asar-archive-policy.ts.
 disableAsarArchiveView(import.meta.url)
+
+// dsh 0.2.0's web bundle reads the client version from this variable in the
+// product-telemetry and product-analytics rows. The supervisor may inject a
+// packaged value; otherwise the running DSH runtime version is the honest one.
+process.env.DSH_CLIENT_VERSION ??= dshProductVersion()
+
+// App-bundled third-party skills mount through the harness's dedicated
+// 'bundled' provider root; an absent snapshot directory leaves the variable
+// untouched so nothing bundled is announced.
+const bundledSkills = bundledSkillRoot(import.meta.url)
+if (bundledSkills !== undefined) process.env.DSH_BUNDLED_SKILL_DIR = bundledSkills
 
 const parentPort = process.parentPort
 if (!parentPort) throw new Error('DSH Host must be started by the Desktop supervisor')
@@ -27,6 +40,27 @@ const rpc = new HostRpc({
 }, 120_000)
 let host: DesktopStartupGenerationHost | undefined
 let inspectServices = () => ({ aaRuntime: false, aaOnboarding: false })
+// Set once the generation mounts and the product layer's quit inspection row is live.
+let inspectQuit: (() => Promise<{ activeTasks: boolean; scheduledTasks: boolean }>) | undefined
+let downloadMandatoryLatest: (() => Promise<void>) | undefined
+rpc.handle('mandatoryUpdateDownload', async () => {
+  if (downloadMandatoryLatest === undefined) return { available: false }
+  try {
+    await downloadMandatoryLatest()
+    return { available: true }
+  } catch (cause) {
+    return { available: false, error: cause instanceof Error ? cause.message : String(cause) }
+  }
+})
+rpc.handle('quitInspection', async () => {
+  if (inspectQuit === undefined) return { available: false }
+  try {
+    const inspection = await inspectQuit()
+    return { available: true, activeTasks: inspection.activeTasks, scheduledTasks: inspection.scheduledTasks }
+  } catch (cause) {
+    return { available: false, error: cause instanceof Error ? cause.message : String(cause) }
+  }
+})
 rpc.handle('status', () => ({ pid: process.pid, services: inspectServices() }))
 let starting = false
 let stopping = false
@@ -70,7 +104,18 @@ rpc.handle('boot', async args => {
       prepareCertificate: () => rpc.call('certificate'),
     })
     inspectServices = await bootDesktopHost(options, runtime, browser, lan,
-      value => { host = value }, code => { void rpc.call('quit', [code]).catch(() => {}) })
+      hostCtx => {
+        host = hostCtx
+        const injectable = hostCtx as unknown as {
+          inject(names: readonly string[], wire: (scope: Record<string, never>) => void): void
+        }
+        injectable.inject(['sensteedQuitInspection'], scope => {
+          inspectQuit = async () => await (scope as never as { sensteedQuitInspection: { inspect(): Promise<{ activeTasks: boolean; scheduledTasks: boolean }> } }).sensteedQuitInspection.inspect()
+        })
+        injectable.inject(['sensteedMandatoryUpdatePolicy'], scope => {
+          downloadMandatoryLatest = async () => await (scope as never as { sensteedMandatoryUpdatePolicy: { downloadLatest(): Promise<void> } }).sensteedMandatoryUpdatePolicy.downloadLatest()
+        })
+      }, code => { void rpc.call('quit', [code]).catch(() => {}) })
     if (stopping) { await host?.fiber.dispose(); throw new Error('DSH Host stopped during startup') }
     await runtime.mountScheduled()
     return { pid: process.pid }

@@ -18,6 +18,9 @@ import { rgPath } from '@vscode/ripgrep'
 import AdmZip from 'adm-zip'
 import { exportDiagnosticsZip } from './diagnostic-export.ts'
 import { installProfilePackageResolver } from './module-resolution.ts'
+import { disableAsarArchiveView } from './asar-archive-policy.ts'
+
+disableAsarArchiveView(import.meta.url)
 
 const OK_MARKER = 'DSH_PACKAGED_RUNTIME_OK'
 
@@ -29,18 +32,21 @@ const installAnchor = new URL('../package.json', import.meta.url)
 const packagedAsarRoot = /(?:^|[\\/])app\.asar(?:\.unpacked)?[\\/]/u
 const packagedDirectoryRoot = /(?:^|[\\/])app[\\/]/u
 const usesAsar = packagedAsarRoot.test(installAnchor.pathname)
+const packagedRgPath = usesAsar
+  ? rgPath.replace(/app\.asar[\\/]/u, 'app.asar.unpacked/')
+  : rgPath
 assert(
   usesAsar || packagedDirectoryRoot.test(installAnchor.pathname),
   `did not start from a packaged application root: ${installAnchor.pathname}`,
 )
 assert(
   usesAsar
-    ? /(?:^|[\\/])app\.asar\.unpacked[\\/]/u.test(rgPath)
-    : packagedDirectoryRoot.test(rgPath),
-  `resolved ripgrep outside the packaged application root: ${rgPath}`,
+    ? /(?:^|[\\/])app\.asar\.unpacked[\\/]/u.test(packagedRgPath)
+    : packagedDirectoryRoot.test(packagedRgPath),
+  `resolved ripgrep outside the packaged application root: ${packagedRgPath}`,
 )
-assert(existsSync(rgPath), `cannot find ripgrep at ${rgPath}`)
-const rgVersion = execFileSync(rgPath, ['--version'], { encoding: 'utf8', windowsHide: true })
+assert(existsSync(packagedRgPath), `cannot find ripgrep at ${packagedRgPath}`)
+const rgVersion = execFileSync(packagedRgPath, ['--version'], { encoding: 'utf8', windowsHide: true })
 assert(/^ripgrep\s/u.test(rgVersion), `received an invalid ripgrep version: ${JSON.stringify(rgVersion.trim())}`)
 if (process.platform === 'win32') {
   const sessionBackend = await import('@deepseek-ai/dsh-session-persistence-jsonl')
@@ -226,7 +232,10 @@ try {
   rmSync(root, { recursive: true, force: true })
 }
 
-await verifyBundledSkills(fileURLToPath(new URL('./', installAnchor)))
+const applicationRoot = fileURLToPath(new URL('./', installAnchor))
+// `bundled/skills` sits beside `lib/` inside the same ASAR; passing it lets the
+// smoke also assert every app-bundled third-party skill is discoverable.
+await verifyBundledSkills(applicationRoot, join(applicationRoot, 'bundled', 'skills'))
 await smokeSessionMigration()
 await smokeDiagnosticExportWorker()
 

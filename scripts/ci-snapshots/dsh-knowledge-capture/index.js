@@ -1,11 +1,11 @@
-// Runtime Knowledge bridge for Yootun-Agent. Trusted identity is derived by
+// Runtime Knowledge bridge for Sensteed-Agent. Trusted identity is derived by
 // the public MCP gateway from MODELS_API_KEY; the desktop never declares a
 // tenant, user, space UUID, or private Knowledge endpoint.
 
-export const name = 'yootun-agent-knowledge-capture'
+export const name = 'sensteed-agent-knowledge-capture'
 export const inject = ['credentials', 'systemPrompt']
 
-export const KNOWLEDGE_MCP_URL = 'https://ixicai.cn/mcp/knowledge'
+export const KNOWLEDGE_MCP_URL = 'https://ai.hozonauto.com/mcp/knowledge'
 const MCP_TIMEOUT_MS = 2500
 const SHUTDOWN_DEADLINE_MS = 1500
 const MAX_PENDING_EVENTS = 200
@@ -13,7 +13,7 @@ const MAX_CHECKPOINT_EVENTS = 50
 const MAX_EVENT_TEXT = 8000
 const MAX_CANDIDATE_TEXT = 12000
 const LOADOUT_TTL_MS = 5 * 60 * 1000
-const RUNTIME_SPACE_KEY = 'user.agent_runtime'
+const PERSONAL_SPACE_KEY = 'user.personal'
 
 const CONTEXT_PACK_STATUS = {
   NOT_ATTEMPTED: 'not_attempted',
@@ -63,12 +63,13 @@ export async function apply(ctx, overrides = {}) {
   }
 
   const getLoadout = async (apiKey, signal) => {
+    if (loadoutCache?.apiKey !== apiKey) loadoutCache = null
     if (loadoutCache && loadoutCache.expiresAt > Date.now()) return loadoutCache.data
     const input = loadoutCache?.data?.digest ? { ifNoneMatch: loadoutCache.data.digest } : {}
     const result = await callKnowledgeMcp(fetchImpl, apiKey, 'knowledge.loadout', input, signal)
-    if (!result.ok) return loadoutCache?.data || null
+    if (!result.ok) return null
     const data = mcpData(result.result)
-    loadoutCache = { data, expiresAt: Date.now() + LOADOUT_TTL_MS }
+    loadoutCache = { apiKey, data, expiresAt: Date.now() + LOADOUT_TTL_MS }
     return data
   }
 
@@ -198,8 +199,8 @@ export async function apply(ctx, overrides = {}) {
       SHUTDOWN_DEADLINE_MS,
     ),
   }
-  ctx.provide('yootunAgentCapture', handle)
-  ctx.provide('yootunAgentKnowledge', handle)
+  ctx.provide('sensteedAgentCapture', handle)
+  ctx.provide('sensteedAgentKnowledge', handle)
 
   ctx.effect(
     () => async () => { await handle.shutdown() },
@@ -280,7 +281,7 @@ function redactText(value, forbiddenCaptureIds) {
 
 function runtimeCandidate(events, captureReason) {
   const text = events
-    .filter(event => event.type === 'user-prompt' || event.type === 'assistant-message' || event.type === 'compaction-summary')
+    .filter(event => event.type === 'user-prompt')
     .map(event => `${event.type}: ${event.text || ''}`)
     .filter(line => line.trim().length > line.indexOf(':') + 1)
     .join('\n')
@@ -289,8 +290,8 @@ function runtimeCandidate(events, captureReason) {
   return {
     content: text,
     type: 'EPISODIC',
-    scope: 'SESSION',
-    spaceKey: RUNTIME_SPACE_KEY,
+    scope: 'USER',
+    spaceKey: PERSONAL_SPACE_KEY,
     evidence: [],
     captureReason,
   }

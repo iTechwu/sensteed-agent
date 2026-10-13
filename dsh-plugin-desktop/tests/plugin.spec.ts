@@ -41,16 +41,6 @@ import type { DesktopRuntime, DesktopShellSpec } from '../src/runtime.ts'
 import type { DesktopPlatformLoginRequest, PlatformLoginAccount } from '../src/platform-login.ts'
 import { createDesktopBrowserAccess } from '../src/desktop-browser-access.ts'
 import { DESKTOP_LAN_HTTPS_CA_PATH, DesktopLanHttpsRuntime } from '../src/lan-https-runtime.ts'
-import {
-  DOFE_ACCESS_MODELS_PATH,
-  DOFE_ACCESS_VALIDATE_PATH,
-} from '../src/dofe-access-route.ts'
-import { DOFE_AUTH_PATHS } from '../src/dofe-auth-route.ts'
-import { YOOTUN_AUDIT_PATH } from '../src/yootun-audit-route.ts'
-import { YOOTUN_RECRUITER_PATH } from '../src/yootun-recruiter-route.ts'
-import { YOOTUN_SALES_PATH } from '../src/yootun-sales-route.ts'
-import { YOOTUN_SUPPLY_WATCH_PATH } from '../src/yootun-supply-watch-route.ts'
-import { YOOTUN_CONTENT_COMMAND_PATH } from '../src/yootun-content-command-route.ts'
 import { RENDERER_BOOT_REPORT_PATH, type RendererBootReport } from '../src/renderer-boot-contract.ts'
 
 /** Loader entry id dsh 0.1.7-alpha.1 keys the Desktop shell's settings by. */
@@ -225,7 +215,6 @@ function createHarness(
   })
   const runtime: DesktopRuntime = {
     platform,
-    windowsBuild: platform === 'win32' ? 22_631 : undefined,
     locale: 'en',
     pickFile: vi.fn(async () => null),
     confirmRestart: vi.fn(async () => true),
@@ -251,6 +240,7 @@ function createHarness(
     mountScheduled: async () => {},
     show: () => {},
     notifyAttention: () => {},
+    reportMandatoryUpdatePolicy: () => {},
     registerTrayItem: () => ({ refresh: () => {}, dispose: () => {} }),
     openTerminal: () => {},
     reloadRenderer: () => {},
@@ -384,6 +374,7 @@ describe('desktop Host plugin', () => {
     expect(Config({} as never)).toMatchObject(GEOMETRY)
     expect(readConfig(Config({ mode: 'advanced' } as never))).toEqual({ ...DEFAULT_SETTINGS, mode: 'advanced' })
     expect(DesktopSettingsSchema({} as DesktopSettings)).toEqual({
+      developerLogging: false,
       mode: 'compatibility',
       macosMaterial: 'transparent',
       windowsMaterial: 'off',
@@ -465,15 +456,13 @@ describe('desktop Host plugin', () => {
       'extended',
       'win32',
       '2.0.3',
-      'mica',
-      22_631,
+      'off',
     )).searchParams)).toEqual({
       'sensteed-agent-mode': 'extended',
       'sensteed-agent-platform': 'win32',
       'sensteed-agent-version': '2.0.3',
-      'sensteed-agent-material': 'mica',
+      'sensteed-agent-material': 'off',
       'sensteed-agent-titlebar-inset': '36',
-      'sensteed-agent-mica': '1',
     })
     expect(Object.fromEntries(new URL(desktopRendererUrl(
       43120,
@@ -587,14 +576,6 @@ describe('desktop Host plugin', () => {
       RENDERER_BOOT_REPORT_PATH,
       DESKTOP_DIRECTORY_PICKER_PATH,
       DESKTOP_DIRECTORY_VALIDATOR_PATH,
-      ...DOFE_AUTH_PATHS,
-      DOFE_ACCESS_MODELS_PATH,
-      DOFE_ACCESS_VALIDATE_PATH,
-      YOOTUN_AUDIT_PATH,
-      YOOTUN_RECRUITER_PATH,
-      YOOTUN_SALES_PATH,
-      YOOTUN_SUPPLY_WATCH_PATH,
-      YOOTUN_CONTENT_COMMAND_PATH,
     ].sort()
     const routes = harness.routes().filter(route => route.path !== DESKTOP_LAN_HTTPS_CA_PATH)
     expect(routes.map(route => route.path).sort()).toEqual(expectedPaths)
@@ -732,14 +713,25 @@ describe('desktop Host plugin', () => {
 
   it('requests one orderly restart after the native material changes', async () => {
     vi.useFakeTimers()
-    const harness = createHarness('win32')
+    const harness = createHarness('darwin')
     apply(harness.ctx, harness.config)
 
     harness.restart.mockImplementation(() => new Promise<void>(() => {}))
-    await harness.notify({ windowsMaterial: 'mica' })
+    await harness.notify({ macosMaterial: 'off' })
     await vi.runAllTimersAsync()
 
     expect(harness.restart).toHaveBeenCalledOnce()
+  })
+
+  it('does not restart for a legacy Windows Mica value that still renders opaque', async () => {
+    vi.useFakeTimers()
+    const harness = createHarness('win32')
+    apply(harness.ctx, harness.config)
+
+    await harness.notify({ windowsMaterial: 'mica' })
+    await vi.runAllTimersAsync()
+
+    expect(harness.restart).not.toHaveBeenCalled()
   })
 
   it('projects live built-in theme changes into an advanced native material', () => {

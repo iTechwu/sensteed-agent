@@ -29,6 +29,7 @@ import {
   resolveDesktopSettingsDocument,
   shippedSkillRoot,
   validateDshMarketBundlePatches,
+  UPSTREAM_PRODUCT_ANALYTICS_ROW_IDS,
 } from '../src/profile.ts'
 import { setDesktopProfileBundleSelected } from '../src/desktop-plugins.ts'
 import { migrateLegacyAgentPresetSettings } from '../src/setup-wizard-settings.ts'
@@ -256,7 +257,7 @@ settings:
     mkdirSync(modulesDir, { recursive: true })
     writeFileSync(join(modulesDir, '.modules.yaml'), `layoutVersion: 5
 nodeLinker: hoisted
-packageManager: pnpm@11.7.0
+packageManager: pnpm@11.28.5
 virtualStoreDirMaxLength: 120
 `)
 
@@ -288,7 +289,7 @@ virtualStoreDirMaxLength: 120
     mkdirSync(modulesDir, { recursive: true })
     writeFileSync(join(modulesDir, '.modules.yaml'), `layoutVersion: 5
 nodeLinker: hoisted
-packageManager: pnpm@11.7.0
+packageManager: pnpm@11.28.5
 virtualStoreDirMaxLength: 120
 `)
 
@@ -304,13 +305,90 @@ virtualStoreDirMaxLength: 120
     mkdirSync(modulesDir, { recursive: true })
     writeFileSync(join(modulesDir, '.modules.yaml'), `layoutVersion: 5
 nodeLinker: hoisted
-packageManager: pnpm@11.7.0
+packageManager: pnpm@11.28.5
 virtualStoreDirMaxLength: 60
 `)
 
     const prepared = prepareDesktopProfile(undefined, home, 'win32')
 
     expect(prepared.requiresDependencyMigration).toBe(false)
+  })
+
+  it('classifies workspace-only drift as compatible while recording the drift', () => {
+    const home = temporaryHome()
+    const dir = ensureDesktopProfile(home)
+    const modulesDir = join(dir, 'node_modules')
+    mkdirSync(modulesDir, { recursive: true })
+    writeFileSync(join(dir, 'pnpm-workspace.yaml'), `packages:
+  - .
+
+nodeLinker: hoisted
+autoInstallPeers: true
+customSetting: preserved
+`)
+    writeFileSync(join(modulesDir, '.modules.yaml'), `layoutVersion: 5
+nodeLinker: hoisted
+packageManager: pnpm@11.28.5
+virtualStoreDirMaxLength: 120
+`)
+
+    const prepared = prepareDesktopProfile(undefined, home, 'darwin')
+
+    expect(prepared.requiresDependencyMigration).toBe(false)
+    expect(prepared.dependencyState).toEqual({
+      status: 'compatible', reasons: [], workspaceDrift: true,
+    })
+    expect(readFileSync(join(dir, 'pnpm-workspace.yaml'), 'utf8')).toContain('customSetting: preserved')
+  })
+
+  it('reports the drifted metadata class without scheduling a boot migration', () => {
+    const home = temporaryHome()
+    const dir = ensureDesktopProfile(home)
+    const modulesDir = join(dir, 'node_modules')
+    mkdirSync(modulesDir, { recursive: true })
+    writeFileSync(join(dir, 'pnpm-lock.yaml'), `lockfileVersion: '9.0'
+settings:
+  autoInstallPeers: true
+`)
+    writeFileSync(join(modulesDir, '.modules.yaml'), `layoutVersion: 5
+nodeLinker: hoisted
+packageManager: pnpm@9.12.0
+virtualStoreDirMaxLength: 120
+`)
+
+    const prepared = prepareDesktopProfile(undefined, home, 'darwin')
+
+    expect(prepared.requiresDependencyMigration).toBe(true)
+    expect(prepared.dependencyState.status).toBe('repair-required')
+    expect([...prepared.dependencyState.reasons]).toEqual(['modules-metadata', 'lockfile-settings'])
+    expect(prepared.dependencyState.workspaceDrift).toBe(false)
+  })
+
+  it('restores the workspace-only migration trigger under the legacy escape switch', () => {    const home = temporaryHome()
+    const dir = ensureDesktopProfile(home)
+    const modulesDir = join(dir, 'node_modules')
+    mkdirSync(modulesDir, { recursive: true })
+    writeFileSync(join(dir, 'pnpm-workspace.yaml'), `packages:
+  - .
+
+nodeLinker: hoisted
+autoInstallPeers: true
+`)
+    writeFileSync(join(modulesDir, '.modules.yaml'), `layoutVersion: 5
+nodeLinker: hoisted
+packageManager: pnpm@11.28.5
+virtualStoreDirMaxLength: 120
+`)
+
+    process.env.DSH_DESKTOP_LEGACY_MIGRATION = '1'
+    try {
+      const prepared = prepareDesktopProfile(undefined, home, 'darwin')
+      expect(prepared.requiresDependencyMigration).toBe(true)
+      expect(prepared.dependencyState.status).toBe('repair-required')
+      expect([...prepared.dependencyState.reasons]).toEqual([])
+    } finally {
+      delete process.env.DSH_DESKTOP_LEGACY_MIGRATION
+    }
   })
 
   it('rejects malformed persistent bundle metadata', () => {
@@ -447,6 +525,12 @@ virtualStoreDirMaxLength: 60
         openBrowser: false,
         trustedHosts: ['lab.internal', '192.168.1.5', '10.0.0.7'],
       }),
+    }))
+    // The fork pins alpha.2, whose Connection row already routes Web trust
+    // through the webStartup service.
+    expect(rows.find(row => row.id === 'connection')).toEqual(expect.objectContaining({
+      inject: ['webStartup'],
+      config: { trustedHosts: { __jsExpr: '[...new Set([...(ctx.webStartup.trustedHosts), ...["lab.internal","192.168.1.5","10.0.0.7"]])]' } },
     }))
     expect(rows.find(row => row.id === 'desktop-webserver')).toEqual(expect.objectContaining({
       config: { host: '127.0.0.1', port: 43_120 },
@@ -685,6 +769,21 @@ virtualStoreDirMaxLength: 60
     }])).toThrow('must insert exactly the canonical dsh-market row')
   })
 
+  it('keeps upstream Desktop product analytics off even when a user patch enables it', () => {
+    const home = temporaryHome()
+    writeFileSync(join(ensureDesktopProfile(home), 'cordis.patch.yml'), [
+      '- id: product-analytics',
+      '  disabled: false',
+      '',
+    ].join('\n'))
+
+    const rows = composeEntries([prepareDesktopProfile(undefined, home, 'darwin').patches])
+
+    for (const id of UPSTREAM_PRODUCT_ANALYTICS_ROW_IDS) {
+      expect(rows.find(row => row.id === id)).toEqual(expect.objectContaining({ disabled: true }))
+    }
+  })
+
   it('boots a selected Web profile without overriding its compatibility UI rows', () => {
     const home = temporaryHome()
     const webDir = join(home, 'profiles', 'web')
@@ -791,6 +890,52 @@ virtualStoreDirMaxLength: 60
     // `networkExposure` is still withdrawn to loopback -- but on the read path, not
     // by overwriting the stored intent the user just edited.
     expect(prepared).toMatchObject({ mode: 'advanced', port: 43_189, networkExposure: 'loopback' })
+  })
+
+  it.each(['openai-completions', 'anthropic-messages', 'openai-responses'])(
+    'preserves %s onboarding edits during validation, reload, and restart', (api) => {
+      const home = temporaryHome()
+      const initial = prepareDesktopProfile(undefined, home, 'darwin')
+      const route = api === 'anthropic-messages' ? 'dofe-messages'
+        : api === 'openai-responses' ? 'dofe-responses' : 'dofe-chat'
+      const edits = [
+        { id: 'llm-pi-ai', config: { providers: {
+          [route]: { api, apiKeyEnv: 'MODELS_API_KEY', baseURL: 'https://gateway.example/v1',
+            models: [{ id: 'glm-5.3-flash' }] },
+          custom: { api: 'openai-completions', baseURL: 'https://custom.example/v1' },
+        } } },
+        { id: 'agent-default-model', config: { provider: route, model: 'glm-5.3-flash' } },
+        { id: 'llm-deepseek', config: { apiKeyEnv: 'MODELS_API_KEY',
+          baseURL: 'https://gateway.example/v1', models: [{ id: 'selected-model' }] } },
+      ]
+      const pending = prepareDesktopProfile(undefined, home, 'darwin', undefined, undefined, undefined, {
+        profilePatches: edits,
+      })
+      for (const edit of edits) {
+        expect(composeEntries([pending.patches]).find(row => row.id === edit.id)?.config).toEqual(edit.config)
+      }
+      // Validation must not persist a draft. Restart must recover the saved choices.
+      expect(readFileSync(initial.profile.patchPath, 'utf8')).not.toContain('glm-5.3-flash')
+      writeFileSync(initial.profile.patchPath, JSON.stringify(edits))
+      const restarted = prepareDesktopProfile(undefined, home, 'darwin')
+      for (const edit of edits) {
+        expect(composeEntries([restarted.patches]).find(row => row.id === edit.id)?.config).toEqual(edit.config)
+      }
+    },
+  )
+
+  it('keeps machine-level model policy above editable profile settings', () => {
+    const home = temporaryHome()
+    const managed = { providers: { managed: { api: 'openai-completions', baseURL: 'https://policy.example/v1' } } }
+    writeFileSync(join(home, 'cordis.patch.yml'), JSON.stringify([
+      { id: 'llm-pi-ai', config: managed },
+    ]))
+    const prepared = prepareDesktopProfile(undefined, home, 'darwin', undefined, undefined, undefined, {
+      profilePatches: [{ id: 'llm-pi-ai', config: { providers: {} } }],
+    })
+    // A genuine administrator override must still trigger the editor's conflict
+    // protection; moving application defaults is not a bypass of that protection.
+    expect(composeEntries([prepared.patches]).find(row => row.id === 'llm-pi-ai')?.config).toEqual(managed)
   })
 
   it('composes a pending patch document in place of the one on disk', () => {
@@ -933,11 +1078,13 @@ virtualStoreDirMaxLength: 60
     ensureDesktopProfile(home)
     writeFileSync(join(home, 'settings.yaml'), ['sensteed-agent:', '  mode: advanced', ''].join('\n'))
 
-    prepareDesktopProfile(undefined, home, 'darwin')
+    const prepared = prepareDesktopProfile(undefined, home, 'darwin')
 
-    // The Loader has not started yet, so upstream's import still finds the section.
-    expect(readFileSync(join(home, 'settings.yaml'), 'utf8'))
-      .toBe(['desktop-shell:', '  mode: advanced', ''].join('\n'))
+    // The pending section lands in the Profile's patch layer before the Loader's
+    // one-shot import can rename it away, and the document is consumed to empty.
+    expect(readFileSync(join(home, 'settings.yaml'), 'utf8')).toBe('{}\n')
+    expect(composeEntries([prepared.patches]).find(row => row.id === 'desktop-shell'))
+      .toEqual(expect.objectContaining({ config: expect.objectContaining({ mode: 'advanced' }) }))
   })
 
   it('keeps legacy browser intent but clamps LAN exposure when compatibility mode is selected', () => {
@@ -976,10 +1123,11 @@ virtualStoreDirMaxLength: 60
     const prepared = prepareDesktopProfile(undefined, home, 'win32')
     const rows = composeEntries([prepared.patches])
 
+    // A removed Windows Mica preference still boots and renders opaque.
     expect(prepared).toEqual(expect.objectContaining({
       mode: 'extended',
       macosMaterial: 'off',
-      windowsMaterial: 'mica',
+      windowsMaterial: 'off',
     }))
     expect(rows.find(row => row.id === 'ui-layout')?.disabled).toBe(true)
     expect(rows.find(row => row.id === 'ui-sidebar')?.disabled).toBe(false)
@@ -988,6 +1136,7 @@ virtualStoreDirMaxLength: 60
       config: expect.objectContaining({
         mode: 'extended',
         macosMaterial: 'off',
+        // The user's legacy leaf is carried through unchanged, never rewritten.
         windowsMaterial: 'mica',
       }),
     }))
@@ -1387,20 +1536,50 @@ describe('desktop profile composition and the recovery deselection ledger', () =
     }
   })
 
-  it('lets a deselected bundle with an unparseable patch stop breaking startup', async () => {
+  it('appends the launcher-owned product layer without persisting it', () => {
+    const home = temporaryHome()
+    const prepared = prepareDesktopProfile(undefined, home, 'darwin')
+
+    expect(prepared.productFailure).toBeUndefined()
+    expect(prepared.profile.layers.some(layer => layer.packageName === '@dofe/dsh-sensteed-product')).toBe(true)
+    const manifest = JSON.parse(readFileSync(join(ensureDesktopProfile(home), 'package.json'), 'utf8')) as {
+      dsh: { profile: { bundles: string[] } }
+    }
+    expect(manifest.dsh.profile.bundles).not.toContain('@dofe/dsh-sensteed-product')
+  })
+
+  it('loads personal memory capture for existing profiles without a manually selected bundle', () => {
+    const home = temporaryHome()
+    const prepared = prepareDesktopProfile(undefined, home, 'darwin')
+    expect(composeEntries([prepared.patches]).filter(row => row.name === '@dofe/dsh-knowledge-capture')).toEqual([
+      expect.objectContaining({ id: 'sensteed-agent-knowledge-capture' }),
+    ])
+  })
+
+  it('loads capture once when a historical profile also selected its standalone bundle', () => {
+    const home = temporaryHome()
+    declareBundle(home, '@dofe/dsh-knowledge-capture')
+    const prepared = prepareDesktopProfile(undefined, home, 'darwin')
+    expect(composeEntries([prepared.patches]).filter(row => row.name === '@dofe/dsh-knowledge-capture')).toHaveLength(1)
+  })
+
+  it('degrades a selected bundle with an unparseable patch instead of failing startup', async () => {
     const home = temporaryHome()
     const packageName = 'broken-plugin'
     installBundle(home, packageName, 'not: [valid yaml')
     declareBundle(home, packageName)
-    expect(() => prepareDesktopProfile(undefined, home, 'darwin')).toThrow()
+    const degraded = prepareDesktopProfile(undefined, home, 'darwin')
+    expect(degraded.bundleFailures).toHaveLength(1)
+    expect(degraded.bundleFailures[0]).toContain(packageName)
+    expect(composeEntries([degraded.patches])).not.toContainEqual(expect.objectContaining({
+      name: `${packageName}/host`,
+    }))
+    expect(degraded.profile.layers.some(layer => layer.packageName === packageName)).toBe(false)
 
     await setDesktopProfileBundleSelected(selectionBootstrap(home), packageName, false)
 
-    const prepared = prepareDesktopProfile(undefined, home, 'darwin')
-    expect(composeEntries([prepared.patches])).not.toContainEqual(expect.objectContaining({
-      name: `${packageName}/host`,
-    }))
-    expect(prepared.profile.layers.some(layer => layer.packageName === packageName)).toBe(false)
+    const deselected = prepareDesktopProfile(undefined, home, 'darwin')
+    expect(deselected.bundleFailures).toEqual([])
     // Nothing was deleted: the declared dependency and the files both survive.
     const manifest = JSON.parse(readFileSync(join(ensureDesktopProfile(home), 'package.json'), 'utf8')) as {
       dependencies: Record<string, string>
@@ -1409,14 +1588,16 @@ describe('desktop profile composition and the recovery deselection ledger', () =
     expect(existsSync(join(home, 'profiles', 'desktop', 'node_modules', packageName, 'package.json'))).toBe(true)
   })
 
-  it('lets a deselected bundle whose package directory has no manifest stop breaking startup', async () => {
+  it('degrades a selected bundle whose package directory has no manifest instead of failing startup', async () => {
     const home = temporaryHome()
     const packageName = 'half-written-plugin'
     mkdirSync(join(home, 'profiles', 'desktop', 'node_modules', packageName), { recursive: true })
     declareBundle(home, packageName)
-    expect(() => prepareDesktopProfile(undefined, home, 'darwin')).toThrow()
+    const degraded = prepareDesktopProfile(undefined, home, 'darwin')
+    expect(degraded.bundleFailures[0]).toContain(packageName)
 
     await setDesktopProfileBundleSelected(selectionBootstrap(home), packageName, false)
-    expect(() => prepareDesktopProfile(undefined, home, 'darwin')).not.toThrow()
+    const deselected = prepareDesktopProfile(undefined, home, 'darwin')
+    expect(deselected.bundleFailures).toEqual([])
   })
 })

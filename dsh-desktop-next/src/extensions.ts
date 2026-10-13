@@ -1,4 +1,5 @@
 /** Narrow Host capabilities consumed by the existing plugin markets. */
+import { installHostLogging } from './host/logging.ts'
 import { spawn } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
@@ -11,25 +12,55 @@ import { NEXT_PACKAGE, profileName } from './profiles.ts'
 import { PNPM_IGNORE_MINIMUM_RELEASE_AGE } from './pnpm-policy.ts'
 
 export const name = 'desktop-next-capabilities'
-export const inject = ['profileContext']
+const sharedCapabilitiesKey = Symbol.for('dsh.desktop.next.capabilities')
+
+function sharedCapabilities(): Record<string, unknown> {
+  const global = globalThis as unknown as Record<symbol, unknown>
+  return (global[sharedCapabilitiesKey] ??= {}) as Record<string, unknown>
+}
+
+function provideShared(ctx: Context, name: string, value: unknown): void {
+  // Include mounts may create a child Context with its own `root`; publish at
+  // the application context so sibling bundles can resolve the capability.
+  let owner = ctx as Context & { fiber?: { parent?: Context } }
+  for (let depth = 0; depth < 32; depth++) {
+    const parent = owner.fiber?.parent
+    if (parent === undefined || parent === owner) break
+    owner = parent as typeof owner
+  }
+  const dispose = owner.provide(name, value)
+  const shared = sharedCapabilities()
+  shared[name] = value
+  ctx.effect(() => () => {
+    if (shared[name] === value) delete shared[name]
+    dispose()
+  }, `Next shared capability: ${name}`)
+}
 
 export function apply(ctx: Context): void {
+  installHostLogging(ctx)
   if (process.send) {
     const permissions = new HostPermissions(process)
-    ctx.provide('desktopPermissions', permissions)
+    provideShared(ctx, 'desktopPermissions', permissions)
     ctx.effect(() => permissions.dispose, 'Next Host permission bridge')
   }
   if (process.send) installNotifications(ctx, notification => {
     if (process.connected) process.send?.({ type: 'notification', notification }, () => {})
   })
-  const profile = ctx.profileContext
+  const profile = ctx.get('profileContext') as {
+    packageManager?: ProfilePnpmInvocation
+    name: string
+    dir: string
+    installAnchor: string
+  } | undefined
+  if (profile === undefined) throw new Error('Next requires its profile context')
   const invocation = profile.packageManager
   if (!invocation) throw new Error('Next requires its bundled pnpm invocation')
   const runner = createPackageRunner(invocation, profile.dir)
-  ctx.provide('desktopProfiles', { current: { name: profile.name, dir: profile.dir } })
-  ctx.provide('desktopPnpm', runner)
+  provideShared(ctx, 'desktopProfiles', { current: { name: profile.name, dir: profile.dir } })
+  provideShared(ctx, 'desktopPnpm', runner)
   const shipped = JSON.parse(readFileSync(profile.installAnchor, 'utf8')) as { name: string; dependencies: Record<string, string> }
-  ctx.provide('desktopPlugins', {
+  provideShared(ctx, 'desktopPlugins', {
     list: () => readProfilePlugins({ binName: 'dsh-desktop-next', profileDir: profile.dir, installAnchor: profile.installAnchor })
       .dependencies.filter(item => item.bundle).map(item => {
         const mutable = item.name !== shipped.name && !Object.hasOwn(shipped.dependencies, item.name)
@@ -44,7 +75,7 @@ export function apply(ctx: Context): void {
           status: item.enabled && active ? 'active' : 'disabled' }
       }),
   })
-  if (process.send) ctx.provide('desktopActions', {
+  if (process.send) provideShared(ctx, 'desktopActions', {
     ...(process.platform === 'darwin' || process.platform === 'win32' ? { openTerminal: () => {
       if (!process.connected || !process.send) throw new Error('Next shell is unavailable')
       process.send({ type: 'desktop-action', action: 'terminal' }, () => {})
@@ -54,7 +85,9 @@ export function apply(ctx: Context): void {
       process.send({ type: 'desktop-action', action: 'restart' }, error => error ? reject(error) : resolve())
     }),
   })
-  ctx.effect(() => () => runner.dispose(), 'Next package process disposal')
+  // The capability fiber can be rebound when the profile graph refreshes.
+  // Keep the process runner alive across that rebinding; the Host process owns
+  // its lifetime and disposes it when the process exits.
 }
 
 /** Own each process handle so a stale cancellation cannot kill its successor. */

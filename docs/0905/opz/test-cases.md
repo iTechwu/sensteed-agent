@@ -53,7 +53,7 @@
 | CFG-002 | 未配置消息渠道 | 不应无限重试或刷日志 | PASS：真实 Profile 运行 4.9.1，连续超过两个旧重试周期无新增 `host.describe` 403 |
 | CFG-003 | 消息插件升级 | 保留机器人、凭据引用、工作区和会话绑定；失败可回滚 | PASS：安装阶段哈希不变；启动后工作区文档迁移为 v2 并保留原绑定，飞书 1/1 在线且测试消息已发送；保留 2 个升级前快照 |
 | CFG-004 | 飞书斜杠命令权限 | 缺少权限时普通消息继续可用，补权后命令可注册 | PARTIAL PASS：缺权只产生一次可操作警告，普通消息在线；管理员补权后的斜杠命令回归 PENDING |
-| MCP-001 | 公共 MCP 探测 | 仅经 `https://ixicai.cn/mcp`，鉴权失败不泄密 | PASS：工具清单可读，`lead_discovery_candidates_list` 返回 HTTP 200、0 条候选；命令与文档均未输出凭据值 |
+| MCP-001 | 公共 MCP 探测 | 仅经 `https://ai.hozonauto.com/mcp`，鉴权失败不泄密 | PASS：工具清单可读，`lead_discovery_candidates_list` 返回 HTTP 200、0 条候选；命令与文档均未输出凭据值 |
 | DATA-001 | 模拟数据规范 | `AUDIT-20260904-<case>` 前缀、最小权限、可追踪，不删生产数据 | PENDING |
 | PKG-001 | macOS 目录包 | 构建、启动、签名/资源/运行时 smoke | 07:30 后执行 |
 | PKG-002 | Windows 安装包 | Jenkins/既有打包契约构建、安装/升级 smoke | 07:30 后执行 |

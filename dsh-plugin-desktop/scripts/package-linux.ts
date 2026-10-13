@@ -1,3 +1,4 @@
+import { assertPackagingRelease } from '../../scripts/release-contract.mjs'
 /** Build an unsigned Linux x64 AppImage and Debian package on a native Linux host. */
 
 import { spawnSync } from 'node:child_process'
@@ -6,6 +7,7 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { prepareFsExtForElectron } from './prepare-fs-ext.ts'
 import { electronBuilderEnvironment } from './electron-builder-environment.ts'
+import { refreshBundledForPackaging } from './refresh-bundled-cli.ts'
 
 const LINUX_SIGNING_KEYS = [
   'CSC_IDENTITY_AUTO_DISCOVERY',
@@ -45,6 +47,8 @@ export interface LinuxPackageOptions {
   ) => void
   /** Report non-secret packaging progress. */
   readonly log: (message: string) => void
+  /** Refresh the bundled skills/plugins before the check gate. */
+  readonly refreshBundled: () => void
 }
 
 /**
@@ -96,6 +100,7 @@ export function createLinuxPackageOptions(verifier = './verify-linux-artifacts.t
     nodeExecutable: process.execPath,
     run,
     log: message => console.log(message),
+    refreshBundled: () => refreshBundledForPackaging('refresh', workspaceRoot),
   }
 }
 
@@ -126,6 +131,7 @@ export function packageLinuxArtifacts(
   const cleanEnvironment = withoutLinuxSigningSecrets(options.env)
   options.log('Building unsigned Linux x64 AppImage and Debian package; signing is a separate release step.')
   if (options.env.DSH_PACKAGE_CHECK_ALREADY_RAN !== '1') {
+    options.refreshBundled()
     options.run(
       'corepack',
       ['pnpm', '--filter', 'dsh-plugin-desktop', 'check:linux-package'],
@@ -152,6 +158,8 @@ export function packageLinuxArtifacts(
     options.desktopRoot,
     electronBuilderEnvironment({
       ...cleanEnvironment,
+      DSH_ELECTRON_BUILDER_TARGET_PLATFORM: 'linux',
+      DSH_ELECTRON_BUILDER_TARGET_ARCH: 'x64',
       CSC_IDENTITY_AUTO_DISCOVERY: 'false',
     }),
   )
@@ -166,6 +174,7 @@ export function packageLinuxArtifacts(
 const invokedPath = process.argv[1]
 if (invokedPath !== undefined && resolve(invokedPath) === fileURLToPath(import.meta.url)) {
   try {
+    assertPackagingRelease()
     packageLinuxArtifacts()
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error))

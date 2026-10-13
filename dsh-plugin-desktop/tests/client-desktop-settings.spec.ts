@@ -47,6 +47,7 @@ import {
 } from '../src/client/desktop-settings.ts'
 import { en, zh, type DesktopSettingsLocaleKey } from '../src/client/desktop-settings-locales.ts'
 import { installDesktopSettingsStyles } from '../src/client/desktop-settings-styles.ts'
+import { DESKTOP_PACKAGE_NAME } from '../src/product-identity.ts'
 
 const BROWSER_AUTH_TOKEN = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
 const CA_FINGERPRINT = 'a'.repeat(64)
@@ -609,6 +610,7 @@ describe('Desktop native action presentation', () => {
     const remove = vi.fn()
     const style = {
       id: '',
+      dataset: {} as Record<string, string>,
       get textContent() { return css },
       set textContent(value: string) { css = value },
       remove,
@@ -631,10 +633,37 @@ describe('Desktop native action presentation', () => {
       vi.unstubAllGlobals()
     }
   })
+
+  it.each([DESKTOP_PACKAGE_NAME, 'dsh-desktop-next'])('keeps %s settings styles out of another plugin lifecycle', owner => {
+    let connected = false
+    const style = { id: '', dataset: {} as Record<string, string>, textContent: '', remove: () => { connected = false } }
+    vi.stubGlobal('document', {
+      getElementById: () => connected ? style : null,
+      createElement: () => style,
+      head: { appendChild: () => {
+        // Ownership must already exist when the tag becomes visible to the loader.
+        expect(style.dataset.plugin).toBe(owner)
+        connected = true
+      } },
+    })
+    try {
+      const dispose = installDesktopSettingsStyles(owner)
+      // Model upstream claimStyles/removeOwnedStyles when a market is loaded
+      // and then disabled. An untagged sheet would disappear here.
+      if (!style.dataset.plugin) style.dataset.plugin = 'dshmarket'
+      if (style.dataset.plugin === 'dshmarket') style.remove()
+      expect(connected).toBe(true)
+      expect(style.textContent).toContain('.sensteedAgentSettingsChoice')
+      dispose()
+      expect(connected).toBe(false)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
 })
 
 describe('Desktop settings Slot registration', () => {
-  it('registers the official Desktop section, native actions, and both settings scopes', async () => {
+  it.each(['darwin', 'win32'] as const)('registers Desktop controls and hides the launcher-owned Market on %s', async platform => {
     const scope = {
       getSnapshot: () => ({
         status: 'loading' as const,
@@ -667,9 +696,8 @@ describe('Desktop settings Slot registration', () => {
     const control = applyDesktopSettings(ctx, {
       version: '2.0.3',
       mode: 'compatibility',
-      platform: 'darwin',
+      platform,
       material: 'off',
-      micaSupported: false,
     })
 
     expect(get).toHaveBeenNthCalledWith(1, DESKTOP_SHELL_SETTINGS_NAMESPACE)
@@ -688,9 +716,8 @@ describe('Desktop settings Slot registration', () => {
     })
     expect(options.label()).toBe(`${DESKTOP_SETTINGS_LOCALE_NAMESPACE}:nav`)
     expect(options.inject()).toMatchObject({
-      platform: 'darwin',
+      platform,
       initialMode: 'compatibility',
-      micaSupported: false,
       setMode: expect.any(Function),
     })
     expect(component).toBe(DesktopSettingsSection)
@@ -707,6 +734,11 @@ describe('Desktop settings Slot registration', () => {
     })
     expect(actionOptions.inject()).toHaveProperty('api')
     expect(actionComponent).toBe(DesktopTerminalSettingsAction)
+    expect(inject).toHaveBeenCalledWith('plugins.bundle.hidden', expect.any(Function))
+    expect(register).toHaveBeenNthCalledWith(3, {
+      name: 'plugins.bundle.hidden',
+      key: 'dshmarket',
+    }, expect.any(Function))
     await control.setMode('extended')
     expect(scope.set).toHaveBeenCalledWith('mode', 'extended')
   })

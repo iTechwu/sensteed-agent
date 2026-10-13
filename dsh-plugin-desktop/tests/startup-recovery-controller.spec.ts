@@ -57,6 +57,7 @@ function createHarness(root: string, options: {
   now?: () => number
   afterCheckpointRestore?: DesktopStartupRecoveryControllerOptions['afterCheckpointRestore']
   uninstallPlugin?: DesktopStartupRecoveryControllerOptions['uninstallPlugin']
+  repairDependencies?: DesktopStartupRecoveryControllerOptions['repairDependencies']
 } = {}) {
   const manifestPath = writeManifest(root)
   const generation = { profileName: 'desktop', generationId: 'current-generation-0001' }
@@ -90,6 +91,7 @@ function createHarness(root: string, options: {
     checkpoints: { listSlots: () => slots(root), restoreSlot, completeDependencyMaterialization },
     openCheckpointDirectory,
     ...(options.afterCheckpointRestore === undefined ? {} : { afterCheckpointRestore: options.afterCheckpointRestore }),
+    ...(options.repairDependencies === undefined ? {} : { repairDependencies: options.repairDependencies }),
     ...(options.now === undefined ? {} : { now: options.now }),
   })
   return {
@@ -332,5 +334,41 @@ describe('pre-Host Desktop startup recovery bundle selection', () => {
     await expect(target.controller.executeDisable(preview.previewId)).rejects.toSatisfy(
       cause => errorCode(cause) === 'invalid-target',
     )
+  })
+
+  it('surfaces the deferred dependency repair outcome under the operation gate', async () => {
+    const root = temporaryRoot()
+    const repairDependencies = vi.fn(async () => 'repaired' as const)
+    const target = createHarness(root, { repairDependencies })
+    await expect(target.controller.repairDependencies()).resolves.toEqual({
+      action: 'repair-dependencies',
+      outcome: 'repaired',
+    })
+    expect(repairDependencies).toHaveBeenCalledOnce()
+  })
+
+  it('reports dependency repair as unavailable before the generation owns an executor', async () => {
+    const root = temporaryRoot()
+    const target = createHarness(root)
+    await expect(target.controller.repairDependencies()).rejects.toSatisfy(
+      cause => errorCode(cause) === 'state-unavailable',
+    )
+  })
+
+  it('keeps the dependency repair mutually exclusive with other recovery operations', async () => {
+    const root = temporaryRoot()
+    let releaseRepair: (() => void) | undefined
+    const target = createHarness(root, {
+      repairDependencies: () => new Promise<'repaired'>(resolve => { releaseRepair = () => resolve('repaired') }),
+    })
+    const bundle = (await target.controller.snapshot()).bundles.find(item => item.action === 'uninstall')
+    expect(bundle).toBeDefined()
+    const repair = target.controller.repairDependencies()
+    const preview = await target.controller.previewUninstall(bundle!.bundleId)
+    await expect(target.controller.executeUninstall(preview.previewId)).rejects.toSatisfy(
+      cause => errorCode(cause) === 'operation-in-progress',
+    )
+    releaseRepair?.()
+    await expect(repair).resolves.toMatchObject({ outcome: 'repaired' })
   })
 })

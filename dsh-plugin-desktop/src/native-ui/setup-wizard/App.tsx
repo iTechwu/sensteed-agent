@@ -17,7 +17,6 @@ import {
   type DesktopSetupWizardNetworkExposure,
   type DesktopSetupWizardNotifications,
   type DesktopSetupWizardSelection,
-  type DesktopSetupWizardWindowsMaterial,
 } from '../../setup-wizard-contract.ts'
 import { desktopSetupWizardCopy, type DesktopSetupWizardCopy } from '../../setup-wizard-copy.ts'
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert.tsx'
@@ -127,12 +126,10 @@ function normalizedSelection(input: DesktopSetupWizardInput): DesktopSetupWizard
   return {
     mode,
     macosMaterial: input.macosMaterial,
-    windowsMaterial: input.platform === 'win32' && input.windowsMaterial === 'mica' && !input.micaSupported
-      ? 'off'
-      : input.windowsMaterial,
+    windowsMaterial: input.windowsMaterial,
     openBrowser: browserAccess,
     networkExposure: browserAccess ? input.networkExposure : 'loopback',
-    market: input.market,
+    market: 'disabled',
     aaEnabled: input.aaEnabled === true,
     notifications: { ...input.notifications },
   }
@@ -153,6 +150,8 @@ function finish(selection: DesktopSetupWizardSelection): void {
   url.searchParams.set('notifyOnTurnFailure', String(selection.notifications.notifyOnTurnFailure))
   url.searchParams.set('notifyOnJobCompletion', String(selection.notifications.notifyOnJobCompletion))
   url.searchParams.set('notifyOnJobFailure', String(selection.notifications.notifyOnJobFailure))
+  url.searchParams.set('notifyOnScheduleCompletion', String(selection.notifications.notifyOnScheduleCompletion))
+  url.searchParams.set('notifyOnScheduleFailure', String(selection.notifications.notifyOnScheduleFailure))
   window.location.assign(url.href)
 }
 
@@ -205,7 +204,7 @@ function ToggleRow({
 }): JSX.Element {
   return <div className="flex items-center justify-between gap-5 rounded-xl border p-4">
     <div className="min-w-0 space-y-1">
-      <Label className="block text-sm font-medium" htmlFor={id}>{label}</Label>
+      <Label className="block text-sm font-medium" data-disabled={disabled || undefined} htmlFor={id}>{label}</Label>
       {description === undefined ? null : <p className="text-xs leading-relaxed text-muted-foreground">{description}</p>}
     </div>
     <Switch
@@ -223,18 +222,21 @@ function Page({
   title,
   subtitle,
   children,
+  actions,
 }: {
   readonly step: DesktopSetupWizardStep
   readonly title: string
   readonly subtitle: string
   readonly children: ReactNode
+  readonly actions?: ReactNode
 }): JSX.Element {
-  return <div className="mx-auto flex w-full max-w-2xl flex-col py-5" data-orientation="vertical" data-setup-step={step}>
-    <header className="mb-6">
+  return <div className="dshSetupPage mx-auto flex w-full max-w-2xl flex-col py-5" data-orientation="vertical" data-setup-step={step}>
+    <header className="dshSetupCopy mb-6">
       <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
       <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{subtitle}</p>
     </header>
-    <Card><CardContent className="space-y-3 p-4 sm:p-5">{children}</CardContent></Card>
+    <Card className="dshSetupOptions"><CardContent className="space-y-3 p-4 sm:p-5">{children}</CardContent></Card>
+    {actions && <div className="dshSetupActions">{actions}</div>}
   </div>
 }
 
@@ -281,7 +283,7 @@ function ModeOptions({
 }
 
 type MaterialOption = {
-  readonly value: DesktopSetupWizardMacosMaterial | DesktopSetupWizardWindowsMaterial
+  readonly value: DesktopSetupWizardMacosMaterial
   readonly title: string
   readonly body: string
 }
@@ -300,27 +302,21 @@ function MaterialOptions({
   const options: readonly MaterialOption[] = input.platform === 'darwin' ? [
     { value: 'off', title: copy.materialOff, body: copy.materialOffBody },
     { value: 'transparent', title: copy.materialTransparent, body: copy.materialTransparentBody },
-  ] : input.platform === 'win32' ? [
-    { value: 'off', title: copy.materialOff, body: copy.materialOffBody },
-    ...(input.micaSupported ? [{ value: 'mica' as const, title: copy.materialMica, body: copy.materialMicaBody }] : []),
   ] : [
     { value: 'off', title: copy.materialOff, body: copy.materialOffBody },
   ]
-  const selected = input.platform === 'darwin' ? selection.macosMaterial
-    : input.platform === 'win32' ? selection.windowsMaterial : 'off'
+  // Windows and Linux offer only the opaque window, so their step shows the
+  // single solid option and never changes a stored material.
+  const selected = input.platform === 'darwin' ? selection.macosMaterial : 'off'
   const choose = (value: MaterialOption['value']): void => {
-    if (input.platform === 'darwin' && (value === 'off' || value === 'transparent')) {
-      update({ ...selection, macosMaterial: value })
-    } else if (input.platform === 'win32' && (value === 'off' || value === 'mica')) {
-      update({ ...selection, windowsMaterial: value })
-    }
+    if (input.platform === 'darwin') update({ ...selection, macosMaterial: value })
   }
   return <RadioGroup
     aria-label={copy.windowMaterial}
     aria-orientation="vertical"
     name="setup-window-material"
     onValueChange={value => {
-      if (value === 'off' || value === 'transparent' || value === 'mica') choose(value)
+      if (value === 'off' || value === 'transparent') choose(value)
     }}
     value={selected}
   >{options.map(option => <Choice
@@ -387,6 +383,8 @@ function NotificationOptions({
       <ToggleRow checked={notifications.notifyOnTurnFailure} disabled={!notifications.enabled} id="setup-turn-failure" label={copy.turnFailure} onChange={checked => { set('notifyOnTurnFailure', checked) }} />
       <ToggleRow checked={notifications.notifyOnJobCompletion} disabled={!notifications.enabled} id="setup-job-completion" label={copy.jobCompletion} onChange={checked => { set('notifyOnJobCompletion', checked) }} />
       <ToggleRow checked={notifications.notifyOnJobFailure} disabled={!notifications.enabled} id="setup-job-failure" label={copy.jobFailure} onChange={checked => { set('notifyOnJobFailure', checked) }} />
+      <ToggleRow checked={notifications.notifyOnScheduleCompletion} disabled={!notifications.enabled} id="setup-schedule-completion" label={copy.scheduleCompletion} onChange={checked => { set('notifyOnScheduleCompletion', checked) }} />
+      <ToggleRow checked={notifications.notifyOnScheduleFailure} disabled={!notifications.enabled} id="setup-schedule-failure" label={copy.scheduleFailure} onChange={checked => { set('notifyOnScheduleFailure', checked) }} />
     </div>
   </div>
 }
@@ -439,6 +437,7 @@ export function SetupWizardStepPage({
   update,
   requestBrowserAccess,
   requestExposure,
+  actions,
 }: {
   readonly step: DesktopSetupWizardStep
   readonly copy: DesktopSetupWizardCopy
@@ -447,10 +446,11 @@ export function SetupWizardStepPage({
   readonly update: (selection: DesktopSetupWizardSelection) => void
   readonly requestBrowserAccess: (enabled: boolean) => void
   readonly requestExposure: (exposure: DesktopSetupWizardNetworkExposure) => void
+  readonly actions?: ReactNode
 }): JSX.Element {
-  if (step === 'mode') return <Page step={step} subtitle={copy.presentationBody} title={copy.presentationTitle}><ModeOptions copy={copy} input={input} selection={selection} update={update} /></Page>
-  if (step === 'material') return <Page step={step} subtitle={copy.windowMaterialBody} title={copy.windowMaterial}><MaterialOptions copy={copy} input={input} selection={selection} update={update} /></Page>
-  if (step === 'aa') return <Page step={step} subtitle={copy.aaIntro} title={copy.aaTitle}>
+  if (step === 'mode') return <Page actions={actions} step={step} subtitle={copy.presentationBody} title={copy.presentationTitle}><ModeOptions copy={copy} input={input} selection={selection} update={update} /></Page>
+  if (step === 'material') return <Page actions={actions} step={step} subtitle={copy.windowMaterialBody} title={copy.windowMaterial}><MaterialOptions copy={copy} input={input} selection={selection} update={update} /></Page>
+  if (step === 'aa') return <Page actions={actions} step={step} subtitle={copy.aaIntro} title={copy.aaTitle}>
     <RadioGroup aria-label={copy.aaTitle} name="setup-aa" value={String(selection.aaEnabled === true)}
       onValueChange={value => { if (value === 'true' || value === 'false') update({ ...selection, aaEnabled: value === 'true' }) }}>
       {[false, true].map(enabled => <Choice key={String(enabled)} id={`setup-aa-${String(enabled)}`}
@@ -464,9 +464,9 @@ export function SetupWizardStepPage({
       <p className="text-xs leading-relaxed text-muted-foreground">{copy.aaNextDesktop}</p>
     </aside>}
   </Page>
-  if (step === 'market') return <Page step={step} subtitle={copy.marketBody} title={copy.marketTitle}><MarketOptions copy={copy} selection={selection} update={update} /></Page>
-  if (step === 'notifications') return <Page step={step} subtitle={copy.notificationsBody} title={copy.notificationsTitle}><NotificationOptions copy={copy} notifications={selection.notifications} update={notifications => { update({ ...selection, notifications }) }} /></Page>
-  if (step === 'browser') return <Page step={step} subtitle={copy.browserBody} title={copy.browserTitle}><BrowserOptions copy={copy} requestBrowserAccess={requestBrowserAccess} requestExposure={requestExposure} selection={selection} /></Page>
+  if (step === 'market') return <Page actions={actions} step={step} subtitle={copy.marketBody} title={copy.marketTitle}><MarketOptions copy={copy} selection={selection} update={update} /></Page>
+  if (step === 'notifications') return <Page actions={actions} step={step} subtitle={copy.notificationsBody} title={copy.notificationsTitle}><NotificationOptions copy={copy} notifications={selection.notifications} update={notifications => { update({ ...selection, notifications }) }} /></Page>
+  if (step === 'browser') return <Page actions={actions} step={step} subtitle={copy.browserBody} title={copy.browserTitle}><BrowserOptions copy={copy} requestBrowserAccess={requestBrowserAccess} requestExposure={requestExposure} selection={selection} /></Page>
   return <div data-setup-step={step} />
 }
 
@@ -474,13 +474,19 @@ function SetupWizardSkipDialog({
   copy,
   onSkip,
   outlined = false,
+  open,
+  onOpenChange,
+  showTrigger = true,
 }: {
   readonly copy: DesktopSetupWizardCopy
   readonly onSkip: () => void
   readonly outlined?: boolean
+  readonly open?: boolean
+  readonly onOpenChange?: (open: boolean) => void
+  readonly showTrigger?: boolean
 }): JSX.Element {
-  return <Dialog>
-    <DialogTrigger render={<Button type="button" variant={outlined ? 'outline' : 'ghost'} />}><SkipForward />{copy.skip}</DialogTrigger>
+  return <Dialog {...(open === undefined ? {} : { open })} {...(onOpenChange ? { onOpenChange } : {})}>
+    {showTrigger && <DialogTrigger render={<Button type="button" variant={outlined ? 'outline' : 'ghost'} />}><SkipForward />{copy.skip}</DialogTrigger>}
     <DialogContent aria-describedby="skip-warning-body" aria-labelledby="skip-warning-title" aria-modal="true" role="alertdialog" showCloseButton={false}>
       <DialogHeader>
         <DialogTitle id="skip-warning-title">{copy.skipDialogTitle}</DialogTitle>
@@ -500,15 +506,18 @@ export function SetupWizardWelcome({
   profileName,
   onStart,
   onSkip,
+  embedded = false,
 }: {
   readonly appVersion: string
   readonly copy: DesktopSetupWizardCopy
   readonly profileName: string
   readonly onStart: () => void
   readonly onSkip: () => void
+  readonly embedded?: boolean
 }): JSX.Element {
   return <div className="flex flex-1 items-center justify-center py-5" data-align="center" data-setup-step="welcome">
-    <div className="flex w-full max-w-xl flex-col items-stretch text-left">
+    <div className="dshSetupWelcome flex w-full max-w-xl flex-col items-stretch text-left">
+      <header className="dshSetupCopy">
       <div className="flex flex-wrap items-end gap-x-2 gap-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">{copy.welcomeTitle}</h1>
         <Badge
@@ -518,7 +527,8 @@ export function SetupWizardWelcome({
         >{copy.beta} · v{appVersion}</Badge>
       </div>
       <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{copy.welcomeBody}</p>
-      <Card className="mt-7 w-full text-left">
+      </header>
+      <Card className="dshSetupOptions mt-7 w-full text-left">
         <CardContent className="space-y-3 p-5">
           <div>
             <span className="block text-xs font-medium uppercase tracking-wide text-muted-foreground">{copy.profile}</span>
@@ -527,8 +537,8 @@ export function SetupWizardWelcome({
           <p className="text-sm leading-relaxed text-muted-foreground">{copy.firstProfileSetup}</p>
         </CardContent>
       </Card>
-      <div className="mt-8 flex flex-wrap items-center justify-end gap-3">
-        <SetupWizardSkipDialog copy={copy} onSkip={onSkip} outlined />
+      <div className="dshSetupActions mt-8 flex flex-wrap items-center justify-end gap-3">
+        {!embedded && <SetupWizardSkipDialog copy={copy} onSkip={onSkip} outlined />}
         <Button onClick={onStart} size="lg" type="button">{copy.startSetup}</Button>
       </div>
     </div>
@@ -561,10 +571,16 @@ export function SetupWizardNavigation({
 export function SetupWizardSuccess({
   copy,
   onStart,
+  embedded = false,
 }: {
   readonly copy: DesktopSetupWizardCopy
   readonly onStart: () => void
+  readonly embedded?: boolean
 }): JSX.Element {
+  if (embedded) return <Page step="success" title={copy.successTitle} subtitle={copy.successBody}
+    actions={<Button onClick={onStart} size="lg" type="button">{copy.startUsing}<ArrowRight /></Button>}>
+    <div className="dshSetupSuccessArtwork" aria-hidden="true"><CheckCircle2 /></div>
+  </Page>
   return <div className="flex flex-1 items-center justify-center" data-align="center" data-setup-step="success">
     <div className="flex max-w-md flex-col items-center text-center">
       <span className="mb-5 flex size-16 items-center justify-center rounded-full bg-primary text-primary-foreground"><CheckCircle2 className="size-8" /></span>
@@ -672,10 +688,17 @@ export function desktopSetupWizardSkipRequiresLanAcknowledgement(
   )
 }
 
-export function SetupWizardApp(): JSX.Element {
-  const locale = localLocale(window.location.search)
+export interface EmbeddedSetupWizard {
+  readonly input: DesktopSetupWizardInput
+  readonly locale: Locale
+  renderNavigation(options: { busy: boolean; onBack?: (() => void) | undefined; onSkip(): void }): ReactNode
+  finish(selection?: DesktopSetupWizardSelection): Promise<void>
+}
+
+export function SetupWizardApp({ embedded }: { embedded?: EmbeddedSetupWizard } = {}): JSX.Element {
+  const locale = embedded?.locale ?? localLocale(window.location.search)
   const copy = desktopSetupWizardCopy(locale)
-  const input = decodeDesktopSetupWizardInput(window.location.search)
+  const input = embedded?.input ?? decodeDesktopSetupWizardInput(window.location.search)
   const [selection, setSelection] = useState<DesktopSetupWizardSelection | undefined>(() => input === undefined ? undefined : normalizedSelection(input))
   const [step, setStep] = useState<DesktopSetupWizardStep>('welcome')
   const [lanAcknowledged, setLanAcknowledged] = useState(false)
@@ -758,14 +781,16 @@ export function SetupWizardApp(): JSX.Element {
         : step === 'welcome'
         ? <SetupWizardWelcome
           appVersion={input.appVersion}
+          embedded={Boolean(embedded)}
           copy={copy}
           onSkip={skip}
           onStart={() => { setStep('mode') }}
           profileName={input.profileName}
         />
         : step === 'success'
-          ? <SetupWizardSuccess copy={copy} onStart={startUsing} />
-          : <SetupWizardStepPage copy={copy} input={input} requestBrowserAccess={requestBrowserAccess} requestExposure={requestExposure} selection={selection} step={step} update={setSelection} />}
+          ? <SetupWizardSuccess copy={copy} onStart={startUsing} embedded={Boolean(embedded)} />
+          : <SetupWizardStepPage copy={copy} input={input} requestBrowserAccess={requestBrowserAccess} requestExposure={requestExposure} selection={selection} step={step} update={setSelection}
+            actions={embedded ? <Button onClick={advance} size="lg" type="button">{copy.next}<ArrowRight /></Button> : undefined} />}
     </div>
       {starting ? null : <SetupWizardNavigation
       copy={copy}

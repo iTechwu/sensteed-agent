@@ -19,6 +19,8 @@ describe('unsigned directory packaging', () => {
     expect(environment).toEqual({
       CSC_IDENTITY_AUTO_DISCOVERY: 'false',
       DSH_PACKAGE_CHECK_ALREADY_RAN: '1',
+      DSH_ELECTRON_BUILDER_TARGET_PLATFORM: process.platform,
+      DSH_ELECTRON_BUILDER_TARGET_ARCH: process.arch,
       DSH_ELECTRON_BUILDER_TRAVERSAL_ONLY: '1',
     })
   })
@@ -33,6 +35,7 @@ describe('unsigned directory packaging', () => {
       env: { CSC_NAME: 'Developer ID Application: Release', KEEP: 'yes' },
       nodeExecutable: '/runtime/node',
       run: run as unknown as typeof import('node:child_process').spawnSync,
+      refreshBundled: () => undefined,
     })
 
     expect(UNSIGNED_DIRECTORY_BUILD_ARGS).toEqual([
@@ -58,6 +61,8 @@ describe('unsigned directory packaging', () => {
         cwd: '/workspace/desktop',
         env: {
           CSC_IDENTITY_AUTO_DISCOVERY: 'false',
+          DSH_ELECTRON_BUILDER_TARGET_PLATFORM: process.platform,
+          DSH_ELECTRON_BUILDER_TARGET_ARCH: process.arch,
           DSH_ELECTRON_BUILDER_TRAVERSAL_ONLY: '1',
           KEEP: 'yes',
         },
@@ -68,11 +73,14 @@ describe('unsigned directory packaging', () => {
 
   it('propagates spawn failures and non-zero exits', () => {
     const failure = new Error('cannot spawn')
+    const skipRefresh = () => undefined
     expect(() => packageDirectory({
       run: (() => ({ error: failure })) as unknown as typeof import('node:child_process').spawnSync,
+      refreshBundled: skipRefresh,
     })).toThrow(failure)
     expect(() => packageDirectory({
       run: (() => ({ status: 7 })) as unknown as typeof import('node:child_process').spawnSync,
+      refreshBundled: skipRefresh,
     })).toThrow('electron-builder --dir exited with 7')
   })
 })

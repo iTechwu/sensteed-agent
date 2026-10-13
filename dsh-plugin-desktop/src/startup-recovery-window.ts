@@ -27,6 +27,7 @@ import {
   type DesktopStartupRecoveryUninstallPreview,
   type DesktopStartupRecoverySnapshot,
 } from './startup-recovery-controller.ts'
+import type { DesktopProfileRepairOutcome } from './profile-repair.ts'
 
 const RECOVERY_SCHEME = 'dsh-recovery:'
 const RECOVERY_DOCUMENT = fileURLToPath(new URL('./native-ui/recovery.html', import.meta.url))
@@ -64,6 +65,8 @@ export interface DesktopStartupRecoveryWindowOptions {
   readonly exportDiagnostics: (signal: AbortSignal) => Promise<string>
   /** Open the launcher-owned terminal even when the Host did not start. */
   readonly openTerminal?: () => void | Promise<void>
+  /** Run the deferred offline-first Profile dependency repair for this generation. */
+  readonly repairDependencies?: () => Promise<DesktopProfileRepairOutcome>
   /** Main-process validated actions available from the failure generation. */
   readonly profileActions?: DesktopStartupRecoveryProfileActions
   /** Launcher-owned DSH Home mutation capabilities, absent before path resolution or in Safe Mode. */
@@ -235,6 +238,7 @@ export function parseDesktopStartupRecoveryAction(
     'open-profile-manifest',
     'open-profile-directory',
     'open-terminal',
+    'repair-dependencies',
     'open-profile-creator',
     'enter-safe-mode',
     'begin-change-data-directory',
@@ -420,6 +424,19 @@ export class DesktopStartupRecoveryWindow {
       } else if (action.action === 'open-checkpoint' && action.id !== undefined) {
         this.activeTab = 'rollback'
         await this.requireController().openCheckpoint(action.id as `slot-${1 | 2 | 3}`)
+      } else if (action.action === 'repair-dependencies') {
+        this.activeTab = 'diagnostics'
+        if (this.options.repairDependencies === undefined) throw new Error(copy.repairDependenciesUnavailable)
+        await this.runBusy(async () => {
+          const outcome = await this.options.repairDependencies!()
+          this.notice = {
+            tone: 'success',
+            title: copy.repairDependencies,
+            body: outcome === 'not-required' ? copy.repairDependenciesUpToDate : copy.repairDependenciesSuccess,
+          }
+          if (outcome !== 'not-required') this.restartReady = true
+          await this.refreshSnapshot()
+        })
       } else if (action.action === 'export-diagnostics') {
         this.activeTab = 'diagnostics'
         await this.startDiagnosticExport().catch(() => {})
@@ -861,6 +878,7 @@ export class DesktopStartupRecoveryWindow {
       ...(this.profiles === undefined ? {} : { profiles: this.profiles }),
       ...(this.options.profileActions === undefined ? {} : { profileActionToken: this.options.profileActions.token }),
       ...(this.options.openTerminal === undefined ? {} : { terminalAvailable: true }),
+      ...(this.options.repairDependencies === undefined ? {} : { dependencyRepairAvailable: true }),
       ...(this.options.profileActions === undefined ? {} : { profileCreatorAvailable: true }),
       ...(this.options.enterSafeMode === undefined ? {} : { safeModeAvailable: true }),
       ...(this.options.safeModeActive === true ? { safeModeActive: true } : {}),

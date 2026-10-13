@@ -1,4 +1,5 @@
 /** Alpha.2 shared Web profile runner, hosted by an Electron Node-mode child. */
+import { auditHostPlugins, configureHostLogging, hostLog, hostOperation } from './logging.ts'
 import { basename, delimiter, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { inspect } from 'node:util'
@@ -6,7 +7,7 @@ import { loadLayeredEnv } from '@deepseek-ai/dsh-app-boot'
 import { runProfile } from '@deepseek-ai/dsh/profile-boot'
 import type {} from '@deepseek-ai/dsh-client-connection'
 import type {} from '@deepseek-ai/dsh-host-webserver'
-import { loadNextProfile, NEXT_PACKAGE } from '../profiles.ts'
+import { loadNextProfile, NEXT_PACKAGE, readNextProfilePatches } from '../profiles.ts'
 import { bundledPnpmEntry } from '../extensions.ts'
 import { withDesktopPnpmPolicy } from '../pnpm-policy.ts'
 import { configureNextBrowserAccess } from '../desktop-browser-access.ts'
@@ -26,6 +27,8 @@ export async function main(): Promise<void> {
   const home = process.env.DSH_HOME
   if (!runtimeDir || !projectDir || !home || !process.send) throw new Error('Next Host requires runtime, profile, home and IPC')
   const preferences = parsePreferences(JSON.parse(process.env.DSH_NEXT_PREFERENCES ?? '{}'))
+  configureHostLogging(preferences)
+  hostLog({ source: 'host', event: 'process.start', fields: { profile: basename(projectDir), node: process.version } })
   const trustedHosts = JSON.parse(process.env.DSH_NEXT_TRUSTED_HOSTS ?? '[]') as unknown
   if (!Array.isArray(trustedHosts) || trustedHosts.some(host => typeof host !== 'string')) throw new Error('Invalid Next trusted hosts')
   const systemProxy = parseSystemProxyProbe(process.env[SYSTEM_PROXY_ENV])
@@ -64,13 +67,21 @@ export async function main(): Promise<void> {
   let stopping: Promise<void> | undefined
   const accountWatch = new AbortController()
   const stop = (): Promise<void> => stopping ??= (async () => {
+    const end = hostOperation('host', 'shutdown')
     accountWatch.abort()
     const running = await application.catch(() => undefined)
-    await running?.shutdown.shutdown(0)
+    try { await running?.shutdown.shutdown(0); end() } catch (error) { end(error); throw error }
     await send({ type: 'shutdown-complete' })
     if (process.connected) process.disconnect()
   })()
   process.on('message', (value: unknown) => {
+    if (typeof value === 'object' && value !== null && 'type' in value && value.type === 'logging-config') {
+      const request = value as { requestId?: unknown; developerLogging?: unknown; logLevel?: unknown }
+      if (!Number.isSafeInteger(request.requestId) || typeof request.developerLogging !== 'boolean' || !['debug', 'info', 'warn', 'error'].includes(String(request.logLevel))) return
+      configureHostLogging({ developerLogging: request.developerLogging, logLevel: request.logLevel as typeof preferences.logLevel })
+      void send({ type: 'logging-config', requestId: request.requestId }).catch(fatal)
+      return
+    }
     if (typeof value === 'object' && value !== null && 'type' in value && value.type === 'shutdown') void stop().catch(fatal)
     if (typeof value === 'object' && value !== null && 'type' in value && value.type === 'injections') {
       // dsh 0.1.7 serves the boot graph as revision-addressed combo bundles, and registering a
@@ -96,6 +107,8 @@ export async function main(): Promise<void> {
   })
   process.once('disconnect', () => { void stop().catch(fatal) })
   const { ctx } = await application
+  auditHostPlugins(ctx)
+  hostLog({ source: 'host', event: 'process.ready' })
   await send({ type: 'ready', url: ctx.connection.authenticatedUrl(`http://127.0.0.1:${ctx.webServer.port}`),
     injections: ctx.webServer.collectIndexInjections() })
   const account = ctx.get('deepseekAccount') as PlatformLoginAccount | undefined

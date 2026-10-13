@@ -1,0 +1,271 @@
+// @vitest-environment jsdom
+import { act, createElement, Fragment } from 'react'
+import { createRoot } from 'react-dom/client'
+import { afterEach, expect, it, vi } from 'vitest'
+import { DofeAccessGate, DofeAccessSection, removeDofeAccess } from '../src/client/DofeAccessSection.tsx'
+
+vi.mock('../src/generated-product-identity.ts', async importOriginal => ({
+  ...await importOriginal<typeof import('../src/generated-product-identity.ts')>(),
+  BRAND_VARIANT: 'sensteed', BRAND_TENANT: 'sensteed',
+}))
+afterEach(() => vi.unstubAllGlobals())
+
+it('clears the rendered SSO identity in the same revocation write', async () => {
+  const writes: Array<Array<{ op: string; path: string[]; value?: unknown }>> = []
+  const calls: string[] = []
+  vi.stubGlobal('fetch', vi.fn(async () => {
+    calls.push('logout')
+    return Response.json({ status: 'idle' })
+  }))
+  const settingsApi = {
+    describe: vi.fn(async () => ({ ok: true, value: { namespaces: [{ ns: 'dofe-access', revision: 4 }] } })),
+    mutate: vi.fn(async (_namespace: string, operations: Array<{ op: string; path: string[]; value?: unknown }>) => {
+      calls.push('settings')
+      writes.push(operations)
+      return { ok: true, value: {} }
+    }),
+  }
+  const credentials = { unset: vi.fn(async () => { calls.push('credentials'); return { ok: true, value: undefined } }) }
+
+  await removeDofeAccess(settingsApi as never, credentials as never)
+
+  expect(writes).toHaveLength(1)
+  expect(writes[0]).toEqual(expect.arrayContaining([
+    { op: 'unset', path: ['identity'] },
+    { op: 'unset', path: ['entitlements'] },
+  ]))
+  expect(calls).toEqual(['settings', 'logout', 'credentials'])
+})
+
+it('requires login before showing model setup and commits authorization only after setup', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+  let snapshot = { value: { setupComplete: false, validationVersion: 0, enabledPlugins: [], modelId: '', protocol: 'chat-completions' } as Record<string, unknown> }
+  let configured = false
+  const listeners = new Set<() => void>()
+  const writes: string[] = []
+  let rejectModelConfig = false
+  const settingsScope = {
+    getSnapshot: () => snapshot,
+    subscribe: (listener: () => void) => { listeners.add(listener); return () => listeners.delete(listener) },
+  }
+  const settingsApi = {
+    describe: async () => ({ ok: true, value: { namespaces: ['dofe-access', 'llm-pi-ai', 'agent-default-model'].map(ns => ({ ns, revision: 1 })) } }),
+    mutate: vi.fn(async (ns: string, operations: Array<{ path: string[]; value?: unknown }>) => {
+      writes.push(ns)
+      if (ns === 'llm-pi-ai' && rejectModelConfig) return { ok: false, error: { message: '保存模型失败' } }
+      if (ns === 'dofe-access') {
+        snapshot = { value: { ...snapshot.value, ...Object.fromEntries(operations.map(op => [op.path[0], op.value])) } }
+        for (const listener of listeners) listener()
+      }
+      return { ok: true }
+    }),
+  }
+  vi.stubGlobal('fetch', vi.fn(async (path: string) => {
+    if (path.endsWith('/session')) {
+      configured = true
+      return Response.json({ status: 'bound', user: { ssoSub: 'user', name: 'User', avatar: 'https://example.com/avatar.png' }, entitlements: { plugins: ['knowledge'], defaultModel: 'preferred-model', allowedProtocols: ['messages'] } })
+    }
+    return Response.json({ models: [{ id: 'first-model' }, { id: 'preferred-model' }] })
+  }))
+  const credentials = {
+    describe: async () => ({ ok: true, value: { MODELS_API_KEY: { configured } } }),
+    unset: vi.fn(async () => { configured = false; return { ok: true } }),
+  }
+  const props = { settingsApi, settingsScope, credentials, t: (key: string) => key }
+  const container = document.createElement('div')
+  document.body.append(container)
+  const root = createRoot(container)
+  try {
+    await act(async () => root.render(createElement(DofeAccessGate, props as never)))
+    expect(container.querySelector('input[type="password"]')).toBeNull()
+    expect(container.querySelector('select')).toBeNull()
+    expect(container.querySelector('#dofe-model-section-title')).toBeNull()
+    await act(async () => {
+      const login = [...container.querySelectorAll('button')].find(button => button.textContent?.includes('飞书登录'))!
+      login.click()
+    })
+    expect(snapshot.value.setupComplete).toBe(false)
+    expect(snapshot.value.modelId).toBe('')
+    expect(snapshot.value.protocol).toBe('messages')
+    expect(container.querySelector('select')).not.toBeNull()
+    expect((container.querySelector('select') as HTMLSelectElement).value).toBe('preferred-model')
+    expect(writes).toEqual(['dofe-access'])
+    expect(container.textContent).not.toContain('飞书登录')
+    expect(container.querySelector('.dshDofeAccessIdentityName')?.textContent).toBe('User')
+    expect(container.querySelector('.dshDofeAccessAvatar img')?.getAttribute('src')).toBe('https://example.com/avatar.png')
+    const setup = [...container.querySelectorAll('.dshDofeAccessPrimary')].at(-1) as HTMLButtonElement
+    rejectModelConfig = true
+    await act(async () => setup.click())
+    expect(snapshot.value.setupComplete).toBe(false)
+    expect(document.body.textContent).not.toContain('loginSuccess')
+    expect(container.textContent).toContain('保存模型失败')
+    rejectModelConfig = false
+    await act(async () => setup.click())
+    expect(snapshot.value.setupComplete).toBe(true)
+    expect(writes.slice(-3)).toEqual(['llm-pi-ai', 'agent-default-model', 'dofe-access'])
+    expect(container.querySelector('[role="dialog"]')).toBeNull()
+    expect(document.querySelector('[role="alert"]')?.textContent).toBe('loginSuccess')
+    await act(async () => root.render(createElement(Fragment, null,
+      createElement(DofeAccessGate, props as never),
+      createElement(DofeAccessSection, props as never),
+    )))
+    expect(container.querySelector('#dofe-account-section-title')?.textContent).toBe('accountSectionTitle')
+    expect(container.querySelector('#dofe-model-section-title')?.textContent).toBe('modelSectionTitle')
+    expect(container.querySelector('.dshDofeAccessPlugins')).not.toBeNull()
+    expect(container.querySelector('.dshDofeAccessModelRefresh')).toBeNull()
+    await act(async () => { (container.querySelector('.dshDofeAccessLogout') as HTMLButtonElement).click() })
+    expect(credentials.unset).toHaveBeenCalledWith('MODELS_API_KEY')
+    expect(snapshot.value.identity).toBeUndefined()
+    expect(snapshot.value.setupComplete).toBe(false)
+    const gate = container.querySelector('[role="dialog"]')!
+    expect(gate).not.toBeNull()
+    expect(gate.textContent).toContain('飞书登录')
+    expect(gate.querySelector('select')).toBeNull()
+    expect(vi.mocked(fetch).mock.calls.some(([path]) => String(path).endsWith('/logout'))).toBe(true)
+  } finally {
+    await act(async () => root.unmount())
+    container.remove()
+  }
+})
+
+it('opens the settings panel with the stored-credential model list already loaded', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+  const snapshot = { value: { setupComplete: true, validationVersion: 1, enabledPlugins: ['knowledge'], modelId: 'preferred-model', protocol: 'messages', authMode: 'feishu', identity: { ssoSub: 'user', name: 'User' }, entitlements: { plugins: ['knowledge'], allowedProtocols: ['messages'], defaultModel: '' } } }
+  const settingsScope = {
+    getSnapshot: () => snapshot,
+    subscribe: () => () => {},
+  }
+  const settingsApi = { describe: vi.fn(), mutate: vi.fn() }
+  const credentials = { describe: vi.fn(async () => ({ ok: true, value: { MODELS_API_KEY: { configured: true } } })) }
+  const fetcher = vi.fn(async () => Response.json({ models: [{ id: 'first-model' }, { id: 'preferred-model' }] }))
+  vi.stubGlobal('fetch', fetcher)
+  const props = { settingsApi, settingsScope, credentials, t: (key: string) => key }
+  const container = document.createElement('div')
+  document.body.append(container)
+  const root = createRoot(container)
+  try {
+    await act(async () => root.render(createElement(DofeAccessSection, props as never)))
+    await act(async () => {})
+    // No refresh click: the stored credential resolves the list on open.
+    const select = container.querySelector('select') as HTMLSelectElement
+    expect(select.value).toBe('preferred-model')
+    expect([...select.options].map(option => option.value)).toEqual(['', 'first-model', 'preferred-model'])
+    expect(fetcher).toHaveBeenCalledOnce()
+    const [path, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit]
+    expect(path).toBe('/api/desktop/dofe/models')
+    expect(JSON.parse(String(init.body))).toEqual({ key: '', protocol: 'messages', useStored: true })
+  } finally {
+    await act(async () => root.unmount())
+    container.remove()
+  }
+})
+
+it('keeps the entitled default model selectable when the catalog is temporarily empty', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+  const snapshot = { value: { setupComplete: false, validationVersion: 0, enabledPlugins: ['knowledge'], modelId: '', protocol: 'messages', authMode: 'feishu', identity: { ssoSub: 'user', name: 'User' }, entitlements: { plugins: ['knowledge'], allowedProtocols: ['messages'], defaultModel: 'preferred-model' } } }
+  const settingsScope = { getSnapshot: () => snapshot, subscribe: () => () => {} }
+  const credentials = { describe: vi.fn(async () => ({ ok: true, value: { MODELS_API_KEY: { configured: true } } })) }
+  const fetcher = vi.fn(async () => Response.json({ models: [] }))
+  vi.stubGlobal('fetch', fetcher)
+  const container = document.createElement('div')
+  document.body.append(container)
+  const root = createRoot(container)
+  try {
+    await act(async () => root.render(createElement(DofeAccessSection, { settingsApi: {}, settingsScope, credentials, t: (key: string) => key } as never)))
+    await act(async () => {})
+    const select = container.querySelector('select') as HTMLSelectElement
+    expect(select.value).toBe('preferred-model')
+    expect([...select.options].map(option => option.value)).toEqual(['', 'preferred-model'])
+    expect(select.disabled).toBe(false)
+  } finally {
+    await act(async () => root.unmount())
+    container.remove()
+  }
+})
+
+it.each(['tenant_unavailable', 'tenant_mismatch', 'invalid_key', 'models_unavailable', 'network'])('keeps setup blocked after %s and permits an explicit catalog retry', async reason => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+  const snapshot = { value: { setupComplete: false, validationVersion: 0, enabledPlugins: ['knowledge'], modelId: '', protocol: 'messages', authMode: 'feishu', identity: { ssoSub: 'user', name: 'User' }, entitlements: { plugins: ['knowledge'], allowedProtocols: ['messages'], defaultModel: 'preferred-model' } } }
+  const settingsScope = { getSnapshot: () => snapshot, subscribe: () => () => {} }
+  const credentials = { describe: vi.fn(async () => ({ ok: true, value: { MODELS_API_KEY: { configured: true } } })) }
+  const fetcher = vi.fn().mockImplementationOnce(async () => {
+    if (reason === 'network') throw new Error('network unavailable')
+    return Response.json({ models: [], reason })
+  }).mockResolvedValueOnce(Response.json({ models: [{ id: 'preferred-model' }] }))
+  vi.stubGlobal('fetch', fetcher)
+  const container = document.createElement('div')
+  document.body.append(container)
+  const root = createRoot(container)
+  try {
+    await act(async () => root.render(createElement(DofeAccessSection, { settingsApi: {}, settingsScope, credentials, t: (key: string) => key } as never)))
+    const select = container.querySelector('select') as HTMLSelectElement
+    const save = container.querySelector('.dshDofeAccessPrimary') as HTMLButtonElement
+    expect(select.value).toBe('')
+    expect(select.disabled).toBe(true)
+    expect(save.disabled).toBe(true)
+    expect(container.querySelector('[role="alert"]')).not.toBeNull()
+    expect(fetcher).toHaveBeenCalledOnce()
+    const retry = [...container.querySelectorAll('button')].find(button => button.textContent === 'loadModels')!
+    await act(async () => retry.click())
+    expect(fetcher).toHaveBeenCalledTimes(2)
+    expect(JSON.parse(fetcher.mock.calls[1]![1].body)).toEqual({ key: '', protocol: 'messages', useStored: true })
+    expect(select.value).toBe('preferred-model')
+    expect(save.disabled).toBe(false)
+    expect(container.querySelector('[role="alert"]')).toBeNull()
+    expect(snapshot.value.setupComplete).toBe(false)
+  } finally { await act(async () => root.unmount()); container.remove() }
+})
+
+it('does not flash setup while loading saved credentials or reopen it for a profile update', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+  let snapshot = { value: { setupComplete: true, validationVersion: 5, modelId: 'model-a', enabledPlugins: ['knowledge'], authMode: 'feishu', identity: { ssoSub: 'user', name: 'Before' } } }
+  const listeners = new Set<() => void>()
+  let finish!: (value: unknown) => void
+  const credentials = { describe: vi.fn(() => new Promise(resolve => { finish = resolve })) }
+  const settingsScope = { getSnapshot: () => snapshot, subscribe: (listener: () => void) => { listeners.add(listener); return () => listeners.delete(listener) } }
+  const container = document.createElement('div')
+  document.body.append(container)
+  const root = createRoot(container)
+  const props = { credentials, settingsScope, settingsApi: {}, t: (key: string) => key }
+  try {
+    await act(async () => root.render(createElement(DofeAccessGate, props as never)))
+    expect(container.querySelector('[role="dialog"]')).toBeNull()
+    await act(async () => finish({ ok: true, value: { MODELS_API_KEY: { configured: true } } }))
+    expect(container.querySelector('[role="dialog"]')).toBeNull()
+    await act(async () => {
+      snapshot = { value: { ...snapshot.value, identity: { ssoSub: 'user', name: 'After' } } }
+      listeners.forEach(listener => listener())
+    })
+    expect(container.querySelector('[role="dialog"]')).toBeNull()
+    expect(credentials.describe).toHaveBeenCalledOnce()
+  } finally {
+    await act(async () => root.unmount())
+    container.remove()
+  }
+})
+
+it('retries a temporary credential read failure without asking the user to configure again', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+  vi.useFakeTimers()
+  const settingsScope = {
+    getSnapshot: () => snapshot,
+    subscribe: () => () => {},
+  }
+  const snapshot = { value: { setupComplete: true, validationVersion: 5, authMode: 'feishu', identity: { ssoSub: 'user', name: 'User' } } }
+  const credentials = { describe: vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValue({ ok: true, value: { MODELS_API_KEY: { configured: true } } }) }
+  const container = document.createElement('div')
+  document.body.append(container)
+  const root = createRoot(container)
+  try {
+    await act(async () => root.render(createElement(DofeAccessGate, { credentials, settingsScope, settingsApi: {}, t: (key: string) => key } as never)))
+    expect(container.querySelector('[role="dialog"]')).toBeNull()
+    expect(container.querySelector('[role="status"]')?.textContent).toBe('loadError')
+    await act(async () => { await vi.advanceTimersByTimeAsync(5_000) })
+    expect(credentials.describe).toHaveBeenCalledTimes(2)
+    expect(container.textContent).toBe('')
+  } finally {
+    await act(async () => root.unmount())
+    container.remove()
+    vi.useRealTimers()
+  }
+})

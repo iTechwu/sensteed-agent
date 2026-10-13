@@ -14,6 +14,8 @@
  * the stable edition while the two implementations stay free to diverge.
  */
 
+import { auditHostDeveloperPlugins } from './host-developer-logging.ts'
+import { configureDeveloperLogging } from './developer-logging.ts'
 import type { Context, Volatile } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-settings'
 import z from '@deepseek-ai/schemastery'
@@ -76,7 +78,7 @@ export interface DesktopSettings {
   mode: DesktopShellMode
   /** Native translucency preference used on macOS custom-chrome modes. */
   macosMaterial: MacosWindowMaterial
-  /** Native backdrop preference used on Windows custom-chrome modes. */
+  /** Legacy Windows backdrop preference; every persisted value resolves to 'off'. */
   windowsMaterial: PersistedWindowsWindowMaterial
   /** Electron-native transparency preference used on Linux generations. */
   linuxMaterial: LinuxWindowMaterial
@@ -88,18 +90,23 @@ export interface DesktopSettings {
   networkExposure: DesktopNetworkExposure
   /** Log verbosity threshold applied to the file logger. */
   logLevel: 'debug' | 'info' | 'warn' | 'error'
+  /** Opt-in metadata tracing; absent in older saved configurations. */
+  developerLogging?: boolean
 }
 
 /** Schema of the editable Desktop preference subset. */
 export const DesktopSettingsSchema: z<DesktopSettings> = z.object({
   mode: z.union(['compatibility', 'extended', 'advanced'] as const).default('compatibility'),
   macosMaterial: z.union(['off', 'transparent'] as const).default(DEFAULT_MACOS_WINDOW_MATERIAL),
+  // Windows no longer offers a material. The removed Acrylic and Mica values
+  // stay schema-valid so older settings still boot; they resolve to 'off'.
   windowsMaterial: z.union(['off', 'acrylic', 'mica'] as const).default(DEFAULT_WINDOWS_WINDOW_MATERIAL),
   linuxMaterial: z.union(['off', 'transparent'] as const).default(DEFAULT_LINUX_WINDOW_MATERIAL),
   port: z.number().step(1).min(0).max(65_535).default(DESKTOP_DEFAULT_WEB_PORT),
   openBrowser: z.boolean().default(false),
   networkExposure: z.union(['loopback', 'lan'] as const).default('loopback'),
   logLevel: z.union(['debug', 'info', 'warn', 'error'] as const).default('info'),
+  developerLogging: z.boolean().default(false),
 })
 
 /**
@@ -124,6 +131,8 @@ export interface DesktopShellConfig {
   networkExposure: Volatile<DesktopNetworkExposure>
   /** Log verbosity threshold applied to the file logger. */
   logLevel: Volatile<'debug' | 'info' | 'warn' | 'error'>
+  /** Opt-in live diagnostic metadata capture. */
+  developerLogging?: Volatile<boolean>
   /** Initial window width in CSS pixels. */
   width: number
   /** Initial window height in CSS pixels. */
@@ -140,12 +149,14 @@ export interface DesktopShellConfig {
 export const DesktopShellConfig = z.object({
   mode: z.union(['compatibility', 'extended', 'advanced'] as const).default('compatibility').volatile(),
   macosMaterial: z.union(['off', 'transparent'] as const).default(DEFAULT_MACOS_WINDOW_MATERIAL).volatile(),
+  // Legacy Acrylic rows stay readable and resolve to 'off'; Mica stays selectable where supported.
   windowsMaterial: z.union(['off', 'acrylic', 'mica'] as const).default(DEFAULT_WINDOWS_WINDOW_MATERIAL).volatile(),
   linuxMaterial: z.union(['off', 'transparent'] as const).default(DEFAULT_LINUX_WINDOW_MATERIAL).volatile(),
   port: z.number().step(1).min(0).max(65_535).default(DESKTOP_DEFAULT_WEB_PORT).volatile(),
   openBrowser: z.boolean().default(false).volatile(),
   networkExposure: z.union(['loopback', 'lan'] as const).default('loopback').volatile(),
   logLevel: z.union(['debug', 'info', 'warn', 'error'] as const).default('info').volatile(),
+  developerLogging: z.boolean().default(false).volatile(),
   width: z.number().step(1).min(800).default(1280),
   height: z.number().step(1).min(600).default(840),
   minWidth: z.number().step(1).min(640).default(900),
@@ -254,6 +265,7 @@ export function createDesktopSettingsPort(
     openBrowser: config.openBrowser.get(),
     networkExposure: config.networkExposure.get(),
     logLevel: config.logLevel.get(),
+    developerLogging: config.developerLogging?.get() ?? false,
   })
   assertDesktopSettings(read(), platform)
   ctx.on('internal/config', function (_raw, next) {
@@ -292,6 +304,7 @@ function readCandidate(raw: unknown): DesktopSettings {
     openBrowser: candidate.openBrowser.get(),
     networkExposure: candidate.networkExposure.get(),
     logLevel: candidate.logLevel.get(),
+    developerLogging: candidate.developerLogging.get(),
   }
 }
 
@@ -317,6 +330,10 @@ export interface DesktopNotificationSettings {
   notifyOnJobCompletion: boolean
   /** Raise attention when a background job fails. */
   notifyOnJobFailure: boolean
+  /** Raise attention when a scheduled turn completes. */
+  notifyOnScheduleCompletion: boolean
+  /** Raise attention when a scheduled turn fails. */
+  notifyOnScheduleFailure: boolean
 }
 
 /** Schema of the editable notification preference subset. */
@@ -326,6 +343,8 @@ export const DesktopNotificationSettingsSchema: z<DesktopNotificationSettings> =
   notifyOnTurnFailure: z.boolean().default(true),
   notifyOnJobCompletion: z.boolean().default(true),
   notifyOnJobFailure: z.boolean().default(true),
+  notifyOnScheduleCompletion: z.boolean().default(true),
+  notifyOnScheduleFailure: z.boolean().default(true),
 })
 
 /** Live notification preferences. */
@@ -340,6 +359,10 @@ export interface DesktopNotificationConfig {
   notifyOnJobCompletion: Volatile<boolean>
   /** Raise attention when a background job fails. */
   notifyOnJobFailure: Volatile<boolean>
+  /** Raise attention when a scheduled turn completes. */
+  notifyOnScheduleCompletion: Volatile<boolean>
+  /** Raise attention when a scheduled turn fails. */
+  notifyOnScheduleFailure: Volatile<boolean>
 }
 
 /** Validated live notification preferences. */
@@ -349,6 +372,8 @@ export const DesktopNotificationConfig = z.object({
   notifyOnTurnFailure: z.boolean().default(true).volatile(),
   notifyOnJobCompletion: z.boolean().default(true).volatile(),
   notifyOnJobFailure: z.boolean().default(true).volatile(),
+  notifyOnScheduleCompletion: z.boolean().default(true).volatile(),
+  notifyOnScheduleFailure: z.boolean().default(true).volatile(),
 })
 
 /** Notification preferences standing before the first observed value. */
@@ -373,6 +398,8 @@ export function bindDesktopNotificationSettings(
     notifyOnTurnFailure: config.notifyOnTurnFailure.get(),
     notifyOnJobCompletion: config.notifyOnJobCompletion.get(),
     notifyOnJobFailure: config.notifyOnJobFailure.get(),
+    notifyOnScheduleCompletion: config.notifyOnScheduleCompletion.get(),
+    notifyOnScheduleFailure: config.notifyOnScheduleFailure.get(),
   })
   // Desktop owns a hand-written notifications page inside its settings section.
   ctx.inject(['settings'], (child) => {
@@ -484,15 +511,24 @@ export function observeDesktopPreferenceSettings(
     readEntryValue<DesktopSettings>(ctx, DESKTOP_SETTINGS_ENTRY_ID)
   const readNotifications = (): DesktopNotificationSettings | undefined =>
     readEntryValue<DesktopNotificationSettings>(ctx, DESKTOP_NOTIFICATIONS_SETTINGS_ENTRY_ID)
-  fileExporter?.setThreshold(readDesktop()?.logLevel ?? 'info')
+  let tracing = false
+  const applyLogging = (desktop: DesktopSettings | undefined) => {
+    const preferences = { developerLogging: desktop?.developerLogging === true, logLevel: desktop?.logLevel ?? 'info' }
+    fileExporter?.setThreshold(preferences.logLevel)
+    configureDeveloperLogging(preferences)
+    ctx.get('desktopRuntime')?.configureDeveloperLogging?.(preferences)
+    if (preferences.developerLogging && !tracing) auditHostDeveloperPlugins(ctx)
+    tracing = preferences.developerLogging
+  }
+  applyLogging(readDesktop())
   ctx.on('settings/document-updated', (ns) => {
     const namespace = String(ns)
     if (namespace !== DESKTOP_SETTINGS_ENTRY_ID
       && namespace !== DESKTOP_NOTIFICATIONS_SETTINGS_ENTRY_ID) return
     const desktop = readDesktop()
     const notifications = readNotifications()
+    if (namespace === DESKTOP_SETTINGS_ENTRY_ID) applyLogging(desktop)
     if (desktop === undefined || notifications === undefined) return
-    if (namespace === DESKTOP_SETTINGS_ENTRY_ID) fileExporter?.setThreshold(desktop.logLevel)
     const write = enqueueProfilePreferencesWrite(current => desktopProfilePreferencesFromSettings(
       desktop,
       notifications,

@@ -1,7 +1,7 @@
 {
   "name": "@dofe/dsh-knowledge-capture",
   "version": "0.2.0",
-  "description": "Yootun-Agent runtime Knowledge bridge over the authenticated public MCP gateway",
+  "description": "Sensteed-Agent runtime Knowledge bridge over the authenticated public MCP gateway",
   "type": "module",
   "main": "./index.js",
   "exports": {

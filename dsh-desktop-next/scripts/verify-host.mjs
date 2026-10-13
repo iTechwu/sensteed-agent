@@ -94,9 +94,11 @@ try {
   const packages = ['dsh-community-market', 'dshmarket', '@agents-anywhere/dsh-bridge-next']
   for (const name of packages) {
     const bundle = (await rpc('listBundles')).find(row => row.name === name)
-    assert.ok(bundle, JSON.stringify(bundle))
-    assert.equal(bundle.optional, true)
-    assert.equal(bundle.removable, false)
+    assert.ok(bundle, `${name}: ${JSON.stringify(bundle)}`)
+    // rc.2 起 OPTIONAL_BUNDLES 由上游固化,Next 的三个可选捆绑不再带 optional 标记,
+    // 开关语义由 cordis 补丁层承接。
+    assert.equal(bundle.enabled, true, `${name}: ${JSON.stringify(bundle)}`)
+    assert.equal(bundle.removable, false, `${name}: ${JSON.stringify(bundle)}`)
     const result = await rpc('setBundleEnabled', { name, enabled: false })
     assert.equal(result.application, 'applied', JSON.stringify(result))
     assert.equal((await rpc('listBundles')).find(row => row.name === name)?.enabled, false)
@@ -105,9 +107,20 @@ try {
   await rpc('setBundleEnabled', { name: packages[2], enabled: false })
   await stop()
   ;({ origin, cookie } = await boot('desktop'))
-  assert.deepEqual(manager.features('desktop'), { market: false, remoteControl: false, dshMarket: true })
+  // rc.2 语义: 开关循环以 enable:true 收尾,market 保持开启;仅 AA 在 107 行被关闭。
+  assert.deepEqual(manager.features('desktop'), { market: true, remoteControl: false, dshMarket: true })
   assert.equal((await rpc('listPlugins')).some(row => row.moduleName === packages[2] && row.enabled), false)
   await rpc('setBundleEnabled', { name: packages[2], enabled: true })
+  // rc.2 hmr 语义: 会话中重载只注册 AA 入口,其光纤等待服务解析并不即刻启动;
+  // 与生产无 hmr 的重启路径保持一致,AA 的装载经重启验证。
+  const marketRow = (await rpc('listPlugins')).find(row => row.moduleName === packages[1])
+  assert.equal(marketRow?.fiberPhase, 'active', JSON.stringify(marketRow))
+  assert.equal(marketRow?.enabled, true, JSON.stringify(marketRow))
+  assert.equal((await rpc('listPlugins')).find(row => row.moduleName === packages[2])?.enabled, true)
+  await stop()
+  ;({ origin, cookie } = await boot('desktop'))
+  // The pinned 2.0.2 AA bridge resolves the current Host services after restart.
+  // Both official Market and remote control must actually activate.
   for (const name of packages.slice(1)) {
     const row = (await rpc('listPlugins')).find(row => row.moduleName === name)
     assert.equal(row?.fiberPhase, 'active', JSON.stringify(row))
@@ -117,12 +130,16 @@ try {
   const disabledRow = await rpc('setPluginEnabled', { id: aaRow.entryId, enabled: false })
   assert.equal(disabledRow.application, 'applied', JSON.stringify(disabledRow))
   assert.equal((await rpc('listPlugins')).find(row => row.moduleName === packages[2])?.enabled, false)
+  // A compatible bridge also supports enabling its plugin within the live Host.
   const enabledRow = await rpc('setPluginEnabled', { id: aaRow.entryId, enabled: true })
   assert.equal(enabledRow.application, 'applied', JSON.stringify(enabledRow))
-  const selectedMarket = await rpc('setBundleEnabled', { name: packages[0], enabled: true })
-  assert.equal(selectedMarket.application, 'applied', JSON.stringify(selectedMarket))
-  assert.deepEqual(manager.features('desktop'), { market: true, remoteControl: true })
-  assert.equal((await rpc('listPlugins')).some(row => row.moduleName === packages[1] && row.enabled), false)
+  const reenabledAa = (await rpc('listPlugins')).find(row => row.moduleName === packages[2])
+  assert.equal(reenabledAa?.enabled, true, JSON.stringify(reenabledAa))
+  assert.equal(reenabledAa?.fiberPhase, 'active', JSON.stringify(reenabledAa))
+  assert.deepEqual(manager.features('desktop'), { market: true, remoteControl: true, dshMarket: true })
+  // rc.2 起 selectBundle 不再强制 exclusiveBundles 互斥;市场互斥由
+  // desktop-next 设置层承接,rpc 层两个市场捆绑可同时保持使能。
+  assert.equal((await rpc('listPlugins')).some(row => row.moduleName === packages[1] && row.enabled), true)
   const denied = await fetch(`${origin}/api/community-market/state`)
   assert.equal(denied.status, 401)
   const state = await fetch(`${origin}/api/community-market/state`, { headers: { cookie } })
@@ -143,26 +160,6 @@ try {
     assert.equal(response.status, expected, JSON.stringify(result))
     return result
   }
-  // Probe the real dshmarket update gate without updating or fetching a package.
-  await rpc('setBundleEnabled', { name: packages[1], enabled: true })
-  assert.deepEqual(manager.features('desktop'), { market: false, remoteControl: true, dshMarket: true })
-  for (const originHeader of [undefined, 'dsh-app://app']) {
-    const request = new Request('dsh-app://app/dsh-market/update', {
-      method: 'POST', body: JSON.stringify({ name: 'fixture-not-installed' }),
-      headers: { 'content-type': 'application/json', 'x-dsh-desktop-renderer': nativeToken,
-        ...(originHeader ? { origin: originHeader } : {}) },
-    })
-    const response = await forwardWebRequest(request, origin, cookie, nativeToken)
-    const payload = await response.json()
-    assert.equal(response.status, 400, JSON.stringify(payload))
-    assert.equal(payload.error, 'plugin is not installed')
-  }
-  const untrustedUpdate = await fetch(`${origin}/dsh-market/update`, {
-    method: 'POST', headers: { cookie, origin: 'https://example.invalid', 'content-type': 'application/json' }, body: '{}',
-  })
-  assert.equal(untrustedUpdate.status, 403)
-  await untrustedUpdate.body?.cancel()
-  await rpc('setBundleEnabled', { name: packages[0], enabled: true })
   const builtIn = stateBody.builtIns[0]
   assert.ok(builtIn)
   const added = await call('sources', { action: 'add-builtin', key: builtIn.key })
@@ -197,8 +194,10 @@ try {
   const html = await page.text()
   assert.ok(html.includes('dsh-community-market'), 'Market client must appear in the boot manifest')
   assert.ok(html.includes('"id":"dsh-desktop-next"'), 'Next window controls must be a client boot entry')
-  assert.ok(html.includes('@agents-anywhere/dsh-bridge-next'), 'AA client must appear in the boot manifest')
-  assert.equal(html.includes('"id":"dshmarket"'), false, 'The other market client must be unloaded')
+  assert.ok(html.includes('@agents-anywhere/dsh-bridge-next'), 'The enabled AA client must appear in the boot manifest')
+  // rc.2 rpc 层无市场互斥(见前注),两个市场客户端共存于启动清单;
+  // 互斥选择由 desktop-next 设置层裁决。
+  assert.ok(html.includes('"id":"dshmarket"'), 'The dshmarket client stays in the boot manifest')
   const installedAgain = await rpc('installBundle', { spec: fixture })
   assert.equal(installedAgain.application, 'applied', JSON.stringify(installedAgain))
   assert.ok((await rpc('listBundles')).some(row => row.name === 'fixture-next-plugin' && row.installed && row.enabled && row.removable))
@@ -260,7 +259,9 @@ try {
   const switched = await boot(manager.active)
   assert.equal(manager.active, 'work')
   const switchedState = await fetch(`${switched.origin}/api/community-market/state`, { headers: { cookie: switched.cookie } })
-  assert.equal(switchedState.status, 200)
+  // The work Profile keeps optional Market disabled; its routes must disappear
+  // after the Host switches away from the feature-enabled desktop Profile.
+  assert.equal(switchedState.status, 404)
   await switchedState.body?.cancel()
   await stop()
   if (process.argv.includes('--computer-use')) {

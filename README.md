@@ -62,7 +62,7 @@ Web 服务默认仅监听本机回环地址。开启「用浏览器打开」后�
 
 ```text
 ├── dsh-plugin-desktop/      桌面主包：Electron 宿主 + 客户端 + 打包脚本
-├── dsh-desktop-next/        下一代壳实验场（不在 workspace 与门禁内）
+├── dsh-desktop-next/        下一代壳实验场（workspace 成员，门禁覆盖 typecheck 与单测）
 ├── dsh-community-market/    社区市场：产品与安全设计
 ├── dsh-community-fabric/    插件互操作 RFC 与调研
 ├── .ci/dsh-*                DoFe 业务插件源码、品牌资源与 CI 资源
@@ -96,7 +96,7 @@ corepack pnpm build                       # 构建 market + 桌面主包
 | `verify:closure` | 一等运行时闭包校验（rc.1 为 319 节点） |
 | `verify:cli` | 打包后 CLI 引导运行时冒烟 |
 | `verify:loader` | Loader 装配冒烟（dofe-managed 装配与托盘桩） |
-| `verify:yootun-clients` | DoFe 客户端运行时校验 |
+| `verify:sensteed-clients` | DoFe 客户端运行时校验 |
 | `verify:profile` | 完整 profile 组合 + 渲染器清单冒烟 |
 | `verify:licenses` | 生产依赖许可证再分发白名单 |
 | `verify:operations` | 运维脚本单测 |
@@ -107,7 +107,7 @@ market 包另有独立 `check`（文档 → 构建 → 导出校验 → loader �
 
 | 平台 | 产物 | 说明 |
 | --- | --- | --- |
-| macOS | Universal DMG（另支持 arm64/x64 单架构冒烟） | 未签名冒烟 + 签名发布两条路径 |
+| macOS | Apple Silicon arm64 DMG | 未签名冒烟 + 签名发布两条路径 |
 | Windows | NSIS 安装程序 + 便携版 zip | 辅助安装消息、升级冒烟、运行中检测脚本齐备 |
 | Linux | AppImage / deb | x64，产物名与可执行名走品牌渲染 |
 

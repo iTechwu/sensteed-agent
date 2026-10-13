@@ -8,7 +8,100 @@
  * everything here is layout/packaging policy and changes rarely.
  */
 
+const MACOS_UNUSED_PLATFORM_RUNTIMES = [
+  '!node_modules/**/@anthropic-ai/claude-agent-sdk-{linux,win32}-*/**',
+  '!node_modules/**/@dataiku/uv-{linux,win32}-*/**',
+  '!node_modules/**/@deepseek-ai/libreoffice-kit-{linux,win32}-*/**',
+  '!node_modules/**/@openai/codex-{linux,win32}-*/**',
+  '!node_modules/**/@trycua/cua-driver-{linux,win32}-*/**',
+  '!node_modules/**/@ubjs/node-{linux,win32}-*/**',
+  '!node_modules/**/@vscode/ripgrep-{linux,win32}-*/**',
+  '!node_modules/**/lightningcss-{android,linux,win32}-*/**',
+  '!node_modules/**/node-addon-require-builtin-{linux,win32}-*/**',
+  '!node_modules/**/sherpa-onnx-{linux,win32}-*/**',
+  '!node_modules/**/@img/sharp-{linux,win32}-*/**',
+  '!node_modules/**/@img/sharp-libvips-{linux,win32}-*/**',
+  '!node_modules/**/@koromix/koffi-{linux,win32,freebsd,openbsd}-*/**',
+]
+
+const WINDOWS_UNUSED_PLATFORM_RUNTIMES = [
+  '!node_modules/**/@anthropic-ai/claude-agent-sdk-{darwin,linux}-*/**',
+  '!node_modules/**/@dataiku/uv-{darwin,linux}-*/**',
+  '!node_modules/**/@deepseek-ai/libreoffice-kit-{darwin,linux}-*/**',
+  '!node_modules/**/@openai/codex-{darwin,linux}-*/**',
+  '!node_modules/**/@trycua/cua-driver-{darwin,linux}-*/**',
+  '!node_modules/**/@ubjs/node-{darwin,linux}-*/**',
+  '!node_modules/**/@vscode/ripgrep-{darwin,linux}-*/**',
+  '!node_modules/**/lightningcss-{android,darwin,linux}-*/**',
+  '!node_modules/**/node-addon-require-builtin-{darwin,linux}-*/**',
+  '!node_modules/**/sherpa-onnx-{darwin,linux}-*/**',
+  '!node_modules/**/@img/sharp-{darwin,linux}-*/**',
+  '!node_modules/**/@img/sharp-libvips-{darwin,linux}-*/**',
+  '!node_modules/**/@koromix/koffi-{darwin,linux,freebsd,openbsd}-*/**',
+]
+
+const LINUX_UNUSED_PLATFORM_RUNTIMES = [
+  '!node_modules/**/@anthropic-ai/claude-agent-sdk-{darwin,win32}-*/**',
+  '!node_modules/**/@dataiku/uv-{darwin,win32}-*/**',
+  '!node_modules/**/@deepseek-ai/libreoffice-kit-{darwin,win32}-*/**',
+  '!node_modules/**/@openai/codex-{darwin,win32}-*/**',
+  '!node_modules/**/@trycua/cua-driver-{darwin,win32}-*/**',
+  '!node_modules/**/@ubjs/node-{darwin,win32}-*/**',
+  '!node_modules/**/@vscode/ripgrep-{darwin,win32}-*/**',
+  '!node_modules/**/lightningcss-{android,darwin,win32}-*/**',
+  '!node_modules/**/node-addon-require-builtin-{darwin,win32}-*/**',
+  '!node_modules/**/sherpa-onnx-{darwin,win32}-*/**',
+  '!node_modules/**/@img/sharp-{darwin,win32}-*/**',
+  '!node_modules/**/@img/sharp-libvips-{darwin,win32}-*/**',
+  '!node_modules/**/@koromix/koffi-{darwin,win32,freebsd,openbsd}-*/**',
+  '!node_modules/**/{linux-arm,linux-arm64,linux-ia32,linux-loong64,linux-ppc64,linux-riscv64,linux-s390x,linuxmusl-*,linux-arm64-musl,linux-x64-musl}-*/**',
+  '!node_modules/**/dsh-community-market/node_modules/**',
+]
+
+// Source maps are build/debug artifacts; keep executable code, declarations,
+// native runtimes, manifests, and licenses in the installed product.
+const RUNTIME_DEBUG_EXCLUSIONS = [
+  '!**/*.{js,cjs,mjs,ts,cts,mts,css}.map',
+  // The sidebar embeds its selected icons in lib/client*.js. Keep package
+  // metadata and licenses; afterPack rejects future runtime references.
+  '!node_modules/**/react-icons/**/*.{js,cjs,mjs,ts,cts,mts}',
+]
+
+const COMMON_APP_FILES = [
+  'build/app-icon.ico',
+  'build/app-icon.png',
+  'build/app-icon-mac.png',
+  'build/brand-logo.png',
+  'build/tray-icon*.png',
+  'cordis.patch.yml',
+  'lib/**',
+  // App-bundled third-party skills (bundled/skills) + the in-package manifest
+  // consumed by the packaged runtime smoke. Written only by
+  // scripts/refresh-bundled.mjs; the afterPack verifier asserts the entries.
+  'bundled/**',
+  // Huashu's animated showcase is README-only reference material. The skill
+  // runtime uses its engine, fonts, references, and generated assets, but never
+  // loads these demo GIFs; leave them in the repository while keeping them out
+  // of the installed application.
+  '!bundled/skills/huashu-art-motion/assets/showcase/**',
+  'package.json',
+  // a0a4298b0b 的运行时闭包：这些一方依赖的 pnpm store 拷贝会被
+  // 图收集器丢弃，globs 是它们进入 ASAR 的通道。
+  'node_modules/@opentelemetry/otlp-exporter-base/**',
+  'node_modules/@opentelemetry/otlp-transformer/**',
+  'node_modules/@opentelemetry/resources/**',
+  'node_modules/@opentelemetry/sdk-logs/**',
+  'node_modules/chokidar/**',
+  'node_modules/execa/**',
+  'node_modules/got/**',
+  'node_modules/turndown/**',
+  '!node_modules/koffi-darwin-*-3-1-1/**',
+  '!node_modules/node-pty/build/**',
+  ...RUNTIME_DEBUG_EXCLUSIONS,
+]
+
 export const ELECTRON_BUILDER_BASE = Object.freeze({
+  electronLanguages: ['en-US', 'zh-CN'],
   asar: {
     smartUnpack: true,
   },
@@ -16,9 +109,10 @@ export const ELECTRON_BUILDER_BASE = Object.freeze({
   afterPack: './scripts/verify-packaged-runtime.ts',
   electronDownload: {
     checksums: {
-      'electron-v43.4.0-darwin-arm64.zip': '827f9f182566f46846377575b51c547b9926b111637313a373b6f717462aebac',
-      'electron-v43.4.0-darwin-x64.zip': '7ab39ec1b0bcf5463f2dc0040142fbc1c30cd7bc3f99086066f588c717b11e24',
-      'electron-v43.4.0-win32-x64.zip': 'ef0709cfa719739acce73de6f9b684304baf38c6454376638a70d34a7cecffe0',
+      'electron-v44.0.0-darwin-arm64.zip': '076d79742986e1b100b69ebecc691cb07368045e54c9087cef631b8622b76a80',
+      'electron-v44.0.0-darwin-x64.zip': '28429e700ad68d9624aaa90b6543ffe891a48c14121fd904cd294e5edcee63ff',
+      'electron-v44.0.0-linux-x64.zip': 'd65286d812719f2b4c1a1b806a80f288a1058c89c7b058dae1e03ab25e499446',
+      'electron-v44.0.0-win32-x64.zip': 'e61aa3bcea8152bc0730abd015e47c032d778a0ef10e2a1c78ba3c4ea47942f9',
     },
   },
   electronFuses: {
@@ -34,25 +128,16 @@ export const ELECTRON_BUILDER_BASE = Object.freeze({
   toolsets: {
     nsis: '1.2.1',
   },
-  files: [
-    'build/app-icon.ico',
-    'build/app-icon.png',
-    'build/app-icon-mac.png',
-    'build/brand-logo.png',
-    'build/tray-icon*.png',
-    'cordis.patch.yml',
-    'lib/**',
-    'package.json',
-    '!node_modules/koffi-darwin-*-3-1-1/**',
-    '!node_modules/node-pty/build/**',
-  ],
+  files: COMMON_APP_FILES,
   mac: {
     asarUnpack: [
       'build/app-icon-mac.png',
       'build/tray-iconTemplate.png',
       'build/tray-iconTemplate@2x.png',
       'node_modules/fs-ext/**',
+      'node_modules/@agents-anywhere/dsh-bridge-next/lib/bundled-connector/**',
       'node_modules/node-addon-require-builtin/**',
+      'node_modules/node-addon-native-custom-loader/**',
       'node_modules/node-addon-require-builtin-darwin-arm64/**',
       'node_modules/node-addon-require-builtin-darwin-x64/**',
     ],
@@ -64,7 +149,7 @@ export const ELECTRON_BUILDER_BASE = Object.freeze({
       'cordis.patch.yml',
       'lib/**',
       'package.json',
-      '!node_modules/@img/sharp-linux*/**',
+                      '!node_modules/@img/sharp-linux*/**',
       '!node_modules/@img/sharp-libvips-linux*/**',
       '!node_modules/@koromix/koffi-linux*/**',
       '!node_modules/@koromix/koffi-freebsd*/**',
@@ -82,10 +167,31 @@ export const ELECTRON_BUILDER_BASE = Object.freeze({
       '!node_modules/**/lightningcss-win32*/**',
       '!node_modules/**/@vscode/ripgrep-linux*/**',
       '!node_modules/**/@vscode/ripgrep-win32*/**',
+      // Local stores can retain optional binaries for other platforms. The
+      // product targets Apple Silicon only, so Intel macOS payloads are also
+      // excluded instead of relying on electron-builder's collector choice.
+      '!node_modules/**/@dataiku/uv-darwin-x64/**',
+      '!node_modules/**/@deepseek-ai/node-addon-system-darwin-x64/**',
+      '!node_modules/**/@img/sharp-darwin-x64/**',
+      '!node_modules/**/@img/sharp-libvips-darwin-x64/**',
+      '!node_modules/**/@koromix/koffi-darwin-x64/**',
+      '!node_modules/**/@openai/codex-darwin-x64/**',
+      '!node_modules/**/@anthropic-ai/claude-agent-sdk-darwin-x64/**',
+      '!node_modules/**/@trycua/cua-driver-darwin-x64/**',
+      '!node_modules/**/@ubjs/node-darwin-x64/**',
+      '!node_modules/**/@vscode/ripgrep-darwin-x64/**',
+      '!node_modules/**/node-addon-require-builtin-darwin-x64/**',
+      '!node_modules/**/node-pty/prebuilds/darwin-x64/**',
+      '!node_modules/**/lightningcss-darwin-x64/**',
       '!node_modules/koffi-win32-x64-3-1-1/**',
+      ...MACOS_UNUSED_PLATFORM_RUNTIMES,
+      ...RUNTIME_DEBUG_EXCLUSIONS,
     ],
     target: [
-      'dir',
+      {
+        target: 'dir',
+        arch: ['arm64'],
+      },
     ],
     category: 'public.app-category.developer-tools',
     extendInfo: {
@@ -98,12 +204,14 @@ export const ELECTRON_BUILDER_BASE = Object.freeze({
     },
     hardenedRuntime: true,
     icon: 'build/app-icon-mac.png',
-    mergeASARs: false,
+    // Keep the single app.asar layout consumed by afterPack and native-runtime
+    // verification. The universal toolchain patch avoids oversized unpack globs.
+    mergeASARs: true,
     notarize: true,
     signIgnore: [
       '\\.(?:pak|dat|wasm)$',
     ],
-      x64ArchFiles: '**/node_modules/{@deepseek-ai/node-addon-system-darwin-*/**,@deepseek-ai/libreoffice-kit-darwin-*/**,node-pty/prebuilds/darwin-*/**,fs-ext/prebuilds/darwin-*/**,node-addon-require-builtin-darwin-*/**,@vscode/ripgrep-darwin-*/**,@img/sharp-darwin-*/**,@img/sharp-libvips-darwin-*/**,@koromix/koffi-darwin-*/**,lightningcss-darwin-*/**,@anthropic-ai/claude-agent-sdk-darwin-*/**,@openai/codex-darwin-*/**,@trycua/cua-driver-darwin-*/**,@ubjs/node-darwin-*/**,sherpa-onnx-darwin-*/**}',
+      x64ArchFiles: '**/node_modules/{@deepseek-ai/node-addon-system-darwin-*/**,@deepseek-ai/libreoffice-kit-darwin-*/**,node-pty/prebuilds/darwin-*/**,fs-ext/prebuilds/darwin-*/**,node-addon-require-builtin-darwin-*/**,@vscode/ripgrep-darwin-*/**,@img/sharp-darwin-*/**,@img/sharp-libvips-darwin-*/**,@koromix/koffi-darwin-*/**,lightningcss-darwin-*/**,@anthropic-ai/claude-agent-sdk-darwin-*/**,@openai/codex-darwin-*/**,@trycua/cua-driver-darwin-*/**,@ubjs/node-darwin-*/**,sherpa-onnx-darwin-*/**,@dataiku/uv-darwin-*/**}',
   },
   win: {
     asarUnpack: [
@@ -114,10 +222,47 @@ export const ELECTRON_BUILDER_BASE = Object.freeze({
       'build/tray-icon-blue@2x.png',
       'node_modules/@agents-anywhere/dsh-bridge-next/lib/bundled-connector/**',
       'node_modules/node-addon-require-builtin/**',
+      'node_modules/node-addon-native-custom-loader/**',
       'node_modules/node-addon-require-builtin-win32-x64/**',
       'node_modules/node-addon-require-builtin-win32-arm64/**',
     ],
     files: [
+      // The AA bridge junction is dropped from the archive by the Windows
+      // dependency-tree copy; force it in through the top-level link and keep
+      // the published tarball's residual nested node_modules out.
+      'node_modules/@agents-anywhere/dsh-bridge-next/**',
+      '!node_modules/@agents-anywhere/dsh-bridge-next/node_modules/**',
+      // Same junction story for every harness workspace Koffi consumer: the
+      // nested koffi platform junction is dropped by the dependency copy while
+      // the file set still records it, failing NSIS with "was not found in
+      // this archive". Ship the package body; runtime resolves koffi through
+      // the root 3.1.5 instance the desktop already depends on.
+      'node_modules/@deepseek-ai/dsh-fs-local/**',
+      'node_modules/@deepseek-ai/dsh-host-directory-picker-native/**',
+      'node_modules/@deepseek-ai/dsh-sandbox-windows-acl/**',
+      'node_modules/@deepseek-ai/dsh-session-persistence-jsonl/**',
+      'node_modules/@deepseek-ai/dsh-subprocess-local/**',
+      'node_modules/@deepseek-ai/dsh-win32-process/**',
+      '!node_modules/@deepseek-ai/dsh-fs-local/node_modules/**',
+      '!node_modules/@deepseek-ai/dsh-host-directory-picker-native/node_modules/**',
+      '!node_modules/@deepseek-ai/dsh-sandbox-windows-acl/node_modules/**',
+      '!node_modules/@deepseek-ai/dsh-session-persistence-jsonl/node_modules/**',
+      '!node_modules/@deepseek-ai/dsh-subprocess-local/node_modules/**',
+      '!node_modules/@deepseek-ai/dsh-win32-process/node_modules/**',
+      // 合并新增的平台运行时包同样会被依赖树拷贝丢档，显式 glob 强制去引用。
+      'node_modules/@deepseek-ai/libreoffice-kit-win32-x64/**',
+      // sources/ 是引擎构建期源码（运行时只用 bin/ 与 program/），CI 依赖拷贝
+      // 会丢档该子树并使 NSIS 校验失败；显式剔除，收录与体积双赢。
+      '!node_modules/@deepseek-ai/libreoffice-kit-win32-x64/sources/**',
+      // 上游合并引入的 workspace 循环链接（cordis ↔ cordis-plugin-loader 等）
+      // 让 Windows 依赖拷贝在 ELOOP 处中止、其后所有条目按遍历序丢档
+      // （koffi/libreoffice/sharp 依次报错即此因）。把循环链从档中剔除；
+      // 运行时模块解析沿目录树上溯到顶层 workspace 副本。
+      '!node_modules/dsh-community-market/node_modules/**/@deepseek-ai/cordis/**',
+      '!node_modules/dsh-community-market/node_modules/**/@deepseek-ai/cordis-plugin-loader/**',
+      '!node_modules/dsh-community-market/node_modules/**/@deepseek-ai/dsh-brand/**',
+      '!node_modules/dsh-community-market/node_modules/**/@deepseek-ai/dsh-typert-protocol/**',
+      '!node_modules/dsh-community-market/node_modules/**/@deepseek-ai/dsh-workspace/**',
       '!node_modules/@img/sharp-darwin*/**',
       '!node_modules/@img/sharp-libvips-darwin*/**',
       '!node_modules/@img/sharp-win32-arm64*/**',
@@ -134,6 +279,8 @@ export const ELECTRON_BUILDER_BASE = Object.freeze({
       '!node_modules/node-addon-require-builtin-win32-arm64*/**',
       '!node_modules/node-addon-require-builtin-win32-ia32*/**',
       '!node_modules/koffi-darwin-*-3-1-1/**',
+      ...WINDOWS_UNUSED_PLATFORM_RUNTIMES,
+      ...RUNTIME_DEBUG_EXCLUSIONS,
     ],
     target: [
       {
@@ -159,6 +306,10 @@ export const ELECTRON_BUILDER_BASE = Object.freeze({
     useZip: false,
   },
   linux: {
+    files: [
+      ...COMMON_APP_FILES,
+      ...LINUX_UNUSED_PLATFORM_RUNTIMES,
+    ],
     target: [
       {
         target: 'AppImage',

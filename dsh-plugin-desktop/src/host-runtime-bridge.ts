@@ -3,12 +3,12 @@ import type { DesktopLocale, DesktopRuntime, DesktopShellSpec, DesktopTrayItem, 
 import { HostRpc } from './host-rpc.ts'
 import { parseDesktopPlatformLoginRequest } from './platform-login.ts'
 
-export type RuntimeSnapshot = Pick<DesktopRuntime, 'platform' | 'windowsBuild' | 'locale'> & {
-  updates: Omit<DesktopUpdateAdapter, 'request' | 'confirmDownload' | 'showManualCheckResult' | 'downloadAndOpen' | 'notify'>
+export type RuntimeSnapshot = Pick<DesktopRuntime, 'platform' | 'locale'> & {
+  updates: Omit<DesktopUpdateAdapter, 'request' | 'confirmDownload' | 'showManualCheckResult' | 'downloadAndOpen' | 'notify' | 'reportMandatoryUpdatePolicy'>
 }
 export function runtimeSnapshot(runtime: DesktopRuntime): RuntimeSnapshot {
   const { isPackaged, canDownload, currentVersion, releaseChannel, statePath, installationId } = runtime.updates
-  return { platform: runtime.platform, windowsBuild: runtime.windowsBuild, locale: runtime.locale,
+  return { platform: runtime.platform, locale: runtime.locale,
     updates: { isPackaged, canDownload, currentVersion, statePath,
       ...(releaseChannel ? { releaseChannel } : {}), ...(installationId ? { installationId } : {}) } }
 }
@@ -47,7 +47,7 @@ export function createHostRuntime(rpc: HostRpc, snapshot: RuntimeSnapshot): Desk
     return localeSync
   }
   const runtime: DesktopRuntime = {
-    platform: snapshot.platform, windowsBuild: snapshot.windowsBuild,
+    platform: snapshot.platform,
     get locale() { return locale },
     updates: {
       ...snapshot.updates,
@@ -62,14 +62,16 @@ export function createHostRuntime(rpc: HostRpc, snapshot: RuntimeSnapshot): Desk
       downloadAndOpen: (version, signal, channel) => send('update:downloadAndOpen', [version, channel], signal),
       notify: notification => { void send('update:notify', [notification]) },
     },
+    reportMandatoryUpdatePolicy(policy) { void send('native:reportMandatoryUpdatePolicy', [policy]) },
     schedule(spec) {
       const callback = callbacks({ quit: spec.requestQuit, mode: spec.requestModeChange,
         ...(spec.readRemoteControl ? { remoteRead: spec.readRemoteControl } : {}),
         ...(spec.enableRemoteControl ? { remoteEnable: spec.enableRemoteControl } : {}),
+        ...(spec.applySetupSettings ? { setup: spec.applySetupSettings } : {}),
       })
-      const { readLocalePreference, readThemeSource, requestQuit: _quit, requestModeChange: _mode, readRemoteControl: _remoteRead, enableRemoteControl: _remoteEnable, ...data } = spec
+      const { readLocalePreference, readThemeSource, requestQuit: _quit, requestModeChange: _mode, readRemoteControl: _remoteRead, enableRemoteControl: _remoteEnable, applySetupSettings: _setup, ...data } = spec
       shellSpecs.set(callback.id, spec)
-      trackSetup(send('shell:schedule', [callback.id, data, readLocalePreference(), readThemeSource(), Boolean(spec.readRemoteControl && spec.enableRemoteControl)]))
+      trackSetup(send('shell:schedule', [callback.id, data, readLocalePreference(), readThemeSource(), Boolean(spec.readRemoteControl && spec.enableRemoteControl), Boolean(spec.applySetupSettings)]))
       return async () => { try { await send('shell:dispose', [callback.id]) } finally { shellSpecs.delete(callback.id); callback.release() } }
     },
     // The parent mounts only after Host boot and this barrier finish.
@@ -104,6 +106,7 @@ export function createHostRuntime(rpc: HostRpc, snapshot: RuntimeSnapshot): Desk
       publish()
       return { refresh: publish, dispose() { trayPublishers.delete(id); releases.forEach(release => release()); void send('tray:dispose', [id]) } }
     },
+    configureDeveloperLogging(preferences) { void send('native:configureDeveloperLogging', [preferences]) },
     show() { void send('native:show') },
     notifyAttention(value) { void send('native:notifyAttention', [value]) },
     openTerminal() { void send('native:openTerminal') },
@@ -136,6 +139,13 @@ export function createHostRuntime(rpc: HostRpc, snapshot: RuntimeSnapshot): Desk
     },
     openOpenMontage: apiKey => send('native:openOpenMontage', [apiKey]),
     openExternal: url => send('native:openExternal', [url]),
+    requestDofeAuth: async (url, init) => {
+      const { signal, ...options } = init
+      const response = await send<{ body: string; status: number; headers: [string, string][] }>('native:requestDofeAuth',
+        [url, { ...options, headers: [...new Headers(init.headers).entries()] }], signal ?? undefined)
+      return new Response([204, 205, 304].includes(response.status) ? null : response.body,
+        { status: response.status, headers: response.headers })
+    },
     openBossWeb: url => send('native:openBossWeb', [url]),
     openContentPlatformWeb: (platform, url) => send('native:openContentPlatformWeb', [platform, url]),
   }
@@ -156,6 +166,10 @@ export function bindNativeRuntime(rpc: HostRpc, runtime: DesktopRuntime): () => 
     'setThemeSource', 'prepareToQuit'] as const) {
     handle(`native:${method}`, args => (runtime[method] as (...args: any[]) => unknown).apply(runtime, args))
   }
+  handle('native:configureDeveloperLogging', ([preferences]) => {
+    if (!preferences || typeof preferences.developerLogging !== 'boolean' || !['debug', 'info', 'warn', 'error'].includes(preferences.logLevel)) throw new TypeError('Invalid logging preferences')
+    runtime.configureDeveloperLogging?.(preferences)
+  })
   handle('native:platformLogin', ([request]) => { runtime.platformLogin(parseDesktopPlatformLoginRequest(request)) })
   handle('native:setLocalePreference', ([preference]) => {
     runtime.setLocalePreference(preference)
@@ -173,11 +187,17 @@ export function bindNativeRuntime(rpc: HostRpc, runtime: DesktopRuntime): () => 
     onSubmit: name => callback(`${id}:submit`, [name]), onCancel: () => report(callback(`${id}:cancel`)),
   }))
   handle('native:openOpenMontage', ([apiKey]) => runtime.openOpenMontage(apiKey as string))
+  handle('native:reportMandatoryUpdatePolicy', ([policy]) => { runtime.reportMandatoryUpdatePolicy(policy as Parameters<DesktopRuntime['reportMandatoryUpdatePolicy']>[0]) })
   handle('native:openExternal', ([url]) => runtime.openExternal(url as string))
+  handle('native:requestDofeAuth', async ([url, init], signal) => {
+    if (!runtime.requestDofeAuth) throw new Error('Desktop authentication transport is unavailable')
+    const response = await runtime.requestDofeAuth(url, { ...init, signal })
+    return { body: await response.text(), status: response.status, headers: [...response.headers.entries()] }
+  })
   handle('native:openBossWeb', ([url]) => runtime.openBossWeb(url as string | undefined))
   handle('native:openContentPlatformWeb', ([platform, url]) =>
     runtime.openContentPlatformWeb(platform as 'toutiao' | 'baidu' | 'xiaohongshu' | 'sohu', url as string))
-  handle('shell:schedule', ([id, data, locale, theme, remoteControl]) => {
+  handle('shell:schedule', ([id, data, locale, theme, remoteControl, setupSettings]) => {
     if (shells.has(id)) throw new Error('Duplicate Host shell')
     const state = { locale, theme }
     preferences.set(id, state)
@@ -188,6 +208,9 @@ export function bindNativeRuntime(rpc: HostRpc, runtime: DesktopRuntime): () => 
       ...(remoteControl ? {
         readRemoteControl: () => callback(`${id}:remoteRead`),
         enableRemoteControl: () => callback(`${id}:remoteEnable`),
+      } : {}),
+      ...(setupSettings ? {
+        applySetupSettings: (settings: unknown) => callback(`${id}:setup`, [settings]),
       } : {}),
     } as DesktopShellSpec))
   })

@@ -20,6 +20,8 @@ export type RendererSurfaceReadiness = () => string | undefined
 
 const ACTIVE_FIBER_STATE = 2
 const LOADER_SETTLEMENT_GRACE_MS = 5_000
+const SURFACE_READINESS_POLL_MS = 100
+const SURFACE_READINESS_GRACE_MS = 15_000
 const BOOT_REPORT_TIMEOUT_MS = 15_000
 
 /**
@@ -32,6 +34,7 @@ const BOOT_REPORT_TIMEOUT_MS = 15_000
 export async function rendererBootReport(
   loader: RendererBootLoader,
   surfaceReadiness?: RendererSurfaceReadiness,
+  surfaceReadinessGraceMs: number = SURFACE_READINESS_GRACE_MS,
 ): Promise<RendererBootReport> {
   let error: string | undefined
   let timeout: ReturnType<typeof setTimeout> | undefined
@@ -49,10 +52,19 @@ export async function rendererBootReport(
   } finally {
     if (timeout !== undefined) clearTimeout(timeout)
   }
-  const plugins = [...loader.entries()]
-    .filter(entry => entry.fiber !== undefined && entry.fiber.state !== ACTIVE_FIBER_STATE)
+  const inactivePlugins = (): string[] => [...loader.entries()]
+    .filter(entry => entry.fiber?.state !== ACTIVE_FIBER_STATE)
     .map(entry => entry.options.name)
-  error ??= surfaceReadiness?.()
+  let plugins = inactivePlugins()
+  if (error === undefined && surfaceReadiness !== undefined) {
+    const started = Date.now()
+    while (true) {
+      error = surfaceReadiness()
+      if ((error === undefined && plugins.length === 0) || Date.now() - started >= surfaceReadinessGraceMs) break
+      await new Promise<void>(resolve => setTimeout(resolve, SURFACE_READINESS_POLL_MS))
+      plugins = inactivePlugins()
+    }
+  }
   return error === undefined && plugins.length === 0
     ? { status: 'healthy' }
     : { status: 'failed', plugins, ...(error === undefined ? {} : { error }) }

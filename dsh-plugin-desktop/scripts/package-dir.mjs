@@ -1,3 +1,4 @@
+import { assertPackagingRelease } from '../../scripts/release-contract.mjs'
 /** Build an unsigned unpacked application for the current host platform. */
 
 import { spawnSync } from 'node:child_process'
@@ -7,6 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { electronBuilderEnvironment } from './electron-builder-environment.ts'
 import { withoutWindowsSigningSecrets } from './package-win.ts'
 import { withoutMacReleaseSecrets } from './release-preflight.ts'
+import { refreshBundledForPackaging } from './refresh-bundled-cli.ts'
 
 const require = createRequire(import.meta.url)
 const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)))
@@ -32,6 +34,8 @@ export const UNSIGNED_DIRECTORY_BUILD_ARGS = Object.freeze([
 export function unsignedDirectoryBuildEnvironment(environment) {
   return electronBuilderEnvironment({
     ...withoutWindowsSigningSecrets(withoutMacReleaseSecrets(environment)),
+    DSH_ELECTRON_BUILDER_TARGET_PLATFORM: process.platform,
+    DSH_ELECTRON_BUILDER_TARGET_ARCH: process.arch,
     CSC_IDENTITY_AUTO_DISCOVERY: 'false',
   })
 }
@@ -45,6 +49,7 @@ export function unsignedDirectoryBuildEnvironment(environment) {
  *   electronDistPath?: string,
  *   nodeExecutable?: string,
  *   run?: typeof spawnSync,
+ *   refreshBundled?: () => void,
  * }} [options]
  */
 export function packageDirectory(options = {}) {
@@ -52,6 +57,9 @@ export function packageDirectory(options = {}) {
   const nodeExecutable = options.nodeExecutable ?? process.execPath
   const electronBuilderCli = options.electronBuilderCli ?? builderCli
   const configuredElectronDist = options.electronDistPath ?? electronDist
+  const refreshBundled = options.refreshBundled
+    ?? (() => refreshBundledForPackaging('refresh', resolve(packageRoot, '..')))
+  refreshBundled()
   const result = run(
     nodeExecutable,
     [
@@ -76,5 +84,6 @@ export function packageDirectory(options = {}) {
 
 const invokedPath = process.argv[1]
 if (invokedPath !== undefined && fileURLToPath(import.meta.url) === resolve(invokedPath)) {
+  assertPackagingRelease()
   packageDirectory()
 }

@@ -1,3 +1,4 @@
+import { assertPackagingRelease } from '../../scripts/release-contract.mjs'
 /** Build a signed and notarized macOS DMG from validated release credentials. */
 
 import { spawnSync } from 'node:child_process'
@@ -12,6 +13,7 @@ import {
 import { prepareInstalledMacUniversalRuntime } from './mac-universal.ts'
 import { prepareFsExtForElectron } from './prepare-fs-ext.ts'
 import { electronBuilderEnvironment } from './electron-builder-environment.ts'
+import { refreshBundledForPackaging } from './refresh-bundled-cli.ts'
 
 /** Injectable release boundary used by focused tests. */
 export interface MacReleaseOptions {
@@ -19,6 +21,7 @@ export interface MacReleaseOptions {
   readonly env: NodeJS.ProcessEnv
   /** Platform executing the release. */
   readonly platform: NodeJS.Platform
+  readonly arch: string
   /** Desktop package root containing package.json. */
   readonly desktopRoot: string
   /** Dedicated signed-release output directory, isolated from historical artifacts. */
@@ -36,8 +39,10 @@ export interface MacReleaseOptions {
   ) => void
   /** Report non-secret release progress. */
   readonly log: (message: string) => void
-  /** Validate and prepare both architecture-specific runtime trees. */
+  /** Validate and prepare the Apple Silicon runtime tree. */
   readonly prepareRuntime: () => void
+  /** Verify the committed bundled skills/plugins before the check gate. */
+  readonly refreshBundled: () => void
 }
 
 function listCodeSigningIdentities(env: NodeJS.ProcessEnv): string {
@@ -66,6 +71,7 @@ function defaultReleaseOptions(): MacReleaseOptions {
   return {
     env: process.env,
     platform: process.platform,
+    arch: process.arch,
     desktopRoot,
     outputDir,
     resetOutput: () => rmSync(outputDir, { recursive: true, force: true }),
@@ -74,9 +80,10 @@ function defaultReleaseOptions(): MacReleaseOptions {
     log: message => console.log(message),
     prepareRuntime: () => {
       prepareFsExtForElectron({ platform: 'darwin', arch: 'arm64', desktopRoot })
-      prepareFsExtForElectron({ platform: 'darwin', arch: 'x64', desktopRoot })
-      prepareInstalledMacUniversalRuntime(desktopRoot)
+      prepareInstalledMacUniversalRuntime(desktopRoot, ['arm64'])
     },
+    // Signed releases are hermetic: verify the committed snapshot, no network.
+    refreshBundled: () => refreshBundledForPackaging('verify', resolve(desktopRoot, '..')),
   }
 }
 
@@ -85,6 +92,7 @@ function defaultReleaseOptions(): MacReleaseOptions {
  * @param options - Injectable process and command boundaries.
  */
 export function releaseMac(options: MacReleaseOptions = defaultReleaseOptions()): void {
+  if (options.arch !== 'arm64') throw new Error('macOS releases require Apple Silicon arm64 Node')
   const releaseEnvironment = adaptMacReleaseEnvironment(options.env)
   const buildEnvironment = withoutMacReleaseSecrets(releaseEnvironment)
   const result = assertMacReleaseReady({
@@ -98,6 +106,7 @@ export function releaseMac(options: MacReleaseOptions = defaultReleaseOptions())
 
   // The workspace check includes the package build and repository-layout gate. Signing
   // material is withheld from every build, test, Loader smoke, and layout subprocess.
+  options.refreshBundled()
   options.run(
     process.execPath,
     ['scripts/prepare-agents-anywhere-release.mjs', '--verify-release'],
@@ -108,11 +117,15 @@ export function releaseMac(options: MacReleaseOptions = defaultReleaseOptions())
   options.resetOutput()
   options.prepareRuntime()
   options.run('pnpm', [
-    'exec', 'electron-builder', '--mac', 'dmg', '--universal',
+    'exec', 'electron-builder', '--mac', 'dmg', '--arm64',
     '--config.forceCodeSigning=true', '--config.mac.notarize=true',
     '--config.npmRebuild=false',
     `--config.directories.output=${options.outputDir}`,
-  ], options.desktopRoot, electronBuilderEnvironment(releaseEnvironment))
+  ], options.desktopRoot, electronBuilderEnvironment({
+    ...releaseEnvironment,
+    DSH_ELECTRON_BUILDER_TARGET_PLATFORM: 'darwin',
+    DSH_ELECTRON_BUILDER_TARGET_ARCH: 'arm64',
+  }))
   options.run(
     process.execPath,
     ['scripts/verify-mac-release.ts', options.outputDir],
@@ -124,6 +137,7 @@ export function releaseMac(options: MacReleaseOptions = defaultReleaseOptions())
 const invokedPath = process.argv[1]
 if (invokedPath !== undefined && resolve(invokedPath) === fileURLToPath(import.meta.url)) {
   try {
+    assertPackagingRelease()
     releaseMac()
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error))

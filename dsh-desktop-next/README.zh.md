@@ -2,46 +2,46 @@
 
 [English](README.md) | 中文
 
-基于 DeepSeek Harness **0.1.6-alpha.2** 的独立实验包。主窗口直接加载官方发布的 `@deepseek-ai/dsh-web-frontend`，复用官方 Web 应用、插件管理器和基本桌面样式；Next 添加系统托盘、桌面设置和工具、Profile、恢复、Agents Anywhere 手机远控、社区市场和 dshmarket。
+基于 DeepSeek Harness **0.1.7-rc.2** 的独立实验包。主窗口直接加载官方发布的 `@deepseek-ai/dsh-web-frontend`，复用官方 Web 应用、插件管理器和基本桌面样式；Next 添加系统托盘、桌面设置和工具、Profile、恢复、Agents Anywhere 手机远控、社区市场和 dshmarket。
 
 ## 开发与验证
 
-在外层仓库根目录执行，使用 Node.js `^22.19.0` 或 `>=24.0.0`，以及 Corepack 提供的 Yarn 4.18.0：
+在外层仓库根目录执行，使用 Node.js `^22.19.0` 或 `>=24.0.0`，以及根 pnpm 发行版（Corepack）。`dsh-desktop-next` 是根 pnpm workspace 成员，其 `@deepseek-ai/dsh-*` 依赖经 `linkWorkspacePackages` 解析到 sibling fork 源：
 
 ```sh
-git submodule update --init --recursive
-corepack yarn install --immutable
-corepack yarn check:next
-corepack yarn dev:next
+corepack pnpm install --frozen-lockfile
+corepack pnpm --filter dsh-community-market build
+corepack pnpm --filter dsh-desktop-next run check
+corepack pnpm --filter dsh-desktop-next run dev
 ```
 
-`check:next` 构建市场与 Next，执行类型检查、单元测试、官方前端与沙箱 preload 检查，以及临时目录中的真实 Host 检查，不打开图形应用。后者使用离线本地测试插件验证 pnpm、市场卸载与重启请求、鉴权、Profile 切换和恢复后启动，并清理测试进程与文件。额外的真实运行时检查覆盖原生 HTTP/WebSocket 访问限制、浏览器访问切换、损坏清单、独立安全模式、全局补丁修复与进程退出。
+`check` 构建 Next，执行类型检查、单元测试、官方前端与沙箱 preload 检查，以及临时目录中的真实 Host 检查，不打开图形应用。后者使用离线本地测试插件验证 pnpm、市场卸载与重启请求、鉴权、Profile 切换和恢复后启动，并清理测试进程与文件。额外的真实运行时检查覆盖原生 HTTP/WebSocket 访问限制、浏览器访问切换、损坏清单、独立安全模式、全局补丁修复与进程退出。市场源变更后先构建 Market。
 
-`dev:next` 是显式的图形启动命令；已有构建可用 `corepack yarn start:next` 启动。Electron 二进制尚未缓存时会下载。需要额外检查真实 Electron Node 模式时，先完成构建，再运行：
+`dev` 是显式的图形启动命令；已有构建可用 `corepack pnpm --filter dsh-desktop-next run start` 启动。Electron 二进制尚未缓存时会下载。需要额外检查真实 Electron Node 模式时，先完成构建，再运行：
 
 ```sh
-corepack yarn workspace dsh-desktop-next verify:host:electron
+corepack pnpm --filter dsh-desktop-next run verify:host:electron
 ```
 
 此检查不打开 Electron 窗口。主窗口呈现、原生对话框和真实手机连接仍需手动验收。
 
-CI 还会在 Linux 中运行 `xvfb-run --auto-servernum corepack yarn workspace dsh-desktop-next verify:protocol --no-sandbox`。此独立测试使用真实 Electron 渲染进程、自定义协议和临时 Host，在关闭普通浏览器访问时验证市场源操作，并拒绝其他页面来源的请求。它不属于跨平台的 `check:next` 命令；关闭沙箱的参数仅用于这个隔离的 CI 进程。
+CI 还会在 Linux 中运行 `xvfb-run --auto-servernum corepack pnpm --filter dsh-desktop-next run verify:protocol --no-sandbox`。此独立测试使用真实 Electron 渲染进程、自定义协议和临时 Host，在关闭普通浏览器访问时验证市场源操作，并拒绝其他页面来源的请求。它不属于跨平台的 `check` 命令；关闭沙箱的参数仅用于这个隔离的 CI 进程。
 
 同一 Linux/Xvfb 环境中的 `verify:sidebar-browser --no-sandbox` 使用同时返回 `frame-ancestors 'none'` 和 `X-Frame-Options: DENY` 的本地测试页，验证 iframe 被拦截、凭租约挂载的真实访客页成功加载、访客自身的安全设置、应用 Cookie 与 preload 隔离、原生历史、伪造租约被拒、工作区分区隔离，以及释放后的清理。跨平台的 `verify:window-controls` 则通过模拟原生接口检查官方工具栏、分栏缩放、弹窗遮挡、标签切换与关闭，并验证普通 Web 客户端仍使用 iframe。
 
 macOS 侧栏和标题栏回归检查会用临时数据目录，在无界面的 Chromium 中运行官方前端的 Desktop 启动分支。测试使用与 Next 相同的入口文档，通过模拟的 preload 接口提供真实 Host 注入，并断言已进入 Desktop 传输模式；随后验证选择工作区之前与创建真实空白会话之后复用同一套官方顶栏，首页及插件列表／详情页可重新展开侧栏，透明拖动区域保持固定而插件标题按原样滚动，控件滚入拖动区域后仍可点击。测试还会打开官方设置中的“桌面设置”分区，验证设置和 Profile 操作，并在没有 Host 依赖时渲染独立恢复窗口的实际构建产物。这些浏览器检查使用模拟的原生 IPC。构建后，首次安装测试浏览器并运行：
 
 ```sh
-corepack yarn workspace dsh-desktop-next exec playwright install chromium
-corepack yarn workspace dsh-desktop-next verify:window-controls
-corepack yarn workspace dsh-desktop-next verify:onboarding
+corepack pnpm --filter dsh-desktop-next exec playwright install chromium
+corepack pnpm --filter dsh-desktop-next run verify:window-controls
+corepack pnpm --filter dsh-desktop-next run verify:onboarding
 ```
 
 设置 `DSH_NEXT_TEST_BROWSER_CHANNEL=chrome` 可使用已安装的 Google Chrome。截图保存在 `dsh-desktop-next/.desktop-next/verification/`。macOS 原生窗口拖动仍需手工验证。版本限定的包补丁让无会话首页复用官方会话顶栏框架及侧栏控件。在插件列表和详情页收起侧栏后，复用官方展开按钮，固定在 macOS 红黄绿按钮右侧，位置不受内容宽度和页面滚动影响，不额外显示会话页的“新会话”按钮。插件页保留原有标题、操作栏、布局与滚动行为。在不滚动的主栏顶部设置 52px 高的透明拖动区域，覆盖顶部及两侧留白，不占布局空间、不遮挡内容。按钮、链接、输入框等交互控件排除原生拖动，滚入该区域后仍可点击。
 
 ## 应用图标资源
 
-`build/app-icon.icon` 是可编辑的 Icon Composer 工程，保留最终 NEXT 徽标布局和 System Dark 背景。在安装了 Xcode 27 和 Icon Composer 的 Mac 上，从仓库根目录运行 `corepack yarn icons:export --channel next`，可更新 `build/app-icon.png`、Windows 使用的 `build/app-icon.ico`、原生编译生成的 `build/app-icon.icns` 和开发运行的 Dock 图标 `build/app-icon-mac.png`。这些文件需与 `build/app-icon.resources.json` 一起提交；`corepack yarn icons:check` 可在任何系统中无界面验证。
+`build/app-icon.icon` 是可编辑的 Icon Composer 工程，保留最终 NEXT 徽标布局和 System Dark 背景。在安装了 Xcode 27 和 Icon Composer 的 Mac 上，从仓库根目录运行 `corepack pnpm --filter dsh-desktop-next run icons:export --channel next`，可更新 `build/app-icon.png`、Windows 使用的 `build/app-icon.ico`、原生编译生成的 `build/app-icon.icns` 和开发运行的 Dock 图标 `build/app-icon-mac.png`。这些文件需与 `build/app-icon.resources.json` 一起提交；`node scripts/export-app-icons.mjs --check --channel next` 可在任何系统中无界面验证。
 
 Next 的 macOS 打包与 Stable、Beta 一样，直接使用分层 `.icon` 源工程编译 `Assets.car`。PNG Dock 图标仅用于未打包的开发运行；Windows 和 Linux 窗口分别使用 ICO 与 PNG 导出资源。
 
@@ -51,16 +51,18 @@ Next 的 macOS 打包与 Stable、Beta 一样，直接使用分层 `.icon` 源�
 
 - **托盘与后台运行：** 沿用原桌面版的常用项顺序：打开主窗口、重新加载界面、打开 DSH 终端、导出诊断、进入／退出安全模式、Profile 选择与新建。另保留桌面设置和恢复助手入口；原生菜单跟随应用内语言。开启后台运行且托盘可用时，关闭主窗口不会停止 Host 和远控连接；明确退出或重启应用时，先隐藏已有窗口，再等待 HTTPS 入口与 Host 清理完成，最后退出或重新启动应用；仅重启 Host 时保留主窗口。系统托盘不可用时，关闭主窗口会退出应用，避免留下无法重新打开的进程。
 - **侧边栏浏览器：** 桌面应用复用官方浏览器工具栏，由隔离的 Electron `WebContentsView` 承载网页。GitHub 等禁止 iframe 嵌入的网站按顶层页面加载，保留 CSP 与 `X-Frame-Options`。前进、后退与地址栏跟随真实导航。视图跟随分栏尺寸和缩放，避让调整宽度的拖动区域，在弹窗或其他分栏遮挡时隐藏，并随标签关闭或渲染器退出而释放。每个标签使用临时会话，不含应用 preload、应用 Cookie、Node 接口、下载或自动授权。普通 Web 客户端继续使用官方 iframe。
-- **桌面设置：** 后台运行、macOS 透明材质、受支持的 Windows Mica、本机和局域网访问、日志级别，以及用户回合完成／失败时的独立通知开关。后台任务不发送通知。沿用原桌面版的分组卡片、Profile 选择和通知开关；开关与材质即时保存。官方设置顶部提供终端和重启菜单，包含重新加载界面、重启应用和重启到恢复模式。与原桌面版保持一致，Acrylic 继续停用；Mica 要求 Windows 内部版本不低于 22621。通知还需系统授权，仅在主窗口未聚焦时显示。成功通知以本轮用户消息为标题、AI 最后一条可见回复为正文，过长内容会截断；失败通知显示通用状态，子代理和自动回合不发送通知。
+- **桌面设置：** 后台运行、macOS 透明材质、本机和局域网访问、日志级别，以及用户回合完成／失败时的独立通知开关。后台任务不发送通知。沿用原桌面版的分组卡片、Profile 选择和通知开关；开关与材质即时保存。官方设置顶部提供终端和重启菜单，包含重新加载界面、重启应用和重启到恢复模式。与原桌面版保持一致，Windows 不提供材质选项，始终使用不透明窗口；旧的 Acrylic 或 Mica 偏好按关闭读取。通知还需系统授权，仅在主窗口未聚焦时显示。成功通知以本轮用户消息为标题、AI 最后一条可见回复为正文，过长内容会截断；失败通知显示通用状态，子代理和自动回合不发送通知。
 - **Profile：** 首次启动和隔离的安全模式默认使用 `desktop`。已有的选择继续保留，包括此前名为 `default` 的 Profile；不会重命名或覆盖已有目录。支持新建、切换、打开目录或移除未使用的 Profile。托盘的新建入口直接聚焦名称，创建后可切换；损坏的清单或缺少 Next bundle 的 Profile 标为不可用，切换当前 Profile 不会重复重启。移除操作将文件移入恢复备份目录，当前 Profile 和 `desktop` 不可移除。Profile 分别保存插件依赖、激活列表和补丁；会话、设置和凭据仍按上游规则在同一个 Next home 内共享，不提供账号或数据隔离。
-- **首次引导：** 每个尚无完成记录的 Profile 会在 Host 启动前显示五页引导：欢迎、插件市场（社区市场、dsh-market 或暂不开启）、远程控制、Computer Use、恢复模式说明。新 Profile 的 Computer Use 默认关闭，齿轮打开现有的官方授权弹窗；打开弹窗只查询状态，点击请求授权后才向系统申请。布局与分组渐入动效参考 AA，支持浅色、深色和减少动态效果。左上角提供“上一步”，右上角每页均可“跳过全部”。返回保留未保存的选项。完成时将市场和远控选择写入 Profile 清单，将 Computer Use 选择写入标准 `cordis.patch.yml` 的 provider 行，保留注释与其他补丁，最后记录引导完成；之后继续遵循官方插件管理器的修改。跳过则保留原配置。已完成的 Profile 不再自动重复显示。可从“设置 → 桌面设置 → 桌面工具 → 设置向导”确认重启并重新进入，预选当前配置；取消或跳过均保留原设置。此启动方式不会重置完成记录，也不会延续到之后的重启。远程控制页复用 AA landing page 的手机和平板合照。恢复模式和隔离的安全模式直接进入，修复有效 Profile 时保留引导记录。
-- **插件市场：** 在官方**插件**页顶部选择 `dsh-community-market`（默认启用）或 `dshmarket`。选项复用旧版桌面的名称、说明和仓库链接。选择一个市场时，官方插件管理器会在同一次操作中停用另一个，并保留已安装的插件。社区市场保留侧边栏入口；dshmarket 保留**设置 → 插件市场**入口。社区市场沿用发现、来源管理、安装预览、确认安装和卸载流程。包操作使用随应用提供的 pnpm，完成后可请求重启；macOS 和 Windows 也支持市场中的终端入口。
-- **手机远控：** 在**插件**页顶部通过独立开关启用 `@agents-anywhere/dsh-bridge-next`（默认关闭）。开关左侧的齿轮打开现有手机连接弹窗，也可从侧边栏进入；启用后齿轮才可使用。Connector 状态按 Profile 保存在 Next home。切换 Profile 会停止旧 Host 和其中的远控连接。
+- **首次引导：** 先按桌面端自己的 Profile 完成记录或主动重新打开请求判断是否显示桌面设置。无需显示、完成或跳过后，官方 rc.2 再按账号、API Key 和官方进度独立判断是否显示账号引导；两者不代替对方完成或重置记录。原来的 Next 五步引导组件嵌入官方容器并沿用官方主题：欢迎、插件市场、远程控制、Computer Use（含现有系统权限弹窗）、恢复说明；保留原文案、插图、导航和选项。不再于 Host 启动前打开独立欢迎窗口。返回保留草稿；完成时保存 Profile 功能和 Computer Use provider，最后记录完成并重启 Host；跳过保留原配置。未完成的引导下次继续，已完成的 Profile 不自动重复，安全模式和恢复模式绕过桌面引导。“桌面设置 → 桌面工具 → 设置向导”可确认重启并带入当前配置。由于 rc.2 尚无公开的第三方引导扩展接口，兼容补丁为官方页面增加续接槽。
+- **插件市场：** 新 Profile 默认不启用插件市场。官方**插件**页顶部的开关可启用或停用上次在当前页面选择的市场；没有选择记录时默认启用 `dsh-community-market`。也可直接选择 `dsh-community-market` 或 `dshmarket`。选项复用旧版桌面的名称、说明和仓库链接。选择一个市场时，官方插件管理器会在同一次操作中停用另一个，并保留已安装的插件。社区市场保留侧边栏入口；dshmarket 保留**设置 → 插件市场**入口。社区市场沿用发现、来源管理、安装预览、确认安装和卸载流程。包操作使用随应用提供的 pnpm，完成后可请求重启；macOS 和 Windows 也支持市场中的终端入口。
+- **手机远控：** 在**插件**页顶部通过独立开关启用 `@agents-anywhere/dsh-bridge-next`（默认关闭）。开关左侧的齿轮打开现有手机连接弹窗，也可从侧边栏进入；启用后齿轮才可使用。AA 使用默认状态目录（`~/.agents-anywhere/dsh-bridge-next`），与 Stable/Beta 及其他 Next Profile 共享登录、设备绑定和 Connector 设置。启用状态仍按 Profile 保存；切换 Profile 会停止旧 Host 和其中的远控连接。旧版 Next 生成的逐 Profile 状态目录覆盖会在下次 Host 启动时移除。原状态目录保留，不自动合并凭据；只在旧隔离目录中登录过的用户可能需要重新登录。多个版本同时运行时，仍受 AA 的共享状态所有权检查约束。
 - **桌面工具：** 打开数据、Profile 和日志目录，刷新界面，打开开发者工具，导出诊断，以及打开 macOS/Windows 终端。终端提供当前安装的 `dsh`、`pnpm` 和基于 Electron 的 `node`；应用处于安全模式时，终端仍选择原 Profile。
 
-市场、远程控制和 Computer Use 位于普通插件列表上方，并与列表的内容宽度对齐。远程控制和 Computer Use 上下排列，设置齿轮位于各自开关左侧。两个市场和远控 bundle 不再重复显示为普通插件卡片。开关仍调用官方管理器，选择保存在当前 Profile 中；已有 Profile 如果同时开启了两个市场，会提示用户选择其中一个。两个市场安装的 bundle 插件仍在普通列表中管理，可继续启用、停用和卸载。dshmarket 自己的插件停用逻辑保持原样。旧 `desktop-next.features.json` 中的选择只迁移一次到 `package.json`，以后启动遵循官方管理器的设置；远控连接配置的 Profile 存储路径保持不变。
+市场、远程控制和 Computer Use 位于普通插件列表上方，并与列表的内容宽度对齐。远程控制和 Computer Use 上下排列，设置齿轮位于各自开关左侧。两个市场和远控 bundle 不再重复显示为普通插件卡片。开关仍调用官方管理器，选择保存在当前 Profile 中；已有 Profile 如果同时开启了两个市场，会提示用户选择其中一个。两个市场安装的 bundle 插件仍在普通列表中管理，可继续启用、停用和卸载。dshmarket 自己的插件停用逻辑保持原样。旧 `desktop-next.features.json` 中的选择只迁移一次到 `package.json`，以后启动遵循官方管理器的设置。
 
 侧边栏扩展入口复用原桌面的底部布局：多个入口纵向排列在设置上方，数量较多时在限定高度内滚动，保留工作区列表空间。
+
+**自动化任务**位于官方“插件”分组，沿用上游插图、实验性标记、原生启用开关和组件详情。它是可选插件，默认关闭。Next 保留现有的 Schedule 选择及其旧版 Profile 迁移，不另设独立的“定时任务”卡片。
 
 ### 浏览器与局域网访问
 
@@ -92,16 +94,16 @@ export async function record(ctx: Context) {
 
 客户端请求必须由当前前台窗口中的用户操作触发。Host 请求不能模拟用户点击：它会在主窗口显示授权弹窗，并返回当前系统状态，插件应在用户授权后重新查询。在前端挂载前发出的原生设置请求会保留，待界面就绪后交付。Host IPC 关联请求与响应，设置超时，并在卸载时拒绝尚未完成的请求。每次查询都会重新读取系统状态。
 
-屏幕共享应在用户点击“共享”时直接调用 `navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })`。macOS 15 及以上使用 Electron 的系统选择器，其余系统使用原生菜单选择来源，不自动选择屏幕。系统选择器的单次共享授权可能不同于全局屏幕录制权限。权限服务本身不录制媒体，屏幕共享也不授予电脑输入控制能力。开发使用的 Electron 应用已经在 Info.plist 中声明麦克风用途；将来打包 Next 时必须保留 `NSMicrophoneUsageDescription`，并填写产品用途说明。
+屏幕共享应在用户点击“共享”时直接调用 `navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })`。macOS 15 及以上使用 Electron 的系统选择器，其余系统使用原生菜单选择来源，不自动选择屏幕。系统选择器的单次共享授权可能不同于全局屏幕录制权限。权限服务本身不录制媒体，屏幕共享也不授予电脑输入控制能力。打包 Next 时保留产品自己的 `NSMicrophoneUsageDescription`，主应用和 Helper 签名直接使用固定上游 checkout 中的 `apps/desktop/scripts/macos-entitlements.plist`。语音输入通过 `getUserMedia` 触发 Chromium/macOS 的录音授权，语音插件旁不再提供额外权限按钮。
 
-内置官方 `@deepseek-ai/dsh-experimental-computer-use-cua-driver-native@0.1.6-alpha.2`，**默认停用**。在**插件**页顶部的 Computer Use 分区中启用，并查看实际加载状态。入口复用官方插件槽位、开关和插件管理服务；Profile 条目 ID 为 `computer-use-cua-driver-native`。共享的 `computer-use` 注册服务已提供。操作和截图沿用现有对话工具卡片及图片附件；理解截图需要模型路由声明支持图片输入。开关左侧的齿轮打开授权弹窗。
+内置官方 `@deepseek-ai/dsh-experimental-computer-use-cua-driver-native@0.1.7-rc.2`，**默认停用**。在**插件**页顶部的 Computer Use 分区中启用，并查看实际加载状态。入口复用官方插件槽位、开关和插件管理服务；Profile 条目 ID 为 `computer-use-cua-driver-native`。共享的 `computer-use` 注册服务已提供。操作和截图沿用现有对话工具卡片及图片附件；理解截图需要模型路由声明支持图片输入。开关左侧的齿轮打开授权弹窗。
 
-版本限定的 Yarn 补丁位于 `patches/dsh-experimental-computer-use-cua-driver-native@0.1.6-alpha.2.patch`。存在 `desktopPermissions` 时，`check_permissions` 通过桌面服务查询权限；`prompt: true` 为缺失的权限打开授权弹窗，再以 `prompt: false` 由驱动执行只读检查。驱动始终报告其实际权限，不根据桌面返回值假定授权成功。没有桌面服务时保留上游行为。固定的 `@trycua/cua-driver@0.28.0` 二进制、操作工具、图片处理和关闭流程保持上游实现。只能注册一个 provider，但这不会自动串行化多个会话对同一桌面的操作。
+自 0.1.7-rc.2 升级起 provider 只保留上游行为：`check_permissions` 执行原生 SDK 自身的权限检查，此前的桌面权限桥（不再适用的出树补丁）已退役。只能注册一个 provider，但这不会自动串行化多个会话对同一桌面的操作。
 
-单元测试对安装后的补丁插件使用模拟原生 SDK。可选的原生验证要求 SDK 支持当前平台，会加载并关闭真实插件，不发送输入、不截图：
+可选的原生验证要求 SDK 支持当前平台，会加载并关闭真实插件，不发送输入、不截图：
 
 ```sh
-corepack yarn workspace dsh-desktop-next verify:host --computer-use
+corepack pnpm --filter dsh-desktop-next run verify:host --computer-use
 ```
 
 可选的 `verify:window-controls --computer-use` 检查还会在无窗口 Chromium 中通过官方前端启用和停用真实驱动，不调用电脑操作工具。原生系统授权和实际电脑操作仍需手动验收。
@@ -119,7 +121,9 @@ corepack yarn workspace dsh-desktop-next verify:host --computer-use
 
 备份保存在 `home/recovery/`。诊断导出为大小受限的 JSON，包含版本、状态和脱敏日志，不读取会话或凭据文件。日志仍可能包含本机路径和插件输出，分享前请检查。本地桌面日志保存在 `home/logs/desktop-next.log`，上限为 128 KiB。桌面设置独立保存在 `home/desktop-preferences.json`，不依赖 Host 设置服务。
 
-开发环境的默认数据目录仍为本包下的 `.desktop-next/home`。安装版使用系统应用数据目录下的 `DSH NEXT/home`，Electron 状态也位于其中；更新不会替换这个目录。可通过绝对路径 `DSH_DESKTOP_NEXT_HOME` 指定专用目录；Next 不使用现有 `DSH_HOME` 来选择数据目录。首次使用不会迁移 Stable/Beta 数据。
+开发和安装版的默认数据目录均为用户目录下的 `~/.dsh`，与 Stable 共用 Profile 和数据；Next 的选定 Profile、桌面偏好等仍使用各自命名的配置文件。原系统应用数据目录下的 `DSH NEXT/home` 只保留之前保存的数据目录位置，已有的手动选择继续有效。可通过绝对路径 `DSH_DESKTOP_NEXT_HOME` 指定专用目录；Next 不使用现有 `DSH_HOME` 来选择数据目录。恢复出厂仍作用于当前整个数据目录，包括与 Stable 共用的数据。
+
+普通 Web Profile 无需在 `package.json` 中声明 `dsh-desktop-next`；Next 仅在自身 Host 启动和配置重组时提供该能力。已有的旧 Next Profile 会在备份清单后移除这个历史 bundle 条目，避免 Stable 或 CLI 打开同一 Profile 时载入 Next 能力。
 
 ## 架构与来源
 
@@ -153,14 +157,26 @@ Next 是正式的 Profile bundle，因此上游插件管理器重新组合配置
 产品版本为 `2.0.14-next`。在仓库根目录运行：
 
 ```sh
-corepack yarn package:dir:next
-corepack yarn dist:mac-smoke:next
-corepack yarn dist:mac:next
-corepack yarn dist:win:next
+corepack pnpm --filter dsh-desktop-next run package:dir
+corepack pnpm --filter dsh-desktop-next run dist:mac-smoke
+corepack pnpm --filter dsh-desktop-next run dist:mac
+corepack pnpm --filter dsh-desktop-next run dist:win
 ```
 
-打包复用 Beta 的目录构建、macOS universal DMG、签名公证预检和 Windows x64 NSIS 流程；Windows 安装包遵循现有未签名构建策略。运行时保持 `asar: false`、`RunAsNode`、完整依赖和双架构原生文件。Next 无需旧壳的 fs-ext 锁模块。所有入口仅构建产物，不发布、不启动 GUI；正式发布仍须先通过 AA 最新构建和仓库检查。
+打包复用 Beta 的目录构建、Apple Silicon macOS DMG、签名公证预检和 Windows x64 NSIS 流程；Windows 安装包遵循现有未签名构建策略。运行时保持 `asar: false`、`RunAsNode`、完整依赖和 arm64 原生文件。Next 无需旧壳的 fs-ext 锁模块。所有入口仅构建产物，不发布、不启动 GUI；正式发布仍须先通过 AA 最新构建和仓库检查。
 
 桌面设置和托盘均可检查更新。安装版启动后延迟检查，之后每 6 小时检查一次；只有用户点击下载才下载。托盘显示字节数或百分比，完成后点击“安装并重启”。安装前先隐藏窗口并停止 Host。macOS 校验 Next 身份、版本和签名团队，将已下载 DMG 中的应用封装为本地 ZIP，交给 Electron 的 Squirrel.Mac 原生更新器验证和替换；不会改写应用目录或降低签名要求。Windows 校验 Next 安装器身份和版本，交接给 NSIS 静默更新并重新启动。开发运行只允许检查，不替换源码或 Electron 开发运行时。
 
 服务契约沿用 AA landingpage：`GET https://www.dshdesktop.cn/api/desktop/version`，请求头 `X-DSH-Desktop-Channel: next` 和当前版本；安装标识只发给版本接口。下载使用 `/api/downloads/mac` 或 `/api/downloads/windows`，固定 `X-DSH-Desktop-Target-Version`，跨存储重定向不携带这些请求头。仅接受 Next 版本，服务提供 SHA-256 时强制校验；错误、空渠道和旧版服务均不会显示“已是最新版本”。服务端必须部署 Next 通道支持并配置真实产物，且版本与包内版本一致（支持 `x.y.z-next` 和 `x.y.z-next.N`）。
+
+## 运行日志与开发者日志
+
+Next 在 `<数据目录>/logs/desktop-next.log` 保存可直接阅读的近期日志，在 `logs/desktop-next-YYYY-MM-DD.<分段>.jsonl` 保存结构化历史。历史按每天和每文件 10 MiB 轮转，保留七天，总量上限 200 MiB，新文件使用私有权限。启动、Host 退出和退出清理阶段不受日志级别过滤；运行标记用于识别上一次未正常结束的启动。错误和强退证据立即刷新，其余记录约 200 毫秒批量保存。日志写入失败不会阻止应用运行，诊断导出会报告存储故障或丢弃的记录数。
+
+在桌面工具中打开 **开发者日志**，即可记录 Electron 命令、前端控制台、插件状态变化、模型流式请求及重试决策、工具执行和 Host HTTP 请求，无需重启 Host。日志级别控制详细程度，选择 `debug` 可进一步保留内核调试消息。记录包含启动标识、进程标识、来源和序号，操作共享关联标识并记录耗时，模型和工具事件可按会话和调用标识关联。新增模型、工具和网络事件只投影元数据，不记录提示词、工具参数与结果、HTTP 正文或认证头；已有插件日志和错误仍会保留，并进行规则脱敏。
+
+**导出诊断** 会生成版本 2 的 JSON 包，包含应用及运行状态、近期日志、未完成操作和最多 50 MiB 的历史证据。导出在独立 Worker 中进行，超时期限为 60 秒，并报告未纳入的文件数；不会遍历 Profile、凭据或对话数据。
+
+官方启动器没有挂载前的 Context 钩子，因此 Next 回放有限的日志缓冲、记录启动完成后的插件状态，并保留原始进程输出和致命错误；不在官方缓冲中的极早期调试日志无法补录。这是进程及应用日志，不包含操作系统系统调用追踪或崩溃转储采集。
+
+插件清单通过官方 `readPluginInventory()` 获取实际启用状态和生命周期阶段。可选的官方 Inspector 可用时，通过 `ctx.inspector.cordis.getTree()` 获取运行时来源、版本序号、连接状态和截断标记等元数据，桌面端不自行重建其拓扑。会话元数据使用官方 `session/event` 事件，保留原始事件类型、序号和时间，便于与 Session Log 对照。原始会话和聊天数据查看、NodeJS 调试及出站 fetch 抓取由官方开发者工具提供；桌面端保留操作耗时、进程/IPC 诊断、日志留存和诊断导出。开启开发者日志不会自动开启官方抓取工具，也不会将其原始正文复制到导出包。

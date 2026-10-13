@@ -1,11 +1,13 @@
-/** alpha.2 launcher facts shared by embedded and isolated Desktop Hosts. */
-import { delimiter } from 'node:path'
+/** Launcher facts shared by embedded and isolated Desktop Hosts. */
+import { delimiter, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type { Context } from '@deepseek-ai/cordis'
 
 import type { AppReady } from '@deepseek-ai/dsh-cmdline'
 import type { DesktopPnpmBootstrap } from './pnpm.ts'
-import { withDesktopPnpmPolicy } from './pnpm-policy.ts'
+import { findOverlayPackage } from './package-overlay.ts'
+import { withDesktopPnpmPolicy, withDesktopPnpmStoreDir } from './pnpm-policy.ts'
+import { desktopPnpmStoreDir } from './profile-store-dir.ts'
 import { desktopInstallAnchor, prepareDesktopProfile, type PreparedDesktopProfile } from './profile.ts'
 
 /** Keep package operations and subsequent HMR on the launcher's actual Profile. */
@@ -23,6 +25,12 @@ export function createDesktopProfileBoot(prepared: PreparedDesktopProfile, pnpm:
     dir: prepared.profile.dir,
     patchPath: prepared.profile.patchPath,
     installAnchor: desktopInstallAnchor(),
+    // Compatibility checks must inspect the same artifact as the module loader,
+    // even before pluginPackages exists. Never inspect stale ancestor copies.
+    resolvePackageManifest: (packageName: string) => findOverlayPackage(packageName, {
+      installPackageUrl: pathToFileURL(desktopInstallAnchor()).href,
+      profilePackageUrl: pathToFileURL(join(prepared.profile.dir, 'package.json')).href,
+    })?.selected.manifestPath,
     cwd: process.cwd(),
     home: prepared.homeDir,
     startedBundles: prepared.profile.layers.map(layer => layer.packageName),
@@ -30,8 +38,13 @@ export function createDesktopProfileBoot(prepared: PreparedDesktopProfile, pnpm:
     telemetryDisabledEnv: options.telemetryDisabled,
     packageManager: {
       command: pnpm.appExecutable,
-      args: ['--import', pathToFileURL(pnpm.clearEnvironmentPath).href, pnpm.pnpmBinPath,
-        ...withDesktopPnpmPolicy([])],
+      get args() {
+        // Repairs and plugin installs can replace metadata after Host boot.
+        // Resolve at each operation, just like the Desktop Market boundary.
+        return ['--import', pathToFileURL(pnpm.clearEnvironmentPath).href, pnpm.pnpmBinPath,
+          ...withDesktopPnpmStoreDir(withDesktopPnpmPolicy([]),
+            desktopPnpmStoreDir(prepared.homeDir, prepared.profile.dir))]
+      },
       env: {
         PATH: [pnpm.nodeBinDir, inheritedPath].filter(Boolean).join(delimiter),
         NODE: pnpm.nodeShimPath,
@@ -58,6 +71,7 @@ export function createDesktopProfileBoot(prepared: PreparedDesktopProfile, pnpm:
       {
         aaEnabled: options.aaEnabled,
         lanAddresses: prepared.lanAddresses,
+        generationMode: prepared.mode,
         ...(profilePatches === undefined ? {} : { profilePatches }),
       } as Parameters<typeof prepareDesktopProfile>[6],
     ).patches, ...context.overlays],

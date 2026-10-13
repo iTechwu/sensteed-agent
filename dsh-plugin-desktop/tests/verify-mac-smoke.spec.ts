@@ -121,12 +121,8 @@ describe('macOS DMG smoke artifact verification', () => {
         ],
       },
       { command: 'plutil', args: ['-lint', value.infoPlist] },
-      {
-        command: 'lipo',
-        args: [value.executable, '-verify_arch', 'x86_64'],
-      },
       { command: 'lipo', args: [value.executable, '-verify_arch', 'arm64'] },
-      ...MACOS_UNIVERSAL_PACKAGED_ENTRIES.map(entry => ({
+      ...MACOS_UNIVERSAL_PACKAGED_ENTRIES.filter(entry => entry.arch === 'arm64').map(entry => ({
         command: 'lipo',
         args: [join(`${value.appAsar}.unpacked`, entry.path), '-verify_arch', entry.arch],
       })),
@@ -162,6 +158,10 @@ describe('macOS DMG smoke artifact verification', () => {
       .filter(call => call.command === 'lipo' && call.args[0] === value.executable)
       .map(call => call.args)
     expect(executableChecks).toEqual([[value.executable, '-verify_arch', 'arm64']])
+    const nativeChecks = harness.calls
+      .filter(call => call.command === 'lipo' && call.args[0] !== value.executable)
+      .map(call => call.args)
+    expect(nativeChecks.every(args => args[2] === 'arm64')).toBe(true)
   })
 
   it('rejects the mount when no DMG is present', () => {

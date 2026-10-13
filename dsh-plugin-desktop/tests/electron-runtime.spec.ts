@@ -111,7 +111,7 @@ const electron = vi.hoisted(() => {
   }
   const webContents = {
     id: 73,
-    session: { fetch: sessionFetch, webRequest },
+    session: { fetch: sessionFetch, webRequest, setPermissionCheckHandler: vi.fn(), setPermissionRequestHandler: vi.fn() },
     closeDevTools: vi.fn(() => { devToolsOpened = false }),
     executeJavaScript: vi.fn(async (_code: string, _userGesture?: boolean) => null as unknown),
     getZoomLevel: vi.fn(() => zoomLevel),
@@ -276,6 +276,7 @@ const electron = vi.hoisted(() => {
     nativeImage: { createFromPath },
     nativeTheme,
     net: { fetch: vi.fn(), request: vi.fn() },
+    session: { defaultSession: { forceReloadProxyConfig: vi.fn(async () => {}) } },
     Notification,
     notifications,
     resetZoomLevel: () => { zoomLevel = 0 },
@@ -284,6 +285,12 @@ const electron = vi.hoisted(() => {
       getDisplayMatching: vi.fn(() => ({
         workArea: { x: 0, y: 0, width: 1920, height: 1080 },
       })),
+    },
+    desktopCapturer: { getSources: vi.fn(async () => []) },
+    systemPreferences: {
+      getMediaAccessStatus: vi.fn(() => 'not-determined'),
+      askForMediaAccess: vi.fn(async () => true),
+      isTrustedAccessibilityClient: vi.fn(() => false),
     },
     shell: {
       openExternal: vi.fn(async () => {}),
@@ -316,10 +323,13 @@ vi.mock('electron', () => ({
   BrowserWindow: electron.BrowserWindow,
   WebContentsView: electron.WebContentsView,
   dialog: electron.dialog,
+  desktopCapturer: electron.desktopCapturer,
+  systemPreferences: electron.systemPreferences,
   Menu: electron.Menu,
   nativeImage: electron.nativeImage,
   nativeTheme: electron.nativeTheme,
   net: electron.net,
+  session: electron.session,
   Notification: electron.Notification,
   screen: electron.screen,
   shell: electron.shell,
@@ -355,6 +365,30 @@ const spec: DesktopShellSpec = {
 }
 
 describe('Electron desktop runtime', () => {
+  it.each(['system', 'none'] as const)('uses live Chromium proxy routing for SSO when the launch source is %s', async source => {
+    const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
+    const runtime = new ElectronDesktopRuntime(async () => {})
+    runtime.setAuthProxySource(source)
+    electron.net.fetch.mockResolvedValueOnce(new Response('{}'))
+    const nodeFetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('stale Node proxy'))
+    const url = 'https://user.hozonauto.com/api/.well-known/openid-configuration'
+    expect((await runtime.requestDofeAuth(url, {})).status).toBe(200)
+    expect(electron.session.defaultSession.forceReloadProxyConfig).toHaveBeenCalledOnce()
+    expect(electron.net.fetch).toHaveBeenCalledWith(url, expect.objectContaining({ redirect: 'error', credentials: 'omit' }))
+    expect(nodeFetch).not.toHaveBeenCalled()
+  })
+
+  it('retains an explicitly configured environment proxy for SSO', async () => {
+    const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
+    const runtime = new ElectronDesktopRuntime(async () => {})
+    runtime.setAuthProxySource('environment')
+    const nodeFetch = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response('{}'))
+    await runtime.requestDofeAuth('https://user.hozonauto.com/api/.well-known/openid-configuration', {})
+    expect(nodeFetch).toHaveBeenCalledOnce()
+    expect(electron.net.fetch).not.toHaveBeenCalled()
+    expect(electron.session.defaultSession.forceReloadProxyConfig).not.toHaveBeenCalled()
+  })
+
   beforeEach(() => {
     clearMainWindowState()
     electron.app.isPackaged = false
@@ -468,6 +502,42 @@ describe('Electron desktop runtime', () => {
     await release()
     expect(electron.browserWindowOff).toHaveBeenCalledWith('page-title-updated', titleListener)
     expect(electron.trays[0]?.off).toHaveBeenCalledWith('click', expect.any(Function))
+  })
+
+  it('limits setup persistence to the active renderer main frame and releases its handler', async () => {
+    const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
+    const runtime = new ElectronDesktopRuntime(async () => {})
+    const bridge = { read: vi.fn(async () => null), finish: vi.fn(async () => {}), dismissAccount: vi.fn(async () => {}), applyPending: vi.fn(async () => {}) }
+    runtime.setupOnboarding = bridge
+    const applySetupSettings = vi.fn(async () => {})
+    const release = runtime.schedule({ ...spec, applySetupSettings })
+    await runtime.mountScheduled()
+    const handler = electron.webContents.ipc.handle.mock.calls.find(([name]) => name === 'dsh-desktop:setup-onboarding')?.[1]
+    expect(handler).toBeTypeOf('function')
+    const previousUrl = electron.webContents.mainFrame.url
+    electron.webContents.mainFrame.url = spec.url
+    const sender = { sender: electron.webContents, senderFrame: electron.webContents.mainFrame }
+    await expect(handler(sender, { action: 'read' })).resolves.toBeNull()
+    await expect(handler({ ...sender, senderFrame: { url: sender.senderFrame.url } }, { action: 'read' })).rejects.toThrow('Untrusted')
+    await expect(handler(sender, { action: 'finish', profile: 'desktop', selection: { market: 'disabled' } })).rejects.toThrow('Invalid setup selection')
+    expect(bridge.finish).not.toHaveBeenCalled()
+    await handler(sender, { action: 'finish', profile: 'desktop' })
+    expect(bridge.finish).toHaveBeenCalledExactlyOnceWith('desktop', undefined, expect.any(Function))
+    // Setup saves through the renderer generation's own settings writer.
+    const settings = { mode: 'extended' }
+    await ((bridge.finish.mock.calls[0] as unknown[])[2] as (value: unknown) => Promise<void>)(settings)
+    expect(applySetupSettings).toHaveBeenCalledExactlyOnceWith(settings)
+    await expect(handler({ ...sender, senderFrame: { url: spec.url } }, { action: 'dismiss-account', profile: 'desktop' })).rejects.toThrow('Untrusted')
+    await handler(sender, { action: 'dismiss-account', profile: 'desktop' })
+    expect(bridge.dismissAccount).toHaveBeenCalledExactlyOnceWith('desktop')
+    await expect(handler({ ...sender, senderFrame: { url: spec.url } }, { action: 'apply-pending', profile: 'desktop' })).rejects.toThrow('Untrusted')
+    expect(bridge.applyPending).not.toHaveBeenCalled()
+    await handler(sender, { action: 'apply-pending', profile: 'desktop' })
+    expect(bridge.applyPending).toHaveBeenCalledExactlyOnceWith('desktop')
+    await release()
+    expect(electron.webContents.ipc.removeHandler).toHaveBeenCalledWith('dsh-desktop:setup-onboarding')
+    await expect(handler(sender, { action: 'read' })).rejects.toThrow('Untrusted')
+    electron.webContents.mainFrame.url = previousUrl
   })
 
   it('attaches the renderer capability to same-origin HTTP and WebSocket requests only', async () => {
@@ -834,6 +904,45 @@ describe('Electron desktop runtime', () => {
     await release()
   })
 
+  it('routes the macOS native flow through a trusted renderer and a parented Electron dialog', async () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin')
+    electron.dialog.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: ['/Users/test/Work'] })
+    const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
+    const runtime = new ElectronDesktopRuntime(async () => {})
+    const release = runtime.schedule(spec)
+    await runtime.mountScheduled()
+
+    const handler = electron.webContents.ipc.handle.mock.calls
+      .find(([name]) => name === 'dsh-desktop:native-directory-picker')?.[1]
+    expect(handler).toEqual(expect.any(Function))
+    const frame = electron.webContents.mainFrame
+    const previousUrl = frame.url
+    frame.url = spec.url
+    try {
+      await expect(handler({ sender: electron.webContents, senderFrame: frame })).resolves.toBe('/Users/test/Work')
+      expect(electron.dialog.showOpenDialog).toHaveBeenCalledWith(
+        electron.browserWindows[0],
+        { title: 'Select Workspace Directory', properties: ['openDirectory', 'dontAddToRecent'] },
+      )
+      await expect(handler({ sender: electron.webContents, senderFrame: { url: spec.url } }))
+        .rejects.toThrow('untrusted directory picker sender')
+    } finally {
+      frame.url = previousUrl
+      await release()
+    }
+  })
+
+  it('uses Electron media consent without the microphone workaround or permission IPC', async () => {
+    const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
+    const runtime = new ElectronDesktopRuntime(async () => {})
+    const release = runtime.schedule(spec)
+    await runtime.mountScheduled()
+    expect(electron.webContents.ipc.handle.mock.calls.map(([name]) => name)).not.toContain('dsh-desktop:permissions')
+    expect(electron.webContents.session.setPermissionCheckHandler).not.toHaveBeenCalled()
+    expect(electron.webContents.session.setPermissionRequestHandler).not.toHaveBeenCalled()
+    await release()
+  })
+
   it('blocks unsupported workspace volumes without returning a risky path', async () => {
     vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
     const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
@@ -882,7 +991,7 @@ describe('Electron desktop runtime', () => {
 
     expect(electron.dialog.showMessageBox).toHaveBeenCalledWith(expect.objectContaining({
       type: 'error',
-      buttons: ['Restart 山子Agent', 'Open DSH Terminal', 'Dismiss'],
+      buttons: ['Restart 哪吒Agent', 'Open DSH Terminal', 'Dismiss'],
       defaultId: 0,
       cancelId: 2,
       detail: expect.stringContaining('0 / 0x00000000'),
@@ -2237,7 +2346,7 @@ describe('Electron desktop runtime', () => {
       title: 'Plugin Load Failed',
       message: 'Some plugins could not be loaded.',
       detail: expect.stringContaining('dsh-vision-router'),
-      buttons: ['Open DSH Terminal', 'Restart 山子Agent', 'Dismiss'],
+      buttons: ['Open DSH Terminal', 'Restart 哪吒Agent', 'Dismiss'],
     }))
     const recoveryCalls = electron.dialog.showMessageBox.mock.calls as unknown as Array<[{ detail?: string }]>
     expect(recoveryCalls[0]?.[0].detail).toContain('vision_crop')
@@ -2333,7 +2442,7 @@ describe('Electron desktop runtime', () => {
 
     expect(restart).not.toHaveBeenCalled()
     expect(electron.dialog.showMessageBox).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'question', title: 'Restart 山子Agent', buttons: ['Restart', 'Cancel'], defaultId: 1, cancelId: 1,
+      type: 'question', title: 'Restart 哪吒Agent', buttons: ['Restart', 'Cancel'], defaultId: 1, cancelId: 1,
     }))
 
     electron.dialog.showMessageBox.mockResolvedValueOnce({ response: 0, checkboxChecked: false })
@@ -2384,7 +2493,7 @@ describe('Electron desktop runtime', () => {
     electron.dialog.showMessageBox.mockResolvedValueOnce({ response: 0, checkboxChecked: false })
     await expect(runtime.confirmRestart(async () => {})).rejects.toThrow('private restart detail')
     expect(electron.dialog.showMessageBox.mock.calls.at(-1)?.at(-1)).toEqual({
-      type: 'error', title: '桌面重启失败', message: '桌面重启失败', detail: '请保存当前工作，然后手动关闭并重新打开 山子Agent。',
+      type: 'error', title: '桌面重启失败', message: '桌面重启失败', detail: '请保存当前工作，然后手动关闭并重新打开 哪吒Agent。',
     })
   })
 
@@ -2553,7 +2662,7 @@ describe('Electron desktop runtime', () => {
     expect(electron.dialog.showMessageBox).toHaveBeenLastCalledWith(
       activeWindow,
       expect.objectContaining({
-        title: '山子Agent Is Up to Date',
+        title: '哪吒Agent Is Up to Date',
         detail: 'Installed version: 2.0.0',
         buttons: ['OK'],
       }),
@@ -2603,7 +2712,7 @@ describe('Electron desktop runtime', () => {
     expect(electron.dialog.showMessageBox).toHaveBeenLastCalledWith(
       activeWindow,
       expect.objectContaining({
-        title: '山子Agent Update Downloaded',
+        title: '哪吒Agent Update Downloaded',
         buttons: ['OK'],
       }),
     )
@@ -2849,35 +2958,7 @@ describe('Electron desktop runtime', () => {
     expect(electron.nativeTheme.themeSource).toBe('light')
   })
 
-  it('refreshes the Windows Mica backdrop after a live advanced theme change', async () => {
-    vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
-    electron.nativeTheme.themeSource = 'light'
-    const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
-    const runtime = new ElectronDesktopRuntime(async () => {})
-    const release = runtime.schedule({
-      ...spec,
-      mode: 'advanced',
-      material: 'mica',
-      windowsBuild: 22_631,
-      readThemeSource: () => 'light',
-    })
-
-    runtime.setThemeSource('dark')
-    expect(electron.nativeTheme.themeSource).toBe('light')
-    await runtime.mountScheduled()
-
-    const window = electron.browserWindows[0]
-    window?.setBackgroundMaterial.mockClear()
-    runtime.setThemeSource('dark')
-
-    expect(electron.nativeTheme.themeSource).toBe('dark')
-    expect(window?.setBackgroundMaterial).toHaveBeenCalledOnce()
-    expect(window?.setBackgroundMaterial).toHaveBeenCalledWith('mica')
-
-    await release()
-  })
-
-  it('keeps an extended Windows 10 window opaque when material is off', async () => {
+  it('keeps an extended Windows window opaque', async () => {
     vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
     electron.nativeTheme.themeSource = 'light'
     const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
@@ -2886,7 +2967,6 @@ describe('Electron desktop runtime', () => {
       ...spec,
       mode: 'extended',
       material: 'off',
-      windowsBuild: 19_045,
       readThemeSource: () => 'dark',
     })
 
@@ -2906,7 +2986,7 @@ describe('Electron desktop runtime', () => {
     await release()
   })
 
-  it('does not install a native backdrop when Windows material is off', async () => {
+  it('never installs a native backdrop on Windows, even after a live theme change', async () => {
     vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
     electron.nativeTheme.themeSource = 'light'
     const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
@@ -2915,7 +2995,6 @@ describe('Electron desktop runtime', () => {
       ...spec,
       mode: 'extended',
       material: 'off',
-      windowsBuild: 22_621,
       readThemeSource: () => 'dark',
     })
 

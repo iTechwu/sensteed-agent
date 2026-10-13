@@ -4,11 +4,14 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, relative } from 'node:path'
+import { finished } from 'node:stream/promises'
+import { dirname, join, relative } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { createPackage, extractFile, getRawHeader, uncache } from '@electron/asar'
 import { describe, expect, it, vi } from 'vitest'
 import {
   ALLOWED_SMART_UNPACK_PACKAGE_PREFIXES,
@@ -16,6 +19,7 @@ import {
   afterPack,
   formatUnpackedRuntimeSummary,
   FORBIDDEN_UNPACKED_RUNTIME_ENTRIES,
+  hydratePackagedLinuxFsExtRuntimeForContext,
   hydratePackagedMacRuntimeForContext,
   indexPackagedAsarHeader,
   listDesktopRuntimeEntries,
@@ -24,6 +28,7 @@ import {
   MAX_UNPACKED_RUNTIME_BYTES,
   MAX_UNPACKED_RUNTIME_FILES,
   REQUIRED_AGENT_PRESET_RUNTIME_ENTRIES,
+  REQUIRED_BUNDLED_SKILL_ENTRIES,
   REQUIRED_DSH_CLI_RUNTIME_ENTRIES,
   REQUIRED_PACKAGED_RUNTIME_ENTRIES,
   REQUIRED_MACOS_UNPACKED_RUNTIME_ENTRIES,
@@ -32,6 +37,7 @@ import {
   REQUIRED_POSIX_FS_EXT_ENTRIES,
   REQUIRED_UNPACKED_RUNTIME_ENTRIES,
   REQUIRED_WINDOWS_X64_NODE_PTY_ENTRIES,
+  repairPackagedAsarHeader,
   resolvePackagedApplicationRoot,
   resolvePackagedAsarPath,
   resolvePackagedExecutablePath,
@@ -39,8 +45,11 @@ import {
   resolveRuntimePackageRoot,
   smokePackagedElectronRuntime,
   smokePackagedFsExtRuntime,
+  smokePackagedBuiltinLoaderRuntime,
   summarizeUnpackedRuntime,
   verifyPackagedAgentsAnywhere,
+  verifyPackagedAsar,
+  verifyProfileClosureArtifact,
   verifyPackagedRuntime,
   verifyPackagedProfileModuleFallback,
   verifySelectiveUnpackedRuntime,
@@ -187,6 +196,56 @@ function physicalFixture(
 }
 
 describe('packaged desktop runtime verification', () => {
+  it.each(['darwin', 'linux', 'win32'])('repairs a real %s ASAR without moving packed bytes', async platform => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-asar-repair-'))
+    const runtimeContext = context(join(root, 'output'), platform)
+    const archive = resolvePackagedAsarPath(runtimeContext)
+    try {
+      const source = join(root, 'source')
+      const packed = {
+        'lib/main.js': 'export const greeting = "你好，桌面";\n',
+        'package.json': '{"name":"asar-repair-fixture","version":"1.0.0"}',
+        'node_modules/fixture/existing.bin': 'original packed bytes',
+      }
+      for (const [path, content] of Object.entries(packed)) {
+        mkdirSync(dirname(join(source, path)), { recursive: true })
+        writeFileSync(join(source, path), content)
+      }
+      mkdirSync(dirname(archive), { recursive: true })
+      // asar 3 resolves with an ending stream before its bytes reach the file.
+      await finished(await createPackage(source, archive))
+      const before = readFileSync(archive)
+      const bodyOffset = 8 + getRawHeader(archive).headerSize
+      // Reproduce afterPack hydration: one new leaf and one packed leaf
+      // replaced by a physical payload with a different size.
+      const hydrated = {
+        'node_modules/fixture/prebuilds/native.bin': 'hydrated native payload',
+        'node_modules/fixture/existing.bin': 'replacement physical payload',
+      }
+      for (const [path, content] of Object.entries(hydrated)) {
+        const physical = join(resolvePackagedUnpackedRoot(runtimeContext), path)
+        mkdirSync(dirname(physical), { recursive: true })
+        writeFileSync(physical, content)
+      }
+
+      repairPackagedAsarHeader(runtimeContext)
+
+      const index = verifyPackagedAsar(archive, [...Object.keys(packed), ...Object.keys(hydrated)])
+      expect([...index.unpackedFiles].sort()).toEqual(Object.keys(hydrated).sort())
+      expect(getRawHeader(archive).headerSize + 8).toBe(bodyOffset)
+      expect(readFileSync(archive).subarray(bodyOffset)).toEqual(before.subarray(bodyOffset))
+      for (const [path, content] of Object.entries({ ...packed, ...hydrated })) {
+        expect(extractFile(archive, join(...path.split('/'))).toString('utf8')).toBe(content)
+      }
+      const repaired = readFileSync(archive)
+      repairPackagedAsarHeader(runtimeContext)
+      expect(readFileSync(archive)).toEqual(repaired)
+    } finally {
+      uncache(archive)
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
   it('finds a package root from its public entry when package.json is not exported', () => {
     const packageRoot = join('/workspace', 'node_modules', 'pnpm')
     const entry = join(packageRoot, 'bin', 'pnpm.cjs')
@@ -224,6 +283,15 @@ describe('packaged desktop runtime verification', () => {
       'node_modules/@deepseek-ai/dsh-web-app/presets/ptc.patch.yml',
     ])
     for (const entry of REQUIRED_AGENT_PRESET_RUNTIME_ENTRIES) {
+      expect(REQUIRED_PACKAGED_RUNTIME_ENTRIES).toContain(entry)
+      expect(FORBIDDEN_UNPACKED_RUNTIME_ENTRIES).toContain(entry)
+    }
+  })
+
+  it('requires every app-bundled skill entry and keeps it inside app.asar', () => {
+    expect(REQUIRED_BUNDLED_SKILL_ENTRIES).toContain('bundled/manifest.json')
+    for (const entry of REQUIRED_BUNDLED_SKILL_ENTRIES) {
+      expect(entry.startsWith('bundled/')).toBe(true)
       expect(REQUIRED_PACKAGED_RUNTIME_ENTRIES).toContain(entry)
       expect(FORBIDDEN_UNPACKED_RUNTIME_ENTRIES).toContain(entry)
     }
@@ -284,9 +352,13 @@ describe('packaged desktop runtime verification', () => {
       },
       () => calls.push('aa'),
       () => calls.push('native'),
+      () => {},
+      () => {},
+      () => {},
+      () => calls.push('size'),
     )
 
-    expect(calls).toEqual(['static', 'aa', 'report', 'native'])
+    expect(calls).toEqual(['static', 'aa', 'report', 'size', 'native'])
   })
 
   it('hydrates omitted macOS native packages before verifying the package', async () => {
@@ -304,9 +376,12 @@ describe('packaged desktop runtime verification', () => {
       () => calls.push('aa'),
       () => calls.push('native'),
       () => calls.push('hydrate'),
+      () => calls.push('closure'),
+      () => {},
+      () => calls.push('size'),
     )
 
-    expect(calls).toEqual(['hydrate', 'static', 'aa', 'report', 'native'])
+    expect(calls).toEqual(['hydrate', 'static', 'aa', 'closure', 'report', 'size', 'native'])
   })
 
   it.skipIf(process.platform === 'win32')('rejects a 0644 packaged uv before signing', () => {
@@ -328,6 +403,73 @@ describe('packaged desktop runtime verification', () => {
       expect(() => verifyPackagedAgentsAnywhere(target, read, read)).toThrow()
       for (const path of files) chmodSync(path, 0o755)
       expect(() => verifyPackagedAgentsAnywhere(target, read, read)).not.toThrow()
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it.skipIf(process.platform === 'win32')('checks only the packaged macOS uv architecture for a single-slice artifact', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-packaged-uv-single-'))
+    try {
+      for (const [arch, packageArch] of [[3, 'arm64'], [1, 'x64']] as const) {
+        const base = context(join(root, packageArch), 'darwin', arch)
+        const target: PackagedRuntimeContext = {
+          ...base, packager: { ...base.packager, platformSpecificBuildOptions: { asar: false } },
+        }
+        const path = join(resolvePackagedApplicationRoot(target), 'node_modules', '@dataiku', `uv-darwin-${packageArch}`, 'bin', 'uv')
+        mkdirSync(join(path, '..'), { recursive: true })
+        writeFileSync(path, 'uv fixture')
+        chmodSync(path, 0o755)
+        const read = (path: string): Buffer => Buffer.from(path.endsWith('package.json') ? '{"version":"1.0.0"}' : 'same AA')
+        expect(() => verifyPackagedAgentsAnywhere(target, read, read)).not.toThrow()
+        chmodSync(path, 0o644)
+        expect(() => verifyPackagedAgentsAnywhere(target, read, read)).toThrow()
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects a stale or missing Profile closure manifest before signing', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-profile-closure-'))
+    try {
+      const target = context(root, 'darwin')
+      const closure = {
+        schemaVersion: 1,
+        desktopVersion: '2.0.11-beta.18',
+        dshVersion: '0.2.0-rc.2',
+        packages: {
+          '@deepseek-ai/dsh': '0.2.0-rc.2',
+          '@deepseek-ai/dsh-plugin-manager': '0.2.0-rc.2',
+        },
+      }
+      const consistent = (path: string): Buffer => {
+        if (path === 'lib/profile-closure.json') return Buffer.from(JSON.stringify(closure))
+        if (path === 'package.json') return Buffer.from(JSON.stringify({ version: '2.0.11-beta.18' }))
+        return Buffer.from(JSON.stringify({ version: '0.2.0-rc.2' }))
+      }
+      expect(() => verifyProfileClosureArtifact(target, consistent)).not.toThrow()
+
+      expect(() => verifyProfileClosureArtifact(target, path => {
+        if (path === 'node_modules/@deepseek-ai/dsh-plugin-manager/package.json') {
+          throw Object.assign(new Error('missing'), { code: 'ENOENT' })
+        }
+        return consistent(path)
+      })).toThrow('Profile closure package @deepseek-ai/dsh-plugin-manager@0.2.0-rc.2 is missing')
+
+      expect(() => verifyProfileClosureArtifact(target, () => {
+        throw Object.assign(new Error('missing'), { code: 'ENOENT' })
+      })).toThrow('missing or unreadable')
+
+      const staleDesktop = (path: string): Buffer =>
+        path === 'package.json' ? Buffer.from('{"version":"2.0.12"}') : consistent(path)
+      expect(() => verifyProfileClosureArtifact(target, staleDesktop)).toThrow('stale against the packaged')
+
+      const staleDsh = (path: string): Buffer =>
+        path === 'node_modules/@deepseek-ai/dsh/package.json'
+          ? Buffer.from('{"version":"0.2.0-rc.3"}')
+          : consistent(path)
+      expect(() => verifyProfileClosureArtifact(target, staleDsh)).toThrow('pins @deepseek-ai/dsh')
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
@@ -395,6 +537,91 @@ describe('packaged desktop runtime verification', () => {
 
     expect(() => smokePackagedFsExtRuntime(context('/build', process.platform), run))
       .toThrow('packaged fs-ext native ABI smoke failed')
+  })
+
+  it('rejects a packaged Host whose native loader helper is missing', () => {
+    const run = vi.fn<PackagedElectronRunner>(() => ({
+      status: 1,
+      stdout: '',
+      stderr: "Cannot find module 'node-addon-native-custom-loader'",
+    }))
+    const runtimeContext = context('/build', process.platform)
+
+    expect(() => smokePackagedBuiltinLoaderRuntime(runtimeContext, run))
+      .toThrow("Cannot find module 'node-addon-native-custom-loader'")
+    expect(run).toHaveBeenCalledWith(
+      resolvePackagedExecutablePath(runtimeContext),
+      ['--expose-internals', join(resolvePackagedAsarPath(runtimeContext), 'node_modules', 'node-addon-require-builtin', 'lib', 'index.js')],
+      expect.objectContaining({ ELECTRON_RUN_AS_NODE: '1' }),
+    )
+  })
+
+  // 水合只在 linux 打包路径执行;win32 的 statSync.mode 不含 Unix 权限位,
+  // 0o755 断言在 Windows gate 上恒假。
+  it.skipIf(process.platform === 'win32')('hydrates the packaged fs-ext binding with the prepared Electron ABI on Linux', () => {
+    const workRoot = mkdtempSync(join(tmpdir(), 'dsh-linux-fs-ext-'))
+    try {
+      const runtimeContext = context(workRoot, 'linux', 1)
+      const preparedName = REQUIRED_POSIX_FS_EXT_ENTRIES.linux.x64.split('/').at(-1) as string
+      const sourceRoot = join(workRoot, 'installed-fs-ext')
+      const source = join(sourceRoot, 'prebuilds', 'linux-x64', preparedName)
+      mkdirSync(dirname(source), { recursive: true })
+      writeFileSync(source, 'electron-abi')
+      const target = join(
+        resolvePackagedUnpackedRoot(runtimeContext),
+        'node_modules/fs-ext/build/Release/fs_ext.node',
+      )
+      mkdirSync(dirname(target), { recursive: true })
+      writeFileSync(target, 'host-node-abi')
+
+      hydratePackagedLinuxFsExtRuntimeForContext(runtimeContext, sourceRoot)
+
+      expect(readFileSync(target, 'utf8')).toBe('electron-abi')
+      expect(statSync(target).mode & 0o755).toBe(0o755)
+    } finally {
+      rmSync(workRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('requires the prepared Electron-ABI fs-ext before Linux packaging', () => {
+    const workRoot = mkdtempSync(join(tmpdir(), 'dsh-linux-fs-ext-'))
+    try {
+      const runtimeContext = context(workRoot, 'linux', 1)
+      const sourceRoot = join(workRoot, 'installed-fs-ext')
+      mkdirSync(sourceRoot, { recursive: true })
+
+      expect(() => hydratePackagedLinuxFsExtRuntimeForContext(runtimeContext, sourceRoot))
+        .toThrow('prepared Electron-ABI fs-ext is missing')
+    } finally {
+      rmSync(workRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects a Linux package without a packaged fs-ext binding to hydrate', () => {
+    const workRoot = mkdtempSync(join(tmpdir(), 'dsh-linux-fs-ext-'))
+    try {
+      const runtimeContext = context(workRoot, 'linux', 1)
+      const preparedName = REQUIRED_POSIX_FS_EXT_ENTRIES.linux.x64.split('/').at(-1) as string
+      const sourceRoot = join(workRoot, 'installed-fs-ext')
+      mkdirSync(dirname(join(sourceRoot, 'prebuilds', 'linux-x64', preparedName)), { recursive: true })
+      writeFileSync(join(sourceRoot, 'prebuilds', 'linux-x64', preparedName), 'electron-abi')
+
+      expect(() => hydratePackagedLinuxFsExtRuntimeForContext(runtimeContext, sourceRoot))
+        .toThrow('packaged fs-ext binding is missing')
+    } finally {
+      rmSync(workRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects unsupported Linux package architectures before hydration', () => {
+    expect(() => hydratePackagedLinuxFsExtRuntimeForContext(context('/build', 'linux', 0)))
+      .toThrow('unsupported Linux package architecture 0')
+  })
+
+  it('leaves non-Linux packaging untouched by the Linux fs-ext hydration', () => {
+    expect(() => hydratePackagedLinuxFsExtRuntimeForContext(
+      context('/definitely-missing-build', 'darwin'),
+    )).not.toThrow()
   })
 
   it('tracks ripgrep and the ConPTY native surface required on Windows', () => {
@@ -911,15 +1138,40 @@ describe('packaged desktop runtime verification', () => {
       }
     })
 
-    smokePackagedElectronRuntime(runtimeContext, run)
+    vi.stubEnv('NODE_PATH', '/build-machine/node_modules')
+    try {
+      smokePackagedElectronRuntime(runtimeContext, run)
+    } finally {
+      vi.unstubAllEnvs()
+    }
 
-    expect(run).toHaveBeenCalledTimes(6)
+    // Windows 的会话后端免 fs-ext（prepare-fs-ext not-required），冒烟少一次调用。
+    const expectedRuns = runtimeContext.electronPlatformName === 'win32' ? 5 : 6
+    expect(run).toHaveBeenCalledTimes(expectedRuns)
+    if (runtimeContext.electronPlatformName !== 'win32') {
+      expect(run.mock.calls.some(([, args]) => args.some(arg => arg.endsWith('/fs-ext/fs-ext.js')))).toBe(true)
+    } else {
+      expect(run.mock.calls.some(([, args]) => args.some(arg => arg.endsWith('/fs-ext/fs-ext.js')))).toBe(false)
+    }
     for (const [executable, args, environment] of run.mock.calls) {
       expect(executable).toBe(resolvePackagedExecutablePath(runtimeContext))
       expect(args).toContain('--expose-internals')
       expect(args.some(arg => arg.includes('app.asar'))).toBe(true)
       expect(environment.ELECTRON_RUN_AS_NODE).toBe('1')
       expect(environment.DSH_HOME).toEqual(expect.any(String))
+      expect(environment.NODE_PATH).toBeUndefined()
+    }
+  })
+
+  it('accepts a direct Profile resolver without generated legacy proxy files', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-profile-direct-resolver-'))
+    try {
+      const modulesDir = join(root, 'profiles', 'node_modules')
+      expect(() => verifyPackagedProfileModuleFallback(modulesDir, join(root, 'app.asar'))).not.toThrow()
+      mkdirSync(modulesDir, { recursive: true })
+      expect(() => verifyPackagedProfileModuleFallback(modulesDir, join(root, 'app.asar'))).not.toThrow()
+    } finally {
+      rmSync(root, { recursive: true, force: true })
     }
   })
 

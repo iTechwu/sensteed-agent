@@ -1,3 +1,4 @@
+import { installUiDiagnostics } from './ui-diagnostics.ts'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
@@ -12,9 +13,9 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { applyAdvancedShell } from './advanced-shell.ts'
-import { applyDofeAccess } from './register-dofe-access.ts'
 import { applyDesktopBrand } from './brand.tsx'
 import { startRendererBootReporter } from './boot-health.ts'
+import { dismissBootSplashWhenSurfacesReady } from './boot-splash-dismiss.ts'
 import { applyDesktopSettings } from './desktop-settings.ts'
 import { installDesktopDirectoryPickerBridge } from './directory-picker.ts'
 import { parseDesktopClientEnvironment } from './environment.ts'
@@ -127,11 +128,21 @@ export const inject = [
 export function apply(ctx: ClientContext): void {
   const environment = parseDesktopClientEnvironment(window.location.search)
   if (!environment) return
+  const requiredSurfaceMissing = (): string | undefined => {
+    const missing = [
+      ctx.slots.entries('main').some(entry => entry.options.key === 'conversation')
+        ? undefined
+        : 'main:conversation',
+      ctx.slots.entries('sidebar.workspaces').length > 0
+        ? undefined
+        : 'sidebar.workspaces',
+    ].filter((name): name is string => name !== undefined)
+    return missing.length === 0
+      ? undefined
+      : `required desktop surfaces are unavailable: ${missing.join(', ')}`
+  }
   applyDesktopBrand(ctx)
-  // Loader-focused tests and compatibility probes may provide only the client
-  // presentation services. The real client always supplies `remote` via the
-  // injection contract, so defer the access surface until that service exists.
-  if (ctx.remote !== undefined) applyDofeAccess(ctx)
+  ctx.effect(installUiDiagnostics, 'Desktop client failure diagnostics')
   ctx.effect(
     () => provideDesktopWindow(ctx, desktopWindowService(environment)),
     'dsh-plugin-desktop: native window geometry service',
@@ -144,19 +155,11 @@ export function apply(ctx: ClientContext): void {
     'dsh-plugin-desktop: sidebar footer stacking styles',
   )
   ctx.effect(
-    () => startRendererBootReporter(ctx.loader, globalThis.fetch, () => {
-      const missing = [
-        ctx.slots.entries('main').some(entry => entry.options.key === 'conversation')
-          ? undefined
-          : 'main:conversation',
-        ctx.slots.entries('sidebar.workspaces').length > 0
-          ? undefined
-          : 'sidebar.workspaces',
-      ].filter((name): name is string => name !== undefined)
-      return missing.length === 0
-        ? undefined
-        : `required desktop surfaces are unavailable: ${missing.join(', ')}`
-    }),
+    () => dismissBootSplashWhenSurfacesReady(requiredSurfaceMissing),
+    'dsh-plugin-desktop: boot splash dismissal',
+  )
+  ctx.effect(
+    () => startRendererBootReporter(ctx.loader, globalThis.fetch, requiredSurfaceMissing),
     'dsh-plugin-desktop: renderer boot health report',
   )
   if (environment.platform === 'win32') {

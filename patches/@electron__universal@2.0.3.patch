@@ -1,0 +1,92 @@
+diff --git a/dist/cjs/asar-utils.js b/dist/cjs/asar-utils.js
+index c09cee642d347f5ec59a57d56674119e6eccb911..690f3ff06cae852b762e90156bb5da5a19ff298d 100644
+--- a/dist/cjs/asar-utils.js
++++ b/dist/cjs/asar-utils.js
+@@ -155,17 +155,31 @@ const mergeASARs = async ({ x64AsarPath, arm64AsarPath, outputAsarPath, singleAr
+             (0, child_process_1.execFileSync)(LIPO, [source, destination, '-create', '-output', destination]);
+         }
+         (0, debug_1.d)(`creating archive at ${outputAsarPath}`);
+-        const resolvedUnpack = Array.from(unpackedFiles).map((file) => path_1.default.join(x64Dir, file));
+-        let unpack;
+-        if (resolvedUnpack.length > 1) {
+-            unpack = `{${resolvedUnpack.join(',')}}`;
+-        }
+-        else if (resolvedUnpack.length === 1) {
+-            unpack = resolvedUnpack[0];
++        // A single brace glob exceeds minimatch's length limit for large runtimes.
++        // Stream the exact unpacked set instead, preserving links and executable modes.
++        const streams = [];
++        for (const file of [...new Set([...x64Files, ...arm64Files])].sort()) {
++            const source = path_1.default.resolve(x64Dir, file);
++            const stat = await fs_extra_1.default.lstat(source);
++            const unpacked = unpackedFiles.has(file);
++            if (unpacked) {
++                const original = x64Files.has(file) && asar_1.default.statFile(x64AsarPath, file).unpacked
++                    ? x64AsarPath : arm64AsarPath;
++                stat.mode = (await fs_extra_1.default.lstat(path_1.default.join(`${original}.unpacked`, file))).mode;
++            }
++            streams.push({
++                path: file,
++                type: stat.isDirectory() ? 'directory' : stat.isSymbolicLink() ? 'link' : 'file',
++                stat,
++                unpacked,
++                streamGenerator: () => fs_extra_1.default.createReadStream(source),
++                symlink: stat.isSymbolicLink() ? await fs_extra_1.default.readlink(source) : undefined,
++            });
+         }
+-        await asar_1.default.createPackageWithOptions(x64Dir, outputAsarPath, {
+-            unpack,
+-        });
++        // All sources now live in x64Dir; remove stale unpacked links before writing.
++        await fs_extra_1.default.remove(`${outputAsarPath}.unpacked`);
++        await asar_1.default.createPackageFromStreams(outputAsarPath, streams);
++        asar_1.default.uncache(outputAsarPath);
+         (0, debug_1.d)('done merging');
+     }
+     finally {
+diff --git a/dist/esm/asar-utils.js b/dist/esm/asar-utils.js
+index d863cf62d197855692935b0b635d18cdcbef1a62..cd1f8b8bd0411eaf670321a9a45c41ff1f9a6712 100644
+--- a/dist/esm/asar-utils.js
++++ b/dist/esm/asar-utils.js
+@@ -147,17 +147,31 @@ export const mergeASARs = async ({ x64AsarPath, arm64AsarPath, outputAsarPath, s
+             execFileSync(LIPO, [source, destination, '-create', '-output', destination]);
+         }
+         d(`creating archive at ${outputAsarPath}`);
+-        const resolvedUnpack = Array.from(unpackedFiles).map((file) => path.join(x64Dir, file));
+-        let unpack;
+-        if (resolvedUnpack.length > 1) {
+-            unpack = `{${resolvedUnpack.join(',')}}`;
+-        }
+-        else if (resolvedUnpack.length === 1) {
+-            unpack = resolvedUnpack[0];
++        // A single brace glob exceeds minimatch's length limit for large runtimes.
++        // Stream the exact unpacked set instead, preserving links and executable modes.
++        const streams = [];
++        for (const file of [...new Set([...x64Files, ...arm64Files])].sort()) {
++            const source = path.resolve(x64Dir, file);
++            const stat = await fs.lstat(source);
++            const unpacked = unpackedFiles.has(file);
++            if (unpacked) {
++                const original = x64Files.has(file) && asar.statFile(x64AsarPath, file).unpacked
++                    ? x64AsarPath : arm64AsarPath;
++                stat.mode = (await fs.lstat(path.join(`${original}.unpacked`, file))).mode;
++            }
++            streams.push({
++                path: file,
++                type: stat.isDirectory() ? 'directory' : stat.isSymbolicLink() ? 'link' : 'file',
++                stat,
++                unpacked,
++                streamGenerator: () => fs.createReadStream(source),
++                symlink: stat.isSymbolicLink() ? await fs.readlink(source) : undefined,
++            });
+         }
+-        await asar.createPackageWithOptions(x64Dir, outputAsarPath, {
+-            unpack,
+-        });
++        // All sources now live in x64Dir; remove stale unpacked links before writing.
++        await fs.remove(`${outputAsarPath}.unpacked`);
++        await asar.createPackageFromStreams(outputAsarPath, streams);
++        asar.uncache(outputAsarPath);
+         d('done merging');
+     }
+     finally {

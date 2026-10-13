@@ -6,5 +6,5 @@
   "redirectUri": "http://127.0.0.1:<dynamic-port>/callback",
   "pkce": "S256",
   "clientSecret": null,
-  "issuer": "https://sso.ixicai.cn/api"
+  "issuer": "https://user.hozonauto.com/api"
 }

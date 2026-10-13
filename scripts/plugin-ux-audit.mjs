@@ -9,7 +9,7 @@ const ciEntries = (await readdir(ciRoot, { withFileTypes: true }))
   .map(entry => entry.name)
   .sort()
 // Client-plugin discovery spans every white-label brand family under .ci/.
-const entries = ciEntries.filter(name => /^dsh-(?:yootun|sensteed)-/.test(name))
+const entries = ciEntries.filter(name => /^dsh-(?:yootun|sensteed)-|^dsh-soup$/.test(name))
 
 async function readSourceTree(root, extensions) {
   const paths = await readdir(root, { recursive: true })
@@ -19,12 +19,26 @@ async function readSourceTree(root, extensions) {
 }
 
 const clientPlugins = []
+const clientArtifacts = new Map()
 for (const name of entries) {
   try {
     await stat(new URL(`../.ci/${name}/src/client.js`, import.meta.url))
     clientPlugins.push(name)
+    clientArtifacts.set(name, `../.ci/${name}/src/client.js`)
   } catch (error) {
     if (error?.code !== 'ENOENT') throw error
+    // Concatenated builds (build.mjs FILES list) ship no src/client.js entry;
+    // their lib/client.js artifact is the audited source.
+    try {
+      const manifest = JSON.parse(await readFile(new URL(`../.ci/${name}/package.json`, import.meta.url), 'utf8'))
+      if (manifest.dsh?.client === undefined) continue
+      await stat(new URL(`../.ci/${name}/lib/client.js`, import.meta.url))
+    } catch (manifestError) {
+      if (manifestError?.code !== 'ENOENT') throw manifestError
+      continue
+    }
+    clientPlugins.push(name)
+    clientArtifacts.set(name, `../.ci/${name}/lib/client.js`)
   }
 }
 
@@ -32,16 +46,17 @@ const failures = []
 const desktopStyles = await readFile(new URL('../dsh-plugin-desktop/src/client/styles.ts', import.meta.url), 'utf8')
 const desktopSettingsStyles = await readFile(new URL('../dsh-plugin-desktop/src/client/desktop-settings-styles.ts', import.meta.url), 'utf8')
 const desktopExtendedStyles = await readFile(new URL('../dsh-plugin-desktop/src/client/extended-styles.ts', import.meta.url), 'utf8')
-const dofeAccessSource = await readFile(new URL('../dsh-plugin-desktop/src/client/DofeAccessSection.tsx', import.meta.url), 'utf8')
+const dofeAccessSource = await readFile(new URL('../dsh-sensteed-product/src/client/DofeAccessSection.tsx', import.meta.url), 'utf8')
 const desktopSettingsApiSource = await readFile(new URL('../dsh-plugin-desktop/src/client/desktop-settings-api.ts', import.meta.url), 'utf8')
 const bootHealthSource = await readFile(new URL('../dsh-plugin-desktop/src/client/boot-health.ts', import.meta.url), 'utf8')
-const dofeManagedSource = await readFile(new URL('../dsh-plugin-desktop/src/dofe-managed.ts', import.meta.url), 'utf8')
+const dofeManagedSource = await readFile(new URL('../dsh-sensteed-product/src/dofe-managed.ts', import.meta.url), 'utf8')
 const themeSource = await readFile(new URL('../deepseek-harness/packages/client/ui-theme/src/styles/design-platform.css', import.meta.url), 'utf8')
 const layoutFrameSource = await readFile(new URL('../deepseek-harness/packages/client/ui-layout/src/client/AppFrame.tsx', import.meta.url), 'utf8')
 const deliverablesStyles = await readFile(new URL('../deepseek-harness/packages/client/ui-deliverables/src/client/Deliverables.module.css', import.meta.url), 'utf8')
 const capabilityMatrix = await readFile(new URL('../docs/superpowers/specs/2026-09-09-mcp-api-capability-matrix.md', import.meta.url), 'utf8')
 const localRouteSources = await Promise.all([
   readSourceTree(new URL('../dsh-plugin-desktop/src/', import.meta.url), ['.ts', '.tsx']),
+  readSourceTree(new URL('../dsh-sensteed-product/src/', import.meta.url), ['.ts', '.tsx']),
   readSourceTree(ciRoot, ['.js']),
 ])
 const locallyHostedApiPaths = new Set(localRouteSources.flat(2).flatMap(source =>
@@ -114,30 +129,13 @@ function declaredToolNames(source) {
   return [...block.matchAll(/['"]([a-z][a-z0-9_-]+)['"]/giu)].map(match => match[1])
 }
 
+// Plugin names whose cards must carry an action lifecycle; empty after the
+// dsh-yootun-* snapshot cleanup in 288809e279.
 const actionLifecyclePlugins = new Set([
-  'dsh-yootun-content-command',
-  'dsh-yootun-recruiter',
-  'dsh-yootun-sales',
-  'dsh-yootun-supply-watch',
-  'dsh-yootun-xhs-operation',
-  'dsh-yootun-douyin-operation',
 ])
 
 const pluginClassPrefixes = {
-  'dsh-yootun-audit': 'ya-',
-  'dsh-yootun-content-command': 'ycc-',
-  'dsh-yootun-daily-report': 'ydr-',
-  'dsh-yootun-dashboard': 'yd-',
-  'dsh-yootun-douyin-operation': 'ydo-',
-  'dsh-yootun-finops': 'yf-',
-  'dsh-yootun-knowledge': 'yk-',
-  'dsh-yootun-lead-discovery': 'yl-',
-  'dsh-yootun-recruiter': 'yr-',
-  'dsh-yootun-retrofit': 'yro-',
-  'dsh-yootun-sales': 'ys-',
-  'dsh-yootun-supply-watch': 'ysw-',
-  'dsh-yootun-ui': 'yu-',
-  'dsh-yootun-xhs-operation': 'yxh-',
+  'dsh-sensteed-finance': 'sf-',
 }
 
 if (!desktopStyles.includes('[aria-modal="true"] :is(')) failures.push('dsh-plugin-desktop: modal focus indicator is missing')
@@ -153,7 +151,7 @@ const desktopClientStyles = `${desktopStyles}\n${desktopSettingsStyles}\n${deskt
 const pluginConsoleClient = await readFile(new URL('../.ci/dsh-plugin-console/lib/client.js', import.meta.url), 'utf8')
 const pluginConsoleHost = await readFile(new URL('../.ci/dsh-plugin-console/lib/index.js', import.meta.url), 'utf8')
 const openCliSource = await readFile(new URL('../.ci/dsh-opencli/index.js', import.meta.url), 'utf8')
-const dofeOpenCliSource = await readFile(new URL('../dsh-plugin-desktop/src/dofe-opencli.ts', import.meta.url), 'utf8')
+const dofeOpenCliSource = await readFile(new URL('../dsh-sensteed-product/src/dofe-opencli.ts', import.meta.url), 'utf8')
 const directMcpServers = [...dofeManagedSource.matchAll(/serverName:\s*'([^']+)'/gu)].map(match => match[1])
 const toolsMcpPaths = dofeManagedSource.match(/\.\.\.\[([\s\S]*?)\]\.map\(path => \(\{ plugin: 'tools'/u)?.[1]
   ?.match(/'[^']+'/gu)?.map(value => value.slice(1, -1)) || []
@@ -161,8 +159,8 @@ const managedMcpServers = new Set([...directMcpServers, ...toolsMcpPaths.map(pat
 const localToolSources = await Promise.all([
   '../dsh-plugin-desktop/src/browser-tools.ts',
   '../dsh-plugin-desktop/src/ci-tools.ts',
-  '../dsh-plugin-desktop/src/yootun-recruiter-tools.ts',
-  '../dsh-plugin-desktop/src/dofe-opencli.ts',
+  '../dsh-sensteed-product/src/yootun-recruiter-tools.ts',
+  '../dsh-sensteed-product/src/dofe-opencli.ts',
   ...ciEntries.filter(name => name.startsWith('dsh-yootun-')).flatMap(name => [
     `../.ci/${name}/index.js`,
     `../.ci/${name}/tool.js`,
@@ -320,7 +318,7 @@ if (!dofeAccessSource.includes('const loadingRef = useRef(false)') || !dofeAcces
 if (!dofeAccessSource.includes('aria-busy={interactionBusy}')) {
   failures.push('dsh-plugin-desktop: native access form does not expose its combined busy state')
 }
-if (!dofeAccessSource.includes('const ACCESS_REQUEST_TIMEOUT_MS = 15000')
+if (!dofeAccessSource.includes('const ACCESS_REQUEST_TIMEOUT_MS = 25000')
   || (dofeAccessSource.match(/signal:\s*AbortSignal\.timeout\(ACCESS_REQUEST_TIMEOUT_MS\)/gu) || []).length !== (dofeAccessSource.match(/\bfetch\(/gu) || []).length) {
   failures.push('dsh-plugin-desktop: native access API calls have no bounded timeout policy')
 }
@@ -360,6 +358,16 @@ for (const name of ciEntries) {
       for (const color of findLegacySemanticColors(clientArtifact)) {
         failures.push(`${name}/${relativePath}: ${color} bypasses the shared semantic theme aliases`)
       }
+      // The retired size-suffixed icon names (Outline16/Outline14/Sparkle16) no
+      // longer exist in @deepseek-ai/dsh-client-ui-primitives; rendering one is
+      // an invalid React element, so the whole client surface disappears. Scoped
+      // to sensteed-shipped surfaces: the yootun-only clients await the same
+      // migration in their owning docker-helm checkout.
+      if (!name.startsWith('dsh-yootun-')) {
+        for (const icon of clientArtifact.match(/\bIcon[A-Za-z0-9]*(?:Outline1[46]|Sparkle16)\b/gu) ?? []) {
+          failures.push(`${name}/${relativePath}: ${icon} is a retired primitives icon name; use the OutlineRegular/SparkleRegular family`)
+        }
+      }
       if (name === 'dsh-yootun-knowledge') {
         for (const color of findHardcodedStateColors(clientArtifact)) {
           failures.push(`${name}/${relativePath}: ${color} hardcodes a knowledge state supplement color`)
@@ -377,7 +385,8 @@ for (const name of ciEntries) {
 }
 
 for (const name of clientPlugins) {
-  const source = await readFile(new URL(`../.ci/${name}/src/client.js`, import.meta.url), 'utf8')
+  const clientPath = clientArtifacts.get(name)
+  const source = await readFile(new URL(clientPath, import.meta.url), 'utf8')
   const localApiPaths = new Set(source.match(/\/(?:api\/desktop|_dsh)\/[a-z0-9/_-]+/giu) || [])
   const sidebarOrder = source.match(/name:\s*['"]sidebar\.footer\.action['"][\s\S]{0,180}?order:\s*(\d+)/u)?.[1]
   const overlayOrder = source.match(/name:\s*['"]shell\.overlay['"][\s\S]{0,180}?order:\s*(\d+)/u)?.[1]
@@ -393,14 +402,24 @@ for (const name of clientPlugins) {
   const hasThemeAliases = themeAliasCount >= 4
     && /var\(--dsw-alias-bg-base\)/.test(source)
     && /var\(--dsw-alias-label-primary\)/.test(source)
-  const fetchCount = (source.match(/\bfetch\s*\(/g) || []).length
+  // esbuild may rename an injected `fetch` binding (`fetch2`, `fetch3`) to
+  // avoid colliding with the browser global. Count those generated names as
+  // the same network primitive instead of flagging a valid bundled policy.
+  const fetchCount = (source.match(/\bfetch\d*\s*\(/g) || []).length
   const sameOriginCount = (source.match(/credentials:\s*['"]same-origin['"]/g) || []).length
   const rejectRedirectCount = (source.match(/redirect:\s*['"]error['"]/g) || []).length
-  const boundedFetchCount = (source.match(/\bsignal:\s*/g) || []).length
+  // Count the shared bounded-timeout wiring itself: a bare `signal:` also
+  // appears on host RPC options, which are not fetches. An AbortSignal.any
+  // composition that keeps a caller cancellation signal next to the shared
+  // timeout satisfies the same policy.
+  const boundedFetchCount = (source.match(/signal:\s*AbortSignal\.(?:any\(\[[^\]]*?)?timeout\(REQUEST_TIMEOUT_MS\d*\)/g) || []).length
   const hasDynamicStatus = /aria-live/.test(source) || /role:\s*[^}\n]*['"](?:status|alert)['"]/.test(source)
   const hasAsyncUiState = /set(?:Loading|Busy)\(/.test(source)
   const exposesAsyncUiState = /aria-busy/.test(source)
-  const hasCanonicalShell = name === 'dsh-yootun-ui' || (hasCanonicalHeader(source) && hasCanonicalIconButton(source))
+  // dsh-soup contributes in-session docks and overlay previews only; it never
+  // mounts shell chrome, so the header baseline names it exempt explicitly.
+  const hasCanonicalShell = name === 'dsh-yootun-ui' || name === 'dsh-soup'
+    || (hasCanonicalHeader(source) && hasCanonicalIconButton(source))
   const hasActionLifecycle = /awaiting_confirmation|confirmed_pending_adapter|adapter_pending/.test(source)
     || (name === 'dsh-yootun-xhs-operation' && /cancelConfirm|confirmYes|confirmNo/.test(source))
   const usesRevisionReload = /\bsetRevision\s*\(/.test(source)
@@ -417,7 +436,7 @@ for (const name of clientPlugins) {
   if (!hasThemeAliases) failures.push(`${name}: client styles do not use desktop theme aliases`)
   if (sameOriginCount !== fetchCount) failures.push(`${name}: every fetch must use same-origin credentials`)
   if (rejectRedirectCount !== fetchCount) failures.push(`${name}: every fetch must reject redirects`)
-  if (!source.includes('const REQUEST_TIMEOUT_MS = 30000') || boundedFetchCount !== fetchCount) {
+  if (!/(?:const|let|var)\s+REQUEST_TIMEOUT_MS\s*=\s*(?:30000|3e4)\b/.test(source) || boundedFetchCount !== fetchCount) {
     failures.push(`${name}: every fetch must have the shared bounded timeout policy`)
   }
   if (!hasDynamicStatus) failures.push(`${name}: client has no announced loading, empty, or error state`)

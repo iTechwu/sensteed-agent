@@ -13,7 +13,7 @@ Yootun-Agent 的企业能力采用“本地工作台 + 可替换外部适配器�
 | 区块 | 来源 | 允许展示 | 不允许展示 | 降级语义 |
 | --- | --- | --- | --- | --- |
 | GEO | GeoFlow `geoflow_analytics_overview` 工具，`preset=yesterday` | KPI、趋势、漏斗、内容排行 | 原始查询、凭据、未裁剪响应字段 | `unavailable` / `error` 不阻塞其他区块 |
-| 消费 | `https://ixicai.cn/api/v1/yootun/usage` | 请求数、Token、费用、按模型聚合 | `model_api_key`、provider 私有字段 | 缺少或拒绝 Key 时仅标记该区块不可用 |
+| 消费 | `https://ai.hozonauto.com/api/v1/yootun/usage` | 请求数、Token、费用、按模型聚合 | `model_api_key`、provider 私有字段 | 缺少或拒绝 Key 时仅标记该区块不可用 |
 | 昨日工作 | 本机 session projection + event log | 会话标题、工作区标签、轮次、工具调用、模型聚合 | prompt、回复正文、附件、路径细节、密钥 | 存储不可读或超限时返回不可用/跳过计数 |
 
 响应固定包含 `period`、`geo`、`usage`、`activity` 与 `refreshedAt`。每个数据源都使用 `{ status: ready|empty, data }` 或 `{ status: unavailable|error, reason }`，前端必须逐块渲染状态，不得把不可用误报为零值成功。

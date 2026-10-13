@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url'
 import { describe, expect, it, vi } from 'vitest'
 import {
   clearElectronRunAsNode,
+  isDirectDesktopCliExecution,
   desktopCliProfileManifestUrl,
   runDesktopDshCli,
   selectedDesktopCliProfile,
@@ -14,6 +15,25 @@ import {
 import { packagedDependencyPath, unpackedAsarPath } from '../src/packaged-runtime-path.ts'
 
 describe('packaged dsh bootstrap', () => {
+  it('recognizes direct CLI execution through a directory alias', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-cli-entry-'))
+    try {
+      const physical = join(root, 'physical')
+      const alias = join(root, 'alias')
+      mkdirSync(physical)
+      const entry = join(physical, 'desktop-cli.js')
+      writeFileSync(entry, '')
+      writeFileSync(join(physical, 'other.js'), '')
+      symlinkSync(physical, alias, 'junction')
+      const moduleUrl = pathToFileURL(realpathSync(entry)).href
+      expect(isDirectDesktopCliExecution(moduleUrl, join(alias, 'desktop-cli.js'))).toBe(true)
+      expect(isDirectDesktopCliExecution(moduleUrl, join(alias, 'other.js'))).toBe(false)
+      expect(isDirectDesktopCliExecution(moduleUrl, undefined)).toBe(false)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
   it('removes every Windows casing of Electron Node mode', () => {
     const environment = {
       ELECTRON_RUN_AS_NODE: '1',
@@ -35,7 +55,10 @@ describe('packaged dsh bootstrap', () => {
     const argv = ['/Applications/Sensteed Agent', '/app.asar/lib/desktop-cli.js', '--dump-config']
     const runCli = vi.fn(async () => {})
     const load = vi.fn(async (url: string) => {
-      expect(environment).toEqual({ KEEP: 'value' })
+      expect(environment).toEqual({
+        KEEP: 'value',
+        DSH_BUNDLED_SKILL_DIR: expect.stringContaining('/dsh-plugin-desktop/bundled/skills'),
+      })
       expect(argv).toEqual([
         '/Applications/Sensteed Agent',
         '/app.asar/lib/desktop-cli.js',
@@ -101,6 +124,52 @@ describe('packaged dsh bootstrap', () => {
     ]
     await runDesktopDshCli({}, load, explicit)
     expect(explicit.slice(2)).toEqual(['plugin', '--profile=work', 'update'])
+  })
+
+  it.each(['default', 'explicit'])('authorizes installed Desktop plugin management with %s profile selection', async selection => {
+    const home = mkdtempSync(join(tmpdir(), 'desktop-cli-managed-plugin-'))
+    try {
+      const profile = join(home, 'profiles', 'desktop')
+      const store = join(home, 'previous-user-store', 'v11')
+      mkdirSync(join(profile, 'node_modules'), { recursive: true })
+      writeFileSync(join(profile, 'node_modules', '.modules.yaml'), JSON.stringify({ storeDir: store }))
+      const environment = { DSH_HOME: home, ...(selection === 'default' ? { DSH_DESKTOP_DEFAULT_PROFILE: 'desktop' } : {}) }
+      const args = selection === 'default' ? ['plugin', 'add', 'example@1.2.3'] : ['plugin', '--profile=desktop', 'add', 'example@1.2.3']
+      const runCli = vi.fn(async () => {})
+      await runDesktopDshCli(environment, async () => ({ runCli }), ['node', 'desktop-cli', ...args])
+      expect(runCli).toHaveBeenCalledWith({
+        manageDesktopProfile: true,
+        packageManager: { command: 'pnpm', args: ['--store-dir', store], env: {} },
+      })
+    } finally {
+      rmSync(home, { recursive: true, force: true })
+    }
+  })
+
+  it.each([
+    ['--store-dir', '/explicit-store'],
+    ['--store-dir=/explicit-store'],
+  ])('keeps an explicit CLI store override: %j', async (...storeFlags) => {
+    const runCli = vi.fn(async () => {})
+    const argv = ['node', 'desktop-cli', 'plugin', '--profile=desktop', 'add', ...storeFlags, 'example@1.2.3']
+    await runDesktopDshCli({}, async () => ({ runCli }), argv)
+    expect(runCli).toHaveBeenCalledWith({ manageDesktopProfile: true })
+    expect(argv.slice(2)).toEqual(['plugin', '--profile=desktop', 'add', ...storeFlags, 'example@1.2.3'])
+  })
+
+  it('uses the explicit custom Profile for new installs without inheriting the default Profile store', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'desktop-cli-custom-plugin-'))
+    try {
+      const runCli = vi.fn(async () => {})
+      await runDesktopDshCli({ DSH_HOME: home, DSH_DESKTOP_DEFAULT_PROFILE: 'desktop' },
+        async () => ({ runCli }), ['node', 'desktop-cli', 'plugin', '--profile=work', 'add', 'example@1.2.3'])
+      expect(runCli).toHaveBeenCalledWith({
+        manageDesktopProfile: true,
+        packageManager: { command: 'pnpm', args: ['--store-dir', join(home, 'pnpm-store')], env: {} },
+      })
+    } finally {
+      rmSync(home, { recursive: true, force: true })
+    }
   })
 
   it('defaults profile and plugin commands without overriding explicit or global modes', () => {

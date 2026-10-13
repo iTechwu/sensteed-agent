@@ -10,7 +10,7 @@
 import { formatUnexpectedHostExit, startIsolatedDesktopHost } from './host-process.ts'
 import { createDesktopProfileBoot } from './profile-context.ts'
 import { logInactiveStartupEntries } from './startup-audit.ts'
-import { app, crashReporter, safeStorage, session, shell } from 'electron'
+import { app, crashReporter, dialog, safeStorage, session, shell } from 'electron'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
@@ -18,8 +18,10 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   boot,
+  createRuntimeResolution,
   installFailLoud,
   loadLayeredEnv,
+  PluginPackages,
   PROFILE_PATCH_FILENAME,
   resolveProfileDir,
   type FailLoudProcess,
@@ -58,6 +60,7 @@ import {
 } from './crash-evidence.ts'
 import { dshProductVersion } from './dsh-product-version.ts'
 import { exportDesktopDiagnostics } from './diagnostic-export.ts'
+import { bundledSkillRoot } from './bundled-skill-root.ts'
 import { createDesktopLifecycleRecorder } from './lifecycle-events.ts'
 import type {
   DesktopLifecycleFailureReason,
@@ -176,6 +179,12 @@ import {
   materializeProfile,
   ProfileMaterializationError,
 } from './profile-materializer.ts'
+import { runDesktopProfileRepair, scheduleDesktopProfileRepair } from './profile-repair.ts'
+import { createDesktopQuitGate, type DesktopQuitInspectionResult } from './quit-gate.ts'
+import { getCachedMandatoryPolicy, readCachedMandatoryPolicyFromState } from './mandatory-policy-cache.ts'
+import { mandatoryBlockingDialogCopy, shouldPromptMandatoryBlocking } from './mandatory-update-dialog.ts'
+import type {} from '@dofe/dsh-sensteed-product/quit-inspection'
+import { ensureDesktopPnpmStoreDir } from './profile-store-dir.ts'
 import {
   formatRecoveryPluginRemoveFailure,
   removeRecoveryPlugin,
@@ -219,7 +228,6 @@ import {
   recoverOversizedSessionProjectionCache,
   type SessionProjectionCacheRecoveryResult,
 } from './session-projcache-recovery.ts'
-import { windowsSupportsMica } from './window-material.ts'
 import {
   removeLegacyModelCredentials,
   removeModelCredentialEnvironment,
@@ -661,13 +669,61 @@ async function start(): Promise<void> {
     async () => { await generation.release() },
     finalExit,
   )
-  const requestQuit = (code: number): void => { void shutdown.request(code) }
+  const rawRequestQuit = (code: number): void => { void shutdown.request(code) }
+  let quitInspectionProbe: (() => Promise<DesktopQuitInspectionResult>) | undefined
+  let mandatoryDownloadProbe: (() => Promise<void>) | undefined
+  let mandatoryLastPromptAt = 0
+  const quitGate = createDesktopQuitGate({
+    enabled: process.env.DSH_DESKTOP_QUIT_GATE !== '0',
+    locale: () => app.getLocale(),
+    canPrompt: () => app.isReady(),
+    inspect: async () => await (quitInspectionProbe?.() ?? Promise.resolve({ source: 'unavailable' as const })),
+    confirm: async copy => {
+      const choice = await dialog.showMessageBox({
+        type: 'warning', buttons: [copy.cancel, copy.confirm], defaultId: 1, cancelId: 0,
+        title: copy.title, message: copy.title, detail: copy.detail,
+      })
+      return choice.response === 1
+    },
+  })
+  // `source` marks origins that must never raise the interactive gate: OS
+  // signals (no user to answer), the installer handshake, and the crash path.
+  const requestQuit = (code: number, source?: 'signal' | 'installer' | 'crash'): void => {
+    if (source !== undefined) { rawRequestQuit(code); return }
+    void quitGate.run().then(proceed => { if (proceed) rawRequestQuit(code) })
+  }
   removeUncaughtExceptionLogging = installDesktopUncaughtExceptionLogging(
     process,
     electronLogger,
-    requestQuit,
+    code => { requestQuit(code, 'crash') },
   )
-  removeShutdownRequests = installShutdownRequests(process, app, requestQuit)
+  removeShutdownRequests = installShutdownRequests(process, app, (code, source) => {
+    requestQuit(code, source === 'before-quit' ? undefined : source)
+  })
+
+  // Blocking-phase reminder: a single-flight native dialog on a 30-minute
+  // cooldown, watching the Host-reported cache. Quitting is never blocked —
+  // the next launch re-enters the same phase and re-prompts.
+  const mandatoryDialogTimer = setInterval(() => {
+    const policy = getCachedMandatoryPolicy()
+    if (!shouldPromptMandatoryBlocking({ policy, now: Date.now(), lastPromptAt: mandatoryLastPromptAt })) return
+    mandatoryLastPromptAt = Date.now()
+    const blockingPolicy = policy!
+    const copy = mandatoryBlockingDialogCopy(app.getLocale(), blockingPolicy.minVersion)
+    void dialog.showMessageBox({
+      type: 'warning',
+      buttons: [copy.cancel, copy.confirm],
+      defaultId: 1, cancelId: 0,
+      title: copy.title, message: copy.message,
+      ...(copy.detail === undefined ? {} : { detail: copy.detail }),
+    }).then(({ response }) => {
+      if (response !== 1) return
+      void mandatoryDownloadProbe?.().catch(cause => {
+        electronLogger.error(`${BIN_NAME}: mandatory update download failed: ${cause instanceof Error ? cause.message : String(cause)}`)
+      })
+    })
+  }, 60_000)
+  mandatoryDialogTimer.unref?.()
 
   const openStartupRecoveryWindow = async (
     failureDetail: string,
@@ -857,6 +913,7 @@ async function start(): Promise<void> {
       lanAddresses: desktopLanAddresses(),
     })
     electronLogger.info(`${BIN_NAME}: ${proxyResolution.summary}`)
+    runtime.setAuthProxySource(proxyResolution.source)
     for (const diagnostic of proxyResolution.diagnostics) electronLogger.error(`${BIN_NAME}: ${diagnostic}`)
     const releaseProxy = await installProxyFromEnvironment(
       desktopProxyEnvLookup(desktopLaunchEnvironment, proxyResolution.overlay),
@@ -1247,6 +1304,23 @@ async function start(): Promise<void> {
           generationId,
         }),
         uninstallPlugin: async packageName => {
+          // Mandatory update gate: the launcher cache (this run) or the
+          // persisted snapshot (a Host report from a previous run) refuses
+          // plugin removal while a notice/blocking phase is active.
+          const live = getCachedMandatoryPolicy()
+          const persisted = live === undefined
+            ? readCachedMandatoryPolicyFromState(runtime.updates.statePath)
+            : undefined
+          const policy = live ?? persisted
+          if (policy !== undefined && (policy.phase === 'notice' || policy.phase === 'blocking')) {
+            throw new DesktopStartupRecoveryControllerError(
+              'operation-failed',
+              policy.phase === 'blocking'
+                ? `Update to ${policy.minVersion ?? ''} is required before changing Desktop bundles.`
+                : `Update to ${policy.minVersion ?? ''} is recommended; bundle changes are unavailable.`,
+              { operationStage: 'plugin-change' },
+            )
+          }
           try {
             await removeRecoveryPlugin({
               appExecutable: process.execPath,
@@ -1287,6 +1361,10 @@ async function start(): Promise<void> {
               homeDir,
               profileDir: activeProfileDir,
               electronVersion,
+              storeDir: ensureDesktopPnpmStoreDir(homeDir, activeProfileDir),
+              // Restored checkpoints pin their lockfile, so the selected store
+              // usually holds every tarball already; go online only on a miss.
+              offline: 'prefer',
             })
           } catch (cause) {
             const detail = maskSecrets(formatProfileMaterializationFailure(cause))
@@ -1301,6 +1379,18 @@ async function start(): Promise<void> {
             )
           }
         },
+        repairDependencies: async () => await runDesktopProfileRepair({
+          homeDir,
+          profileDir: activeProfileDir,
+          platform: process.platform,
+          lockDir: desktopUserDataDir,
+          appExecutable: process.execPath,
+          clearEnvironmentPath: pnpmRuntime.clearEnvironmentPath,
+          pnpmBinPath,
+          nodeBinDir: pnpmRuntime.nodeBinDir,
+          nodeShimPath: pnpmRuntime.nodeShimPath,
+          electronVersion,
+        }),
       })
     }
     if (recoveryModeRequested) {
@@ -1469,7 +1559,6 @@ async function start(): Promise<void> {
           appVersion,
           profileName: activeProfileName,
           platform: runtime.platform,
-          micaSupported: process.platform === 'win32' && windowsSupportsMica(runtime.windowsBuild),
           ...setupSettings,
           market: marketSelection.requested,
           aaEnabled: profilePreferences?.aaEnabled === true,
@@ -1570,40 +1659,79 @@ async function start(): Promise<void> {
       : undefined
     const releaseDshRuntime = generation.own(() => { dshRuntime?.dispose() })
     if (prepared.requiresDependencyMigration) {
-      electronLogger.error(`${BIN_NAME}: migrating legacy Profile dependency layout with packaged pnpm`)
-      try {
-        await materializeProfile({
+      if (process.env.DSH_DESKTOP_LEGACY_MIGRATION === '1') {
+        electronLogger.error(`${BIN_NAME}: migrating legacy Profile dependency layout with packaged pnpm`)
+        try {
+          await materializeProfile({
+            appExecutable: process.execPath,
+            clearEnvironmentPath: pnpmRuntime.clearEnvironmentPath,
+            pnpmBinPath,
+            nodeBinDir: pnpmRuntime.nodeBinDir,
+            nodeShimPath: pnpmRuntime.nodeShimPath,
+            homeDir,
+            profileDir: prepared.profile.dir,
+            electronVersion,
+            updateLockfile: true,
+          })
+          prepared = prepareDesktopProfile(
+            process.env.DSH_TELEMETRY_DISABLED,
+            homeDir,
+            process.platform,
+            activeProfileName,
+            pluginManagementStatePath,
+            marketSelection,
+            preparationHooks,
+          )
+          if (prepared.requiresDependencyMigration) {
+            throw new Error(`${BIN_NAME}: packaged pnpm did not produce compatible Profile dependency metadata`)
+          }
+        } catch (migrationCause) {
+          const detail = migrationCause instanceof ProfileMaterializationError
+            ? migrationCause.result?.stderr || migrationCause.message
+            : migrationCause instanceof Error ? migrationCause.message : String(migrationCause)
+          throw new Error(`${BIN_NAME}: Profile dependency migration failed: ${maskSecrets(detail)}`)
+        }
+      } else {
+        // Boot resolution never depended on the migration: prepareDesktopProfile
+        // already composed every bundle above, and the metadata only matters to
+        // later pnpm operations. Repair after the Host had a fair chance to
+        // start instead of blocking first paint on a network-sensitive install.
+        electronLogger.info(
+          `${BIN_NAME}: Profile dependency metadata needs repair (${prepared.dependencyState.reasons.join(', ')}); deferring repair until after startup`,
+        )
+        const repairSchedule = scheduleDesktopProfileRepair({
+          homeDir,
+          profileDir: prepared.profile.dir,
+          platform: process.platform,
+          lockDir: desktopUserDataDir,
           appExecutable: process.execPath,
           clearEnvironmentPath: pnpmRuntime.clearEnvironmentPath,
           pnpmBinPath,
           nodeBinDir: pnpmRuntime.nodeBinDir,
           nodeShimPath: pnpmRuntime.nodeShimPath,
-          homeDir,
-          profileDir: prepared.profile.dir,
           electronVersion,
-          updateLockfile: true,
+        }, {
+          onOutcome: outcome => {
+            electronLogger.info(`${BIN_NAME}: deferred Profile dependency repair finished: ${outcome}`)
+          },
+          onFailure: cause => {
+            electronLogger.error(`${BIN_NAME}: deferred Profile dependency repair failed: ${maskSecrets(cause instanceof Error ? cause.message : String(cause))}`)
+          },
         })
-        prepared = prepareDesktopProfile(
-          process.env.DSH_TELEMETRY_DISABLED,
-          homeDir,
-          process.platform,
-          activeProfileName,
-          pluginManagementStatePath,
-          marketSelection,
-          preparationHooks,
-        )
-        if (prepared.requiresDependencyMigration) {
-          throw new Error(`${BIN_NAME}: packaged pnpm did not produce compatible Profile dependency metadata`)
-        }
-      } catch (migrationCause) {
-        const detail = migrationCause instanceof ProfileMaterializationError
-          ? migrationCause.result?.stderr || migrationCause.message
-          : migrationCause instanceof Error ? migrationCause.message : String(migrationCause)
-        throw new Error(`${BIN_NAME}: Profile dependency migration failed: ${maskSecrets(detail)}`)
+        generation.own(() => { repairSchedule.dispose() })
       }
     }
     if (prepared.aaFailure !== undefined) {
       electronLogger.error(`${BIN_NAME}: requested AA bundle was disabled for this generation: ${maskSecrets(prepared.aaFailure)}`)
+    }
+    for (const failure of prepared.bundleFailures) {
+      electronLogger.error(`${BIN_NAME}: skipping third-party bundle for this generation: ${maskSecrets(failure)}`)
+    }
+    if (prepared.productFailure !== undefined) {
+      electronLogger.error(`${BIN_NAME}: launcher-owned product layer was disabled for this generation: ${maskSecrets(prepared.productFailure)}`)
+    }
+    for (const violation of prepared.closureViolations) {
+      electronLogger.error(`${BIN_NAME}: packaged dependency closure violation: ${maskSecrets(violation)}`)
     }
     if (prepared.marketFailure !== undefined) {
       electronLogger.error(
@@ -1667,6 +1795,14 @@ async function start(): Promise<void> {
         // `{ fiber: { dispose } }`, never a Context, and must not be handed
         // to `profileBoot.prepare`.
         bindHost: host => { generation.bindHost(host) }, requestQuit,
+        registerQuitInspection: impl => {
+          quitInspectionProbe = impl === undefined
+            ? undefined
+            : async () => ({ source: 'ready' as const, ...(await impl()) })
+        },
+        registerMandatoryDownload: impl => {
+          mandatoryDownloadProbe = impl ?? undefined
+        },
         onFailure: (error, exit) => {
           electronLogger.error(formatUnexpectedHostExit(error, exit))
           lifecycleRecorder.recordHostExit({
@@ -1682,6 +1818,10 @@ async function start(): Promise<void> {
         },
       })
     } else {
+      // Same bundled-skills contract as the isolated Host entry: the legacy
+      // in-process boot must announce the app-bundled skill root too.
+      const bundledSkills = bundledSkillRoot(import.meta.url)
+      if (bundledSkills !== undefined) process.env.DSH_BUNDLED_SKILL_DIR = bundledSkills
       let currentProfilePreferences: DesktopProfilePreferences = profilePreferences
       let profilePreferencesWriteTail: Promise<void> = Promise.resolve()
       let profilePreferencesStopping = false
@@ -1711,6 +1851,10 @@ async function start(): Promise<void> {
       startupStage = 'host-boot'
       lifecycleRecorder.transitionStartupStage(startupStage)
       const releasePackageResolver = installProfilePackageResolver(prepared.bareModuleBaseUrl)
+      // Same pluginPackages contract as the isolated Host: the compatibility
+      // preflight must judge rows against this installation's versions, not
+      // the Profile's registry-installed @deepseek-ai copies.
+      const resolution = await createRuntimeResolution({ installAnchor: desktopInstallAnchor(), profile: prepared.profile })
       const ctx = await boot(
         BIN_NAME,
         prepared.rootConfig,
@@ -1719,7 +1863,14 @@ async function start(): Promise<void> {
           // Keep Host imports and browser bundle discovery on the same public
           // profile-overlay resolver used by packaged Electron.
           hostCtx.loader.internal = undefined
+          hostCtx.inject(['sensteedQuitInspection'], scope => {
+            quitInspectionProbe = async () => ({
+              source: 'ready' as const,
+              ...(await scope.sensteedQuitInspection.inspect()),
+            })
+          })
           generation.bindHost(hostCtx)
+          await hostCtx.plugin(PluginPackages, { resolution })
           hostCtx.effect(
             () => async () => { await flushProfilePreferencesWrites() },
             'dsh-plugin-desktop: flush Profile preference writes',

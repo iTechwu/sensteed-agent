@@ -7,8 +7,8 @@ import { writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 import {
   compareSemVerVersions,
   DESKTOP_RELEASE_CHANNEL_HEADER,
-  parseSemVer,
   parseCanonicalChannelVersion,
+  parseCanonicalSupportedVersion,
   type DesktopReleaseChannel,
 } from './update-checker.ts'
 
@@ -24,9 +24,6 @@ export const DESKTOP_DOWNLOAD_URLS: Readonly<Record<DesktopDownloadPlatform, str
 /** Header pinning a download request and response to the checked release. */
 export const DESKTOP_TARGET_VERSION_HEADER = 'X-Sensteed-Agent-Target-Version'
 
-/** Maximum accepted installer size, in bytes. */
-export const MAX_UPDATE_DOWNLOAD_BYTES = 1024 * 1024 * 1024
-
 /** Failure categories exposed to the update coordinator. */
 export type UpdateDownloadErrorCode =
   | 'aborted'
@@ -36,13 +33,12 @@ export type UpdateDownloadErrorCode =
   | 'invalid-options'
   | 'network'
   | 'redirect-origin'
-  | 'response-too-large'
 
 /**
  * One settled download response plus the URL the redirect chain landed on.
  * Electron `net.fetch` cannot fill `Response.url` (a documented limitation:
  * the value is always empty), so the transport adapter follows redirects
- * itself and reports the settled URL here for the origin gate to validate.
+ * itself and reports the settled URL here for the HTTPS check.
  */
 export interface UpdateArtifactResponse {
   readonly response: Response
@@ -52,24 +48,6 @@ export interface UpdateArtifactResponse {
 
 /** Request boundary supplied by the Electron adapter or a test. */
 export type UpdateArtifactRequest = (url: string, init: RequestInit) => Promise<UpdateArtifactResponse>
-
-/**
- * Download targets the installer fetch may settle on: the fixed product
- * endpoint plus the reviewed mirror it redirects through. The mirror is
- * pinned to the maintainer's repository path, not just the host, because the
- * host serves arbitrary user uploads under other paths. A redirect chain
- * that ends anywhere else is treated as a compromised download service
- * instead of being executed after a magic-number check. Adding or moving a
- * target requires a client release.
- */
-const ALLOWED_DOWNLOAD_TARGETS: readonly {
-  readonly host: string
-  readonly pathPrefix?: string
-}[] = [
-  { host: 'www.dshdesktop.cn' },
-  { host: 'dshdesktop.cn' },
-  { host: 'modelscope.cn', pathPrefix: '/models/t4wefan/deepseek-harness-desktop/' },
-]
 
 /** Inputs for one user-confirmed installer download. */
 export interface DownloadDesktopUpdateOptions {
@@ -122,7 +100,6 @@ export class UpdateDownloadError extends Error {
 
 const PRIVATE_DIRECTORY_MODE = 0o700
 const PRIVATE_FILE_MODE = 0o600
-const DECIMAL_BYTES = /^(0|[1-9][0-9]*)$/u
 const DMG_TRAILER_BYTES = 512
 const DMG_TRAILER_MAGIC = Buffer.from('koly', 'ascii')
 const DOS_HEADER_BYTES = 64
@@ -192,8 +169,7 @@ export async function downloadDesktopUpdate(options: DownloadDesktopUpdateOption
     throw new UpdateDownloadError('empty-body', 'The update download service returned an empty body.')
   }
   try {
-    assertAllowedDownloadOrigin(finalUrl)
-    assertDeclaredSize(response)
+    assertSecureDownloadUrl(finalUrl)
   } catch (cause) {
     await discardResponseBody(response)
     throw cause
@@ -322,13 +298,7 @@ function validatedVersion(version: string, channel: DesktopReleaseChannel = 'sta
 }
 
 function validatedReleaseVersion(version: string): string {
-  const parsed = parseSemVer(version)
-  const isStable = parsed?.prerelease.length === 0
-  const isBeta = parsed?.prerelease.length === 2
-    && parsed.prerelease[0] === 'beta'
-    && /^[0-9]+$/u.test(parsed.prerelease[1]!)
-  const isNext = parseCanonicalChannelVersion(version, 'next') !== null
-  if (parsed === null || parsed.version !== version || (!isStable && !isBeta && !isNext)) {
+  if (parseCanonicalSupportedVersion(version) === null) {
     throw new UpdateDownloadError('invalid-options', 'The update version must belong to a supported release channel.')
   }
   return version
@@ -453,18 +423,8 @@ async function discardResponseBody(response: Response): Promise<void> {
   await response.body?.cancel().catch(() => undefined)
 }
 
-function assertDeclaredSize(response: Response): void {
-  const declared = response.headers.get('content-length')
-  if (declared === null || !DECIMAL_BYTES.test(declared)) return
-  if (BigInt(declared) > BigInt(MAX_UPDATE_DOWNLOAD_BYTES)) {
-    throw new UpdateDownloadError(
-      'response-too-large',
-      `The update installer exceeds ${String(MAX_UPDATE_DOWNLOAD_BYTES)} bytes.`,
-    )
-  }
-}
-
-export function assertAllowedDownloadOrigin(finalUrl: string): void {
+/** Require a usable HTTPS URL even when an update channel permits external artifact hosts. */
+export function assertSecureDownloadUrl(finalUrl: string): URL {
   let parsed: URL
   try {
     parsed = new URL(finalUrl)
@@ -474,17 +434,7 @@ export function assertAllowedDownloadOrigin(finalUrl: string): void {
   if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.port && parsed.port !== '443') {
     throw new UpdateDownloadError('redirect-origin', 'The update download must settle on HTTPS.')
   }
-  const host = parsed.hostname.toLowerCase()
-  const allowed = ALLOWED_DOWNLOAD_TARGETS.some(target =>
-    host === target.host
-    && (target.pathPrefix === undefined || parsed.pathname.startsWith(target.pathPrefix)),
-  )
-  if (!allowed) {
-    throw new UpdateDownloadError(
-      'redirect-origin',
-      'The update download was redirected to an unreviewed origin.',
-    )
-  }
+  return parsed
 }
 
 /** Normalize the optional expected digest at option validation time, before any network work. */
@@ -542,12 +492,6 @@ async function writeResponseBody(
       const chunk = await reader.read()
       throwIfAborted(signal)
       if (chunk.done) break
-      if (chunk.value.byteLength > MAX_UPDATE_DOWNLOAD_BYTES - bytesWritten) {
-        throw new UpdateDownloadError(
-          'response-too-large',
-          `The update installer exceeds ${String(MAX_UPDATE_DOWNLOAD_BYTES)} bytes.`,
-        )
-      }
       await writeAll(handle, chunk.value)
       bytesWritten += chunk.value.byteLength
       onProgress?.(bytesWritten)
@@ -581,7 +525,7 @@ async function validateArtifact(filename: string, platform: DesktopDownloadPlatf
   const handle = await open(filename, 'r')
   try {
     const stat = await handle.stat()
-    if (!stat.isFile() || stat.size <= 0 || stat.size > MAX_UPDATE_DOWNLOAD_BYTES) {
+    if (!stat.isFile() || stat.size <= 0) {
       throw invalidArtifact(platform)
     }
     if (platform === 'darwin') {

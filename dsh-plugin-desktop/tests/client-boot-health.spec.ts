@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { Context } from '@deepseek-ai/cordis'
+import Loader from '@deepseek-ai/cordis-plugin-loader'
 import {
   RENDERER_BOOT_REPORT_PATH,
   rendererBootReport,
@@ -63,6 +65,7 @@ describe('desktop renderer boot health', () => {
   })
 
   it('rejects a settled loader when required desktop surfaces are missing', async () => {
+    vi.useFakeTimers()
     const loader = {
       await: vi.fn(async () => {}),
       * entries() {
@@ -70,14 +73,91 @@ describe('desktop renderer boot health', () => {
       },
     }
 
-    await expect(rendererBootReport(
+    const report = rendererBootReport(
       loader,
       () => 'required desktop surfaces are unavailable: main:conversation, sidebar.workspaces',
-    )).resolves.toEqual({
+      0,
+    )
+    await vi.runAllTimersAsync()
+
+    await expect(report).resolves.toEqual({
       status: 'failed',
       plugins: [],
       error: 'required desktop surfaces are unavailable: main:conversation, sidebar.workspaces',
     })
+  })
+
+  it('waits for required desktop surfaces that settle after the Loader', async () => {
+    vi.useFakeTimers()
+    let missing = true
+    const loader = {
+      await: vi.fn(async () => {}),
+      * entries() {
+        yield { options: { name: 'dsh-plugin-desktop' }, fiber: { state: 2 } }
+      },
+    }
+
+    const report = rendererBootReport(loader, () => {
+      return missing ? 'required desktop surfaces are unavailable: main:conversation' : undefined
+    })
+    setTimeout(() => { missing = false }, 50)
+    await vi.advanceTimersByTimeAsync(100)
+
+    await expect(report).resolves.toEqual({ status: 'healthy' })
+  })
+
+  it('does not retain a loading fiber after the real Loader activates its surface', async () => {
+    vi.useFakeTimers()
+    const ctx = new Context()
+    let ready = false
+    try {
+      await ctx.plugin(Loader)
+      ctx.loader.builtins.slowSurface = async () => {
+        await new Promise<void>(resolve => setTimeout(resolve, 6_000))
+        ready = true
+      }
+      const loading = ctx.loader.create({ name: 'cordis:slowSurface' })
+      const report = rendererBootReport(ctx.loader, () => ready ? undefined : 'main conversation is missing')
+      await vi.advanceTimersByTimeAsync(6_100)
+      await loading
+
+      await expect(report).resolves.toEqual({ status: 'healthy' })
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('includes entries whose imports have no fiber in a failed boot report', async () => {
+    const loader = {
+      await: async () => {},
+      * entries() {
+        yield { options: { name: '@deepseek-ai/dsh-client-ui-sidebar' } }
+      },
+    }
+
+    await expect(rendererBootReport(loader)).resolves.toEqual({
+      status: 'failed',
+      plugins: ['@deepseek-ai/dsh-client-ui-sidebar'],
+    })
+  })
+
+  it('waits for remaining plugin activation even when the required surfaces already exist', async () => {
+    vi.useFakeTimers()
+    const ctx = new Context()
+    try {
+      await ctx.plugin(Loader)
+      ctx.loader.builtins.slowPlugin = async () => {
+        await new Promise<void>(resolve => setTimeout(resolve, 6_000))
+      }
+      const loading = ctx.loader.create({ name: 'cordis:slowPlugin' })
+      const report = rendererBootReport(ctx.loader, () => undefined)
+      await vi.advanceTimersByTimeAsync(6_100)
+      await loading
+
+      await expect(report).resolves.toEqual({ status: 'healthy' })
+    } finally {
+      await ctx.fiber.dispose()
+    }
   })
 
   it('posts the terminal boot report to the same-origin desktop Host', async () => {

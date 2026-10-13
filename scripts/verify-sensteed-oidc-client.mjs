@@ -12,7 +12,7 @@ if (JSON.stringify(value.scopes) !== JSON.stringify(requiredScopes)) errors.push
 if (value.redirectUri !== 'http://127.0.0.1:<dynamic-port>/callback') errors.push('redirectUri must use the loopback dynamic-port form')
 if (value.pkce !== 'S256') errors.push('pkce must be S256')
 if (value.clientSecret !== null) errors.push('public client must not define a clientSecret')
-if (value.issuer !== 'https://sso.ixicai.cn/api') errors.push('issuer does not match the SSO discovery issuer')
+if (value.issuer !== 'https://user.hozonauto.com/api') errors.push('issuer does not match the SSO discovery issuer')
 if (errors.length > 0) {
   console.error(errors.join('\n'))
   process.exitCode = 1

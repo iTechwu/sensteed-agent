@@ -8,7 +8,7 @@ const packageRoot = new URL('../', import.meta.url)
 
 describe('OpenMontage workflow guard composition', () => {
   it('mounts the shared Host policy in the Desktop profile', async () => {
-    const patch = readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')
+    const patch = readFileSync(new URL('../dsh-sensteed-product/cordis.patch.yml', packageRoot), 'utf8')
     const manifest = JSON.parse(
       readFileSync(new URL('package.json', packageRoot), 'utf8'),
     ) as { dependencies?: Record<string, string> }

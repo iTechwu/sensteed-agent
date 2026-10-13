@@ -41,7 +41,9 @@ it('prepares request inventory for Desktop-owned entries and private-manifest pl
             dir = parent;
           }
         } };
-        apply({ baseUrl, loader: tree, get: (key) => key === 'pluginPackages' ? pluginPackages : undefined, deepseekLlmApiExtensions: {
+        // upstream 8e1dbdf88c 起 inventory 在 identity 不可读时走 ctx.logger.warn,
+        // 假 ctx 按真实插件契约提供 logger。
+        apply({ baseUrl, loader: tree, logger: { warn() {}, debug() {}, error() {}, info() {} }, get: (key) => key === 'pluginPackages' ? pluginPackages : undefined, deepseekLlmApiExtensions: {
           register: (key, value) => { assert.equal(key, 'dsh_plugin_packages'); provider = value; }
         } }, {});
         return (await provider.prepare({})).value.packages;
@@ -69,9 +71,11 @@ it('prepares request inventory for Desktop-owned entries and private-manifest pl
       }));
       writeFileSync(join(plugin, 'index.js'), 'throw new Error("inventory evaluated plugin")');
       assert.deepEqual(await collect(['private-manifest-plugin']), [{ name: 'private-manifest-plugin', version: '1.2.3' }]);
-      await assert.rejects(() => collect(['inventory-nonexistent-package']), /cannot resolve.*package/);
+      // upstream 8e1dbdf88c 起,不可解析/身份不完整的包从 inventory 中省略
+      // (ctx.logger.warn 点名)而非让请求失败。
+      assert.deepEqual(await collect(['inventory-nonexistent-package']), []);
       writeFileSync(join(plugin, 'package.json'), JSON.stringify({ name: 'private-manifest-plugin', exports: './index.js' }));
-      await assert.rejects(() => collect(['private-manifest-plugin']), /non-empty name and version/);
+      assert.deepEqual(await collect(['private-manifest-plugin']), [{ name: 'private-manifest-plugin' }]);
       release(); release = undefined;
       // 0.1.6 caches package identities per process: disposal restores plain
       // node_modules resolution without re-reading manifests, so the resolver

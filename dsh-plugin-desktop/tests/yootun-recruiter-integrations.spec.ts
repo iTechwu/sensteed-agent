@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createBossOfficialAdapter } from '../src/yootun-boss-official-adapter.ts'
-import { createRecruiterKnowledgePublisher } from '../src/yootun-recruiter-integrations.ts'
+import { createRecruiterKnowledgePublisher } from '@dofe/dsh-sensteed-product/yootun-recruiter-integrations'
 
 describe('Yootun recruiter integrations', () => {
   it('creates and confirms one ACL-scoped HR memory through registered knowledge tools', async () => {

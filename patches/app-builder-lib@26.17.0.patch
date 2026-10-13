@@ -1,0 +1,300 @@
+diff --git a/out/node-module-collector/pnpmNodeModulesCollector.js b/out/node-module-collector/pnpmNodeModulesCollector.js
+--- a/out/node-module-collector/pnpmNodeModulesCollector.js
++++ b/out/node-module-collector/pnpmNodeModulesCollector.js
+@@ -152,12 +152,10 @@
+      * versions of a dep exist in the workspace.
+      */
+     async locateFromDepOrRoot(pkgName, parentPath, requiredRange) {
+-        // pnpm's virtual store is content-addressed: every `name@version` lookup is deterministic,
+-        // so memoize on the exact version. `requiredRange` is normally an exact version coming from
+-        // the pnpm list output (e.g. `value.version`), which makes this cache hit on duplicates.
+-        // Only memoize when we have a concrete version — semver ranges could resolve differently
+-        // depending on what's installed at `parentPath` vs root, so skip the cache for those.
+-        const memoKey = requiredRange && /^\d/.test(requiredRange) ? `${pkgName}@${requiredRange}` : null;
++        // The same version can resolve differently (or be absent) from different virtual-store
++        // parents. Include the parent in the key so one failed workspace lookup cannot poison a
++        // later lookup from the dependency's actual package directory.
++        const memoKey = requiredRange && /^\d/.test(requiredRange) ? `${pkgName}@${requiredRange}::${parentPath || this.rootDir}` : null;
+         if (memoKey != null) {
+             const cached = this.locateMemo.get(memoKey);
+             if (cached != null) {
+@@ -187,15 +185,28 @@
+                 satisfying !== null && satisfying !== void 0 ? satisfying : (satisfying = await this.cache.locatePackageVersion({ pkgName, parentDir: dir, requiredRange, skipDownwardSearch, skipOverrideFallback: true }));
+             }
+             if (satisfying) {
+-                return satisfying;
++                // Resolve pnpm links on the satisfying-version path too. Otherwise the
++                // next dependency lookup starts outside the package's virtual-store tree.
++                const packageDir = this.cache.realPath
++                    ? await this.cache.realPath[satisfying.packageDir] : satisfying.packageDir;
++                return { ...satisfying, packageDir };
+             }
+             // Phase 2: no version satisfies requiredRange (package-manager override, or no range
+             // given). Fall back to the original dep-then-root order, now allowing override versions.
+             const fromDep = parentPath ? await this.cache.locatePackageVersion({ pkgName, parentDir: parentPath, requiredRange, skipDownwardSearch }) : null;
++            const normalizeLocatedPackage = async (result) => {
++                if (!result) {
++                    return result;
++                }
++                const packageDir = this.cache.realPath
++                    ? await this.cache.realPath[result.packageDir]
++                    : result.packageDir;
++                return { ...result, packageDir };
++            };
+             if (fromDep) {
+-                return fromDep;
++                return normalizeLocatedPackage(fromDep);
+             }
+-            return this.cache.locatePackageVersion({ pkgName, parentDir: this.rootDir, requiredRange, skipDownwardSearch });
++            return normalizeLocatedPackage(await this.cache.locatePackageVersion({ pkgName, parentDir: this.rootDir, requiredRange, skipDownwardSearch }));
+         })();
+         if (memoKey != null) {
+             this.locateMemo.set(memoKey, promise);
+@@ -285,8 +296,25 @@
+     async resolveOmittedDependency(depName, declaredRange, parentPath) {
+         const range = typeof declaredRange === "string" ? declaredRange : undefined;
+         const located = await this.locateFromDepOrRoot(depName, parentPath, range);
+-        const exact = located ? this.allDependencies.get(`${depName}@${located.packageJson.version}`) : undefined;
+-        return exact !== null && exact !== void 0 ? exact : this.getAllDepsByName().get(depName);
++        if (located) {
++            const id = `${depName}@${located.packageJson.version}`;
++            let recovered = this.allDependencies.get(id);
++            if (!recovered) {
++                // Workspace links use a link: version in the graph. Reuse that identity
++                // when it points at this same installed package instead of duplicating it.
++                recovered = [...this.allDependencies.entries()].find(([key, value]) =>
++                    key.startsWith(`${depName}@`) && value.path === located.packageDir)?.[1];
++            }
++            if (!recovered) {
++                // A pnpm deduplicated subtree may never appear in list output at all.
++                // Seed its installed entry so graph traversal can recover its children too.
++                recovered = { name: depName, from: depName, version: located.packageJson.version, path: located.packageDir };
++                this.allDependencies.set(id, recovered);
++                this._allDepsByName = null;
++            }
++            return recovered;
++        }
++        return this.getAllDepsByName().get(depName);
+     }
+     async collectAllDependencies(_tree, _appPackageName) {
+         for (const root of this.allWorkspacePackages) {
+@@ -296,9 +324,6 @@
+     async collectDepsRecursively(tree) {
+         const visit = async (key, value) => {
+             var _a, _b;
+-            if (((_a = value === null || value === void 0 ? void 0 : value.dedupedDependenciesCount) !== null && _a !== void 0 ? _a : 0) > 0) {
+-                return;
+-            }
+             const id = `${key}@${value.version}`;
+             // The pnpm list output can include the same `name@version` thousands of times across a
+             // deep workspace; without this guard we re-resolve and re-recurse each occurrence.
+@@ -336,4 +361,4 @@
+     }
+ }
+ exports.PnpmNodeModulesCollector = PnpmNodeModulesCollector;
+-//# sourceMappingURL=pnpmNodeModulesCollector.js.map
+\ No newline at end of file
++//# sourceMappingURL=pnpmNodeModulesCollector.js.map
+diff --git a/out/util/appFileCopier.js b/out/util/appFileCopier.js
+--- a/out/util/appFileCopier.js
++++ b/out/util/appFileCopier.js
+@@ -155,8 +155,50 @@ async function computeNodeModuleFileSets(platformPackager, mainMatcher) {
+     const result = new Array();
+     let index = 0;
+     const NODE_MODULES = "node_modules";
++    const targetPlatform = process.env.DSH_ELECTRON_BUILDER_TARGET_PLATFORM;
++    const targetArch = process.env.DSH_ELECTRON_BUILDER_TARGET_ARCH;
++    const matchesTarget = (values, target, universalTargets = []) => {
++        if (!Array.isArray(values) || values.length === 0 || !target)
++            return true;
++        if (values.some(value => value === `!${target}`))
++            return false;
++        const positives = values.filter(value => !value.startsWith("!"));
++        if (positives.length === 0)
++            return true;
++        if (positives.includes(target))
++            return true;
++        return target === "universal" && universalTargets.some(value => positives.includes(value));
++    };
++    // pnpm's virtual store is physical: the same package directory is reached once per
++    // declaring branch, while the nested npm-style destinations below would archive the
++    // same files twice (a hoisted copy plus a stray copy under the declaring package's
++    // root). Deduplicate on the resolved source directory and keep the first, hoisted
++    // destination; real duplicate installations keep distinct physical paths and are
++    // unaffected.
++    const seenSources = new Set();
++    // Preserve hoisted instances across pnpm peer-hash splits.
++    // A matching nested name/version is already reachable from its parent.
++    const hoistedVersions = new Map();
++    for (const dep of deps) {
++        const versions = hoistedVersions.get(dep.name) ?? new Set();
++        versions.add(dep.version);
++        hoistedVersions.set(dep.name, versions);
++    }
++    // Keep distinct installed versions; only exact hoisted duplicates are omitted.
++    // This avoids unpacking native files under workspace package roots.
++    // Source-directory deduplication above remains independent of this check.
+     const collectNodeModules = async (dep, destination) => {
+         const source = dep.dir;
++        const packageJson = await (0, fs_extra_1.readJson)(path.join(source, "package.json")).catch(() => null);
++        if (packageJson && (!matchesTarget(packageJson.os, targetPlatform) || !matchesTarget(packageJson.cpu, targetArch, ["x64", "arm64"]))) {
++            builder_util_1.log.debug({ dep: dep.name, version: dep.version, os: packageJson.os, cpu: packageJson.cpu }, "skipping dependency for another target platform");
++            return;
++        }
++        if (seenSources.has(source)) {
++            builder_util_1.log.debug({ dep: dep.name, from: builder_util_1.log.filePath(source), duplicateOf: builder_util_1.log.filePath(destination) }, "skipping physically duplicated module");
++            return;
++        }
++        seenSources.add(source);
+         const matcher = new fileMatcher_1.FileMatcher(source, destination, mainMatcher.macroExpander, mainMatcher.patterns);
+         const copier = new NodeModuleCopyHelper_1.NodeModuleCopyHelper(matcher, platformPackager.info);
+         const files = await copier.collectNodeModules(dep, nodeModuleExcludedExts, path.relative(mainMatcher.to, destination));
+@@ -164,6 +206,10 @@ async function computeNodeModuleFileSets(platformPackager, mainMatcher) {
+         builder_util_1.log.debug({ dep: dep.name, from: builder_util_1.log.filePath(source), to: builder_util_1.log.filePath(destination), filesCount: files.length }, "identified module");
+         if (dep.dependencies) {
+             for (const c of dep.dependencies) {
++                if (hoistedVersions.get(c.name)?.has(c.version)) {
++                    builder_util_1.log.debug({ dep: c.name, version: c.version, under: builder_util_1.log.filePath(destination) }, "skipping nested module duplicating a hoisted top-level module");
++                    continue;
++                }
+                 await collectNodeModules(c, path.join(destination, NODE_MODULES, c.name));
+             }
+         }
+diff --git a/templates/nsis/include/allowOnlyOneInstallerInstance.nsh b/templates/nsis/include/allowOnlyOneInstallerInstance.nsh
+index 7d08e55f5ddf70e51ebd965803d001561bca6d71..64a35c42fc5c9ae80a2dd72fd959d9647b0e4c1a 100644
+--- a/templates/nsis/include/allowOnlyOneInstallerInstance.nsh
++++ b/templates/nsis/include/allowOnlyOneInstallerInstance.nsh
+@@ -63,7 +63,7 @@
+ 
+ !macro FIND_PROCESS _FILE _RETURN
+   ${if} $IsPowerShellAvailable == 0
+-    nsExec::Exec `"$PowerShellPath" -NoProfile -NonInteractive -C "if ((Get-CimInstance -ClassName Win32_Process | ? {$$_.Path -and $$_.Path.StartsWith('$INSTDIR', 'CurrentCultureIgnoreCase')}).Count -gt 0) { exit 0 } else { exit 1 }"`
++    nsExec::Exec `"$PowerShellPath" -NoProfile -NonInteractive -C "if ((Get-CimInstance -ClassName Win32_Process | ? {$$_.Path -and [System.IO.Path]::GetFileName($$_.Path) -ieq '${_FILE}'}).Count -gt 0) { exit 0 } else { exit 1 }"`
+     Pop ${_RETURN}
+   ${else}
+     !ifdef INSTALL_MODE_PER_ALL_USERS
+@@ -91,7 +91,7 @@
+   ${endIf}
+ 
+   ${if} $IsPowerShellAvailable == 0
+-    nsExec::Exec `"$PowerShellPath" -NoProfile -NonInteractive -C "Get-CimInstance -ClassName Win32_Process | ? {$$_.Path -and $$_.Path.StartsWith('$INSTDIR', 'CurrentCultureIgnoreCase')} | % { Stop-Process -Id $$_.ProcessId $0 }"`
++    nsExec::Exec `"$PowerShellPath" -NoProfile -NonInteractive -C "Get-CimInstance -ClassName Win32_Process | ? {$$_.Path -and [System.IO.Path]::GetFileName($$_.Path) -ieq '${_FILE}'} | % { Stop-Process -Id $$_.ProcessId $0 }"`
+   ${else}
+     !ifdef INSTALL_MODE_PER_ALL_USERS
+       nsExec::Exec `taskkill /IM "${_FILE}" /FI "PID ne $pid"`
+diff --git a/templates/nsis/include/extractAppPackage.nsh b/templates/nsis/include/extractAppPackage.nsh
+index f5470bf52e923dc47266cea4684c76ef78ced451..54fe67e965b2548991f382f169700c0012a7f418 100644
+--- a/templates/nsis/include/extractAppPackage.nsh
++++ b/templates/nsis/include/extractAppPackage.nsh
+@@ -90,49 +90,8 @@
+ !macroend
+ 
+ !macro extractUsing7za FILE
+-  Push $OUTDIR
+-  CreateDirectory "$PLUGINSDIR\7z-out"
+-  ClearErrors
+-  SetOutPath "$PLUGINSDIR\7z-out"
++  # The Desktop package favors install speed over atomic replacement: avoid
++  # writing the entire app to $PLUGINSDIR and copying every file a second time.
++  SetOutPath "$INSTDIR"
+   Nsis7z::Extract "${FILE}"
+-  Pop $R0
+-  SetOutPath $R0
+-
+-  # Retry counter
+-  StrCpy $R1 0
+-
+-  LoopExtract7za:
+-    IntOp $R1 $R1 + 1
+-
+-    # Attempt to copy files in atomic way
+-    CopyFiles /SILENT "$PLUGINSDIR\7z-out\*" $OUTDIR
+-    IfErrors 0 DoneExtract7za
+-
+-    DetailPrint `Can't modify "${PRODUCT_NAME}"'s files.`
+-    ${if} $R1 < 5
+-      # Try copying a few times before asking for a user action.
+-      Goto RetryExtract7za
+-    ${else}
+-      MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "$(appCannotBeClosed)" /SD IDRETRY IDCANCEL AbortExtract7za
+-    ${endIf}
+-
+-    # As an absolutely last resort after a few automatic attempts and user
+-    # intervention - we will just overwrite everything with `Nsis7z::Extract`
+-    # even though it is not atomic and will ignore errors.
+-
+-    # Clear the temporary folder first to make sure we don't use twice as
+-    # much disk space.
+-    RMDir /r "$PLUGINSDIR\7z-out"
+-
+-    Nsis7z::Extract "${FILE}"
+-    Goto DoneExtract7za
+-
+-  AbortExtract7za:
+-    Quit
+-
+-  RetryExtract7za:
+-    Sleep 1000
+-    Goto LoopExtract7za
+-
+-  DoneExtract7za:
+ !macroend
+diff --git a/templates/nsis/include/installUtil.nsh b/templates/nsis/include/installUtil.nsh
+index 47367741632726ba0886ac516461dbe98b7aea58..69e7e0f0ff4cf9cbb1a184ad89f1d210a55af2e6 100644
+--- a/templates/nsis/include/installUtil.nsh
++++ b/templates/nsis/include/installUtil.nsh
+@@ -126,10 +126,15 @@ Function handleUninstallResult
+   Return
+ 
+   ${if} $R0 != 0
+-    MessageBox MB_OK|MB_ICONEXCLAMATION "$(uninstallFailed): $R0"
+-    DetailPrint `Uninstall was not successful. Uninstaller error code: $R0.`
+-    SetErrorLevel 2
+-    Quit
++    ${if} $R0 == 2
++      DetailPrint `Old uninstaller returned code 2; continuing with non-atomic in-place replacement.`
++      StrCpy $R0 0
++    ${else}
++      MessageBox MB_OK|MB_ICONEXCLAMATION "$(uninstallFailed): $R0"
++      DetailPrint `Uninstall was not successful. Uninstaller error code: $R0.`
++      SetErrorLevel 2
++      Quit
++    ${endif}
+   ${endif}
+ FunctionEnd
+ 
+@@ -234,6 +239,10 @@ Function uninstallOldVersion
+       ${if} $R0 == 0
+         Return
+       ${endIf}
++      ${if} $R0 == 2
++        # Code 2 is handled by the non-atomic in-place replacement path.
++        Return
++      ${endIf}
+ 
+     Sleep 1000
+     Goto UninstallLoop
+diff --git a/templates/nsis/installer.nsi b/templates/nsis/installer.nsi
+index 4b1f42e4e96ba2b3e7d6d8d2f9ee19b46779a422..937dd51e4c4796e8414764b080ef21ddb9b0c779 100644
+--- a/templates/nsis/installer.nsi
++++ b/templates/nsis/installer.nsi
+@@ -26,6 +26,7 @@ Var oldMenuDirectory
+ !else
+   RequestExecutionLevel user
+ !endif
++ManifestLongPathAware true
+ 
+ !ifdef BUILD_UNINSTALLER
+   SilentInstall silent
+diff --git a/templates/nsis/portable.nsi b/templates/nsis/portable.nsi
+index e5436bb0f810058b52e15ce65b3d256f86dabc6f..fe29c49d063c2e3b91438a3418acd40c99a258b5 100644
+--- a/templates/nsis/portable.nsi
++++ b/templates/nsis/portable.nsi
+@@ -6,6 +6,7 @@ CRCCheck off
+ WindowIcon Off
+ AutoCloseWindow True
+ RequestExecutionLevel ${REQUEST_EXECUTION_LEVEL}
++ManifestLongPathAware true
+ 
+ Function .onInit
+   !ifndef SPLASH_IMAGE

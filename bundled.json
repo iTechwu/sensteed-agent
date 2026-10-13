@@ -1,0 +1,96 @@
+{
+  "version": 1,
+  "skills": [
+    {
+      "name": "dashi-ppt-skill",
+      "repository": "https://github.com/chuspeeism/dashi-ppt-skill",
+      "ref": null,
+      "snapshotDir": "dsh-plugin-desktop/bundled/skills/dashi-ppt",
+      "resolvedSha": "21dc7e5fc8c3a0d7f6a94948153dd1ee954f4e64",
+      "refreshedAt": "2026-10-10T17:43:27.335Z"
+    },
+    {
+      "name": "humanizer",
+      "repository": "https://github.com/blader/humanizer",
+      "ref": null,
+      "snapshotDir": "dsh-plugin-desktop/bundled/skills/humanizer",
+      "resolvedSha": "225a6f39ac85f76ee48dbad772ea4abe4ed6c9d8",
+      "refreshedAt": "2026-10-10T17:43:27.344Z"
+    },
+    {
+      "name": "huashu-art-motion",
+      "repository": "https://github.com/alchaincyf/huashu-art-motion",
+      "ref": null,
+      "snapshotDir": "dsh-plugin-desktop/bundled/skills/huashu-art-motion",
+      "resolvedSha": "9ff59339f934e08483ba0a5b1db20f4c2c421b35",
+      "refreshedAt": "2026-10-10T17:43:27.507Z"
+    },
+    {
+      "name": "text-to-cad",
+      "repository": "https://github.com/earthtojake/text-to-cad",
+      "ref": null,
+      "snapshotDir": "dsh-plugin-desktop/bundled/skills",
+      "resolvedSha": "b48ff49e00968ac07af08572b0595483dae07c85",
+      "refreshedAt": "2026-10-10T17:43:27.546Z"
+    }
+  ],
+  "plugins": [
+    {
+      "name": "dsh-opencli",
+      "package": "@dofe/dsh-opencli",
+      "source": "sibling",
+      "snapshotDir": ".ci/dsh-opencli"
+    },
+    {
+      "name": "dsh-plugin-console",
+      "package": "@noob-stupid/dsh-plugin-console",
+      "source": "sibling",
+      "snapshotDir": ".ci/dsh-plugin-console"
+    },
+    {
+      "name": "dsh-sensteed-finance",
+      "package": "@dofe/dsh-sensteed-finance",
+      "source": "sibling",
+      "snapshotDir": ".ci/dsh-sensteed-finance"
+    },
+    {
+      "name": "dsh-sensteed-knowledge",
+      "package": "@dofe/dsh-sensteed-knowledge",
+      "source": "sibling",
+      "snapshotDir": ".ci/dsh-sensteed-knowledge"
+    },
+    {
+      "name": "dsh-sensteed-supplier-intelligence",
+      "package": "@dofe/dsh-sensteed-supplier-intelligence",
+      "source": "sibling",
+      "snapshotDir": ".ci/dsh-sensteed-supplier-intelligence"
+    },
+    {
+      "name": "dsh-sensteed-video-notes",
+      "package": "@dofe/dsh-sensteed-video-notes",
+      "source": "sibling",
+      "snapshotDir": ".ci/dsh-sensteed-video-notes"
+    },
+    {
+      "name": "dsh-tools-mcp",
+      "package": "@dofe/dsh-tools-mcp",
+      "source": "sibling",
+      "snapshotDir": ".ci/dsh-tools-mcp"
+    },
+    {
+      "name": "dsh-knowledge-capture",
+      "package": "@dofe/dsh-knowledge-capture",
+      "source": "sibling",
+      "snapshotDir": "scripts/ci-snapshots/dsh-knowledge-capture"
+    },
+    {
+      "name": "dsh-soup",
+      "package": "@lyhue1991/dsh-soup",
+      "source": "github",
+      "upstream": "https://github.com/lyhue1991/dsh-soup",
+      "siblingDir": "../docker-helm.dofe.ai/plugins/dsh-soup",
+      "siblingRepository": "../docker-helm.dofe.ai",
+      "snapshotDir": ".ci/dsh-soup"
+    }
+  ]
+}

@@ -7,6 +7,7 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs'
 import { createRequire } from 'node:module'
@@ -73,11 +74,13 @@ const builderConfig = JSON.parse(readFileSync(new URL('electron-builder.json', p
   asar?: unknown
   asarUnpack?: unknown
   afterPack?: unknown
+  electronLanguages?: readonly string[]
   electronDownload?: { checksums?: Record<string, unknown> }
   electronFuses?: unknown
   toolsets?: Record<string, unknown>
   files?: unknown
   mac?: {
+    files?: unknown
     asarUnpack?: unknown
     extendInfo?: unknown
     hardenedRuntime?: unknown
@@ -91,7 +94,7 @@ const builderConfig = JSON.parse(readFileSync(new URL('electron-builder.json', p
   win?: { icon?: unknown; files?: unknown; target?: unknown; artifactName?: unknown }
   nsis?: Record<string, unknown>
   portable?: Record<string, unknown>
-  linux?: { icon?: unknown; target?: unknown; artifactName?: unknown; executableName?: unknown }
+  linux?: { files?: unknown; icon?: unknown; target?: unknown; artifactName?: unknown; executableName?: unknown }
   deb?: Record<string, unknown>
 }
 // Resolve the brand document the same way the build does, so packaging jobs
@@ -117,12 +120,12 @@ const main = readFileSync(new URL('src/main.ts', packageRoot), 'utf8')
 describe('published package surface', () => {
   it('runs all desktop editions and community market typechecks from the root command', () => {
     expect(workspaceManifest.scripts?.typecheck)
-      .toBe('pnpm --filter dsh-plugin-desktop typecheck && pnpm --filter dsh-community-market typecheck')
+      .toBe('pnpm --filter @dofe/dsh-sensteed-product typecheck && pnpm --filter dsh-plugin-desktop typecheck && pnpm --filter dsh-community-market typecheck')
   })
 
   it('runs all desktop editions and community market tests from the root command', () => {
     expect(workspaceManifest.scripts?.test)
-      .toBe('pnpm --filter dsh-plugin-desktop test && pnpm --filter dsh-community-market test')
+      .toBe('pnpm --filter @dofe/dsh-sensteed-product test && pnpm --filter dsh-plugin-desktop test && pnpm --filter dsh-community-market test')
   })
 
   it('rebuilds the sibling fork cleanly from the root command', () => {
@@ -133,101 +136,75 @@ describe('published package surface', () => {
 
   it('preinstalls every DoFe plugin from the plugin workspace', () => {
     const plugins = [
-      ['@dofe/dsh-geoflow-mcp', 'dsh-geoflow-mcp'],
-      ['@dofe/dsh-georank-mcp', 'dsh-georank-mcp'],
       ['@dofe/dsh-opencli', 'dsh-opencli'],
       ['@noob-stupid/dsh-plugin-console', 'dsh-plugin-console'],
       ['@dofe/dsh-tools-mcp', 'dsh-tools-mcp'],
-      ['@dofe/dsh-yootun-audit', 'dsh-yootun-audit'],
-      ['@dofe/dsh-yootun-content-command', 'dsh-yootun-content-command'],
-      ['@dofe/dsh-yootun-daily-report', 'dsh-yootun-daily-report'],
-      ['@dofe/dsh-yootun-dashboard', 'dsh-yootun-dashboard'],
-      ['@dofe/dsh-yootun-douyin-operation', 'dsh-yootun-douyin-operation'],
-      ['@dofe/dsh-yootun-finops', 'dsh-yootun-finops'],
-      ['@dofe/dsh-yootun-knowledge', 'dsh-yootun-knowledge'],
-      ['@dofe/dsh-yootun-lead-discovery', 'dsh-yootun-lead-discovery'],
-      ['@dofe/dsh-yootun-recruiter', 'dsh-yootun-recruiter'],
-      ['@dofe/dsh-yootun-retrofit', 'dsh-yootun-retrofit'],
-      ['@dofe/dsh-yootun-sales', 'dsh-yootun-sales'],
-      ['@dofe/dsh-yootun-supply-watch', 'dsh-yootun-supply-watch'],
-      ['@dofe/dsh-yootun-tos-upload', 'dsh-yootun-tos-upload'],
-      ['@dofe/dsh-yootun-ui', 'dsh-yootun-ui'],
-      ['@dofe/dsh-yootun-xhs-operation', 'dsh-yootun-xhs-operation'],
+      ['@dofe/dsh-sensteed-finance', 'dsh-sensteed-finance'],
+      ['@dofe/dsh-sensteed-supplier-intelligence', 'dsh-sensteed-supplier-intelligence'],
+      ['@dofe/dsh-sensteed-video-notes', 'dsh-sensteed-video-notes'],
+      ['@lyhue1991/dsh-soup', 'dsh-soup'],
     ] as const
     for (const [name, directory] of plugins) {
       expect(manifest.dependencies?.[name])
         .toBe(`file:../../docker-helm.dofe.ai/plugins/${directory}`)
     }
+    // 打包只是把文件带进安装目录；桌面 overlay 不登记 insert 行，插件就不会加载。
+    const desktopPatch = parseYaml(
+      readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8'),
+    ) as Array<{ insert?: Array<{ id?: unknown, name?: unknown }> }>
+    const overlayNames = new Set(
+      desktopPatch.flatMap(statement => statement.insert ?? [])
+        .map(row => typeof row.name === 'string' ? row.name : undefined)
+        .filter((name): name is string => name !== undefined),
+    )
+    const productPatch = parseYaml(
+      readFileSync(new URL('../dsh-sensteed-product/cordis.patch.yml', packageRoot), 'utf8'),
+    ) as Array<{ insert?: Array<{ id?: unknown, name?: unknown }> }>
+    const productNames = new Set(
+      productPatch.flatMap(statement => statement.insert ?? [])
+        .map(row => typeof row.name === 'string' ? row.name : undefined)
+        .filter((name): name is string => name !== undefined),
+    )
+    for (const overlayed of ['@dofe/dsh-sensteed-finance']) {
+      expect(productNames.has(overlayed), `product cordis.patch.yml must insert ${overlayed}`).toBe(true)
+    }
+    for (const overlayed of ['@dofe/dsh-sensteed-supplier-intelligence', '@dofe/dsh-sensteed-video-notes', '@lyhue1991/dsh-soup']) {
+      expect(overlayNames.has(overlayed), `cordis.patch.yml must insert ${overlayed}`).toBe(true)
+    }
     expect(workspaceManifest.scripts?.['dofe-ui:build'])
       .toBe('node scripts/build-dofe-ui.mjs')
-    expect(dofeUiBuild).toContain("'dsh-yootun-audit'")
+    expect(dofeUiBuild).not.toContain("'dsh-yootun-audit'")
     expect(manifest.scripts?.['test:audit-ui']).toBe('node tests/browser/yootun-audit.visual.mjs')
-    expect(ciWorkflow.match(/node scripts\/prepare-dofe-ui\.mjs/g)).toHaveLength(4)
+    // check、desktop-windows、desktop-linux、desktop-macos、
+    // upstream-command-windows 五个 job 各自在打包/冒烟前物化 sibling
+    // 插件快照，并离线校验内置 skills/plugins 快照，一处都不能少。
+    expect(ciWorkflow.match(/node scripts\/prepare-dofe-ui\.mjs/g)).toHaveLength(5)
+    expect(ciWorkflow.match(/node scripts\/refresh-bundled\.mjs --offline/g)).toHaveLength(5)
   })
 
   it('keeps CI fallback snapshots for every preinstalled plugin', () => {
     const pluginMains = new Map([
-      ['dsh-geoflow-mcp', 'index.js'], ['dsh-georank-mcp', 'index.js'], ['dsh-opencli', 'index.js'],
+      ['dsh-opencli', 'index.js'],
       ['dsh-plugin-console', 'lib/index.js'], ['dsh-tools-mcp', 'index.js'],
-      ['dsh-yootun-audit', 'index.js'], ['dsh-yootun-content-command', 'index.js'],
-      ['dsh-yootun-daily-report', 'index.js'], ['dsh-yootun-dashboard', 'index.js'],
-      ['dsh-yootun-douyin-operation', 'index.js'],
-      ['dsh-yootun-finops', 'index.js'], ['dsh-yootun-knowledge', 'index.js'],
-      ['dsh-yootun-lead-discovery', 'index.js'], ['dsh-yootun-recruiter', 'index.js'],
-      ['dsh-yootun-retrofit', 'index.js'], ['dsh-yootun-sales', 'index.js'],
-      ['dsh-yootun-supply-watch', 'index.js'], ['dsh-yootun-tos-upload', 'index.js'], ['dsh-yootun-ui', 'index.js'],
-      ['dsh-yootun-xhs-operation', 'index.js'],
+      ['dsh-sensteed-finance', 'index.js'],
+      ['dsh-sensteed-supplier-intelligence', 'index.js'],
+      ['dsh-sensteed-video-notes', 'index.js'],
+      ['dsh-soup', 'lib/index.js'],
     ])
     for (const [name, main] of pluginMains) {
       expect(existsSync(new URL(`../.ci/${name}/package.json`, packageRoot))).toBe(true)
       expect(existsSync(new URL(`../.ci/${name}/${main}`, packageRoot))).toBe(true)
     }
-    const recruiterSource = readFileSync(new URL('../.ci/dsh-yootun-recruiter/src/client.js', packageRoot), 'utf8')
-    expect(recruiterSource).toContain("succeeded: '适配器已完成'")
-    expect(recruiterSource).toContain("requiresLogin: '需要重新登录'")
   })
 
-  it('ships the Douyin operation plugin snapshot and bundle wiring', () => {
-    // 快照必须与 sibling 源同一版本，且四个入口都来自同一次快照。
-    const snapshotRoot = new URL('../.ci/dsh-yootun-douyin-operation/', packageRoot)
-    const snapshotManifest = JSON.parse(readFileSync(new URL('package.json', snapshotRoot), 'utf8')) as {
-      name?: unknown
-      main?: unknown
-      exports?: Record<string, unknown>
-      dsh?: { bundle?: { patch?: unknown }; client?: { platform?: unknown } }
-      dependencies?: Record<string, unknown>
+  it('excludes retired plugin snapshots and packaged legacy endpoints', () => {
+    for (const name of ['dsh-yootun-ui', 'dsh-yootun-douyin-operation', 'dsh-geoflow-mcp', 'dsh-georank-mcp']) {
+      expect(existsSync(new URL(`../.ci/${name}/package.json`, packageRoot))).toBe(false)
     }
-    expect(snapshotManifest.name).toBe('@dofe/dsh-yootun-douyin-operation')
-    expect(snapshotManifest.main).toBe('./index.js')
-    expect(snapshotManifest.exports?.['./client']).toBe('./lib/client.js')
-    expect(snapshotManifest.dsh?.bundle?.patch).toBe('./cordis.patch.yml')
-    expect(snapshotManifest.dsh?.client?.platform).toBe('web')
-    // 运行依赖必须由 desktop 的解析链管理，不能只靠开发机 node_modules。
-    expect(snapshotManifest.dependencies?.['playwright-core']).toBeDefined()
-    for (const file of ['package.json', 'index.js', 'cordis.patch.yml', 'src/client.js', 'lib/client.js']) {
-      expect(existsSync(new URL(file, snapshotRoot)), file).toBe(true)
+    for (const file of ['lib/index.js', 'lib/client.js']) {
+      expect(readFileSync(new URL(file, packageRoot), 'utf8')).not.toContain('ixicai.cn')
     }
-    expect(existsSync(new URL('node_modules', snapshotRoot))).toBe(false)
-
-    // Host 路由与 cordis bundle entry 与插件自身声明一致。
-    const patch = readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')
-    expect(patch).toContain("id: dofe-yootun-douyin-operation")
-    expect(patch).toContain("name: '@dofe/dsh-yootun-douyin-operation'")
-    const hostSource = readFileSync(new URL('index.js', snapshotRoot), 'utf8')
-    expect(hostSource).toContain("export const PATH = '/api/desktop/yootun/douyin-operation'")
-    expect(hostSource).toContain("export const inject = ['webServer', 'tools']")
-
-    // 客户端只使用独占的 ydo- 命名空间，且本地请求带同源凭证、拒绝重定向和超时。
-    const clientSource = readFileSync(new URL('src/client.js', snapshotRoot), 'utf8')
-    expect(clientSource).toContain('.ydo-overlay')
-    expect(clientSource).not.toMatch(/\.yd-/u)
-    expect(clientSource).toContain("const REQUEST_TIMEOUT_MS = 30000")
-    expect(clientSource).toContain("credentials: 'same-origin'")
-    expect(clientSource).toContain("redirect: 'error'")
-    expect(clientSource).toContain('AbortSignal.timeout(REQUEST_TIMEOUT_MS)')
-    expect(clientSource).not.toContain('MODELS_API_KEY')
-    // 凭证只允许出现在注释里说明边界，不能出现在可执行代码中。
-    expect(clientSource).not.toMatch(/storage_state\s*[:=]/u)
+    expect(readFileSync(new URL('../dsh-sensteed-product/lib/dofe-managed.js', packageRoot), 'utf8')).not.toContain('ixicai.cn')
   })
 
   it('keeps the capture SDK fallback loadable as Node ESM', () => {
@@ -272,7 +249,7 @@ describe('published package surface', () => {
     expect(main).toContain('notifyDesktopSafeModeActive(runtime, electronLogger)')
     expect(main).toContain('safeModePaths !== undefined && DESKTOP_SAFE_MODE_DEFAULTS.settings.notifications.enabled')
     expect(main).toContain('const setupWizardState = safeModePaths === undefined')
-    expect(main).toContain('if (safeModePaths === undefined && desktopSetupWizardRequired(')
+    expect(main).toContain('let setupPending = safeModePaths === undefined')
     expect(main).toContain('const safeModeDefaults = DESKTOP_SAFE_MODE_DEFAULTS')
     expect(main).toContain('updateDesktopSetupWizardSettings(prepared.settingsDocument, safeModeDefaults.settings)')
     expect(main).toContain('selectDesktopMarketProvider(marketUserDataDir, safeModeDefaults.market)')
@@ -314,10 +291,7 @@ describe('published package surface', () => {
       types: './lib/types/notifications.d.ts',
       default: './lib/notifications.js',
     })
-    expect(manifest.exports).toHaveProperty('./yootun-recruiter-tools', {
-      types: './lib/types/yootun-recruiter-tools.d.ts',
-      default: './lib/yootun-recruiter-tools.js',
-    })
+    expect(manifest.exports).not.toHaveProperty('./yootun-recruiter-tools')
     expect(manifest.exports).not.toHaveProperty('./windows-acl-runner')
     expect(manifest.exports).not.toHaveProperty('./desktop-cli')
     expect(manifest.exports).not.toHaveProperty('./desktop-runtime-environment')
@@ -346,28 +320,14 @@ describe('published package surface', () => {
     expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop/diagnostics')
     expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop/notifications')
     expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop/updates')
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop/dofe-managed')
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop/yootun-recruiter-tools')
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain("name: '@dofe/dsh-yootun-ui'")
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain("name: '@dofe/dsh-yootun-dashboard'")
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain("name: '@dofe/dsh-yootun-recruiter'")
+    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).not.toContain('dsh-plugin-desktop/dofe-managed')
+    const productPatch = readFileSync(new URL('../dsh-sensteed-product/cordis.patch.yml', packageRoot), 'utf8')
+    expect(productPatch).toContain("name: '@dofe/dsh-sensteed-product'")
+    expect(productPatch).toContain("name: '@dofe/dsh-sensteed-product/dofe-managed'")
+    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).not.toContain('name: dsh-plugin-desktop/yootun-recruiter-tools')
     const patchSource = readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')
-    for (const plugin of ['recruiter', 'sales', 'supply-watch', 'content-command']) {
-      expect(patchSource).toMatch(
-        new RegExp(`name: '@dofe/dsh-yootun-${plugin}'\\n\\s+config:\\n\\s+registerHostRoute: false`, 'u'),
-      )
-    }
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain("name: '@dofe/dsh-yootun-sales'")
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain("name: '@dofe/dsh-yootun-supply-watch'")
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain("name: '@dofe/dsh-yootun-content-command'")
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain("name: '@dofe/dsh-yootun-knowledge'")
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain("name: '@dofe/dsh-yootun-audit'")
-    expect(patchSource).not.toContain('dsh-yootun-approvals')
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain("name: '@dofe/dsh-yootun-finops'")
-    expect(patchSource).not.toMatch(/name: '@dofe\/dsh-yootun-finops'\n\s+config:\n\s+registerHostRoute: false/u)
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain("name: '@dofe/dsh-yootun-retrofit'")
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain("name: '@dofe/dsh-yootun-daily-report'")
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('baseURL: https://ixicai.cn/api/v1')
+    expect(patchSource).not.toContain("name: '@dofe/dsh-yootun-")
+    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('baseURL: https://ai.hozonauto.com/api/v1')
     expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('apiKeyEnv: MODELS_API_KEY')
     expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('id: ui-settings-models')
     expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('disabled: true')
@@ -485,15 +445,7 @@ describe('published package surface', () => {
     expect(config).toContain("'update-download': 'src/update-download.ts'")
     expect(config).toContain("updates: 'src/updates.ts'")
     expect(readFileSync(new URL('src/openmontage-window.ts', packageRoot), 'utf8'))
-      .toContain("export const OPENMONTAGE_URL = 'https://ixicai.cn/montage/'")
-  })
-
-  it('builds the browser client without Node process globals', () => {
-    const config = readFileSync(new URL('tsdown.config.ts', packageRoot), 'utf8')
-    const client = readFileSync(new URL('lib/client.js', packageRoot), 'utf8')
-
-    expect(config).toContain("'process.env.NODE_ENV': JSON.stringify('production')")
-    expect(client).not.toMatch(/\bprocess(?:\.|\[)/u)
+      .toContain("export const OPENMONTAGE_URL = 'https://montage.hozonauto.com/'")
   })
 
   it('packages the confirmed Yootun hero headline in the conversation client', () => {
@@ -671,45 +623,24 @@ describe('published package surface', () => {
 
   it.skip('finishes or skips per-Profile native setup before Host boot and the main window', () => {
     const main = readFileSync(new URL('src/main.ts', packageRoot), 'utf8')
-    const requestedRecovery = main.indexOf('if (recoveryModeRequested)')
     const prepare = main.indexOf('let prepared = prepareDesktopProfile(')
-    const setupState = main.indexOf('readDesktopSetupWizardState(', prepare)
-    const setupWindow = main.indexOf('new DesktopSetupWizardWindow({', setupState)
-    const usageHistory = main.indexOf('!hasDesktopProfileUsageHistory(releaseUserDataLocations, prepared.profile.dir, activeProfileName)', setupState)
-    expect(usageHistory).toBeGreaterThan(setupState)
-    expect(setupWindow).toBeGreaterThan(usageHistory)
-    const setupRun = main.indexOf('await setupWizardWindow.run()', setupWindow)
-    const skipBranch = main.indexOf("if (setupResult.action === 'skip')", setupRun)
-    const completeBranch = main.indexOf('} else {', skipBranch)
-    const profilePreferences = main.indexOf('profilePreferences = await writeDesktopProfilePreferences(', completeBranch)
-    const updateSettings = main.indexOf('await updateDesktopSetupWizardSettings(', profilePreferences)
-    const selectMarket = main.indexOf('await selectDesktopMarketProvider(', updateSettings)
-    const reprepare = main.indexOf('prepared = prepareDesktopProfile(', selectMarket)
-    const completeMarker = main.indexOf("'completed',", reprepare)
-    const installDsh = main.indexOf("const dshRuntime = process.platform === 'win32'", completeMarker)
-    const boot = main.indexOf('const ctx = await boot', installDsh)
-    const mount = main.indexOf('runtime.mountScheduled(),', boot)
-
-    expect(requestedRecovery).toBeGreaterThanOrEqual(0)
-    expect(prepare).toBeGreaterThan(requestedRecovery)
-    expect(setupState).toBeGreaterThan(prepare)
-    expect(setupWindow).toBeGreaterThan(setupState)
-    expect(setupRun).toBeGreaterThan(setupWindow)
-    expect(skipBranch).toBeGreaterThan(setupRun)
-    expect(main.slice(skipBranch, completeBranch)).toContain('aaEnabled: false')
-    expect(main.slice(skipBranch, completeBranch)).toContain('writeDesktopProfilePreferences(')
-    expect(profilePreferences).toBeGreaterThan(completeBranch)
-    expect(updateSettings).toBeGreaterThan(profilePreferences)
-    expect(selectMarket).toBeGreaterThan(updateSettings)
-    expect(reprepare).toBeGreaterThan(selectMarket)
-    expect(completeMarker).toBeGreaterThan(reprepare)
-    expect(installDsh).toBeGreaterThan(completeMarker)
-    expect(boot).toBeGreaterThan(installDsh)
-    expect(mount).toBeGreaterThan(boot)
-    expect(main).toContain("setupResult.action === 'quit'")
-    expect(main).toContain("setupResult.action === 'skip'")
-    expect(main).toContain("'skipped',")
-    expect(main).toContain('clearDesktopProfileUsageHistory(releaseUserDataLocations, profileDir)')
+    const pending = main.indexOf('await beginDesktopSetupWizard(', prepare)
+    const bridge = main.indexOf('runtime.setupOnboarding =', pending)
+    const persist = main.indexOf('profilePreferences = await writeDesktopProfilePreferences(', bridge)
+    const complete = main.indexOf('await completeOrSkipDesktopSetupWizard(', persist)
+    const boot = main.indexOf('const ctx = await boot', complete)
+    expect(pending).toBeGreaterThan(prepare)
+    expect(bridge).toBeGreaterThan(pending)
+    expect(persist).toBeGreaterThan(bridge)
+    expect(complete).toBeGreaterThan(persist)
+    expect(boot).toBeGreaterThan(complete)
+    expect(main).not.toContain('new DesktopSetupWizardWindow(')
+    expect(main).toContain('desktopSetupWizardPending(marketUserDataDir, prepared.profile.dir)')
+    expect(main).toContain('!hasDesktopProfileUsageHistory(releaseUserDataLocations, prepared.profile.dir, activeProfileName)')
+    expect(main).toContain("selection === undefined ? 'skipped' : 'completed'")
+    expect(main).toContain('profile !== activeProfileName || safeModePaths !== undefined')
+    const client = readFileSync(new URL('src/client/onboarding.tsx', packageRoot), 'utf8')
+    expect(client).toContain("ctx.slots.inject('onboarding.desktop.before'")
   })
 
   it('declares every remote service consumed by the mandatory DoFe gate', () => {
@@ -894,6 +825,7 @@ describe('published package surface', () => {
       resetAdHocDarwinSignature: true,
       runAsNode: true,
     })
+    expect(builderConfig?.electronLanguages).toEqual(['en-US', 'zh-CN'])
     expect(builderConfig?.toolsets).toEqual({ nsis: '1.2.1' })
     expect(manifest.files).toEqual(expect.arrayContaining([
       'build/app-icon.ico',
@@ -911,9 +843,24 @@ describe('published package surface', () => {
       'build/tray-icon*.png',
       'cordis.patch.yml',
       'lib/**',
+      // 内置第三方 skills 快照（scripts/refresh-bundled.mjs 产物）与包内清单。
+      'bundled/**',
+      '!bundled/skills/huashu-art-motion/assets/showcase/**',
       'package.json',
+      // a0a4298b0b 的运行时闭包：这些一方依赖的 pnpm store 拷贝会被
+      // 图收集器丢弃，globs 是它们进入 ASAR 的通道。
+      'node_modules/@opentelemetry/otlp-exporter-base/**',
+      'node_modules/@opentelemetry/otlp-transformer/**',
+      'node_modules/@opentelemetry/resources/**',
+      'node_modules/@opentelemetry/sdk-logs/**',
+      'node_modules/chokidar/**',
+      'node_modules/execa/**',
+      'node_modules/got/**',
+      'node_modules/turndown/**',
       '!node_modules/koffi-darwin-*-3-1-1/**',
       '!node_modules/node-pty/build/**',
+      '!**/*.{js,cjs,mjs,ts,cts,mts,css}.map',
+      '!node_modules/**/react-icons/**/*.{js,cjs,mjs,ts,cts,mts}',
     ])
     expect(builderConfig?.mac?.icon).toBe('build/app-icon-mac.png')
     expect(builderConfig?.mac?.asarUnpack).toEqual([
@@ -921,14 +868,24 @@ describe('published package surface', () => {
       'build/tray-iconTemplate.png',
       'build/tray-iconTemplate@2x.png',
       'node_modules/fs-ext/**',
+      'node_modules/@agents-anywhere/dsh-bridge-next/lib/bundled-connector/**',
       'node_modules/node-addon-require-builtin/**',
+      'node_modules/node-addon-native-custom-loader/**',
       'node_modules/node-addon-require-builtin-darwin-arm64/**',
       'node_modules/node-addon-require-builtin-darwin-x64/**',
     ])
-    expect(builderConfig?.mac?.mergeASARs).toBe(false)
+    expect(builderConfig?.mac?.mergeASARs).toBe(true)
     expect(builderConfig?.mac?.signIgnore).toEqual(['\\.(?:pak|dat|wasm)$'])
     expect(builderConfig?.win?.icon).toBe('build/app-icon.ico')
-    expect(builderConfig?.win?.files).toEqual([
+    expect(builderConfig?.win?.files).toEqual(expect.arrayContaining([
+      'node_modules/@agents-anywhere/dsh-bridge-next/**',
+      '!node_modules/@agents-anywhere/dsh-bridge-next/node_modules/**',
+      // workspace koffi 消费方的嵌套 junction 不入档（NSIS 校验会失败），
+      // 包体显式保留，运行时 koffi 走根级 3.1.5 实例。
+      'node_modules/@deepseek-ai/dsh-fs-local/**',
+      'node_modules/@deepseek-ai/dsh-win32-process/**',
+      '!node_modules/@deepseek-ai/dsh-fs-local/node_modules/**',
+      '!node_modules/@deepseek-ai/dsh-win32-process/node_modules/**',
       '!node_modules/@img/sharp-darwin*/**',
       '!node_modules/@img/sharp-libvips-darwin*/**',
       '!node_modules/@img/sharp-win32-arm64*/**',
@@ -945,7 +902,10 @@ describe('published package surface', () => {
       '!node_modules/node-addon-require-builtin-win32-arm64*/**',
       '!node_modules/node-addon-require-builtin-win32-ia32*/**',
       '!node_modules/koffi-darwin-*-3-1-1/**',
-    ])
+    ]))
+    expect(builderConfig?.win?.files).toContain(
+      '!node_modules/**/@openai/codex-{darwin,linux}-*/**',
+    )
     expect(builderConfig?.win?.target).toEqual([{
       target: 'nsis',
       arch: ['x64'],
@@ -967,6 +927,15 @@ describe('published package surface', () => {
       artifactName: `${String(activeBrandChannel.artifactPrefix)}-\${version}-\${arch}-Setup.\${ext}`,
     })
     expect(builderConfig?.linux?.icon).toBe('build/app-icon.png')
+    expect(builderConfig?.linux?.files).toContain(
+      '!node_modules/**/dsh-community-market/node_modules/**',
+    )
+    expect(builderConfig?.linux?.files).toContain(
+      '!node_modules/**/@openai/codex-{darwin,win32}-*/**',
+    )
+    expect(builderConfig?.mac?.files).toContain(
+      '!node_modules/**/@openai/codex-{linux,win32}-*/**',
+    )
     expect(builderConfig?.linux?.target).toEqual([
       { target: 'AppImage', arch: ['x64'] },
       { target: 'deb', arch: ['x64'] },
@@ -995,6 +964,9 @@ describe('published package surface', () => {
     expect(manifest.scripts?.['dist:mac']).toBe('node scripts/release-mac.ts')
     expect(manifest.scripts?.['dist:mac-smoke']).toBe('node scripts/package-mac.ts')
     expect(manifest.scripts?.['dist:win']).toBe('node scripts/package-win.ts')
+    expect(manifest.scripts?.['dist:win-prepare']).toBe('node scripts/package-win.ts --prepare')
+    expect(manifest.scripts?.['dist:win-installer']).toBe('node scripts/package-win.ts --installer')
+    expect(manifest.scripts?.['dist:win-portable-prepared']).toBe('node scripts/package-win.ts --portable')
     expect(manifest.scripts?.['dist:win-portable']).toBe('node scripts/package-win-portable.ts')
     expect(manifest.scripts?.['check:win-package']).toContain('pnpm --filter dsh-community-market build')
     expect(manifest.scripts?.['check:win-package']).toContain('pnpm run build')
@@ -1028,12 +1000,14 @@ describe('published package surface', () => {
       .toBe('pnpm --filter dsh-community-market build && pnpm --filter dsh-plugin-desktop dist:linux')
     expect(builderConfig?.afterPack).toBe('./scripts/verify-packaged-runtime.ts')
     expect(builderConfig?.electronDownload?.checksums).toEqual({
-      'electron-v43.4.0-darwin-arm64.zip':
-        '827f9f182566f46846377575b51c547b9926b111637313a373b6f717462aebac',
-      'electron-v43.4.0-darwin-x64.zip':
-        '7ab39ec1b0bcf5463f2dc0040142fbc1c30cd7bc3f99086066f588c717b11e24',
-      'electron-v43.4.0-win32-x64.zip':
-        'ef0709cfa719739acce73de6f9b684304baf38c6454376638a70d34a7cecffe0',
+      'electron-v44.0.0-darwin-arm64.zip':
+        '076d79742986e1b100b69ebecc691cb07368045e54c9087cef631b8622b76a80',
+      'electron-v44.0.0-darwin-x64.zip':
+        '28429e700ad68d9624aaa90b6543ffe891a48c14121fd904cd294e5edcee63ff',
+      'electron-v44.0.0-linux-x64.zip':
+        'd65286d812719f2b4c1a1b806a80f288a1058c89c7b058dae1e03ab25e499446',
+      'electron-v44.0.0-win32-x64.zip':
+        'e61aa3bcea8152bc0730abd015e47c032d778a0ef10e2a1c78ba3c4ea47942f9',
     })
     expect(builderConfig?.mac).toEqual(expect.objectContaining({
       extendInfo: {
@@ -1042,14 +1016,15 @@ describe('published package surface', () => {
         CFBundleLocalizations: ['en', 'zh_CN'],
       },
       hardenedRuntime: true,
-      mergeASARs: false,
+      mergeASARs: true,
       notarize: true,
       signIgnore: ['\\.(?:pak|dat|wasm)$'],
-      target: ['dir'],
+      target: [{ target: 'dir', arch: ['arm64'] }],
       x64ArchFiles: expect.stringContaining('node-pty/prebuilds/darwin-*'),
     }))
     expect(builderConfig?.mac?.x64ArchFiles).toContain('lightningcss-darwin-*')
     expect(builderConfig?.mac?.x64ArchFiles).toContain('@deepseek-ai/node-addon-system-darwin-*')
+    expect(builderConfig?.mac?.x64ArchFiles).toContain('@dataiku/uv-darwin-*')
     expect(builderConfig?.files).toContain('!node_modules/node-pty/build/**')
     expect(manifest.devDependencies?.['@electron/asar']).toBe('3.4.1')
   })
@@ -1067,11 +1042,18 @@ describe('published package surface', () => {
     expect(windowsJob).not.toContain('- run: pnpm check')
     expect(windowsJob).toContain('timeout-minutes: 60')
     expect(windowsJob).toContain('run: pnpm --filter dsh-plugin-desktop check:win-package')
-    expect(windowsJob).toContain('run: pnpm --filter dsh-plugin-desktop dist:win')
-    expect(windowsJob).toContain('run: pnpm --filter dsh-plugin-desktop dist:win-portable')
+    expect(windowsJob).toContain('run: pnpm --filter dsh-plugin-desktop dist:win-prepare')
+    expect(windowsJob).toContain('run: pnpm --filter dsh-plugin-desktop dist:win-installer')
+    expect(windowsJob).toContain('run: pnpm --filter dsh-plugin-desktop dist:win-portable-prepared')
+    expect(windowsJob).toContain('name: Build Windows installer')
+    expect(windowsJob).toContain('name: Build Windows portable archive')
+    expect(windowsJob).toContain('name: Preserve Windows packaging phase timings')
+    expect(windowsJob).not.toContain('run: pnpm --filter dsh-plugin-desktop dist:win-bundle')
+    expect(windowsJob).not.toContain('run: pnpm --filter dsh-plugin-desktop dist:win-portable\n')
     expect(windowsJob.match(/CI: 'false'/g)?.length).toBeGreaterThanOrEqual(3)
     expect(windowsJob.match(/npm_config_minimum_release_age: '0'/g)?.length).toBeGreaterThanOrEqual(3)
     expect(windowsJob).toContain('DSH_PACKAGE_CHECK_ALREADY_RAN: \'1\'')
+    expect(windowsJob).toContain('DSH_WINDOWS_PACKAGE_COMPRESSION: store')
     expect(macosJob).not.toContain('- run: pnpm check')
     expect(macosJob).toContain('run: pnpm --filter dsh-plugin-desktop check:mac-package')
     expect(macosJob).toContain('run: pnpm --filter dsh-plugin-desktop dist:mac-smoke')
@@ -1170,12 +1152,13 @@ describe('published package surface', () => {
 
   it('keeps Electron out of production dependencies consumed by electron-builder', () => {
     expect(manifest.dependencies).not.toHaveProperty('electron')
-    expect(manifest.peerDependencies?.electron).toBe('43.4.0')
-    expect(manifest.devDependencies?.electron).toBe('43.4.0')
-    expect(manifest.dependencies?.pnpm).toBe('11.7.0')
+    expect(manifest.peerDependencies?.electron).toBe('44.0.0')
+    expect(manifest.devDependencies?.electron).toBe('44.0.0')
+    expect(manifest.dependencies?.pnpm).toBe('11.28.5')
+    expect(manifest.dependencies?.['node-addon-native-custom-loader']).toBe('0.1.7')
   })
 
-  it('keeps the packaged pnpm manifest, lock entry, and installed runtime on 11.7.0', () => {
+  it('keeps the packaged pnpm manifest, lock entry, and installed runtime on 11.28.5', () => {
     const lockfile = readFileSync(new URL('pnpm-lock.yaml', workspaceRoot), 'utf8')
     const workspaceRequire = createRequire(new URL('package.json', packageRoot))
     const installedPnpm = JSON.parse(readFileSync(
@@ -1183,9 +1166,9 @@ describe('published package surface', () => {
       'utf8',
     )) as { version?: unknown }
 
-    expect(manifest.dependencies?.pnpm).toBe('11.7.0')
-    expect(lockfile).toContain('pnpm@11.7.0:')
-    expect(installedPnpm.version).toBe('11.7.0')
+    expect(manifest.dependencies?.pnpm).toBe('11.28.5')
+    expect(lockfile).toContain('pnpm@11.28.5:')
+    expect(installedPnpm.version).toBe('11.28.5')
   })
 
   it('packages the native-compiled Koffi Windows runtime', () => {
@@ -1295,7 +1278,7 @@ describe('published package surface', () => {
 
   it('resolves electron-builder through the pinned app-builder-lib keychain patch', () => {
     const lockfile = readFileSync(new URL('pnpm-lock.yaml', workspaceRoot), 'utf8')
-    const patch = readFileSync(new URL('patches/app-builder-lib@26.15.7.patch', workspaceRoot), 'utf8')
+    const patch = readFileSync(new URL('patches/app-builder-lib@26.17.0.patch', workspaceRoot), 'utf8')
     const workspaceRequire = createRequire(new URL('package.json', packageRoot))
     const electronBuilderManifest = workspaceRequire.resolve('electron-builder/package.json')
     const electronBuilderRequire = createRequire(electronBuilderManifest)
@@ -1316,10 +1299,11 @@ describe('published package surface', () => {
       'utf8',
     )
 
-    expect(manifest.devDependencies?.['electron-builder']).toBe('26.15.7')
-    expect(lockfile).toContain('app-builder-lib@26.15.7(patch_hash=')
-    expect(patch).toContain('importCerts(keychainFile, certPaths, cscPasswords, keychainPassword)')
-    expect(patch).toContain('"-k", keychainPassword, keychainFile')
+    expect(manifest.devDependencies?.['electron-builder']).toBe('26.17.0')
+    expect(lockfile).toContain('app-builder-lib@26.17.0(patch_hash=')
+    // The macOS keychain password fix was adopted upstream in 26.17.0, so the
+    // patch file only carries the NSIS and collector-selection changes.
+    expect(patch).not.toContain('importCerts(keychainFile, certPaths, cscPasswords, keychainPassword)')
     expect(patch).toContain('ManifestLongPathAware true')
     expect(patch).toContain("[System.IO.Path]::GetFileName($$_.Path) -ieq '${_FILE}'")
     expect(patch).toContain('diff --git a/templates/nsis/include/extractAppPackage.nsh')
@@ -1348,120 +1332,113 @@ describe('published package surface', () => {
     expect(installedNsisInstallUtil).toContain('MessageBox MB_OK|MB_ICONEXCLAMATION "$(uninstallFailed): $R0"')
   })
 
-  it('collects external production dependencies omitted from pnpm 11 workspace trees', async () => {
+  it('filters installed optional runtimes by the packaging target and keeps both universal slices', async () => {
     const workspaceRequire = createRequire(new URL('package.json', packageRoot))
-    const electronBuilderManifest = workspaceRequire.resolve('electron-builder/package.json')
-    const electronBuilderRequire = createRequire(electronBuilderManifest)
-    const appBuilderManifest = electronBuilderRequire.resolve('app-builder-lib/package.json')
-    const collectorModule = electronBuilderRequire(
-      join(dirname(appBuilderManifest), 'out/node-module-collector/pnpmNodeModulesCollector.js'),
-    ) as {
+    const builderRequire = createRequire(workspaceRequire.resolve('electron-builder/package.json'))
+    const source = readFileSync(join(
+      dirname(builderRequire.resolve('app-builder-lib/package.json')), 'out/util/appFileCopier.js',
+    ), 'utf8')
+    const start = source.indexOf('async function computeNodeModuleFileSets(')
+    const end = source.indexOf('\n}', start) + 2
+    const root = mkdtempSync(join(tmpdir(), 'dsh-target-runtimes-'))
+    try {
+      const packages = [
+        { name: 'tool-win32-x64', os: ['win32'], cpu: ['x64'] },
+        { name: 'tool-win32-arm64', os: ['win32'], cpu: ['arm64'] },
+        { name: 'tool-linux-x64', os: ['linux'], cpu: ['x64'] },
+        { name: 'tool-linux-arm64', os: ['linux'], cpu: ['arm64'] },
+        { name: 'tool-darwin-x64', os: ['darwin'], cpu: ['x64'] },
+        { name: 'tool-darwin-arm64', os: ['darwin'], cpu: ['arm64'] },
+        { name: 'shared' },
+      ]
+      const deps = packages.map(pkg => {
+        const dir = join(root, pkg.name)
+        mkdirSync(dir)
+        writeFileSync(join(dir, 'package.json'), JSON.stringify({ ...pkg, version: '1.0.0' }))
+        return { name: pkg.name, version: '1.0.0', dir }
+      })
+      for (const [platform, arch, expected] of [
+        ['win32', 'x64', ['tool-win32-x64', 'shared']],
+        ['linux', 'x64', ['tool-linux-x64', 'shared']],
+        ['darwin', 'arm64', ['tool-darwin-arm64', 'shared']],
+        ['darwin', 'universal', ['tool-darwin-x64', 'tool-darwin-arm64', 'shared']],
+      ] as const) {
+        // Execute the installed function; replace only graph collection and file copying.
+        const collect = runInNewContext(`${source.slice(start, end)}; computeNodeModuleFileSets`, {
+          process: { env: { DSH_ELECTRON_BUILDER_TARGET_PLATFORM: platform, DSH_ELECTRON_BUILDER_TARGET_ARCH: arch } },
+          collectNodeModulesWithLogging: async () => deps,
+          getNodeModuleExcludedExts: () => [],
+          fs_extra_1: builderRequire('fs-extra'),
+          path: { join, relative: builderRequire('node:path').relative },
+          builder_util_1: { log: { debug: () => {}, filePath: (value: string) => value } },
+          fileMatcher_1: { FileMatcher: class {} },
+          NodeModuleCopyHelper_1: { NodeModuleCopyHelper: class {
+            metadata = new Map()
+            async collectNodeModules() { return [] }
+          } },
+          validateFileSet: (value: unknown) => value,
+        }) as (packager: unknown, matcher: unknown) => Promise<{ src: string }[]>
+        const sets = await collect({ info: {} }, { to: join(root, 'app'), patterns: [] })
+        expect(sets.map(set => deps.find(dep => dep.dir === set.src)?.name)).toEqual(expected)
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('follows a satisfying pnpm link before resolving its transitive dependencies', async () => {
+    const workspaceRequire = createRequire(new URL('package.json', packageRoot))
+    const builderRequire = createRequire(workspaceRequire.resolve('electron-builder/package.json'))
+    const collectorModule = builderRequire(join(
+      dirname(builderRequire.resolve('app-builder-lib/package.json')),
+      'out/node-module-collector/pnpmNodeModulesCollector.js',
+    )) as {
       PnpmNodeModulesCollector: new (rootDir: string, tempDirManager: unknown) => {
-        _pnpmMajorVersion: number
-        _allWorkspacePackages: unknown[]
-        allDependencies: Map<string, { path?: string; version?: string }>
+        isHoisted: { value: Promise<boolean> }
+        locateFromDepOrRoot: (name: string, parent: string, range: string) => Promise<{ packageDir: string } | null>
+        extractProductionDependencyGraph: (tree: { name: string; version: string; path: string }, id: string) => Promise<void>
         productionGraph: Record<string, { dependencies: string[] }>
-        locateFromDepOrRoot: (
-          packageName: string,
-          parentPath: string | undefined,
-          requiredRange: string | undefined,
-        ) => Promise<unknown>
-        extractProductionDependencyGraph: (tree: unknown, dependencyId: string) => Promise<void>
+        allDependencies: Map<string, { name: string; from: string; version: string; path: string }>
       }
     }
-    const collector = new collectorModule.PnpmNodeModulesCollector('/workspace', {})
-    collector._pnpmMajorVersion = 11
-    const packages = new Map<string, { packageDir: string; packageJson: Record<string, unknown> }>([
-      ['dsh-plugin-desktop', {
-        packageDir: '/workspace/app',
-        packageJson: {
-          name: 'dsh-plugin-desktop',
-          version: '2.0.4',
-          dependencies: {
-            '@deepseek-ai/dsh-session-telemetry-otel': 'workspace:*',
-            '@deepseek-ai/schemastery': 'workspace:*',
-          },
-        },
-      }],
-      ['@deepseek-ai/dsh-session-telemetry-otel', {
-        packageDir: '/workspace/packages/session-telemetry-otel',
-        packageJson: {
-          name: '@deepseek-ai/dsh-session-telemetry-otel',
-          version: '0.1.2-alpha.5',
-          dependencies: {
-            '@deepseek-ai/schemastery': 'workspace:^',
-            '@deepseek-ai/node-addon-landlock-run': 'workspace:^',
-            '@opentelemetry/sdk-logs': '^0.220.0',
-          },
-        },
-      }],
-      ['@deepseek-ai/schemastery', {
-        packageDir: '/workspace/packages/schemastery',
-        packageJson: {
-          name: '@deepseek-ai/schemastery',
-          version: '0.1.2-alpha.5',
-        },
-      }],
-      ['@deepseek-ai/node-addon-landlock-run', {
-        packageDir: '/workspace/native/landlock-run',
-        packageJson: {
-          name: '@deepseek-ai/node-addon-landlock-run',
-          version: '0.1.1',
-        },
-      }],
-      ['@opentelemetry/sdk-logs', {
-        packageDir: '/workspace/node_modules/@opentelemetry/sdk-logs',
-        packageJson: {
-          name: '@opentelemetry/sdk-logs',
-          version: '0.220.0',
-        },
-      }],
-    ])
-    collector._allWorkspacePackages = [...packages.values()].map(pkg => ({
-      name: pkg.packageJson.name,
-      version: pkg.packageJson.version,
-      path: pkg.packageDir,
-    }))
-    collector.locateFromDepOrRoot = async packageName => packages.get(packageName)
-    collector.allDependencies.set(
-      '@deepseek-ai/dsh-session-telemetry-otel@link:session-telemetry-otel',
-      { path: '/workspace/packages/session-telemetry-otel', version: 'link:session-telemetry-otel' },
-    )
-    collector.allDependencies.set(
-      '@deepseek-ai/schemastery@link:schemastery',
-      { path: '/workspace/packages/schemastery', version: 'link:schemastery' },
-    )
-    const dependencyId = '@deepseek-ai/dsh-session-telemetry-otel@link:session-telemetry-otel'
+    const root = mkdtempSync(join(tmpdir(), 'dsh-collector-link-'))
+    try {
+      const store = join(root, '.pnpm', 'watcher@1.0.0', 'node_modules')
+      for (const name of ['watcher', 'reader', 'leaf']) {
+        mkdirSync(join(store, name), { recursive: true })
+        writeFileSync(join(store, name, 'package.json'), JSON.stringify({
+          name, version: '1.0.0',
+          dependencies: name === 'watcher' ? { reader: '^1.0.0' } : name === 'reader' ? { leaf: '^1.0.0' } : {},
+        }))
+      }
+      mkdirSync(join(root, 'node_modules'))
+      symlinkSync(join(store, 'watcher'), join(root, 'node_modules', 'watcher'), 'junction')
+      const collector = new collectorModule.PnpmNodeModulesCollector(root, {})
+      collector.isHoisted = { value: Promise.resolve(false) }
 
-    await collector.extractProductionDependencyGraph({
-      name: 'dsh-plugin-desktop',
-      version: '2.0.4',
-      path: '/workspace/app',
-      dependencies: {
-        '@deepseek-ai/dsh-session-telemetry-otel': {
-          from: '@deepseek-ai/dsh-session-telemetry-otel',
-          version: 'link:session-telemetry-otel',
-          path: '/workspace/packages/session-telemetry-otel',
-        },
-        '@deepseek-ai/schemastery': {
-          from: '@deepseek-ai/schemastery',
-          version: 'link:schemastery',
-          path: '/workspace/packages/schemastery',
-        },
-      },
-    }, 'dsh-plugin-desktop')
-
-    expect(collector.productionGraph[dependencyId]?.dependencies)
-      .toEqual([
-        '@deepseek-ai/schemastery@link:schemastery',
-        '@deepseek-ai/node-addon-landlock-run@0.1.1',
-        '@opentelemetry/sdk-logs@0.220.0',
-      ])
-    expect(collector.allDependencies.get('@opentelemetry/sdk-logs@0.220.0')?.path)
-      .toBe('/workspace/node_modules/@opentelemetry/sdk-logs')
-    expect(collector.allDependencies.get('@deepseek-ai/node-addon-landlock-run@0.1.1')?.path)
-      .toBe('/workspace/native/landlock-run')
-    expect(collector.productionGraph).not.toHaveProperty('@deepseek-ai/schemastery@0.1.2-alpha.5')
+      const watcher = await collector.locateFromDepOrRoot('watcher', root, '1.0.0')
+      expect(watcher?.packageDir).toBe(realpathSync(join(store, 'watcher')))
+      expect(await collector.locateFromDepOrRoot('reader', watcher!.packageDir, '^1.0.0'))
+        .toMatchObject({ packageDir: realpathSync(join(store, 'reader')) })
+      // pnpm can omit the entire subtree: reconstruct it from installed manifests.
+      await collector.extractProductionDependencyGraph({
+        name: 'watcher', version: '1.0.0', path: watcher!.packageDir,
+      }, 'watcher@1.0.0')
+      expect(collector.productionGraph['watcher@1.0.0']?.dependencies).toEqual(['reader@1.0.0'])
+      expect(collector.productionGraph['reader@1.0.0']?.dependencies).toEqual(['leaf@1.0.0'])
+      const linkedCollector = new collectorModule.PnpmNodeModulesCollector(root, {})
+      linkedCollector.isHoisted = { value: Promise.resolve(false) }
+      linkedCollector.allDependencies.set('reader@link:../reader', {
+        name: 'reader', from: 'reader', version: 'link:../reader', path: realpathSync(join(store, 'reader')),
+      })
+      await linkedCollector.extractProductionDependencyGraph({
+        name: 'watcher', version: '1.0.0', path: watcher!.packageDir,
+      }, 'watcher@1.0.0')
+      expect(linkedCollector.productionGraph['watcher@1.0.0']?.dependencies).toEqual(['reader@link:../reader'])
+      expect(linkedCollector.allDependencies.has('reader@1.0.0')).toBe(false)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 
   it('does not reuse a pnpm package lookup miss across different parents', async () => {
@@ -1500,126 +1477,7 @@ describe('published package surface', () => {
       .toMatchObject({ packageDir: expectedPackageDir })
   })
 
-  it('normalizes pnpm symlink locations before walking transitive dependencies', async () => {
-    const workspaceRequire = createRequire(new URL('package.json', packageRoot))
-    const electronBuilderManifest = workspaceRequire.resolve('electron-builder/package.json')
-    const electronBuilderRequire = createRequire(electronBuilderManifest)
-    const appBuilderManifest = electronBuilderRequire.resolve('app-builder-lib/package.json')
-    const collectorModule = electronBuilderRequire(
-      join(dirname(appBuilderManifest), 'out/node-module-collector/pnpmNodeModulesCollector.js'),
-    ) as {
-      PnpmNodeModulesCollector: new (rootDir: string, tempDirManager: unknown) => {
-        isHoisted: { value: Promise<boolean> }
-        cache: {
-          realPath: Record<string, Promise<string>>
-          locatePackageVersion: (options: { parentDir: string; pkgName: string }) => Promise<unknown>
-        }
-        locateFromDepOrRoot: (
-          packageName: string,
-          parentPath: string | undefined,
-          requiredRange: string | undefined,
-        ) => Promise<{ packageDir?: string } | null>
-      }
-    }
-    const collector = new collectorModule.PnpmNodeModulesCollector('/workspace', {})
-    collector.isHoisted = { value: Promise.resolve(false) }
-    collector.cache.realPath = {
-      '/workspace/packages/telemetry/node_modules/@opentelemetry/resources': Promise.resolve('/store/resources'),
-      '/store/resources/node_modules/@opentelemetry/core': Promise.resolve('/store/core'),
-    }
-    collector.cache.locatePackageVersion = async ({ parentDir, pkgName }) => {
-      if (parentDir === '/workspace/packages/telemetry' && pkgName === '@opentelemetry/resources') {
-        return {
-          packageDir: '/workspace/packages/telemetry/node_modules/@opentelemetry/resources',
-          packageJson: { name: pkgName, version: '2.10.0' },
-        }
-      }
-      if (parentDir === '/store/resources' && pkgName === '@opentelemetry/core') {
-        return {
-          packageDir: '/store/resources/node_modules/@opentelemetry/core',
-          packageJson: { name: pkgName, version: '2.10.0' },
-        }
-      }
-      return null
-    }
 
-    const resources = await collector.locateFromDepOrRoot(
-      '@opentelemetry/resources',
-      '/workspace/packages/telemetry',
-      '2.10.0',
-    )
-    const core = await collector.locateFromDepOrRoot(
-      '@opentelemetry/core',
-      resources?.packageDir,
-      '2.10.0',
-    )
-
-    expect(resources?.packageDir).toBe('/store/resources')
-    expect(core?.packageDir).toBe('/store/core')
-  })
-
-  it('rebuilds pnpm 11 external edges from the installed package manifest', async () => {
-    const workspaceRequire = createRequire(new URL('package.json', packageRoot))
-    const electronBuilderManifest = workspaceRequire.resolve('electron-builder/package.json')
-    const electronBuilderRequire = createRequire(electronBuilderManifest)
-    const appBuilderManifest = electronBuilderRequire.resolve('app-builder-lib/package.json')
-    const collectorModule = electronBuilderRequire(
-      join(dirname(appBuilderManifest), 'out/node-module-collector/pnpmNodeModulesCollector.js'),
-    ) as {
-      PnpmNodeModulesCollector: new (rootDir: string, tempDirManager: unknown) => {
-        _pnpmMajorVersion: number
-        allDependencies: Map<string, { path?: string; version?: string }>
-        productionGraph: Record<string, { dependencies: string[] }>
-        locateFromDepOrRoot: (packageName: string) => Promise<unknown>
-        extractProductionDependencyGraph: (tree: unknown, dependencyId: string) => Promise<void>
-      }
-    }
-    const collector = new collectorModule.PnpmNodeModulesCollector('/workspace', {})
-    collector._pnpmMajorVersion = 11
-    const packages = new Map([
-      ['@opentelemetry/sdk-logs', {
-        packageDir: '/store/sdk-logs',
-        packageJson: {
-          name: '@opentelemetry/sdk-logs',
-          version: '0.220.0',
-          dependencies: {
-            '@opentelemetry/core': '2.9.0',
-            '@opentelemetry/resources': '2.9.0',
-          },
-        },
-      }],
-      ['@opentelemetry/core', {
-        packageDir: '/store/core-2.9.0',
-        packageJson: { name: '@opentelemetry/core', version: '2.9.0' },
-      }],
-      ['@opentelemetry/resources', {
-        packageDir: '/store/resources-2.9.0',
-        packageJson: { name: '@opentelemetry/resources', version: '2.9.0' },
-      }],
-    ])
-    collector.locateFromDepOrRoot = async packageName => packages.get(packageName)
-
-    await collector.extractProductionDependencyGraph({
-      name: '@opentelemetry/sdk-logs',
-      version: '0.220.0',
-      path: '/store/sdk-logs',
-      dependencies: {
-        '@opentelemetry/resources': {
-          from: '@opentelemetry/resources',
-          version: '2.10.0',
-          path: '/store/resources-2.10.0',
-        },
-      },
-    }, '@opentelemetry/sdk-logs@0.220.0')
-
-    expect(collector.productionGraph['@opentelemetry/sdk-logs@0.220.0']?.dependencies)
-      .toEqual([
-        '@opentelemetry/core@2.9.0',
-        '@opentelemetry/resources@2.9.0',
-      ])
-    expect(collector.allDependencies.get('@opentelemetry/core@2.9.0')?.path)
-      .toBe('/store/core-2.9.0')
-  })
 
   it('loads the Windows sandbox implementation from the sibling checkout', () => {
     const lockfile = readFileSync(new URL('pnpm-lock.yaml', workspaceRoot), 'utf8')

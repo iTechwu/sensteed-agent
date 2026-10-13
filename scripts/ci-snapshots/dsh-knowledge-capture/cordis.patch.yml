@@ -1,5 +1,5 @@
 # Register the runtime bridge. It derives identity from MODELS_API_KEY at the
 # public MCP gateway, captures DSH session events, and injects ContextPack data.
 - insert:
-    - id: yootun-agent-knowledge-capture
+    - id: sensteed-agent-knowledge-capture
       name: '@dofe/dsh-knowledge-capture'

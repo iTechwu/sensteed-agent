@@ -14,7 +14,7 @@ Tracking the DeepSeek Harness source as a pinned git submodule and consuming the
 
 `upstream.json` declares exactly `repository` (SSH fork URL), `branch`, `localCheckout`, and `sourceVersion`. It does not pin a commit; the source of truth is the sibling working tree, and `sourceVersion` must equal the sibling's root version. CI clones the fork to `../deepseek-harness` (SSH, `--depth 1 --branch dev`) before `pnpm install`, and `scripts/upstream-workspace-link.mjs` materializes the Windows junction before any install.
 
-Desktop-owned behaviors are native fork commits. The former `patches/` DSH behavior patches and `scripts/apply-upstream-patches.mjs` are deleted; `patches/` keeps only the three toolchain patches (`app-builder-lib`, `dshmarket`, `open`) governed by `patchedDependencies`. `dsh-plugin-desktop/tests/package.spec.ts` asserts the ported behaviors directly against the fork's sources.
+Desktop-owned behaviors are native fork commits. The former `patches/` DSH behavior patches and `scripts/apply-upstream-patches.mjs` are deleted; `patches/` keeps only toolchain patches (`app-builder-lib`, `@electron/universal`, `dshmarket`, `open`) governed by `patchedDependencies`. `dsh-plugin-desktop/tests/package.spec.ts` asserts the ported behaviors directly against the fork's sources.
 
 ## Consequences
 
