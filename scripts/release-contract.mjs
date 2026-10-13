@@ -1,6 +1,6 @@
 /** Enforce the main -> version commit -> exact tag -> package contract. */
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { readFileSync, realpathSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -55,9 +55,22 @@ export function assertPackagingRelease(root = resolve(import.meta.dirname, '..')
       throw new Error(`Packaging input differs from tagged commit: ${path}`)
     }
   }
-  // CI materializes generated lib/UI files before packaging. The release
-  // inputs above are compared byte-for-byte with the tagged commit; derived
-  // build output is intentionally allowed to appear in the working tree.
+  // License notices and icons are generated from the installed platform
+  // closure. Every other tracked source/build input must still match the tag.
+  const generated = new Set([
+    'dsh-plugin-desktop/THIRD_PARTY_NOTICES.md',
+    'dsh-plugin-desktop/build/app-icon.ico',
+    'dsh-plugin-desktop/build/app-icon.icns',
+  ])
+  const changes = git('diff', '--name-only', '-z', 'HEAD', '--').split('\0').filter(Boolean)
+  const unexpected = changes.filter(path => {
+    if (generated.has(path)) return false
+    if (path === 'deepseek-harness' && process.platform === 'win32') {
+      return realpathSync(resolve(root, path)) !== realpathSync(resolve(root, upstream.localCheckout))
+    }
+    return true
+  })
+  if (unexpected.length) throw new Error(`Tracked packaging inputs differ from tag: ${unexpected.join(', ')}`)
   const source = read('release-source.json')
   const repository = /^git@github\.com:([\w.-]+\/[\w.-]+)\.git$/u.exec(upstream.repository)?.[1]
   if (!repository || source.version !== version || source.sourceVersion !== upstream.sourceVersion || source.repository !== repository || !/^[a-f0-9]{40}$/u.test(source.commit)) {
