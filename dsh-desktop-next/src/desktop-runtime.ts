@@ -23,6 +23,8 @@ interface RuntimeOptions {
   /** Disposable desktop settings; recovery continues to address the original home. */
   stateHome?: string
   root: string
+  /** Bundled interpreter payload for this CPU; a development tree without one runs without Office skills. */
+  primaryRuntime?: string
   executable: string
   addresses(): string[]
   /** The system proxy main probed at startup; the Host decides whether it applies. */
@@ -279,7 +281,7 @@ export class NextDesktopRuntime {
         DSH_NEXT_PREFERENCES: JSON.stringify(effective), DSH_NEXT_TRUSTED_HOSTS: JSON.stringify(addresses),
         [SYSTEM_PROXY_ENV]: JSON.stringify(options.systemProxy?.() ?? {}),
         ...(this.safeMode ? { DSH_TELEMETRY_DISABLED: '1' } : {}) },
-      onFailure, undefined, undefined, join(options.root, 'lib', 'host.js'), options.onRestart, options.onNotification,
+      onFailure, options.primaryRuntime, undefined, join(options.root, 'lib', 'host.js'), options.onRestart, options.onNotification,
       (chunk, stream, pid) => this.diagnostics.hostChunk(chunk, stream, pid), options.onTerminal, options.onPermission, undefined, options.onPlatformLogin,
       input => { if (input.event === 'exit') this.diagnostics.hostClosed(input.pid); this.diagnostics.record(input) })
     this.hostProcess = host

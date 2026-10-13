@@ -107,6 +107,96 @@
       "upstream": "apps/desktop/tests/keybindings.spec.ts",
       "local": "tests/keybindings.spec.ts",
       "upstreamSha256": "3d90e7dfde4733a9fec33b44a3347805404d4ba0a1a68ca4648ec5e94002a3ad"
+    },
+    {
+      "upstream": "apps/desktop/src/runtime-tree.ts",
+      "local": "src/runtime-tree.ts",
+      "upstreamSha256": "aaef471a94c1bb295c7aecd080f2bf9f4fa037a8fc3f2d76c63db9b367c80778"
+    },
+    {
+      "upstream": "apps/desktop/scripts/runtime-file-policy.ts",
+      "local": "scripts/runtime-file-policy.ts",
+      "upstreamSha256": "1b1318a52d315c10ca54c6e10c43cc0d3eacfe3051af89f09202e2858d961af6"
+    },
+    {
+      "upstream": "apps/desktop/tests/runtime-tree.spec.ts",
+      "local": "tests/runtime-tree.spec.ts",
+      "upstreamSha256": "b72793f4458b6ce36629fe4c26c17ac320051c75e2ac9a7a2493ec55ad959873"
+    },
+    {
+      "upstream": "apps/desktop/tests/runtime-file-policy.spec.ts",
+      "local": "tests/runtime-file-policy.spec.ts",
+      "upstreamSha256": "f51e7891a3d10a22ce9d36cead755aa41e66b325c2973d476db720bceabc125a"
+    },
+    {
+      "upstream": "apps/desktop/tests/runtime-fixture.ts",
+      "local": "tests/runtime-fixture.ts",
+      "upstreamSha256": "578b43a9b65f23627134f954c642f722dff52c09340860142a49f285bc7ddac1"
+    },
+    {
+      "upstream": "apps/desktop-host/src/office-engine.ts",
+      "local": "src/host/office-engine.ts",
+      "upstreamSha256": "9e399122d163f92aca01c57c0f5fd207946ebd7b7a3f6967b7e2e262e7f46432"
+    },
+    {
+      "upstream": "apps/desktop-host/tests/office-engine.spec.ts",
+      "local": "tests/office-engine.spec.ts",
+      "upstreamSha256": "0ef9ae8b2de83cb00a19db96b11cab886672277582986346df4431df189f6344"
+    },
+    {
+      "upstream": "apps/desktop-host/src/office.ts",
+      "local": "src/host/office.ts",
+      "upstreamSha256": "33c85997b69dacd6a9e5410d3c101039dd0e9a4cc8f63f9bbdfee1242390a668"
+    },
+    {
+      "upstream": "apps/desktop-host/tests/office.spec.ts",
+      "local": "tests/host-office.spec.ts",
+      "upstreamSha256": "580b1bf1213e0a5dc6baaa2df430b0aabf4ae186fd39559685e89e4428b8a6df"
+    },
+    {
+      "upstream": "scripts/primary-runtime/prepare.ts",
+      "local": "scripts/primary-runtime.ts",
+      "upstreamSha256": "f2a61674ab2283f2ee23aeef9c84265c738f22bf101eaa3ef43814235ed48fb6"
+    },
+    {
+      "upstream": "scripts/primary-runtime/prepare.spec.ts",
+      "local": "tests/primary-runtime.spec.ts",
+      "upstreamSha256": "3496aee098f0c684e5a0c22de8d9c147d3de7f042cee39200c5fe9e8572dfc93"
+    },
+    {
+      "upstream": "scripts/primary-runtime/prune-python-tests.ts",
+      "local": "scripts/prune-python-tests.ts",
+      "upstreamSha256": "030e3db3e733ac0e4a3ded3762bdba498cbc57f91405567aef40c02018319881"
+    },
+    {
+      "upstream": "scripts/primary-runtime/prune-python-tests.spec.ts",
+      "local": "tests/prune-python-tests.spec.ts",
+      "upstreamSha256": "c3d5528a5ac6ef88b184a3652b16c6a1f3548f292341c6e777f711f3e3f97bd0"
+    },
+    {
+      "upstream": "scripts/libreoffice-packages.mjs",
+      "local": "scripts/office-packages.ts",
+      "upstreamSha256": "dee06b3337deec553858d9edbbbef09bbca88dadefead0903cbd42162acfe445"
+    },
+    {
+      "upstream": "apps/desktop/scripts/macos-runtime.ts",
+      "local": "scripts/sign-runtime.ts",
+      "upstreamSha256": "445924b21ab4ddbe219f755de11bc62537b6f1a8b7dcbe5c2a124b2ee63c816c"
+    },
+    {
+      "upstream": "apps/desktop/scripts/verify-macos-signature.mjs",
+      "local": "scripts/sign-runtime.ts",
+      "upstreamSha256": "32162091de8ed8bbe418ae8aa6101bc7b46c80e55d163568f0231ee5356226de"
+    },
+    {
+      "upstream": "apps/desktop/scripts/macos-signing-keychain.mjs",
+      "local": "scripts/sign-runtime.ts",
+      "upstreamSha256": "e73ad2ab60d56e610dfa5322f5bcd27e43bd297f2bda83aa44c69cd8d0352b3e"
+    },
+    {
+      "upstream": "apps/desktop/tests/macos-runtime.spec.ts",
+      "local": "tests/sign-runtime.spec.ts",
+      "upstreamSha256": "fc42b35da18477120f4595ff5a155370962d8231cceaec6a467d575d15398157"
     }
   ]
 }

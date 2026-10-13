@@ -15741,6 +15741,9 @@ importers:
       '@deepseek-ai/dsh-client-modules':
         specifier: 0.2.1-alpha.2
         version: link:../deepseek-harness/packages/client/modules
+      '@deepseek-ai/dsh-client-shortcuts':
+        specifier: 0.2.1-alpha.2
+        version: link:../deepseek-harness/packages/client/shortcuts
       '@deepseek-ai/dsh-client-store':
         specifier: 0.2.1-alpha.2
         version: link:../deepseek-harness/packages/client/store
@@ -15876,9 +15879,15 @@ importers:
       '@deepseek-ai/dsh-experimental-tool-worktree':
         specifier: 0.2.1-alpha.2
         version: link:../deepseek-harness/packages/experimental/tool-worktree
+      '@deepseek-ai/dsh-experimental-translator':
+        specifier: 0.2.1-alpha.2
+        version: link:../deepseek-harness/packages/experimental/translator
       '@deepseek-ai/dsh-experimental-voice-input-bundle':
         specifier: 0.2.1-alpha.2
         version: link:../deepseek-harness/packages/experimental/voice-input-bundle
+      '@deepseek-ai/dsh-experimental-worktree':
+        specifier: 0.2.1-alpha.2
+        version: link:../deepseek-harness/packages/experimental/worktree
       '@deepseek-ai/dsh-file-reference':
         specifier: 0.2.1-alpha.2
         version: link:../deepseek-harness/packages/context/file-reference
@@ -15933,6 +15942,12 @@ importers:
       '@deepseek-ai/dsh-llm-deepseek':
         specifier: 0.2.1-alpha.2
         version: link:../deepseek-harness/packages/llm/llm-deepseek
+      '@deepseek-ai/dsh-llm-deepseek-account':
+        specifier: 0.2.1-alpha.2
+        version: link:../deepseek-harness/packages/llm/llm-deepseek-account
+      '@deepseek-ai/dsh-llm-deepseek-api-key':
+        specifier: 0.2.1-alpha.2
+        version: link:../deepseek-harness/packages/llm/llm-deepseek-api-key
       '@deepseek-ai/dsh-llm-retry':
         specifier: 0.2.1-alpha.2
         version: link:../deepseek-harness/packages/llm/llm-retry
@@ -16032,6 +16047,9 @@ importers:
       '@deepseek-ai/dsh-skill-filesystem':
         specifier: 0.2.1-alpha.2
         version: link:../deepseek-harness/packages/skill/skill-filesystem
+      '@deepseek-ai/dsh-skill-office':
+        specifier: 0.2.1-alpha.2
+        version: link:../deepseek-harness/packages/skill/skill-office
       '@deepseek-ai/dsh-spill':
         specifier: 0.2.1-alpha.2
         version: link:../deepseek-harness/packages/spill/spill
@@ -16095,6 +16113,9 @@ importers:
       '@deepseek-ai/dsh-tool-workflow':
         specifier: 0.2.1-alpha.2
         version: link:../deepseek-harness/packages/workflow/tool-workflow
+      '@deepseek-ai/dsh-tool-workspace-dependencies':
+        specifier: 0.2.1-alpha.2
+        version: link:../deepseek-harness/packages/skill/tool-workspace-dependencies
       '@deepseek-ai/dsh-tools':
         specifier: 0.2.1-alpha.2
         version: link:../deepseek-harness/packages/core/tools
@@ -16137,9 +16158,15 @@ importers:
       '@deepseek-ai/dsh-workflow':
         specifier: 0.2.1-alpha.2
         version: link:../deepseek-harness/packages/workflow/workflow
+      '@deepseek-ai/dsh-working-directory':
+        specifier: 0.2.1-alpha.2
+        version: link:../deepseek-harness/packages/session/working-directory
       '@deepseek-ai/dsh-workspace':
         specifier: 0.2.1-alpha.2
         version: link:../deepseek-harness/packages/workspace/workspace
+      '@deepseek-ai/libreoffice-kit':
+        specifier: 0.1.5
+        version: 0.1.5
       '@deepseek-ai/schemastery':
         specifier: ^3.18.5-alpha.1
         version: link:../deepseek-harness/vendor/schemastery
@@ -16147,8 +16174,20 @@ importers:
         specifier: 0.1.0-dev.0
         version: link:../dsh-community-market
       dshmarket:
-        specifier: 1.66.7
-        version: 1.66.7(@deepseek-ai/cordis@deepseek-harness+vendor+cordis)(@deepseek-ai/dsh-settings@deepseek-harness+packages+settings+settings)(@deepseek-ai/schemastery@deepseek-harness+vendor+schemastery)
+        specifier: 1.66.20
+        version: 1.66.20(@deepseek-ai/cordis@deepseek-harness+vendor+cordis)(@deepseek-ai/dsh-settings@deepseek-harness+packages+settings+settings)(@deepseek-ai/schemastery@deepseek-harness+vendor+schemastery)
+      mdast-util-from-markdown:
+        specifier: ^2.0.3
+        version: 2.0.3(supports-color@9.4.0)
+      mdast-util-gfm:
+        specifier: ^3.1.0
+        version: 3.1.0(supports-color@9.4.0)
+      mdast-util-to-string:
+        specifier: ^4.0.0
+        version: 4.0.0
+      micromark-extension-gfm:
+        specifier: ^3.0.0
+        version: 3.0.0
       pnpm:
         specifier: 11.28.5
         version: 11.28.5
@@ -16165,9 +16204,6 @@ importers:
       '@base-ui/react':
         specifier: ^1.7.0
         version: 1.7.0(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@deepseek-ai/dsh-client-shortcuts':
-        specifier: 0.2.1-alpha.2
-        version: link:../deepseek-harness/packages/client/shortcuts
       '@deepseek-ai/dsh-client-ui-sidebar-browser':
         specifier: 0.2.1-alpha.2
         version: link:../deepseek-harness/packages/client/ui-sidebar-browser
@@ -16177,6 +16213,9 @@ importers:
       '@deepseek-ai/dsh-host-open-in-app':
         specifier: 0.2.1-alpha.2
         version: link:../deepseek-harness/packages/host/open-in-app
+      '@electron/asar':
+        specifier: 3.4.1
+        version: 3.4.1
       '@fontsource-variable/inter':
         specifier: ^5.3.0
         version: 5.3.0
@@ -16192,6 +16231,9 @@ importers:
       '@types/node':
         specifier: ^22.20.0
         version: 22.20.1
+      '@types/papaparse':
+        specifier: ^5.3.0
+        version: 5.5.2
       '@types/react':
         specifier: ^18
         version: 18.3.31
@@ -16219,6 +16261,12 @@ importers:
       electron-builder:
         specifier: 26.15.7
         version: 26.15.7(electron-builder-squirrel-windows@26.15.7)(supports-color@9.4.0)
+      extract-zip:
+        specifier: 2.0.1
+        version: 2.0.1(supports-color@9.4.0)
+      fflate:
+        specifier: 0.8.2
+        version: 0.8.2
       immer:
         specifier: ^10.1.1
         version: 10.1.1
@@ -16228,24 +16276,12 @@ importers:
       lucide-react:
         specifier: ^1.33.0
         version: 1.33.0(react@18.3.1)
-      mdast-util-from-markdown:
-        specifier: ^2.0.3
-        version: 2.0.3(supports-color@9.4.0)
-      mdast-util-gfm:
-        specifier: ^3.1.0
-        version: 3.1.0(supports-color@9.4.0)
       mdast-util-math:
         specifier: ^3.0.0
         version: 3.0.0(supports-color@9.4.0)
-      mdast-util-to-string:
-        specifier: ^4.0.0
-        version: 4.0.0
       micromark-core-commonmark:
         specifier: ^2.0.3
         version: 2.0.4
-      micromark-extension-gfm:
-        specifier: ^3.0.0
-        version: 3.0.0
       micromark-extension-math:
         specifier: ^3.1.0
         version: 3.1.0
@@ -16264,6 +16300,9 @@ importers:
       micromark-util-symbol:
         specifier: ^2.0.1
         version: 2.0.1
+      papaparse:
+        specifier: ^5.5.0
+        version: 5.7.0
       playwright:
         specifier: 1.63.0
         version: 1.63.0
@@ -16288,6 +16327,9 @@ importers:
       tailwindcss:
         specifier: ^4
         version: 4.3.3
+      tar:
+        specifier: 7.5.22
+        version: 7.5.22
       tsdown:
         specifier: 0.22.2
         version: 0.22.2(tsx@4.23.15)(typescript@6.0.3)
@@ -17624,6 +17666,9 @@ importers:
       '@types/node':
         specifier: ^22.20.0
         version: 22.20.1
+      '@types/papaparse':
+        specifier: ^5.3.0
+        version: 5.5.2
       '@types/react':
         specifier: ^18
         version: 18.3.31
@@ -17651,6 +17696,9 @@ importers:
       electron-builder:
         specifier: 26.17.0
         version: 26.17.0(electron-builder-squirrel-windows@26.17.0)(supports-color@9.4.0)
+      extract-zip:
+        specifier: 2.0.1
+        version: 2.0.1(supports-color@9.4.0)
       jsdom:
         specifier: 29.1.1
         version: 29.1.1(@noble/hashes@2.4.0)
@@ -17666,6 +17714,9 @@ importers:
       node-gyp:
         specifier: 13.0.1
         version: 13.0.1
+      papaparse:
+        specifier: ^5.5.0
+        version: 5.7.0
       react-dom:
         specifier: 18.3.1
         version: 18.3.1(react@18.3.1)
@@ -17681,6 +17732,9 @@ importers:
       tailwindcss:
         specifier: ^4
         version: 4.3.3
+      tar:
+        specifier: 7.5.22
+        version: 7.5.22
       tsdown:
         specifier: 0.22.2
         version: 0.22.2(tsx@4.23.15)(typescript@6.0.3)
@@ -25172,8 +25226,8 @@ packages:
       '@deepseek-ai/schemastery':
         optional: true
 
-  dshmarket@1.66.7:
-    resolution: {integrity: sha512-GeiZ+97aPscNPTR8tp3udV2F6uHIDbzFWcqIoJPW4paU7HuGVobHw9t4z9vbBqATh95Z/dz2YuERu8hwO05tAQ==}
+  dshmarket@1.66.20:
+    resolution: {integrity: sha512-qmWbLSXqey8tW6OPXMcbsdC/7kHZTVD5ZBd7taMGGZjN2EtmKZvFvBEscyYcAkayWkL/kJrF5Zk2+SC1djCWXg==}
     peerDependencies:
       '@deepseek-ai/cordis': ^4.0.1
       '@deepseek-ai/dsh-settings': ^0.1.0-rc.7 || ^0.1.1-rc.2 || ^0.1.2-alpha.2 || ^0.2.0-rc.1
@@ -28323,6 +28377,10 @@ packages:
 
   undici@7.29.0:
     resolution: {integrity: sha512-IDxfleLmmbSskfWSUATiN1nfn2rDuvnMOqb5CWR92iIfojA0Ud+ulOAAEQ57LPr9rWmsreUyf5lwyao+7GNNVw==}
+    engines: {node: '>=20.18.1'}
+
+  undici@7.30.0:
+    resolution: {integrity: sha512-dkrQXeHSaoamnItlYbmzG0wFYrM0ZwDxCIg0A7aKjTyyhh9svRzCNFEzV+Vm05/yehjCzjDZ31KXfGEjYSztDQ==}
     engines: {node: '>=20.18.1'}
 
   undici@8.10.2:
@@ -38416,11 +38474,11 @@ snapshots:
       '@deepseek-ai/dsh-settings': link:deepseek-harness/packages/settings/settings
       '@deepseek-ai/schemastery': link:deepseek-harness/vendor/schemastery
 
-  dshmarket@1.66.7(@deepseek-ai/cordis@deepseek-harness+vendor+cordis)(@deepseek-ai/dsh-settings@deepseek-harness+packages+settings+settings)(@deepseek-ai/schemastery@deepseek-harness+vendor+schemastery):
+  dshmarket@1.66.20(@deepseek-ai/cordis@deepseek-harness+vendor+cordis)(@deepseek-ai/dsh-settings@deepseek-harness+packages+settings+settings)(@deepseek-ai/schemastery@deepseek-harness+vendor+schemastery):
     dependencies:
       '@deepseek-ai/cordis': link:deepseek-harness/vendor/cordis
-      js-yaml: 4.3.1
-      undici: 7.29.0
+      js-yaml: 4.3.2
+      undici: 7.30.0
     optionalDependencies:
       '@deepseek-ai/dsh-settings': link:deepseek-harness/packages/settings/settings
       '@deepseek-ai/schemastery': link:deepseek-harness/vendor/schemastery
@@ -42168,6 +42226,8 @@ snapshots:
   undici@6.28.0: {}
 
   undici@7.29.0: {}
+
+  undici@7.30.0: {}
 
   undici@8.10.2: {}
 

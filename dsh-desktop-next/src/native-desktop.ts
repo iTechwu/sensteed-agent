@@ -1,4 +1,5 @@
 /** Electron-only tray, materials, and user-turn notifications. */
+import { unpackedPath } from './asar-archive-policy.ts'
 import { join } from 'node:path'
 import { Menu, nativeImage, nativeTheme, Notification, Tray, type BrowserWindow } from 'electron'
 import { desktopMenu } from './desktop-menu.ts'
@@ -25,7 +26,7 @@ export class NativeDesktop {
   get available(): boolean { return !!this.tray && !this.tray.isDestroyed() }
   createTray(): void {
     try {
-      const icon = nativeImage.createFromPath(join(this.options.root, 'assets', process.platform === 'darwin' ? 'tray-iconTemplate.png' : 'tray-icon-blue.png'))
+      const icon = nativeImage.createFromPath(unpackedPath(join(this.options.root, 'assets', process.platform === 'darwin' ? 'tray-iconTemplate.png' : 'tray-icon-blue.png')))
       if (icon.isEmpty()) throw new Error('Tray icon is unavailable')
       if (process.platform === 'darwin') icon.setTemplateImage(true)
       this.tray = new Tray(icon)

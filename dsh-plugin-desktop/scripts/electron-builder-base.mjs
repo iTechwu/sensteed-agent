@@ -208,12 +208,28 @@ export const ELECTRON_BUILDER_BASE = Object.freeze({
     // verification. The universal toolchain patch avoids oversized unpack globs.
     mergeASARs: true,
     notarize: true,
+    // The interpreter payload rides beside the application; electron-builder must
+    // copy it verbatim and not re-sign the payload signed by sign-runtime.ts.
+    extraResources: [
+      {
+        from: '.desktop-build/runtime',
+        to: 'runtime',
+      },
+    ],
     signIgnore: [
       '\\.(?:pak|dat|wasm)$',
+      '/Contents/Resources/runtime/arm64/primary-runtime(?:/|$)',
     ],
       x64ArchFiles: '**/node_modules/{@deepseek-ai/node-addon-system-darwin-*/**,@deepseek-ai/libreoffice-kit-darwin-*/**,node-pty/prebuilds/darwin-*/**,fs-ext/prebuilds/darwin-*/**,node-addon-require-builtin-darwin-*/**,@vscode/ripgrep-darwin-*/**,@img/sharp-darwin-*/**,@img/sharp-libvips-darwin-*/**,@koromix/koffi-darwin-*/**,lightningcss-darwin-*/**,@anthropic-ai/claude-agent-sdk-darwin-*/**,@openai/codex-darwin-*/**,@trycua/cua-driver-darwin-*/**,@ubjs/node-darwin-*/**,sherpa-onnx-darwin-*/**,@dataiku/uv-darwin-*/**}',
   },
   win: {
+    // The interpreter payload rides beside the application like on macOS.
+    extraResources: [
+      {
+        from: '.desktop-build/runtime',
+        to: 'runtime',
+      },
+    ],
     asarUnpack: [
       'build/app-icon.png',
       'build/tray-icon-blue.png',

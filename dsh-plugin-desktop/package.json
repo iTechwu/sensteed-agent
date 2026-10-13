@@ -148,11 +148,11 @@
     "verify:notices": "node scripts/verify-licenses.mjs --notices THIRD_PARTY_NOTICES.md",
     "check": "corepack pnpm run verify:brand && corepack pnpm run build && corepack pnpm run typecheck && corepack pnpm run test && corepack pnpm run verify:closure && corepack pnpm run verify:cli && corepack pnpm run verify:loader && corepack pnpm run verify:sensteed-clients && corepack pnpm run verify:profile && corepack pnpm run verify:licenses && corepack pnpm run verify:operations",
     "check:win-package": "pnpm --filter @dofe/dsh-sensteed-product build && pnpm --filter dsh-community-market build && pnpm run build && pnpm run typecheck && vitest run tests/client-boot-health.spec.ts tests/renderer-boot.spec.ts tests/renderer-recovery.spec.ts tests/package.spec.ts tests/package-win.spec.ts tests/desktop-installer-quit.spec.ts tests/installer-nsh.spec.ts tests/update-checker.spec.ts tests/update-download.spec.ts tests/verify-win-installer.spec.ts tests/verify-win-portable.spec.ts tests/verify-packaged-runtime.spec.ts tests/windows-pwsh-sandbox.spec.ts tests/windows-volume-diagnostics.spec.ts tests/window-options.spec.ts tests/safe-mode.spec.ts tests/quit-gate.spec.ts tests/desktop-mandatory-policy.spec.ts tests/mandatory-update-dialog.spec.ts && pnpm run verify:closure",
-    "check:mac-package": "corepack pnpm --filter @dofe/dsh-sensteed-product build && corepack pnpm --filter dsh-community-market build && corepack pnpm run build && corepack pnpm run typecheck && vitest run tests/package.spec.ts tests/package-mac.spec.ts tests/verify-mac-smoke.spec.ts tests/verify-packaged-runtime.spec.ts tests/mac-universal.spec.ts && corepack pnpm run verify:closure",
+    "check:mac-package": "corepack pnpm --filter @dofe/dsh-sensteed-product build && corepack pnpm --filter dsh-community-market build && corepack pnpm run build && corepack pnpm run typecheck && vitest run tests/package.spec.ts tests/package-mac.spec.ts tests/verify-mac-smoke.spec.ts tests/verify-mac-release.spec.ts tests/verify-packaged-runtime.spec.ts tests/mac-universal.spec.ts && corepack pnpm run verify:closure",
     "check:linux-package": "corepack pnpm --filter @dofe/dsh-sensteed-product build && corepack pnpm --filter dsh-community-market build && corepack pnpm run build && corepack pnpm run typecheck && vitest run tests/package.spec.ts tests/package-linux.spec.ts tests/verify-linux-artifacts.spec.ts tests/verify-packaged-runtime.spec.ts && corepack pnpm run verify:closure",
     "start": "node lib/bin.js",
     "dev": "corepack pnpm run build && node lib/bin.js",
-    "package:dir": "corepack pnpm run build && node scripts/package-dir.mjs",
+    "package:dir": "corepack pnpm run build && corepack pnpm run prepare:runtime && node scripts/package-dir.mjs",
     "dist:mac": "node scripts/release-mac.ts",
     "dist:mac-smoke": "node scripts/package-mac.ts",
     "dist:win": "node scripts/package-win.ts",
@@ -162,7 +162,9 @@
     "dist:win-bundle": "node scripts/package-win.ts --bundle",
     "dist:win-portable": "node scripts/package-win-portable.ts",
     "dist:linux": "node scripts/package-linux.ts",
-    "prepack": "corepack pnpm run check"
+    "prepack": "corepack pnpm run check",
+    "prepare:electron-native": "node scripts/prepare-fs-ext.ts",
+    "prepare:runtime": "node scripts/prepare-runtime.ts"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "1.4.0",
@@ -631,7 +633,11 @@
     "tw-animate-css": "^1.4.0",
     "typescript": "6.0.3",
     "vite": "8.2.1",
-    "vitest": "4.1.8"
+    "vitest": "4.1.8",
+    "extract-zip": "2.0.1",
+    "tar": "7.5.22",
+    "papaparse": "^5.5.0",
+    "@types/papaparse": "^5.3.0"
   },
   "optionalDependencies": {
     "@deepseek-ai/node-addon-system-darwin-arm64": "0.1.2",

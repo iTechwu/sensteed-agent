@@ -11,6 +11,7 @@ import { macSmokeArchitecture, prepareInstalledMacUniversalRuntime } from './mac
 import { prepareFsExtForElectron } from './prepare-fs-ext.ts'
 import { electronBuilderEnvironment } from './electron-builder-environment.ts'
 import { refreshBundledForPackaging } from './refresh-bundled-cli.ts'
+import { prepareDesktopInterpreters, verifyPreparedDesktopRuntime } from './prepare-runtime.ts'
 
 /** Injectable native macOS packaging boundary used by focused tests. */
 export interface MacSmokePackageOptions {
@@ -81,6 +82,7 @@ function defaultOptions(): MacSmokePackageOptions {
     prepareRuntime: () => {
       prepareFsExtForElectron({ platform: 'darwin', arch: 'arm64', desktopRoot })
       prepareInstalledMacUniversalRuntime(desktopRoot, ['arm64'])
+      verifyPreparedDesktopRuntime(desktopRoot, 'darwin')
     },
     builderCli: require.resolve('electron-builder/cli.js'),
     verifier: fileURLToPath(new URL('./verify-mac-smoke.ts', import.meta.url)),
@@ -168,6 +170,8 @@ const invokedPath = process.argv[1]
 if (invokedPath !== undefined && resolve(invokedPath) === fileURLToPath(import.meta.url)) {
   try {
     assertPackagingRelease()
+    // The interpreter payloads are downloaded and assembled before the long package gate; the flow re-checks them right before electron-builder.
+    await prepareDesktopInterpreters({ desktopRoot: resolve(dirname(fileURLToPath(import.meta.url)), '..') })
     packageMacSmoke()
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error))

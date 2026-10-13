@@ -10,6 +10,7 @@ import { installNotifications } from './notifications.ts'
 import { HostPermissions } from './host-permissions.ts'
 import { NEXT_PACKAGE, profileName } from './profiles.ts'
 import { PNPM_IGNORE_MINIMUM_RELEASE_AGE } from './pnpm-policy.ts'
+import { unpackedPath } from './asar-archive-policy.ts'
 
 export const name = 'desktop-next-capabilities'
 const sharedCapabilitiesKey = Symbol.for('dsh.desktop.next.capabilities')
@@ -157,7 +158,13 @@ export function createPackageRunner(invocation: ProfilePnpmInvocation, directory
   }
 }
 
+/**
+ * Entry of the pnpm this installation carries. Electron runs it as a separate Node-mode process
+ * with its own workers, so a packaged Next uses the copy unpacked beside app.asar.
+ * @param anchor - Manifest the installation resolves packages from.
+ * @returns Absolute physical path of `pnpm.mjs`.
+ */
 export function bundledPnpmEntry(anchor: string): string {
   const require = createRequire(anchor)
-  return join(dirname(require.resolve('pnpm')), 'bin', 'pnpm.mjs')
+  return unpackedPath(join(dirname(require.resolve('pnpm')), 'bin', 'pnpm.mjs'))
 }
