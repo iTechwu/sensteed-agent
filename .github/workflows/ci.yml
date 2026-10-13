@@ -632,7 +632,7 @@ jobs:
           name: desktop-linux
           path: artifacts/linux
       - name: Publish installers and checksum manifest to TOS
-        timeout-minutes: 100
+        timeout-minutes: 120
         env:
           TOS_ACCESS_KEY_ID: ${{ secrets.TOS_ACCESS_KEY_ID }}
           TOS_SECRET_ACCESS_KEY: ${{ secrets.TOS_SECRET_ACCESS_KEY }}
