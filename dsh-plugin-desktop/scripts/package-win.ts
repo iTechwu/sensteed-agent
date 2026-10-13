@@ -1,3 +1,4 @@
+import { assertPackagingRelease } from '../../scripts/release-contract.mjs'
 /** Build an unsigned Windows x64 artifact on a native Windows host. */
 
 import { spawnSync } from 'node:child_process'
@@ -388,6 +389,7 @@ export function packageWindowsBundle(
 const invokedPath = process.argv[1]
 if (invokedPath !== undefined && resolve(invokedPath) === fileURLToPath(import.meta.url)) {
   try {
+    assertPackagingRelease()
     if (process.argv.includes('--prepare')) prepareWindowsDirectory()
     else if (process.argv.includes('--installer')) packagePreparedWindowsInstaller()
     else if (process.argv.includes('--portable')) packagePreparedWindowsPortable()

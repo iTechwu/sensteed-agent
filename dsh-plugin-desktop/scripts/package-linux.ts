@@ -1,3 +1,4 @@
+import { assertPackagingRelease } from '../../scripts/release-contract.mjs'
 /** Build an unsigned Linux x64 AppImage and Debian package on a native Linux host. */
 
 import { spawnSync } from 'node:child_process'
@@ -173,6 +174,7 @@ export function packageLinuxArtifacts(
 const invokedPath = process.argv[1]
 if (invokedPath !== undefined && resolve(invokedPath) === fileURLToPath(import.meta.url)) {
   try {
+    assertPackagingRelease()
     packageLinuxArtifacts()
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error))

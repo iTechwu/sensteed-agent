@@ -77,6 +77,8 @@ export function parseCanonicalChannelVersion(
   const parsed = parseCanonicalVersion(input)
   if (parsed === null) return null
   if (channel === 'stable') return parsed.prerelease.length === 0 ? parsed : null
+  // Harness prereleases retain their own identifiers before the Desktop suffix.
+  if (channel === 'beta' && parsed.build.length === 0 && /-beta\.[1-9][0-9]{11}$/u.test(input)) return parsed
   if (channel === 'next' && parsed.prerelease.length === 1 && parsed.prerelease[0] === 'next') return parsed
   return parsed.prerelease.length === 2
     && parsed.prerelease[0] === channel

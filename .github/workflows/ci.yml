@@ -2,10 +2,10 @@ name: CI
 
 on:
   pull_request:
-    branches: [master]
+    branches: [main]
   push:
-    branches: [master, dev]
-    tags: ['v*']
+    branches: [main, dev]
+    tags: ['*-beta.*']
   workflow_dispatch:
     inputs:
       publish_kind:
@@ -50,6 +50,7 @@ jobs:
       version: ${{ steps.source.outputs.version }}
       release: ${{ steps.source.outputs.release }}
       channel: ${{ steps.source.outputs.channel }}
+      packaging: ${{ steps.source.outputs.packaging }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -83,7 +84,7 @@ jobs:
 
       - name: Test CI publication contracts
         run: |
-          node --test scripts/ci/resolve-source.test.mjs
+          node --test scripts/ci/resolve-source.test.mjs scripts/release-contract.test.mjs
           python3 -B -m unittest discover -s scripts/ci -p 'test_*.py'
       - name: Resolve one Harness commit for every platform
         if: steps.scope.outputs.product == 'true'
@@ -96,12 +97,13 @@ jobs:
     needs: changes
     if: >-
       needs.changes.outputs.product == 'true' && github.event_name != 'pull_request' &&
-      (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
+      needs.changes.outputs.packaging == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
@@ -138,6 +140,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@v6
         if: needs.changes.outputs.product == 'true'
         with:
@@ -219,6 +222,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@v6
         with:
           node-version: 22.23.2
@@ -293,6 +297,7 @@ jobs:
             console.log('app-level @dataiku:', fs.existsSync('dsh-plugin-desktop/node_modules/@dataiku/uv/package.json'))
           "
       - name: Prepare Windows packaged directory
+        if: needs.changes.outputs.packaging == 'true'
         env:
           CI: 'false'
           npm_config_minimum_release_age: '0'
@@ -304,6 +309,7 @@ jobs:
           NODE_OPTIONS: '--max-old-space-size=6144'
         run: pnpm --filter dsh-plugin-desktop dist:win-prepare
       - name: Build Windows installer
+        if: needs.changes.outputs.packaging == 'true'
         env:
           CI: 'false'
           npm_config_minimum_release_age: '0'
@@ -312,6 +318,7 @@ jobs:
           NODE_OPTIONS: '--max-old-space-size=6144'
         run: pnpm --filter dsh-plugin-desktop dist:win-installer
       - name: Build Windows portable archive
+        if: needs.changes.outputs.packaging == 'true'
         env:
           CI: 'false'
           npm_config_minimum_release_age: '0'
@@ -354,6 +361,7 @@ jobs:
           retention-days: 14
 
       - name: Upload Windows applications
+        if: needs.changes.outputs.packaging == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: desktop-windows
@@ -376,6 +384,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@v6
         with:
           node-version: 22.23.2
@@ -419,6 +428,7 @@ jobs:
           npm_config_minimum_release_age: '0'
         run: pnpm --filter dsh-plugin-desktop check:linux-package
       - name: Build Linux AppImage and Debian package
+        if: needs.changes.outputs.packaging == 'true'
         env:
           CI: 'false'
           npm_config_minimum_release_age: '0'
@@ -435,6 +445,7 @@ jobs:
           retention-days: 14
 
       - name: Upload Linux applications
+        if: needs.changes.outputs.packaging == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: ${{ inputs.brand || 'sensteed' }}-agent-linux-x64
@@ -445,6 +456,7 @@ jobs:
           retention-days: 7
 
       - name: Stage Linux applications for publication
+        if: needs.changes.outputs.packaging == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: desktop-linux
@@ -468,6 +480,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@v6
         with:
           node-version: 22.23.2
@@ -518,7 +531,7 @@ jobs:
           npm_config_minimum_release_age: '0'
         run: pnpm --filter dsh-plugin-desktop check:mac-package
       - name: Build macOS smoke artifact
-        if: needs.changes.outputs.release != 'true'
+        if: needs.changes.outputs.packaging == 'true' && needs.changes.outputs.release != 'true'
         env:
           CI: 'false'
           DSH_MAC_SMOKE_ARCH: 'arm64'
@@ -527,7 +540,7 @@ jobs:
           NODE_OPTIONS: '--max-old-space-size=6144'
         run: pnpm --filter dsh-plugin-desktop dist:mac-smoke
       - name: Build signed and notarized macOS release
-        if: needs.changes.outputs.release == 'true' && github.event_name != 'pull_request'
+        if: needs.changes.outputs.packaging == 'true' && needs.changes.outputs.release == 'true' && github.event_name != 'pull_request'
         env:
           CI: 'false'
           npm_config_minimum_release_age: '0'
@@ -549,6 +562,7 @@ jobs:
           retention-days: 14
 
       - name: Upload macOS application
+        if: needs.changes.outputs.packaging == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: desktop-macos
@@ -569,6 +583,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@v6
         with:
           node-version: 22.23.2
@@ -603,7 +618,7 @@ jobs:
     needs: [changes, publish-config, check, desktop-windows, desktop-linux, desktop-macos, upstream-command-windows]
     if: >-
       github.event_name != 'pull_request' &&
-      (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
+      needs.changes.outputs.packaging == 'true'
     runs-on: ubuntu-latest
     # Downloading five installers and uploading them across regions can exceed 30 minutes.
     timeout-minutes: 120
@@ -614,6 +629,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'

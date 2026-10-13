@@ -1,3 +1,4 @@
+import { assertPackagingRelease } from '../../scripts/release-contract.mjs'
 /** Build an unsigned unpacked application for the current host platform. */
 
 import { spawnSync } from 'node:child_process'
@@ -83,5 +84,6 @@ export function packageDirectory(options = {}) {
 
 const invokedPath = process.argv[1]
 if (invokedPath !== undefined && fileURLToPath(import.meta.url) === resolve(invokedPath)) {
+  assertPackagingRelease()
   packageDirectory()
 }

@@ -1,3 +1,4 @@
+import { assertPackagingRelease } from '../../scripts/release-contract.mjs'
 /** Build a signed and notarized macOS DMG from validated release credentials. */
 
 import { spawnSync } from 'node:child_process'
@@ -136,6 +137,7 @@ export function releaseMac(options: MacReleaseOptions = defaultReleaseOptions())
 const invokedPath = process.argv[1]
 if (invokedPath !== undefined && resolve(invokedPath) === fileURLToPath(import.meta.url)) {
   try {
+    assertPackagingRelease()
     releaseMac()
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error))

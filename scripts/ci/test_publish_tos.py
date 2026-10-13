@@ -95,6 +95,17 @@ class PublicationTests(unittest.TestCase):
         source = Path(__file__).with_name('publish-tos.py').read_text()
         self.assertLess(source.index('def signed_download_url('), source.index("if __name__ == '__main__':"))
 
+    def test_harness_timestamp_versions_publish_all_artifacts_and_manifest(self):
+        version = '0.2.1-alpha.2-beta.202610131600'
+        for path in self.root.glob('*/*'):
+            path.rename(path.with_name(path.name.replace(self.context['version'], version)))
+        context = publisher.release_context({**self.env, 'DESKTOP_VERSION': version})
+        _, manifest = publisher.publish(FakeTos(), self.config, context, self.root)
+        self.assertEqual(manifest['version'], version)
+        self.assertEqual(len(manifest['artifacts']), 5)
+        self.assertLess(publisher.version_key(version), publisher.version_key('0.2.1-alpha.2-beta.202610131601'))
+        self.assertGreater(publisher.version_key(version), publisher.version_key('2.0.11-beta.21'))
+
     def test_config_supports_endpoint_hostname_and_requires_secrets(self):
         self.assertEqual(self.config['TOS_ENDPOINT'], 'https://tos.example.com')
         self.assertEqual(self.config['TOS_BUCKET'], 'dofe-public')

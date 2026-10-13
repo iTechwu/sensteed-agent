@@ -7,8 +7,8 @@ import { writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 import {
   compareSemVerVersions,
   DESKTOP_RELEASE_CHANNEL_HEADER,
-  parseSemVer,
   parseCanonicalChannelVersion,
+  parseCanonicalSupportedVersion,
   type DesktopReleaseChannel,
 } from './update-checker.ts'
 
@@ -298,13 +298,7 @@ function validatedVersion(version: string, channel: DesktopReleaseChannel = 'sta
 }
 
 function validatedReleaseVersion(version: string): string {
-  const parsed = parseSemVer(version)
-  const isStable = parsed?.prerelease.length === 0
-  const isBeta = parsed?.prerelease.length === 2
-    && parsed.prerelease[0] === 'beta'
-    && /^[0-9]+$/u.test(parsed.prerelease[1]!)
-  const isNext = parseCanonicalChannelVersion(version, 'next') !== null
-  if (parsed === null || parsed.version !== version || (!isStable && !isBeta && !isNext)) {
+  if (parseCanonicalSupportedVersion(version) === null) {
     throw new UpdateDownloadError('invalid-options', 'The update version must belong to a supported release channel.')
   }
   return version

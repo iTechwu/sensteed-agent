@@ -13,15 +13,25 @@ from urllib.parse import quote, urlsplit, urlunsplit
 from xml.etree import ElementTree
 
 
-VERSION = re.compile(r'(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-beta\.(0|[1-9]\d*))?')
+VERSION = re.compile(r'(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?')
 
 
 def version_key(version):
     match = VERSION.fullmatch(version)
     if not match:
         raise ValueError('Unsupported release version')
-    major, minor, patch, beta = match.groups()
-    return (int(major), int(minor), int(patch), beta is None, int(beta or 0))
+    major, minor, patch, prerelease = match.groups()
+    identifiers = prerelease.split('.') if prerelease else []
+    if any(value.isdigit() and len(value) > 1 and value.startswith('0') for value in identifiers):
+        raise ValueError('Unsupported release version')
+    if prerelease and not re.search(r'(?:^beta\.(0|[1-9]\d*)$|-beta\.[1-9]\d{11}$)', prerelease):
+        raise ValueError('Unsupported release version')
+    # The Harness-derived numbering is a new publication generation. It must
+    # replace historical 2.x pointers, while Desktop keeps normal SemVer and
+    # therefore requires manual installation for that one-time migration.
+    generation = bool(re.search(r'-beta\.[1-9]\d{11}$', version))
+    return (generation, int(major), int(minor), int(patch), prerelease is None,
+            tuple((0, int(value)) if value.isdigit() else (1, value) for value in identifiers))
 
 
 def settings(env, check_signing=False):

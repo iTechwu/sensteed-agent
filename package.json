@@ -9,6 +9,8 @@
     "node": "^22.19.0 || >=24.0.0"
   },
   "scripts": {
+    "release:prepare": "node scripts/prepare-release.mjs",
+    "release:verify": "node scripts/release-contract.mjs",
     "preinstall": "node scripts/prepare-node-gyp.mjs",
     "build": "pnpm --filter dsh-community-market build && pnpm --filter @dofe/dsh-sensteed-product build && pnpm --filter dsh-plugin-desktop build",
     "build:yootun": "BRAND=yootun pnpm run build",

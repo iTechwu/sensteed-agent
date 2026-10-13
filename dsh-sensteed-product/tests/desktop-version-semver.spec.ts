@@ -15,6 +15,9 @@ describe('desktop version semver', () => {
   })
 
   it('applies channel prerelease rules', () => {
+    expect(parseCanonicalChannelVersion('0.2.1-alpha.2-beta.202610131600', 'beta')?.version).toBe('0.2.1-alpha.2-beta.202610131600')
+    expect(parseCanonicalChannelVersion('0.2.1-alpha.2-beta.202610131600', 'stable')).toBeNull()
+    expect(compareSemVerVersions('0.2.1-alpha.2-beta.202610131601', '0.2.1-alpha.2-beta.202610131600')).toBeGreaterThan(0)
     expect(parseCanonicalChannelVersion('2.0.11-beta.18', 'beta')?.version).toBe('2.0.11-beta.18')
     expect(parseCanonicalChannelVersion('2.0.11-beta.18', 'stable')).toBeNull()
     expect(parseCanonicalChannelVersion('2.0.11', 'stable')?.version).toBe('2.0.11')

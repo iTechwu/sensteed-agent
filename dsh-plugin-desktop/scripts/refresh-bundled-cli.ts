@@ -8,13 +8,12 @@ export type RefreshBundledMode = 'refresh' | 'verify'
 /**
  * Run `scripts/refresh-bundled.mjs` for one packaging entry.
  *
- * - `refresh`: pull the latest skills and github-sourced plugins before the
- *   check gate; network failures degrade to the committed snapshot (exit 0).
- * - `verify`: offline gate for the signed release path — the release ships
- *   exactly the committed snapshot, or fails loudly.
+ * Both historical modes now verify the tagged snapshot offline. Refresh
+ * skills and GitHub-sourced plugins in dev before preparing the release.
  */
 export function refreshBundledForPackaging(mode: RefreshBundledMode, repositoryRoot: string): void {
-  const args = mode === 'verify' ? ['--offline'] : []
+  // Packaging is always based on the tagged snapshot. Refresh in dev before release preparation.
+  const args = ['--offline']
   const result = spawnSync(process.execPath, [join(repositoryRoot, 'scripts', 'refresh-bundled.mjs'), ...args], {
     cwd: repositoryRoot,
     stdio: 'inherit',
