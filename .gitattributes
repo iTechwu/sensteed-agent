@@ -1,3 +1,6 @@
 * text=auto eol=lf
 patches/*.patch text eol=lf whitespace=-space-before-tab,-blank-at-eol
 .yarn/patches/*.patch text eol=lf whitespace=-space-before-tab,-blank-at-eol
+# Imported snapshots retain upstream bytes; their snapshot hashes verify integrity.
+.ci/** whitespace=-blank-at-eol,-blank-at-eof
+dsh-plugin-desktop/bundled/skills/** whitespace=-blank-at-eol,-blank-at-eof

@@ -145,4 +145,3 @@ function isNumeric(identifier: string): boolean {
 function hasLeadingZero(identifier: string): boolean {
   return identifier.length > 1 && identifier.startsWith('0')
 }
-
