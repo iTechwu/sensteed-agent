@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { join } from 'node:path'
 import {
   packageWindowsArtifact,
   packageWindowsBundle,
@@ -12,6 +13,8 @@ interface CommandCall {
   readonly cwd: string
   readonly env: NodeJS.ProcessEnv
 }
+
+const preparedDirectory = join('C:\\repo\\dsh-plugin-desktop', 'dist', 'win-unpacked')
 
 function options(calls: CommandCall[], logs: string[] = []): WindowsPackageOptions {
   return {
@@ -102,7 +105,7 @@ describe('Windows x64 installer packaging', () => {
         '--config', 'electron-builder.json', '--win', 'nsis', '--x64', '--publish', 'never',
         '--config.win.signExecutable=false', '--config.npmRebuild=false',
         '--config.electronFuses.onlyLoadAppFromAsar=false', '--prepackaged',
-        'C:\\repo\\dsh-plugin-desktop/dist/win-unpacked',
+        preparedDirectory,
       ],
       cwd: 'C:\\repo\\dsh-plugin-desktop',
       env: expect.objectContaining({ DEBUG: 'electron-builder,app-builder-lib' }),
@@ -143,7 +146,7 @@ describe('Windows x64 installer packaging', () => {
       '--config.win.signExecutable=false',
       '--config.npmRebuild=false',
       '--config.electronFuses.onlyLoadAppFromAsar=false',
-      '--prepackaged', 'C:\\repo\\dsh-plugin-desktop/dist/win-unpacked',
+      '--prepackaged', preparedDirectory,
     ])
     expect(calls[4]?.args).toEqual([
       'C:\\repo\\dsh-plugin-desktop\\scripts\\verify-win-portable.ts',
@@ -312,7 +315,7 @@ describe('Windows x64 bundle packaging', () => {
         '--config.win.signExecutable=false',
         '--config.npmRebuild=false',
         '--config.electronFuses.onlyLoadAppFromAsar=false',
-        '--prepackaged', 'C:\\repo\\dsh-plugin-desktop/dist/win-unpacked',
+        '--prepackaged', preparedDirectory,
       ],
       cwd: 'C:\\repo\\dsh-plugin-desktop',
       env: expect.objectContaining({ CSC_IDENTITY_AUTO_DISCOVERY: 'false' }),
