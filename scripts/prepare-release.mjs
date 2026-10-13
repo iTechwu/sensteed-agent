@@ -23,7 +23,7 @@ if (!args.includes('--execute')) {
   if (main && git('rev-parse', 'main') !== git('rev-parse', 'origin/main')) throw new Error('Local main must equal origin/main')
   const repository = /^git@github\.com:([\w.-]+\/[\w.-]+)\.git$/u.exec(upstream.repository)?.[1]
   if (!repository) throw new Error('Invalid Harness repository')
-  const commit = git('ls-remote', '--exit-code', `https://github.com/${repository}.git`, `refs/heads/${upstream.branch}`).split(/\s+/u)[0]
+  const commit = git('ls-remote', '--exit-code', upstream.repository, `refs/heads/${upstream.branch}`).split(/\s+/u)[0]
   if (!/^[a-f0-9]{40}$/u.test(commit)) throw new Error('Could not pin Harness commit')
   // Validate source and mergeability before any branch or manifest mutation.
   const response = await fetch(`https://raw.githubusercontent.com/${repository}/${commit}/package.json`, {
