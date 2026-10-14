@@ -4,6 +4,596 @@ import test from 'node:test'
 
 const root = new URL('../', import.meta.url)
 
+function clientHarness(source, componentName, overrides = {}) {
+  const state = []
+  const effects = []
+  let cursor = 0
+  let effectCursor = 0
+  let pending = []
+  const useState = initial => {
+    const index = cursor++
+    if (!(index in state)) state[index] = typeof initial === 'function' ? initial() : initial
+    return [state[index], value => { state[index] = typeof value === 'function' ? value(state[index]) : value }]
+  }
+  const h = (type, props, ...children) => ({ type, props: props || {}, children: children.flat(Infinity).filter(Boolean) })
+  const dependencies = {
+    h, useState,
+    useRef: initial => useState(() => ({ current: initial }))[0],
+    useId: () => useState(() => 'selector-' + Math.random())[0],
+    useMemo: compute => compute(),
+    useEffect: (effect, values) => {
+      const index = effectCursor++
+      if (!effects[index] || values.some((value, offset) => value !== effects[index].values[offset])) {
+        pending.push(() => {
+          effects[index]?.cleanup?.()
+          effects[index] = { values, cleanup: effect() }
+        })
+      }
+    },
+    document: { addEventListener() {}, removeEventListener() {} },
+    window: { innerWidth: 1024, innerHeight: 768, addEventListener() {}, removeEventListener() {} },
+    requestAnimationFrame: callback => callback(),
+    yearOptions: () => [['2026', '2026']],
+    budgetVersionLabel: version => version.name,
+    PLAN_TYPES: [], EXPENSE_TYPES: [],
+    ...overrides,
+  }
+  const component = new Function(...Object.keys(dependencies), source + '\nreturn ' + componentName)(...Object.values(dependencies))
+  return {
+    render(props) { cursor = 0; effectCursor = 0; pending = []; return component(props) },
+    flushEffects() { pending.forEach(effect => effect()); pending = [] },
+  }
+}
+
+function clientNodes(node) {
+  if (!node || typeof node !== 'object') return []
+  return [node, ...(node?.children || []).flatMap(clientNodes)]
+}
+
+test('selector popups stay within the viewport and reposition on resize without leaking listeners', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8')
+  const listeners = new Map()
+  const viewport = {
+    innerWidth: 1024, innerHeight: 768,
+    addEventListener: (event, handler) => listeners.set(event, handler),
+    removeEventListener: (event, handler) => { if (listeners.get(event) === handler) listeners.delete(event) },
+  }
+  let rect = { left: 950, top: 620, bottom: 656, width: 400 }
+  const anchor = { current: { getBoundingClientRect: () => rect } }
+  const harness = clientHarness(source + '\nfunction PopupHarness({ open, anchor }) { return useFinancePopupPosition(open, anchor) }', 'PopupHarness', { window: viewport })
+  harness.render({ open: true, anchor })
+  harness.flushEffects()
+  let style = harness.render({ open: true, anchor })
+  assert.equal(style.position, 'fixed')
+  assert.equal(style.left, 616)
+  assert.equal(style.width, 400)
+  assert.equal(style.top, 'auto')
+  assert.equal(style.bottom, 152)
+  viewport.innerWidth = 390
+  rect = { left: 300, top: 80, bottom: 112, width: 180 }
+  listeners.get('resize')()
+  style = harness.render({ open: true, anchor })
+  assert.equal(style.left, 102)
+  assert.equal(style.width, 280)
+  assert.equal(style.top, 116)
+  assert.equal(style.bottom, 'auto')
+  harness.render({ open: false, anchor })
+  harness.flushEffects()
+  assert.equal(listeners.size, 0)
+})
+
+test('matrix and detail tables expose sortable raw values for formatted finance columns', async () => {
+  const files = ['src/format.js', 'src/components.js', 'src/views/budget.js', 'src/views/cash.js']
+  const source = (await Promise.all(files.map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  const budgetRow = { id: 'line-1', orgName: '主体一', month: 1, expenseType: 'FIXED_OPERATION', budgetAmount: 10000, prSubmittedAmount: 2000, prEstimatedAmount: 500, paidAmount: 1000 }
+  const cases = [
+    ['MatrixView', { budget: { summary: { list: [budgetRow] } }, onCell() {} }, 'total.budget', 10000],
+    ['LinesView', { budget: { lines: { list: [budgetRow] } }, page: 1, onPage() {} }, 'budgetAmount', 10000],
+    ['CashMatrix', { rows: [{ orgName: '主体一', month: 1, projectedBalance: 3000 }] }, 'month-1', 3000],
+    ['PlansTab', { rows: [{ id: 'plan-1', plannedAmount: 12000, actualAmount: 2000 }], page: 1, onPage() {} }, 'plannedAmount', 12000],
+    ['RevenueTab', { revenues: { list: [{ plannedAmount: 100, actualAmount: 80, varianceAmount: -20 }] }, page: 1, onPage() {} }, 'varianceAmount', -20],
+  ]
+  const tableIds = new Set()
+  for (const [component, props, field, expected] of cases) {
+    const harness = clientHarness(source, component, { EXPENSE_LABELS: {}, PAGE_SIZE: 30, BUDGET_LINE_LIMIT: 100 })
+    const tree = harness.render({ ...props, t: key => key })
+    const table = clientNodes(tree).find(node => node.type?.name === 'Table')
+    assert.ok(table.props.tableId, component)
+    assert.equal(tableIds.has(table.props.tableId), false)
+    tableIds.add(table.props.tableId)
+    assert.equal(new Set(table.props.columns.map(column => column.key)).size, table.props.columns.length, component)
+    for (const column of table.props.columns) {
+      assert.ok(column.key, component + ':' + column.label)
+      if (column.key === 'actions') assert.equal(column.sortable, false)
+    }
+    const column = table.props.columns.find(column => column.key === field)
+    const row = table.props.rows[0]
+    assert.equal(column.sortValue ? column.sortValue(row) : row[column.key], expected, component)
+    if (component === 'MatrixView') assert.match(row[table.props.columns[0].key], /主体一/)
+    if (component === 'CashMatrix') assert.equal(row[table.props.columns[0].key], '主体一')
+  }
+})
+
+
+test('filing saves selected cost IDs before submission and preserves rows on failure', async () => {
+  const components = await readFile(new URL('src/components.js', root), 'utf8')
+  const entry = await readFile(new URL('src/views/entry.js', root), 'utf8')
+  const assignment = {
+    id: 'assignment-1', status: 'PENDING', task: { status: 'OPEN', month: 10 },
+    rows: [{ costItemId: 'cost-1', month: 10, plannedAmount: 123.45, description: '十月费用' }],
+  }
+  let closed = false
+  const calls = []
+  const harness = clientHarness(components + '\n' + entry, 'AssignmentDialog')
+  const props = { assignment, busy: false, t: key => key, onClose: () => { closed = true }, act: async (path, body) => { calls.push({ path, body }); return false } }
+  let tree = harness.render(props)
+  await tree.props.footer.find(button => button?.props.key === 'submit').props.onClick()
+  assert.equal(closed, false)
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0].path, '/filing-assignments/assignment-1/rows')
+  assert.equal(calls[0].body.rows[0].costItemId, 'cost-1')
+  tree = harness.render(props)
+  assert.ok(clientNodes(tree).some(node => node.props.role === 'alert' && node.children.includes('保存失败，填写内容已保留，请重试')))
+  calls.length = 0
+  tree = harness.render({ ...props, act: async (path, body) => { calls.push({ path, body }); return true } })
+  await tree.props.footer.find(button => button?.props.key === 'submit').props.onClick()
+  assert.equal(closed, true)
+  assert.deepEqual(calls.map(call => call.path), ['/filing-assignments/assignment-1/rows', '/filing-assignments/assignment-1/submit'])
+})
+
+test('filing validates missing dimensions and keeps locked or closed assignments read-only', async () => {
+  const components = await readFile(new URL('src/components.js', root), 'utf8')
+  const entry = await readFile(new URL('src/views/entry.js', root), 'utf8')
+  let writes = 0
+  const props = {
+    assignment: { id: 'assignment-1', status: 'DRAFT', task: { status: 'OPEN' }, rows: [{ month: 10, plannedAmount: 123 }] },
+    busy: false, t: key => key, onClose() {}, act: async () => { writes++; return true },
+  }
+  const harness = clientHarness(components + '\n' + entry, 'AssignmentDialog')
+  let tree = harness.render(props)
+  await tree.props.footer.find(button => button?.props.key === 'submit').props.onClick()
+  assert.equal(writes, 0)
+  tree = harness.render(props)
+  assert.ok(clientNodes(tree).some(node => node.props.role === 'alert'))
+  for (const assignment of [
+    { ...props.assignment, status: 'LOCKED' },
+    { ...props.assignment, task: { status: 'CLOSED' } },
+    { ...props.assignment, status: 'SUBMITTED', task: { status: 'OPEN', allowModify: false } },
+  ]) {
+    tree = harness.render({ ...props, assignment })
+    assert.equal(tree.props.footer.some(button => ['save', 'submit'].includes(button?.props.key)), false)
+    assert.ok(clientNodes(tree).filter(node => node.type?.name === 'Field').every(node => node.props.disabled))
+  }
+})
+
+test('cost-item selector reads the authoritative public finance dictionary', async () => {
+  let requested
+  const { routes } = await loadHost({
+    fetch: async url => { requested = new URL(url); return mcpJson({ list: [{ id: 'cost-1', name: '费用类别', active: true }] }) },
+  })
+  const response = await invokeRoute(routes.get(BASE), 'GET', BASE + '/cost-items')
+  assert.equal(response.status, 200)
+  assert.equal(requested.pathname, '/api/finance/cost-items')
+})
+
+
+test('entry fields support uncontrolled input and controlled callbacks', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8')
+  for (const name of ['Field', 'Textarea']) {
+    const harness = clientHarness(source, name)
+    const input = harness.render({ name: 'description', required: true })
+    assert.equal(Object.hasOwn(input.props, 'value'), false)
+    assert.doesNotThrow(() => input.props.onChange({ target: { value: '费用说明' } }))
+    let changed
+    const controlled = harness.render({ value: '旧说明', onChange: value => { changed = value } })
+    controlled.props.onChange({ target: { value: '新说明' } })
+    assert.equal(changed, '新说明')
+  }
+})
+
+test('search drafts and Escape preserve the committed department; explicit selection submits ID', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8')
+  const changes = []
+  const harness = clientHarness(source, 'SearchSelect')
+  const props = { value: 'dept-1', options: [['dept-1', '财务部'], ['dept-2', '市场部']], placeholder: '部门', onChange: value => changes.push(value) }
+  let tree = harness.render(props)
+  const input = () => clientNodes(tree).find(node => node.props.role === 'combobox')
+  input().props.onFocus()
+  tree = harness.render(props)
+  input().props.onChange({ target: { value: '市场' } })
+  tree = harness.render(props)
+  assert.deepEqual(changes, [])
+  assert.equal(clientNodes(tree).find(node => node.props.type === 'hidden').props.value, 'dept-1')
+  let stopped = false
+  tree.props.onKeyDown({ key: 'Escape', preventDefault() {}, stopPropagation() { stopped = true } })
+  tree = harness.render(props)
+  assert.equal(input().props.value, '财务部')
+  assert.equal(stopped, true)
+  input().props.onFocus()
+  tree = harness.render(props)
+  clientNodes(tree).find(node => node.props.role === 'option' && node.props.key === 'dept-2').props.onClick()
+  assert.deepEqual(changes, ['dept-2'])
+  tree = harness.render({ ...props, value: '' })
+  assert.equal(input().props.value, '')
+})
+
+test('custom search requires confirmation and form reset clears both visible and submitted values', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8')
+  let reset
+  let validity
+  const inputElement = {
+    setCustomValidity: message => { validity = message }, focus() {},
+    getBoundingClientRect: () => ({ left: 20, top: 40, bottom: 70, width: 200 }),
+    form: { addEventListener: (_event, handler) => { reset = handler }, removeEventListener() {} },
+  }
+  const harness = clientHarness(source, 'SearchSelect')
+  const props = { name: 'costItemNameChoice', required: true, allowCustom: true, options: [], placeholder: '费用项' }
+  let tree = harness.render(props)
+  let input = clientNodes(tree).find(node => node.props.role === 'combobox')
+  input.props.ref.current = inputElement
+  harness.flushEffects()
+  assert.match(validity, /请选择/)
+  input.props.onChange({ target: { value: '  临时费用  ' } })
+  tree = harness.render(props)
+  harness.flushEffects()
+  assert.match(validity, /请选择/)
+  assert.equal(clientNodes(tree).find(node => node.props.type === 'hidden').props.value, '')
+  clientNodes(tree).find(node => node.props.role === 'option').props.onClick()
+  tree = harness.render(props)
+  harness.flushEffects()
+  assert.equal(validity, '')
+  assert.equal(clientNodes(tree).find(node => node.props.type === 'hidden').props.value, '临时费用')
+  reset()
+  tree = harness.render(props)
+  harness.flushEffects()
+  assert.equal(clientNodes(tree).find(node => node.props.role === 'combobox').props.value, '')
+  assert.equal(clientNodes(tree).find(node => node.props.type === 'hidden').props.value, '')
+  assert.match(validity, /请选择/)
+})
+
+test('custom text and one matching directory option require an explicit choice on Enter', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8')
+  const changes = []
+  const inputElement = { focus() {} }
+  const harness = clientHarness(source, 'SearchSelect')
+  const props = { value: '', options: [['vendor-1', '上海供应商']], allowCustom: true, placeholder: '付款方', onChange: value => changes.push(value) }
+  let tree = harness.render(props)
+  const input = clientNodes(tree).find(node => node.props.role === 'combobox')
+  input.props.ref.current = inputElement
+  input.props.onChange({ target: { value: '上海' } })
+  tree = harness.render(props)
+  tree.props.onKeyDown({ key: 'Enter', target: inputElement, preventDefault() {} })
+  assert.deepEqual(changes, [])
+  const choices = clientNodes(tree).filter(node => node.props.role === 'option')
+  assert.equal(choices[0].props.className.includes('sf-search-custom'), true)
+  choices[0].props.onClick()
+  assert.deepEqual(changes, ['上海'])
+})
+
+test('directory searches are isolated and sync refreshes data with an explicit result', async () => {
+  const components = await readFile(new URL('src/components.js', root), 'utf8')
+  const entry = await readFile(new URL('src/views/entry.js', root), 'utf8')
+  const requests = []
+  let failContacts = true
+  let write
+  const harness = clientHarness(components + '\n' + entry, 'EntryView', {
+    api: async path => { requests.push(path); if (path.startsWith('/contacts?') && failContacts) throw new Error('offline'); return { data: { list: [] } } },
+    post: async (path, body) => { write = { path, body }; return { data: { users: 2, departments: 1, departmentMatched: 1, userMatched: 2, skipped: false } } },
+  })
+  const props = { ctx: { year: 2026, departments: [], orgs: [], revision: 1 }, t: key => key }
+  let tree = harness.render(props)
+  harness.flushEffects()
+  await new Promise(resolve => setImmediate(resolve))
+  tree = harness.render(props)
+  clientNodes(tree).find(node => node.type?.name === 'PillTabs').props.onChange('org')
+  tree = harness.render(props)
+  let directory = clientNodes(tree).find(node => node.type?.name === 'DirectoryCard')
+  assert.equal(directory.props.contacts.error, true)
+  directory.props.setKeyword('财务')
+  failContacts = false
+  tree = harness.render(props)
+  harness.flushEffects()
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(requests.filter(path => path === '/filing-tasks').length, 1)
+  assert.equal(requests.filter(path => path.startsWith('/contacts?')).length, 2)
+  tree = harness.render(props)
+  directory = clientNodes(tree).find(node => node.type?.name === 'DirectoryCard')
+  const cardHarness = clientHarness(components + '\n' + entry, 'DirectoryCard')
+  const card = cardHarness.render(directory.props)
+  await card.props.actions.find(node => node.props.key === 'sync').props.onClick()
+  assert.deepEqual(write, { path: '/contacts-sync', body: {} })
+  tree = harness.render(props)
+  assert.match(clientNodes(tree).find(node => node.type?.name === 'Notice').children.join(''), /同步完成：人员 2/)
+  harness.flushEffects()
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(requests.filter(path => path.startsWith('/contacts?')).length, 3)
+})
+
+test('employment registration resets person dimensions, blocks duplicate writes, and retains failed input', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8')
+  let finish
+  const writes = []
+  const closed = []
+  const harness = clientHarness(source, 'EmploymentDialog')
+  const props = {
+    contacts: [{ systemUserId: 'user-1', name: '张三' }, { systemUserId: 'user-2', name: '李四' }],
+    departments: [{ id: 'dept-1', name: '财务部' }], t: key => key,
+    onClose: () => closed.push(true),
+    act: (path, body) => { writes.push({ path, body }); return new Promise(resolve => { finish = resolve }) },
+  }
+  const controls = tree => clientNodes(tree).filter(node => ['SearchSelect', 'Field'].includes(node.type?.name))
+  let tree = harness.render(props)
+  controls(tree)[0].props.onChange('user-1')
+  tree = harness.render(props)
+  controls(tree)[1].props.onChange('dept-1')
+  controls(tree)[2].props.onChange('2026-10-10')
+  tree = harness.render(props)
+  controls(tree)[0].props.onChange('user-2')
+  tree = harness.render(props)
+  assert.equal(controls(tree)[1].props.value, '')
+  assert.equal(controls(tree)[2].props.value, '')
+  controls(tree)[1].props.onChange('dept-1')
+  controls(tree)[2].props.onChange('2026-10-10')
+  tree = harness.render(props)
+  const submit = tree.props.footer.find(node => node.props.key === 'ok').props.onClick
+  const first = submit()
+  await submit()
+  assert.equal(writes.length, 1)
+  tree = harness.render(props)
+  assert.ok(controls(tree).every(node => node.props.disabled))
+  assert.equal(clientNodes(tree).find(node => node.type === 'fieldset').props.disabled, true)
+  finish(false)
+  await first
+  tree = harness.render(props)
+  assert.equal(controls(tree)[2].props.value, '2026-10-10')
+  assert.ok(clientNodes(tree).some(node => node.props.role === 'alert' && node.children.includes('登记失败，请检查字段或稍后重试。已保留输入。')))
+  assert.equal(closed.length, 0)
+  tree = harness.render({ ...props, departments: [] })
+  assert.equal(tree.props.footer.find(node => node.props.key === 'ok').props.disabled, true)
+  tree = harness.render(props)
+  const second = tree.props.footer.find(node => node.props.key === 'ok').props.onClick()
+  finish(true)
+  await second
+  assert.equal(closed.length, 1)
+  assert.deepEqual(writes[0], { path: '/employment-records', body: {
+    systemUserId: 'user-2', departmentId: 'dept-1',
+    startDate: new Date('2026-10-10T00:00:00').toISOString(), sourceRef: 'manual',
+  } })
+})
+
+test('employment picker loads an independent directory and failed records are retryable', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8')
+  const requests = []
+  const harness = clientHarness(source, 'EntryView', {
+    api: async path => {
+      requests.push(path)
+      if (path.startsWith('/employment-records')) throw new Error('offline')
+      return { data: { list: path === '/contacts?limit=100' ? [{ name: '张三', systemUserId: 'user-1' }] : [] } }
+    },
+  })
+  const props = { ctx: { year: 2026, departments: [], orgs: [], revision: 1 }, t: key => key }
+  let tree = harness.render(props)
+  harness.flushEffects()
+  await new Promise(resolve => setImmediate(resolve))
+  tree = harness.render(props)
+  clientNodes(tree).find(node => node.type?.name === 'PillTabs').props.onChange('org')
+  tree = harness.render(props)
+  const directory = clientNodes(tree).find(node => node.type?.name === 'DirectoryCard')
+  directory.props.setOnlyUnmapped(true)
+  directory.props.onDialog({ kind: 'employment' })
+  tree = harness.render(props)
+  harness.flushEffects()
+  await new Promise(resolve => setImmediate(resolve))
+  tree = harness.render(props)
+  assert.ok(requests.includes('/contacts?limit=100'))
+  const dialog = clientNodes(tree).find(node => node.type?.name === 'EmploymentDialog')
+  assert.equal(dialog.props.contacts[0].systemUserId, 'user-1')
+  const card = clientNodes(tree).find(node => node.type?.name === 'EmploymentCard')
+  assert.equal(card.props.employments.error, true)
+  const cardHarness = clientHarness(source, 'EmploymentCard')
+  const cardTree = cardHarness.render(card.props)
+  assert.ok(clientNodes(cardTree).some(node => node.props.role === 'alert'))
+  assert.equal(clientNodes(cardTree).find(node => node.type?.name === 'Table').props.empty, null)
+  const retry = clientNodes(cardTree).find(node => node.type?.name === 'LinkButton' && node.children.includes('重试加载'))
+  retry.props.onClick()
+  harness.render(props)
+  harness.flushEffects()
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(requests.filter(path => path.startsWith('/employment-records')).length, 2)
+})
+
+test('employment columns use local dates, raw chronological sorts, ongoing labels and readable sources', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8')
+  const start = new Date(2026, 9, 10).toISOString()
+  const rows = [
+    { id: 'old', departmentId: 'dept-1', startDate: '2025-01-01T00:00:00Z', endDate: start, sourceRef: 'manual' },
+    { id: 'new', departmentId: 'dept-2', startDate: start, endDate: null, sourceRef: 'feishu-contact:test' },
+  ]
+  const harness = clientHarness(source, 'EmploymentCard')
+  const tree = harness.render({ employments: { list: rows, total: 51 }, t: key => key, onDialog() {} })
+  const table = clientNodes(tree).find(node => node.type?.name === 'Table')
+  assert.equal(table.props.rows[0].id, 'new')
+  const column = key => table.props.columns.find(item => item.key === key)
+  assert.equal(column('startDate').render(rows[1]), '2026-10-10 00:00')
+  assert.equal(column('startDate').sortValue(rows[1]), new Date(start).getTime())
+  assert.equal(column('endDate').label, '结束日期')
+  assert.equal(column('endDate').render(rows[1]), '至今')
+  assert.equal(column('sourceRef').render(rows[0]), '人工补录')
+  assert.equal(column('sourceRef').render(rows[1]), '通讯录同步')
+  assert.equal(column('departmentName').render(rows[0]), 'dept-1')
+  assert.ok(clientNodes(tree).some(node => node.children.includes('仅展示前 2 条记录，排序仅作用于已加载记录。')))
+})
+
+test('entry lists distinguish loading, empty, and failed requests with retry actions', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8')
+  let retries = 0
+  const props = { busy: false, t: key => key, act() {}, onDialog() {}, onRetry: () => { retries += 1 } }
+  const sectionHarness = clientHarness(source, 'FilingSection')
+  const errorTree = sectionHarness.render({ ...props, tasks: { list: [], error: true } })
+  assert.equal(errorTree.children[0].type?.name, 'Table')
+  assert.equal(errorTree.children[0].props.rows.length, 0)
+  assert.equal(errorTree.children[0].props.empty.type?.name, 'ListLoadError')
+  const errorHarness = clientHarness(source, 'ListLoadError')
+  const errorView = errorHarness.render({ label: '填报任务', onRetry: props.onRetry })
+  assert.equal(errorView.props.role, 'alert')
+  assert.match(errorView.children[0].children.join(''), /填报任务加载失败/)
+  errorView.children[1].props.onClick()
+  assert.equal(retries, 1)
+
+  const loadingTree = sectionHarness.render({ ...props, tasks: null })
+  assert.equal(loadingTree.children[0].type?.name, 'Table')
+  assert.equal(loadingTree.children[0].props.empty, 'loading')
+  const emptyTree = sectionHarness.render({ ...props, tasks: { list: [] } })
+  assert.equal(emptyTree.children[0].props.empty, 'empty')
+  const myHarness = clientHarness(source, 'MyFilingSection')
+  assert.equal(myHarness.render({ ...props, assignments: null }).children[0].props.empty, 'loading')
+  assert.equal(myHarness.render({ ...props, assignments: { list: [], error: true } }).children[0].props.empty.type?.name, 'ListLoadError')
+  const membersHarness = clientHarness(source, 'MembersCard')
+  assert.equal(membersHarness.render({ ...props, members: { list: [], error: true } }).children[0].type?.name, 'ListLoadError')
+  assert.equal(membersHarness.render({ ...props, members: { list: [], forbidden: true } }).children[0].props.role, 'status')
+})
+
+test('client preserves HTTP status so member permission failures are distinguished from network errors', async () => {
+  const head = await readFile(new URL('src/head.js', root), 'utf8')
+  const requestSource = head.slice(head.indexOf('async function api('), head.indexOf('// One idempotency key'))
+  const read = new Function('fetch', 'AbortSignal', 'BASE', 'REQUEST_TIMEOUT_MS', requestSource + '\nreturn api')
+  const response = status => ({ ok: status === 200, status, json: async () => status === 200 ? { data: { list: [] } } : { error: 'permission_denied' } })
+  const denied = read(async () => response(403), { timeout: () => undefined }, '/finance', 30000)
+  await assert.rejects(denied('/members'), error => error.status === 403 && error.message === 'permission_denied')
+  const unavailable = read(async () => response(503), { timeout: () => undefined }, '/finance', 30000)
+  await assert.rejects(unavailable('/members'), error => error.status === 503)
+
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8')
+  const harness = clientHarness(source, 'EntryView', { api: path => path === '/members' ? denied(path) : Promise.resolve({ data: { list: [] } }) })
+  const props = { ctx: { year: 2026, orgs: [], departments: [], revision: 1 }, t: key => key }
+  let tree = harness.render(props)
+  harness.flushEffects()
+  await new Promise(resolve => setImmediate(resolve))
+  tree = harness.render(props)
+  clientNodes(tree).find(node => node.type?.name === 'PillTabs').props.onChange('org')
+  tree = harness.render(props)
+  const card = clientNodes(tree).find(node => node.type?.name === 'MembersCard')
+  assert.equal(card.props.members.forbidden, true)
+  assert.equal(card.props.members.error, undefined)
+})
+
+test('member field settings remain available without rows and all writes lock while busy', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8')
+  const harness = clientHarness(source, 'MembersCard')
+  const props = { t: key => ({ roleNameDEPT_COLLABORATOR: '信息协同人' }[key] || key), act() {} }
+  for (const members of [null, { list: [] }, { error: true }, { forbidden: true }]) {
+    const tree = harness.render({ ...props, members })
+    assert.ok(clientNodes(tree).some(node => node.type?.name === 'Table'))
+  }
+  const row = { id: 'm1', userId: 'user-1', name: '张三', role: 'DEPT_COLLABORATOR', enabled: true }
+  const tree = harness.render({ ...props, members: { list: [row] }, busy: true })
+  const table = clientNodes(tree).find(node => node.type?.name === 'Table')
+  const roleColumn = table.props.columns.find(column => column.key === 'role')
+  assert.equal(roleColumn.sortValue(row), '信息协同人')
+  assert.equal(roleColumn.render(row).props.disabled, true)
+  assert.equal(table.props.columns.find(column => column.key === 'actions').render(row).props.disabled, true)
+})
+
+test('task form and all custom selectors are locked while submitting', async () => {
+  const components = await readFile(new URL('src/components.js', root), 'utf8')
+  const entry = await readFile(new URL('src/views/entry.js', root), 'utf8')
+  const harness = clientHarness(components + '\n' + entry, 'CreateTaskDialog')
+  const tree = harness.render({ year: 2026, departments: [{ id: 'dept-1', name: '财务部' }], members: { list: [] }, busy: true, t: key => key, onClose() {}, act() {} })
+  assert.equal(clientNodes(tree).find(node => node.type === 'fieldset').props.disabled, true)
+  assert.ok(clientNodes(tree).filter(node => ['SearchSelect', 'MultiSearchSelect'].includes(node.type?.name)).every(node => node.props.disabled))
+})
+
+test('department multi-select closes when keyboard focus leaves or controls become disabled', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8')
+  const harness = clientHarness(source, 'MultiSearchSelect')
+  const props = { value: ['dept-1'], options: [['dept-1', '财务部']], placeholder: '部门' }
+  let tree = harness.render(props)
+  clientNodes(tree).find(node => node.props['aria-expanded'] === false).props.onClick()
+  tree = harness.render(props)
+  tree.props.onBlur({ currentTarget: { contains: () => false }, relatedTarget: {} })
+  tree = harness.render(props)
+  assert.equal(clientNodes(tree).some(node => node.props.role === 'listbox'), false)
+  clientNodes(tree).find(node => node.props['aria-expanded'] === false).props.onClick()
+  tree = harness.render({ ...props, disabled: true })
+  harness.flushEffects()
+  tree = harness.render({ ...props, disabled: true })
+  assert.equal(clientNodes(tree).some(node => node.props.role === 'listbox'), false)
+  tree = harness.render(props)
+  assert.equal(clientNodes(tree).some(node => node.props.role === 'listbox'), false)
+})
+
+test('department multi-select adds filtered results without losing previous choices', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8')
+  let selected
+  const harness = clientHarness(source, 'MultiSearchSelect')
+  const props = { value: ['dept-1'], onChange: value => { selected = value }, options: [['dept-1', '财务部'], ['dept-2', '市场部'], ['dept-3', '研发部']], placeholder: '部门' }
+  let tree = harness.render(props)
+  assert.equal(clientNodes(tree).some(node => node.props.role === 'listbox'), false)
+  clientNodes(tree).find(node => node.props['aria-expanded'] === false).props.onClick()
+  tree = harness.render(props)
+  clientNodes(tree).find(node => node.type === 'input').props.onChange({ target: { value: '市场' } })
+  tree = harness.render(props)
+  clientNodes(tree).find(node => node.children.includes('全选当前结果')).props.onClick()
+  assert.deepEqual(selected, ['dept-1', 'dept-2'])
+  tree = harness.render({ ...props, value: selected })
+  tree.children[0].props.onKeyDown({ key: 'Escape', preventDefault() {} })
+  tree = harness.render({ ...props, value: selected })
+  assert.equal(clientNodes(tree).some(node => node.props.role === 'listbox'), false)
+})
+
+test('budget entry submits custom cost item and resets captured form after async save', async () => {
+  const components = await readFile(new URL('src/components.js', root), 'utf8')
+  const entry = await readFile(new URL('src/views/entry.js', root), 'utf8')
+  let payload
+  let resetCount = 0
+  const formElement = { reset() { resetCount++ } }
+  const values = { orgId: 'org-1', year: '2026', expenseType: 'FIXED_OPERATION', departmentId: 'dept-1', costItemNameChoice: '新费用项', budgetAmount: '1250.50' }
+  const harness = clientHarness(components + '\n' + entry, 'EntryPanel', {
+    FormData: class { constructor(form) { assert.equal(form, formElement) } get(key) { return values[key] } },
+    post: async (path, body) => { assert.equal(path, '/budget-lines'); payload = body },
+  })
+  const props = { year: 2026, orgs: [], departments: [], t: key => key }
+  let tree = harness.render(props)
+  clientNodes(tree).find(node => node.type?.name === 'PillTabs').props.onChange('budget')
+  tree = harness.render(props)
+  const event = { currentTarget: formElement, preventDefault() {} }
+  const saving = tree.props.onSubmit(event)
+  event.currentTarget = null
+  await saving
+  assert.equal(payload.costItemName, '新费用项')
+  assert.equal(payload.departmentId, 'dept-1')
+  assert.equal(payload.budgetAmount, 1250.5)
+  assert.equal(resetCount, 1)
+  tree = harness.render(props)
+  assert.ok(clientNodes(tree).some(node => node.type?.name === 'Notice' && node.children.includes('submitted')))
+})
+
+test('table settings stay isolated across lists and numeric sorts keep missing values last', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8')
+  const values = new Map([
+    ['dofe-finance-table:second', JSON.stringify(['name'])],
+    ['dofe-finance-table:second:sort', JSON.stringify({ id: 'name', direction: 'desc' })],
+  ])
+  const harness = clientHarness(source, 'Table', {
+    localStorage: { getItem: key => values.get(key), setItem: (key, value) => values.set(key, value), removeItem: key => values.delete(key) },
+  })
+  const props = { tableId: 'first', columns: [{ key: 'name', label: '名称' }, { key: 'amount', label: '金额', num: true }], rows: [{ id: 'low', name: '低', amount: 20 }, { id: 'high', name: '高', amount: 100 }, { id: 'missing', name: '空', amount: null }], rowKey: 'id' }
+  harness.render(props); harness.flushEffects()
+  let tree = harness.render(props); harness.flushEffects()
+  clientNodes(tree).find(node => node.props['aria-label']?.startsWith('按金额排序')).props.onClick()
+  tree = harness.render(props); harness.flushEffects()
+  const rowIds = () => clientNodes(tree).filter(node => node.type === 'tr' && node.props.key).map(node => node.props.key)
+  assert.deepEqual(rowIds(), ['low', 'high', 'missing'])
+  clientNodes(tree).find(node => node.props['aria-label']?.startsWith('按金额排序')).props.onClick()
+  tree = harness.render(props); harness.flushEffects()
+  assert.deepEqual(rowIds(), ['high', 'low', 'missing'])
+  harness.render({ ...props, tableId: 'second' }); harness.flushEffects()
+  tree = harness.render({ ...props, tableId: 'second' }); harness.flushEffects()
+  assert.deepEqual(clientNodes(tree).filter(node => node.type === 'th').map(node => node.props.key), ['name'])
+  assert.equal(JSON.parse(values.get('dofe-finance-table:second:sort')).id, 'name')
+})
+
+
 // 前缀路由注册名：子路径用例统一从 BASE 拼接，避免散落完整字面量
 const BASE = '/api/desktop/sensteed/finance'
 
@@ -249,6 +839,7 @@ test('new read routes map to public REST resources', async () => {
     ['/contacts?onlyUnmapped=1', 'finance_directory_contacts_query'],
     ['/data-source-configs', 'finance_get_data_source_configs'],
     ['/data-source-runs?status=FAILED', 'finance_get_data_source_runs'],
+    ['/data-source-metrics?days=7', 'finance_get_data_source_metrics'],
     ['/budget-adjustments?status=SUBMITTED', 'finance_budget_adjustment_list'],
     ['/plan-adjustments', 'finance_plan_adjustment_list'],
     ['/allocations?page=1', 'finance_allocation_list'],
@@ -304,6 +895,15 @@ test('new write routes merge path captures into REST resources', async () => {
   assert.match(calls.at(-1).url, /\/api\/data-source\/configs\/ds-1\/active/u)
   assert.equal(calls.at(-1).body.active, false)
   assert.equal(calls.at(-1).body.operator, undefined)
+  await invokeRoute(route, 'POST', BASE + '/data-source-configs', { scope: 'HEADQUARTERS', kind: 'DSS', displayName: '总部 DSS' })
+  assert.match(calls.at(-1).url, /\/api\/data-source\/configs$/u)
+  assert.equal(calls.at(-1).init.method, 'PUT')
+  assert.equal(calls.at(-1).body.displayName, '总部 DSS')
+  assert.equal(calls.at(-1).body.operator, undefined)
+  await invokeRoute(route, 'POST', BASE + '/data-source-sync', { scope: 'HEADQUARTERS', bizSystem: 'OA' })
+  assert.match(calls.at(-1).url, /\/api\/data-source\/runs\/sync$/u)
+  assert.equal(calls.at(-1).init.method, 'POST')
+  assert.equal(calls.at(-1).body.bizSystem, 'OA')
 })
 
 test('bootstrap tool reports tenant and orgs', async () => {
@@ -398,17 +998,22 @@ test('search selectors use the shared accessible popup instead of browser datali
   assert.match(source, /'aria-controls': menuId/u)
   assert.doesNotMatch(source, /h\('datalist'/u)
   assert.match(source, /className: 'sf-search-clear'/u)
+  assert.match(source, /全选当前结果/u)
+  assert.match(source, /清空已选/u)
+  assert.match(source, /className: 'sf-multi-trigger'/u)
+  assert.match(source, /className: 'sf-multi-menu'/u)
 })
 
 test('table keeps column identities after hiding fields and offers settings when empty', async () => {
   const source = await readFile(new URL('src/components.js', root), 'utf8')
   const element = (type, props, ...children) => ({ type, props: props || {}, children })
   const storage = { getItem: () => JSON.stringify(['column-1', 'column-2']), setItem() {} }
-  const table = new Function('h', 'useState', 'useEffect', 'useMemo', 'localStorage', `${source}\nreturn Table`)(
+  const table = new Function('h', 'useState', 'useEffect', 'useMemo', 'useRef', 'localStorage', `${source}\nreturn Table`)(
     element,
     initial => [typeof initial === 'function' ? initial() : initial, () => {}],
     () => {},
     compute => compute(),
+    initial => ({ current: initial }),
     storage,
   )
   const columns = [{ label: 'A', sortKey: 'a' }, { label: 'B', sortKey: 'b' }, { label: 'C', sortKey: 'c' }]
@@ -420,13 +1025,157 @@ test('table keeps column identities after hiding fields and offers settings when
   assert.ok(empty.some(node => node?.props?.className === 'sf-empty'))
 })
 
+test('table column settings search labels and preserve column identities', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8')
+  const values = new Map()
+  const harness = clientHarness(source, 'Table', {
+    localStorage: { getItem: key => values.get(key), setItem: (key, value) => values.set(key, value), removeItem: key => values.delete(key) },
+  })
+  const props = { tableId: 'searchable', columns: [{ key: 'org', label: '主体' }, { key: 'amount', label: '预算金额' }], rows: [{ id: 'one', org: '甲', amount: 100 }], rowKey: 'id' }
+  let tree = harness.render(props)
+  const search = () => clientNodes(tree).find(node => node.props['aria-label'] === '搜索展示字段')
+  search().props.onChange({ target: { value: '预算' } })
+  tree = harness.render(props)
+  assert.deepEqual(clientNodes(tree).filter(node => node.props.className === 'sf-table-field-option').map(node => node.props.key), ['amount'])
+  search().props.onChange({ target: { value: '不存在' } })
+  tree = harness.render(props)
+  assert.ok(clientNodes(tree).some(node => node.children.includes('没有匹配字段')))
+})
+
+test('table restores the action column from old preferences and keeps one data field visible', async () => {
+  const values = new Map([['dofe-finance-table:actions', JSON.stringify(['name'])]])
+  const source = await readFile(new URL('src/components.js', root), 'utf8')
+  const harness = clientHarness(source, 'Table', {
+    localStorage: { getItem: key => values.get(key), setItem: (key, value) => values.set(key, value), removeItem: key => values.delete(key) },
+  })
+  const tree = harness.render({ tableId: 'actions', columns: [{ key: 'name', label: '名称' }, { key: 'amount', label: '金额' }, { key: 'actions', label: '操作', sortable: false }], rows: [{ name: '甲', amount: 10 }] })
+  assert.deepEqual(clientNodes(tree).filter(node => node.type === 'th').map(node => node.props.key), ['name', 'actions'])
+  const options = clientNodes(tree).filter(node => node.props.className === 'sf-table-field-option')
+  assert.equal(options.find(node => node.props.key === 'actions').children[0].props.disabled, true)
+  assert.equal(options.find(node => node.props.key === 'name').children[0].props.disabled, true)
+})
+
+test('busy primary actions stay disabled when validation explicitly enables the button', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8')
+  const harness = clientHarness(source, 'PrimaryButton')
+  assert.equal(harness.render({ busy: true, disabled: false }).props.disabled, true)
+  assert.equal(harness.render({ busy: false, disabled: true }).props.disabled, true)
+  assert.equal(harness.render({ busy: false, disabled: false }).props.disabled, false)
+})
+
+test('department popup handles arrow navigation and Escape without closing the task dialog', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8')
+  const focus = []
+  const items = [{ focus: () => focus.push('first') }, { focus: () => focus.push('second') }]
+  const harness = clientHarness(source, 'MultiSearchSelect')
+  const props = { value: [], options: [['one', '甲部门'], ['two', '乙部门']], onChange() {} }
+  let tree = harness.render(props)
+  tree.children[0].props.onClick()
+  tree = harness.render(props)
+  tree.props.ref.current = { querySelectorAll: () => items, querySelector: () => ({ focus: () => focus.push('trigger') }) }
+  let stopped = 0
+  const event = key => ({ key, preventDefault() {}, stopPropagation() { stopped++ } })
+  tree.props.onKeyDown(event('ArrowDown'))
+  tree.props.onKeyDown(event('Escape'))
+  tree = harness.render(props)
+  assert.deepEqual(focus, ['first', 'trigger'])
+  assert.equal(stopped, 2)
+  assert.equal(clientNodes(tree).some(node => node.props.role === 'listbox'), false)
+})
+
+test('task selectors use member names, accept custom names and initialize departments after loading only once', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8')
+  const harness = clientHarness(source, 'CreateTaskDialog', { api: async () => ({ data: { list: [] } }) })
+  const props = { year: 2026, departments: [], members: { list: [{ name: '张三' }, { name: '张三' }, { name: '停用', enabled: false }] }, t: key => key, act() {}, onClose() {} }
+  let tree = harness.render(props)
+  harness.flushEffects()
+  const owner = clientNodes(tree).find(node => node.type?.name === 'SearchSelect' && node.props.placeholder === 'taskOwner')
+  assert.deepEqual(owner.props.options, [['张三', '张三']])
+  assert.equal(owner.props.allowCustom, true)
+  const loaded = { ...props, departments: [{ id: 'one', name: '甲部门' }] }
+  harness.render(loaded); harness.flushEffects()
+  tree = harness.render(loaded)
+  const picker = () => clientNodes(tree).find(node => node.type?.name === 'MultiSearchSelect')
+  assert.deepEqual(picker().props.value, ['one'])
+  picker().props.onChange([])
+  harness.render(loaded); harness.flushEffects()
+  tree = harness.render(loaded)
+  assert.deepEqual(picker().props.value, [])
+})
+
+test('task version loading can retry and stale departments cannot be submitted', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8')
+  let requests = 0
+  let writes = 0
+  const harness = clientHarness(source, 'CreateTaskDialog', { api: async () => {
+    if (++requests === 1) throw new Error('offline')
+    return { data: { list: [{ id: 'draft', name: '草稿', status: 'DRAFT' }, { id: 'locked', name: '锁定', status: 'LOCKED' }] } }
+  } })
+  const props = { year: 2026, departments: [{ id: 'one', name: '甲部门' }], t: key => key, act: async () => { writes++; return true }, onClose() {} }
+  let tree = harness.render(props)
+  harness.flushEffects()
+  await new Promise(resolve => setImmediate(resolve))
+  clientNodes(tree).find(node => node.type?.name === 'Field' && node.props.maxLength === 150).props.onChange('年度预算')
+  clientNodes(tree).find(node => node.props.type === 'datetime-local').props.onChange('2026-12-20T18:00')
+  clientNodes(tree).find(node => node.type?.name === 'Select' && node.props.value === 'PAYMENT_PLAN').props.onChange('BUDGET')
+  tree = harness.render(props)
+  assert.equal(tree.props.footer[1].props.disabled, true)
+  clientNodes(tree).find(node => node.children.includes('重新加载版本')).props.onClick()
+  harness.render(props); harness.flushEffects()
+  await new Promise(resolve => setImmediate(resolve))
+  tree = harness.render(props)
+  const version = clientNodes(tree).find(node => node.type?.name === 'SearchSelect' && node.props.placeholder === 'version')
+  assert.deepEqual(version.props.options, [['draft', '草稿']])
+  version.props.onChange('draft')
+  tree = harness.render(props)
+  assert.equal(tree.props.footer[1].props.disabled, false)
+  tree = harness.render({ ...props, departments: [] })
+  assert.equal(tree.props.footer[1].props.disabled, true)
+  await tree.props.footer[1].props.onClick()
+  assert.equal(writes, 0)
+})
+
+test('dialog Escape closes one layer and focus stays in the form then returns to its opener', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8')
+  const focuses = []
+  const document = { activeElement: { focus: () => focuses.push('opener') } }
+  let cleanup
+  let closed = 0
+  const harness = clientHarness(source, 'Dialog', { document, useEffect: effect => { cleanup = effect() } })
+  const tree = harness.render({ title: '创建填报任务', onClose: () => closed++ })
+  const panel = tree.children[0]
+  const first = { focus: () => focuses.push('first'), closest: () => null, getClientRects: () => [1] }
+  const last = { focus: () => focuses.push('last'), closest: () => null, getClientRects: () => [1] }
+  panel.props.ref.current = { querySelectorAll: () => [first, last], focus: () => focuses.push('panel') }
+  document.activeElement = last
+  panel.props.onKeyDown({ key: 'Tab', preventDefault() {} })
+  document.activeElement = first
+  panel.props.onKeyDown({ key: 'Tab', shiftKey: true, preventDefault() {} })
+  let stopped = false
+  panel.props.onKeyDown({ key: 'Escape', preventDefault() {}, stopPropagation() { stopped = true } })
+  cleanup()
+  assert.equal(closed, 1)
+  assert.equal(stopped, true)
+  assert.deepEqual(focuses, ['first', 'last', 'opener'])
+})
+
+test('plugin year and budget version choices match the web labels and preserve an out-of-window selection', async () => {
+  const source = await readFile(new URL('src/format.js', root), 'utf8')
+  const helpers = new Function(source + '\nreturn { yearOptions, budgetVersionLabel }')()
+  const currentYear = new Date().getFullYear()
+  assert.deepEqual(helpers.yearOptions().map(([value]) => Number(value)), Array.from({ length: 7 }, (_, index) => currentYear + 2 - index))
+  assert.equal(helpers.yearOptions(2010).at(-1)[0], '2010')
+  assert.equal(helpers.budgetVersionLabel({ year: 2026, type: 'ROLLING', status: 'DRAFT', frozenThroughMonth: 9, isPrimary: true, lineCount: 12, budgetTotal: 12345.6, publishedAt: '2026-10-01T00:00:00Z' }), '2026 年滚动预算 · 草稿（冻结至 9 月） · 主版本 · 12 行 · ¥12,345.60 · 发布于 2026-10-01')
+})
+
 test('filing task dialog submits the same dimensions and keeps failures open', async () => {
   const components = await readFile(new URL('src/components.js', root), 'utf8')
   const entry = await readFile(new URL('src/views/entry.js', root), 'utf8')
+  const format = await readFile(new URL('src/format.js', root), 'utf8')
   const element = (type, props, ...children) => ({ type, props: props || {}, children })
   const createDialog = values => {
     let index = 0
-    return new Function('h', 'useState', 'useEffect', `${components}\n${entry}\nreturn CreateTaskDialog`)(
+    return new Function('h', 'useState', 'useEffect', `${format}\n${components}\n${entry}\nreturn CreateTaskDialog`)(
       element,
       initial => [index in values ? values[index++] : (index++, initial), () => {}],
       () => {},

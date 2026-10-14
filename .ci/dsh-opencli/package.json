@@ -11,6 +11,7 @@
     "./package.json": "./package.json"
   },
   "dsh": {
-    "bundle": {"patch": "./cordis.patch.yml"}
+    "bundle": {"patch": "./cordis.patch.yml"},
+    "capabilities": [{"id": "opencli-research", "kind": "basic", "name": "互联网检索与资料整理", "description": "受控读取公开网页，提炼来源与研究结论。"}]
   }
 }

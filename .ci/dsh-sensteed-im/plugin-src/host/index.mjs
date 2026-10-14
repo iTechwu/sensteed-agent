@@ -25,6 +25,9 @@ import { installSessionTitlePrefix } from './session-title-prefix.mjs';
 import { installUpdateRpc } from './update-rpc.mjs';
 
 export const name = 'dsh-im-host';
+export const capabilities = Object.freeze([
+  { id: 'connect-im', kind: 'basic', name: '企业消息与协作连接', description: '连接微信、飞书、企微、钉钉、QQ 与 Matrix 等企业消息渠道。' },
+]);
 export const inject = [
   'connection',
   'credentials',

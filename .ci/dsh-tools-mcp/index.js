@@ -1,5 +1,8 @@
 export const name = 'tools-guidance'
 export const inject = ['systemPrompt']
+export const capabilities = Object.freeze([
+  { id: 'tools-market-research', kind: 'business', name: '商业调研与热点分析', description: '围绕行业、竞品和热点事件形成结构化调研。' },
+])
 
 export function apply(ctx) {
   return ctx.systemPrompt.section({

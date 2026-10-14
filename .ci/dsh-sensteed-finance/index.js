@@ -14,6 +14,9 @@ const REQUEST_TIMEOUT_MS = 30000
 const MAX_BODY_BYTES = 32 * 1024
 
 export const inject = ['webServer', 'credentials', 'tools', 'systemPrompt', 'dofeAuth', 'dofeAccess']
+export const capabilities = Object.freeze([
+  { id: 'finance-management', kind: 'business', name: '财务经营分析', description: '预算、台账、资金、预警和数据治理看板。' },
+])
 
 /** Resolve the live Feishu session on every call; never trust a browser-supplied identity. */
 async function resolveConfig(ctx) {
@@ -172,7 +175,7 @@ export function apply(ctx, overrides = {}) {
 
 const QUERY_KEYS = [
   'year', 'month', 'page', 'limit', 'severity', 'status', 'orgId', 'expenseType', 'recordType', 'planType',
-  'versionId', 'departmentId', 'unassigned', 'operator', 'keyword', 'onlyUnmapped', 'systemUserId',
+  'versionId', 'departmentId', 'unassigned', 'operator', 'keyword', 'onlyUnmapped', 'systemUserId', 'days',
   'baseVersionId', 'targetVersionId', 'planId', 'type', 'scope', 'kind', 'bizSystem', 'transport',
 ]
 
@@ -283,6 +286,9 @@ async function dispatchGet(fetchImpl, config, sub, url, res, logger) {
       break
     case '/data-source-runs':
       calls = [['finance_get_data_source_runs', { ...tenant(), scope: query.scope, status: query.status, bizSystem: query.bizSystem, transport: query.transport, page: query.page, limit: query.limit }]]
+      break
+    case '/data-source-metrics':
+      calls = [['finance_get_data_source_metrics', { ...tenant(), scope: query.scope, days: query.days }]]
       break
     case '/budget-adjustments':
       calls = [['finance_budget_adjustment_list', { ...tenant(), status: query.status, page: query.page, limit: query.limit }]]
@@ -395,6 +401,8 @@ const WRITE_ROUTES = [
   { pattern: /^\/allocations$/, tool: 'finance_allocation_confirm' },
   { pattern: /^\/allocations\/([\w-]+)\/remove$/, tool: 'finance_allocation_remove', map: m => ({ id: m[1] }) },
   { pattern: /^\/data-source-configs\/([\w-]+)\/active$/, tool: 'finance_toggle_data_source_config', map: m => ({ id: m[1] }), needsOperator: false },
+  { pattern: /^\/data-source-configs$/, tool: 'finance_upsert_data_source_config', needsOperator: false },
+  { pattern: /^\/data-source-sync$/, tool: 'finance_sync_data_source', needsOperator: false },
 ]
 
 async function dispatchPost(fetchImpl, config, sub, req, res, logger) {
@@ -644,6 +652,9 @@ function resolveFinanceRoute(toolName, args = {}) {
     finance_get_alert_summary: ['GET', '/finance/alerts/summary'],
     finance_get_data_source_configs: ['GET', '/data-source/configs'],
     finance_get_data_source_runs: ['GET', '/data-source/runs'],
+    finance_get_data_source_metrics: ['GET', '/data-source/metrics'],
+    finance_upsert_data_source_config: ['PUT', '/data-source/configs'],
+    finance_sync_data_source: ['POST', '/data-source/runs/sync'],
     finance_toggle_data_source_config: ['PATCH', `/data-source/configs/${args.id}/active`],
   }
   if (toolName === 'finance_patch_payment_plan_schedule') return { method: 'PATCH', path: `/finance/payment-plans/${args.id}/schedule`, body: args }

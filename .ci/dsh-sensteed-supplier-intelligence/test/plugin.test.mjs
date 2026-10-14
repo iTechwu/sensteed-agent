@@ -30,7 +30,10 @@ test('package registers the supply-chain MCP patch', async () => {
 })
 
 test('loads the skill as system guidance and registers a read-only bootstrap', async () => {
-  const { tools, sections } = await loadHost(['mcp__supply-chain__supply_chain_suppliers_list'])
+  const { tools, sections } = await loadHost([
+    'mcp__supply-chain__supply_chain_suppliers_list',
+    'mcp__supply-chain__supply_chain_qcc_company_search',
+  ])
   assert.equal(sections[0].name, 'sensteed:supplier-intelligence-skill')
   assert.match(sections[0].text, /供应商全量归集与舆情分析/u)
   assert.match(sections[0].text, /QCC_MCP_UNAVAILABLE/u)
@@ -40,12 +43,15 @@ test('loads the skill as system guidance and registers a read-only bootstrap', a
   const result = await bootstrap.execute({})
   assert.equal(result.result.dataSource, 'local_tool_catalog')
   assert.equal(result.result.externalCallMade, false)
+  assert.equal(result.result.tools.supply_chain_qcc_company_search, true)
 })
 
 test('skill preserves cache, verification, idempotency, and evidence boundaries', async () => {
   const skill = await readFile(new URL('skills/supplier-intelligence/SKILL.md', root), 'utf8')
   for (const token of [
     '30 分钟数据库优先缓存',
+    'supply_chain_qcc_company_search',
+    '禁止默认选第一条',
     'confirm=true',
     '稳定 `idempotencyKey`',
     '已核验供应商',

@@ -7,9 +7,18 @@ description: 归集供应商企查查与社交媒体数据，复核全量覆盖�
 
 通过 `mcp__supply-chain__*` 工具工作。开始时调用 `sensteed_supplier_intelligence_bootstrap` 和 `supply_chain_capabilities_get`，确认当前工具目录；不要把客户端、Cookie、API Key、租户或用户标识作为工具参数。
 
+## 企业主体检索
+
+当用户给出公司名称、简称、品牌名或股票简称，但供应商台账中尚无对应记录时，直接调用 `supply_chain_qcc_company_search({query})`。该工具独立于供应商主数据，使用 QCC `company.get_company_by_query`，按标准化关键词走 30 分钟数据库优先缓存；缓存未命中可能消耗 QCC 额度。
+
+- 先把所有候选及其统一社会信用代码、状态等返回字段完整展示。唯一精确匹配也要向用户说明命中依据；多候选时必须等待用户明确选择，禁止默认选第一条或把相似名称当同一主体。
+- 无匹配时检查名称/关键词后再询问是否重试，不要改用 `knowledge_search` 代替企业登记检索。
+- 此工具只检索并缓存实体候选，不创建供应商、不自动启动其他 QCC 付费 capability。用户确认主体后，再按授权流程建档/核验，之后使用 `supply_chain_qcc_company_data_get` 获取工商等详情。
+- 返回的候选是识别线索，不是已核验的供应商事实；保留 `metadata` 中的来源、检索时间、缓存命中和外部调用状态。
+
 ## 数据归集
 
-1. 分页调用 `supply_chain_suppliers_list`，建立全部未归档供应商清单，并按 `verificationStatus` 区分已核验和待核验主体。不要把历史固定数量写成当前事实。
+1. 对用户明确指定但未必在台账中的企业，先按“企业主体检索”执行；只有全量供应商覆盖分析才分页调用 `supply_chain_suppliers_list`，并按 `verificationStatus` 区分已核验和待核验主体。不要把历史固定数量写成当前事实。
 2. 对每家供应商先调用 `supply_chain_qcc_company_data_list` 读取本地企查查缓存。需要补充或刷新时，先用 `supply_chain_qcc_capabilities_get` 选择 Server、capability 和 `agentArgumentsSchema`，再调用 `supply_chain_qcc_company_data_get`。该调用自行执行 30 分钟数据库优先缓存；禁止传 `searchKey` 或凭据，禁止自动重试。
 3. 优先覆盖 `company`、`risk`、`ipr`、`operation`、`history`、`executive` 六个 Server 中已编目的能力。目录标为 `entitlement_required` 的能力要作为权益缺口输出，不能伪装为可用。
 4. 使用 `supply_chain_relationships_list` 读取子公司/投资企业。只有关系已审核、已核验且已生效时，才可扩展社媒监控范围；候选关系只作为待审核证据。

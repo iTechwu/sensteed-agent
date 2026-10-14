@@ -15,7 +15,7 @@ type Copy = (key: DofeAccessLocaleKey) => string
 type DofePluginCardState = 'built-in' | 'enabled' | 'unentitled' | 'disabled'
 
 interface DofePluginCardInjected {
-  readonly plugin: { id: DofePluginId; name: string; description: string; servers: readonly string[]; builtIn: boolean }
+  readonly plugin: { id: DofePluginId; name: string; description: string; servers: readonly string[]; access?: 'basic' | 'business'; builtIn: boolean }
   readonly settingsScope: ConfigForm<DofeAccessSettings>
   readonly t: Copy
 }
@@ -23,8 +23,9 @@ interface DofePluginCardInjected {
 type DofePluginCardProps = PropsRuntime<'plugins.item'> & InjectFace<DofePluginCardInjected>
 
 /** Derive the reported state from the same gate the settings section writes. */
-export function dofePluginCardState(plugin: { id: DofePluginId; builtIn: boolean }, settings: DofeAccessSettings | undefined): DofePluginCardState {
+export function dofePluginCardState(plugin: { id: DofePluginId; access?: 'basic' | 'business'; builtIn: boolean }, settings: DofeAccessSettings | undefined): DofePluginCardState {
   if (plugin.builtIn) return 'built-in'
+  if (plugin.access === 'basic') return settings?.enabledPlugins.includes(plugin.id) ? 'enabled' : 'disabled'
   if (!settings?.setupComplete || settings.validationVersion !== DOFE_ACCESS_VALIDATION_VERSION) return 'disabled'
   if (!settings.entitlements?.plugins.includes(plugin.id)) return 'unentitled'
   return settings.enabledPlugins.includes(plugin.id) ? 'enabled' : 'disabled'

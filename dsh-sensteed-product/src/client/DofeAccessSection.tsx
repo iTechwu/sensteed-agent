@@ -3,7 +3,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import type { ClientRemote } from '@deepseek-ai/dsh-api-remotes/client'
 import type { InjectFace, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { Button, Toast } from '@deepseek-ai/dsh-client-ui-primitives'
-import { ArrowRight, Check } from 'lucide-react'
+import { ArrowRight, Check, LockKeyhole, Sparkles } from 'lucide-react'
 import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { DofeOnboardingModal } from './DofeOnboardingModal.tsx'
 import { DofeLoginSection } from './DofeLoginSection.tsx'
@@ -11,7 +11,7 @@ import { DOFE_AUTH_LOGOUT_PATH, DOFE_AUTH_STATUS_PATH, type DofeAuthSnapshot } f
 import { heroBrandDataUrl } from '../generated-brand-assets.ts'
 import { BRAND_TENANT, BRAND_VARIANT } from '../generated-product-identity.ts'
 import { DOFE_ACCESS_KEY, type DofeAccessLocaleKey } from './dofe-access.ts'
-import { dofePluginsForBrand, normalizeDofePluginIds, DOFE_ACCESS_SETTINGS_NAMESPACE, DOFE_ACCESS_VALIDATION_VERSION, type DofeAccessSettings, type DofePluginId, DEFAULT_DOFE_PLUGIN_IDS } from '../dofe-plugins.ts'
+import { dofeCapabilitiesForBrand, dofePluginCanEnable, normalizeDofeEnabledPluginIds, normalizeDofePluginIds, DOFE_ACCESS_SETTINGS_NAMESPACE, DOFE_ACCESS_VALIDATION_VERSION, type DofeAccessSettings, type DofePluginId, DEFAULT_DOFE_PLUGIN_IDS } from '../dofe-plugins.ts'
 import { DOFE_ACCESS_MODELS_PATH, DOFE_ACCESS_VALIDATE_PATH } from '../dofe-access-route.ts'
 import { DEFAULT_DOFE_PROTOCOL, DOFE_ANTHROPIC_BASE_URL, normalizeDofeUiProtocol, parseDofeModelCatalog, UI_DOFE_PROTOCOLS, type DofeModel, type DofeProtocol } from '../dofe-models.ts'
 
@@ -69,18 +69,24 @@ const CSS = `
 .dshDofeAccessDanger:focus-visible { outline: 2px solid var(--dsw-alias-state-error-primary, #c93636); outline-offset: 2px; }
 .dshDofeAccessStatus { color: var(--dsw-alias-label-secondary, #667085); font-size: 13px; }
 .dshDofeAccessError { color: var(--dsw-alias-state-error-primary, #c93636); background: rgba(201, 54, 54, .08); border-left: 3px solid var(--dsw-alias-state-error-primary, #c93636); padding: 10px 12px; margin: 0; font-size: 13px; line-height: 1.45; }
-.dshDofeAccessPlugins { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--dsw-alias-border-l1, #e2e6ed); }
-.dshDofeAccessPlugin { position: relative; display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 10px; min-height: 66px; align-items: center; padding: 11px 12px 11px 4px; border-bottom: 1px solid var(--dsw-alias-border-l1, #e2e6ed); cursor: pointer; }
-.dshDofeAccessPlugin:nth-child(odd) { padding-right: 18px; border-right: 1px solid var(--dsw-alias-border-l1, #e2e6ed); }
-.dshDofeAccessPlugin:nth-child(even) { padding-left: 18px; }
-.dshDofeAccessPlugin:hover:not(:has(input:disabled)) { background: var(--dsw-alias-interactive-bg-hover, #f2f5f9); }
-.dshDofeAccessPlugin:has(input:disabled) { opacity: .55; cursor: default; }
-.dshDofeAccessPlugin input { position: absolute; opacity: 0; pointer-events: none; }
-.dshDofeAccessPluginCheck { width: 20px; height: 20px; display: grid; place-items: center; color: transparent; background: var(--dsw-alias-bg-layer-1, #fff); border: 1px solid var(--dsw-alias-border-l2, #c7ced9); border-radius: 5px; }
-.dshDofeAccessPluginSelected .dshDofeAccessPluginCheck { color: var(--dsw-alias-label-primary-foreground, #fff); background: var(--dsw-alias-brand-primary, #245eea); border-color: var(--dsw-alias-brand-primary, #245eea); }
-.dshDofeAccessPlugin:has(input:focus-visible) .dshDofeAccessPluginCheck { outline: 2px solid var(--dsw-alias-brand-primary, #245eea); outline-offset: 2px; }
-.dshDofeAccessPluginName { display: block; color: var(--dsw-alias-label-primary, #172033); font-size: 14px; font-weight: 650; line-height: 1.35; }
-.dshDofeAccessPluginDescription { display: block; color: var(--dsw-alias-label-secondary, #667085); font-size: 12px; line-height: 1.4; margin-top: 2px; }
+.dshDofeAccessCapabilityGroups { display: grid; gap: 14px; }
+.dshDofeAccessCapabilityGroup { display: grid; gap: 8px; }
+.dshDofeAccessCapabilityGroupHeader { display: flex; align-items: center; gap: 7px; color: var(--dsw-alias-label-primary, #172033); font-size: 13px; font-weight: 650; }
+.dshDofeAccessCapabilityGroupHeader svg { color: var(--dsw-alias-brand-primary, #245eea); }
+.dshDofeAccessCapabilityGroupHint { margin: -2px 0 0; color: var(--dsw-alias-label-secondary, #667085); font-size: 12px; line-height: 1.4; }
+.dshDofeAccessCapabilities { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.dshDofeAccessCapability { position: relative; display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 10px; min-height: 70px; align-items: start; padding: 12px; background: var(--dsw-alias-bg-layer-1, #fff); border: 1px solid var(--dsw-alias-border-l1, #e2e6ed); border-radius: 7px; cursor: pointer; }
+.dshDofeAccessCapability:hover:not(:has(input:disabled)) { border-color: var(--dsw-alias-brand-primary, #245eea); background: var(--dsw-alias-interactive-bg-hover, #f2f5f9); }
+.dshDofeAccessCapability:has(input:disabled) { opacity: .58; cursor: default; }
+.dshDofeAccessCapability input { position: absolute; opacity: 0; pointer-events: none; }
+.dshDofeAccessCapabilityCheck { width: 20px; height: 20px; display: grid; place-items: center; color: transparent; background: var(--dsw-alias-bg-layer-1, #fff); border: 1px solid var(--dsw-alias-border-l2, #c7ced9); border-radius: 5px; }
+.dshDofeAccessCapabilitySelected .dshDofeAccessCapabilityCheck { color: var(--dsw-alias-label-primary-foreground, #fff); background: var(--dsw-alias-brand-primary, #245eea); border-color: var(--dsw-alias-brand-primary, #245eea); }
+.dshDofeAccessCapability:has(input:focus-visible) .dshDofeAccessCapabilityCheck { outline: 2px solid var(--dsw-alias-brand-primary, #245eea); outline-offset: 2px; }
+.dshDofeAccessCapabilityName { display: block; color: var(--dsw-alias-label-primary, #172033); font-size: 14px; font-weight: 650; line-height: 1.35; }
+.dshDofeAccessCapabilityDescription { display: block; color: var(--dsw-alias-label-secondary, #667085); font-size: 12px; line-height: 1.4; margin-top: 3px; }
+.dshDofeAccessCapabilityStatus { display: inline-flex; align-items: center; gap: 4px; margin-top: 7px; color: var(--dsw-alias-state-success-primary, #12805c); font-size: 11px; font-weight: 600; }
+.dshDofeAccessCapabilityStatusUnavailable { color: var(--dsw-alias-state-warn-primary, #a56200); }
+.dshDofeAccessCapabilityStatus svg { flex: none; }
 .dshDofePluginSummary { display: inline-flex; align-items: center; gap: 8px; color: var(--dsw-alias-label-secondary, #667085); font-size: 13px; }
 .dshDofePluginState { flex: none; display: inline-flex; align-items: center; padding: 2px 10px; color: var(--dsw-alias-label-secondary, #667085); background: var(--dsw-alias-bg-layer-2, #f5f7fa); border-radius: 999px; font-size: 12px; font-weight: 600; }
 .dshDofePluginStateOn { color: var(--dsw-alias-state-success-primary, #12805c); background: color-mix(in srgb, var(--dsw-alias-state-success-primary, #12805c) 10%, transparent); }
@@ -106,8 +112,7 @@ const CSS = `
   .dshDofeModalBody { padding: 18px 20px 22px; }
   .dshDofeAccessSection { padding: 14px; }
   .dshDofeAccessFieldHeader { align-items: flex-start; flex-direction: column; gap: 3px; }
-  .dshDofeAccessPlugins { grid-template-columns: 1fr; }
-  .dshDofeAccessPlugin:nth-child(n) { padding: 11px 4px; border-right: 0; }
+  .dshDofeAccessCapabilities { grid-template-columns: 1fr; }
 }
 `
 
@@ -235,9 +240,10 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
   const [draft, setDraft] = useState('')
   const settingsStore = useMemo(() => dofeAccessSettingsStore(settingsScope), [settingsScope])
   const settings = useSyncExternalStore(settingsStore.subscribe, settingsStore.getSnapshot, settingsStore.getSnapshot)
-  const availablePlugins = useMemo(() => dofePluginsForBrand(BRAND_VARIANT).filter(plugin => !plugin.builtIn && settings.value?.entitlements?.plugins.includes(plugin.id)), [settings.value?.entitlements])
+  const capabilities = useMemo(() => dofeCapabilitiesForBrand(BRAND_VARIANT), [])
+  const entitledPlugins = settings.value?.entitlements?.plugins
   const defaultPluginIds = useMemo(() => normalizeDofePluginIds(DEFAULT_DOFE_PLUGIN_IDS, BRAND_VARIANT), [])
-  const [enabledPlugins, setEnabledPlugins] = useState<DofePluginId[]>(() => normalizeDofePluginIds(settings.value?.enabledPlugins ?? defaultPluginIds, BRAND_VARIANT))
+  const [enabledPlugins, setEnabledPlugins] = useState<DofePluginId[]>(() => normalizeDofeEnabledPluginIds(settings.value?.enabledPlugins ?? defaultPluginIds, BRAND_VARIANT, settings.value?.entitlements?.plugins))
   const [models, setModels] = useState<readonly DofeModel[]>([])
   const [selectedModel, setSelectedModel] = useState('')
   const [protocol, setProtocol] = useState<DofeProtocol>(() => normalizeDofeUiProtocol(settings.value?.protocol))
@@ -253,11 +259,12 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
     && settings.value?.authMode === 'feishu' && Boolean(settings.value.identity?.ssoSub)
   const showSetup = BRAND_VARIANT !== 'sensteed' || ssoBound
   const showCapabilities = BRAND_VARIANT === 'sensteed' ? ssoBound : onboarding === true
+  const selectedCapabilityCount = capabilities.filter(capability => enabledPlugins.includes(capability.plugin) && dofePluginCanEnable(capability.plugin, BRAND_VARIANT, entitledPlugins)).length
   const bindFeishuLogin = async (status: DofeAuthSnapshot): Promise<void> => {
     if (!status.user?.ssoSub || !status.entitlements) throw new Error('登录身份不完整')
     const nextProtocol = UI_DOFE_PROTOCOLS.find(candidate => status.entitlements?.allowedProtocols.includes(candidate))
     if (!nextProtocol) throw new Error('当前账号没有可用的模型协议')
-    const plugins = normalizeDofePluginIds(status.entitlements.plugins, BRAND_VARIANT)
+    const plugins = normalizeDofeEnabledPluginIds(status.entitlements.plugins, BRAND_VARIANT, status.entitlements.plugins)
     await mutateDofeAccessSettings(settingsApi, [
       { op: 'set', path: ['setupComplete'], value: false },
       { op: 'set', path: ['authMode'], value: 'feishu' },
@@ -275,8 +282,8 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
     await loadModels({ key: '', protocol: nextProtocol, configured: true, preferredModel: status.entitlements.defaultModel })
   }
   useEffect(() => {
-    if (settings.value?.enabledPlugins !== undefined) setEnabledPlugins(normalizeDofePluginIds(settings.value.enabledPlugins, BRAND_VARIANT))
-  }, [settings.value?.enabledPlugins])
+    if (settings.value?.enabledPlugins !== undefined) setEnabledPlugins(normalizeDofeEnabledPluginIds(settings.value.enabledPlugins, BRAND_VARIANT, settings.value.entitlements?.plugins))
+  }, [settings.value?.enabledPlugins, settings.value?.entitlements?.plugins])
   useEffect(() => {
     if (settings.value?.modelId !== undefined) setSelectedModel(settings.value.modelId)
   }, [settings.value?.modelId])
@@ -436,7 +443,7 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
       await mutateDofeAccessSettings(settingsApi, [
         { op: 'set', path: ['setupComplete'], value: true },
         { op: 'set', path: ['validationVersion'], value: DOFE_ACCESS_VALIDATION_VERSION },
-        { op: 'set', path: ['enabledPlugins'], value: normalizeDofePluginIds(enabledPlugins, BRAND_VARIANT).filter(id => settings.value?.entitlements?.plugins.includes(id)) },
+        { op: 'set', path: ['enabledPlugins'], value: normalizeDofeEnabledPluginIds(enabledPlugins, BRAND_VARIANT, entitledPlugins) },
         { op: 'set', path: ['modelId'], value: selectedModel },
         { op: 'set', path: ['protocol'], value: protocol },
         { op: 'set', path: ['authMode'], value: 'feishu' },
@@ -485,7 +492,30 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
       {BRAND_VARIANT === 'sensteed' && <DofeLoginSection disabled={interactionBusy} name={ssoBound ? settings.value?.identity?.name || '用户' : undefined} avatar={ssoBound ? settings.value?.identity?.avatar : undefined} onBound={bindFeishuLogin} onLogout={remove} />}
       {BRAND_VARIANT === 'sensteed' && !ssoBound && <p className="dshDofeAccessIntro">{t('sensteedLoginIntro')}</p>}
       {BRAND_VARIANT === 'sensteed' && ssoBound && <p className="dshDofeAccessHint">{t('sensteedSetupIntro')}{settings.value?.identity?.groups?.length ? ` · 企业授权：${settings.value.identity.groups.map(group => settings.value?.identity?.groupNames?.[group] ?? group).join('、')}` : ''}</p>}
-      {showCapabilities && <div className="dshDofeAccessField"><div className="dshDofeAccessFieldHeader"><span className="dshDofeAccessLabel">{t('pluginsTitle')}</span><span className="dshDofeAccessCount">{t('selectedCount').replace('{count}', String(enabledPlugins.length))}</span></div><div className="dshDofeAccessPlugins">{availablePlugins.map(plugin => { const selected = enabledPlugins.includes(plugin.id); return <label className={`dshDofeAccessPlugin${selected ? ' dshDofeAccessPluginSelected' : ''}`} key={plugin.id}><input type="checkbox" checked={selected} disabled={interactionBusy} onChange={event => { const checked = event.currentTarget.checked; setEnabledPlugins(current => checked ? [...new Set([...current, plugin.id])] : current.filter(id => id !== plugin.id)) }} /><span className="dshDofeAccessPluginCheck" aria-hidden="true"><Check size={14} strokeWidth={2.5} /></span><span><span className="dshDofeAccessPluginName">{plugin.name}</span><span className="dshDofeAccessPluginDescription">{plugin.description}</span></span></label> })}</div></div>}
+      {showCapabilities && <div className="dshDofeAccessField">
+        <div className="dshDofeAccessFieldHeader"><span className="dshDofeAccessLabel">{t('pluginsTitle')}</span><span className="dshDofeAccessCount">{t('selectedCount').replace('{count}', String(selectedCapabilityCount))}</span></div>
+        <div className="dshDofeAccessCapabilityGroups dshDofeAccessPlugins">
+          {(['basic', 'business'] as const).map(kind => {
+            const items = capabilities.filter(capability => capability.kind === kind)
+            const titleKey = kind === 'basic' ? 'basicCapabilitiesTitle' : 'businessCapabilitiesTitle'
+            const hintKey = kind === 'basic' ? 'basicCapabilitiesHint' : 'businessCapabilitiesHint'
+            return <section className="dshDofeAccessCapabilityGroup" key={kind} aria-labelledby={`dofe-${kind}-capabilities-title`}>
+              <div className="dshDofeAccessCapabilityGroupHeader" id={`dofe-${kind}-capabilities-title`}><Sparkles size={15} aria-hidden="true" /><span>{t(titleKey)}</span></div>
+              <p className="dshDofeAccessCapabilityGroupHint">{t(hintKey)}</p>
+              <div className="dshDofeAccessCapabilities">{items.map(capability => {
+                const selectable = dofePluginCanEnable(capability.plugin, BRAND_VARIANT, entitledPlugins)
+                const required = capability.kind === 'basic'
+                const selected = required || (selectable && enabledPlugins.includes(capability.plugin))
+                return <label className={`dshDofeAccessCapability${selected ? ' dshDofeAccessCapabilitySelected' : ''}`} key={capability.id} title={selectable ? undefined : t('capabilityPermissionRequired')}>
+                  <input type="checkbox" checked={selected} disabled={interactionBusy || required || !selectable} onChange={event => { const checked = event.currentTarget.checked; setEnabledPlugins(current => checked ? [...new Set([...current, capability.plugin])] : current.filter(id => id !== capability.plugin)) }} />
+                  <span className="dshDofeAccessCapabilityCheck" aria-hidden="true">{selectable ? <Check size={14} strokeWidth={2.5} /> : <LockKeyhole size={13} strokeWidth={2.2} />}</span>
+                  <span><span className="dshDofeAccessCapabilityName">{capability.name}</span><span className="dshDofeAccessCapabilityDescription">{capability.description}</span><span className={`dshDofeAccessCapabilityStatus${selectable ? '' : ' dshDofeAccessCapabilityStatusUnavailable'}`}>{selectable ? <Check size={12} aria-hidden="true" /> : <LockKeyhole size={12} aria-hidden="true" />}{t(selectable ? 'capabilityAvailable' : 'capabilityPermissionRequired')}</span></span>
+                </label>
+              })}</div>
+            </section>
+          })}
+        </div>
+      </div>}
     </section>
     {showSetup && <section className="dshDofeAccessSection" aria-labelledby="dofe-model-section-title">
       <div className="dshDofeAccessSectionHeader"><h3 id="dofe-model-section-title">{t('modelSectionTitle')}</h3></div>

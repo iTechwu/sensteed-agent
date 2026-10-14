@@ -80,6 +80,14 @@
       ],
       "platform": "web"
     },
+    "capabilities": [
+      {
+        "id": "connect-im",
+        "kind": "basic",
+        "name": "企业消息与协作连接",
+        "description": "连接微信、飞书、企微、钉钉、QQ 与 Matrix 等企业消息渠道。"
+      }
+    ],
     "compatibility": {
       "dsh": "0.2.0-rc.2",
       "dshReleases": {

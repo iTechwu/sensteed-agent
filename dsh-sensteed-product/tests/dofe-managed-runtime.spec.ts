@@ -72,7 +72,7 @@ describe('dofe-managed MCP runtime', () => {
 
     await apply(harness.ctx as never)
 
-    expect(harness.clients).toHaveLength(1)
+    expect(harness.clients).toHaveLength(2)
     expect(harness.clients[0]?.config).toMatchObject({
       serverName: 'openmontage',
       url: DOFE_MCP_BASE_URL + '/montage',
@@ -85,14 +85,14 @@ describe('dofe-managed MCP runtime', () => {
 
     const accessWatcher = harness.access.watch.mock.calls[0]?.[0] as (() => void) | undefined
     accessWatcher?.()
-    await vi.waitFor(() => expect(harness.ctx.plugin).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => expect(harness.ctx.plugin).toHaveBeenCalledTimes(2))
   })
 
   it('publishes the shared Knowledge and Memory permission gate from live access settings', async () => {
     const settings: DofeAccessSettings = {
       setupComplete: true,
       validationVersion: DOFE_ACCESS_VALIDATION_VERSION,
-      enabledPlugins: ['knowledge'],
+      enabledPlugins: ['openmontage', 'media', 'opencli', 'connect-im', 'knowledge'],
       modelId: 'deepseek-chat',
       protocol: 'chat-completions',
       authMode: 'feishu',
@@ -108,7 +108,7 @@ describe('dofe-managed MCP runtime', () => {
     expect(getGate).toBeDefined()
     expect(getGate?.()).toMatchObject({
       ready: true,
-      enabledPlugins: ['knowledge'],
+      enabledPlugins: ['openmontage', 'media', 'opencli', 'connect-im', 'knowledge'],
       entitlements: { plugins: ['knowledge'], knowledge: { permissionVersion: 1, accesses: ['read', 'write'] } },
     })
 

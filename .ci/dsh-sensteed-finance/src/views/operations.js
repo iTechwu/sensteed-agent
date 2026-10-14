@@ -65,12 +65,12 @@ function OperationsView({ brief, t, onDrill }) {
       h(KpiCard, { icon: 'data', label: t('kpiExecRate'), value: ratio(exec, 1) ?? '—', hint: `${t('kpiBudget')} ${wan(m.budgetAmount) ?? '—'}`, onClick: () => onDrill('budget') }),
       h(KpiCard, { icon: 'plan', label: t('kpiPayRate'), value: payRate ?? '—', hint: `${t('kpiPrSubmitted')} ${wan(m.prSubmittedAmount) ?? '—'}`, onClick: () => onDrill('budget', { view: 'ledger' }) }),
       h(KpiCard, { icon: 'goal', label: t('kpiNetInflow'), value: wan(netTotal), hint: `↑${wan(totals.actualIncome) ?? '—'} / ↓${wan(totals.actualExpense) ?? '—'}`, hintTone: netTotal >= 0 ? 'up' : 'down', negative: netTotal < 0, onClick: () => onDrill('cash') })),
-    h(Card, { title: t('opTheme') }, h(Table, {
+    h(Card, { title: t('opTheme') }, h(Table, { tableId: 'finance-OperationsView-1',
       columns: [
         { label: t('theme'), key: '0' },
         { label: t('metric'), key: '1' },
         { label: t('dataSource'), key: '2' },
-        { label: t('readiness'), render: row => row[3] ? h(Pill, { tone: 'green' }, t('ready')) : h(Pill, { tone: 'muted' }, t('pending')) },
+        { label: t('readiness'), key: '3', render: row => row[3] ? h(Pill, { tone: 'green' }, t('ready')) : h(Pill, { tone: 'muted' }, t('pending')) },
       ],
       rows: OP_TOPICS, empty: t('empty'),
     })),

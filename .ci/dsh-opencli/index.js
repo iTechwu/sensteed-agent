@@ -2,6 +2,9 @@ import { execFile } from 'node:child_process'
 
 export const name = 'dsh-agent-reach-tools'
 export const inject = ['tools', 'systemPrompt', 'credentials']
+export const capabilities = Object.freeze([
+  { id: 'opencli-research', kind: 'basic', name: '互联网检索与资料整理', description: '受控读取公开网页，提炼来源与研究结论。' },
+])
 
 const TIMEOUT_MS = 90000
 const MAX_OUTPUT_BYTES = 2 * 1024 * 1024

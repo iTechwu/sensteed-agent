@@ -5,6 +5,7 @@ const REQUIRED_TOOLS = [
   'supply_chain_capabilities_get',
   'supply_chain_suppliers_list',
   'supply_chain_qcc_capabilities_get',
+  'supply_chain_qcc_company_search',
   'supply_chain_qcc_company_data_get',
   'supply_chain_qcc_company_data_list',
   'supply_chain_relationships_list',
@@ -14,6 +15,9 @@ const REQUIRED_TOOLS = [
 ]
 
 export const inject = ['tools', 'systemPrompt']
+export const capabilities = Object.freeze([
+  { id: 'supplier-intelligence', kind: 'business', name: '供应商情报与风险', description: '采集供应商情报，分析舆情并跟踪风险变化。' },
+])
 
 export function apply(ctx) {
   const disposers = []
@@ -27,7 +31,7 @@ export function apply(ctx) {
   if (ctx.tools?.register) {
     disposers.push(ctx.tools.register({
       name: 'sensteed_supplier_intelligence_bootstrap',
-      description: 'Inspect the local supply-chain tool catalog before supplier collection or public-opinion analysis. This tool is read-only.',
+      description: 'Inspect the local supply-chain tool catalog before company search, supplier collection, or public-opinion analysis. This tool is read-only.',
       parameters: { type: 'object', additionalProperties: false, properties: {} },
       output: {
         schema: { type: 'object', additionalProperties: true },
@@ -46,7 +50,7 @@ export function apply(ctx) {
             externalCallMade: false,
             tools,
             missing,
-            usage: 'Read database coverage first. Use QCC capability discovery before a cache-aware get. Submit social collection only for verified suppliers with a stable idempotencyKey and poll the original runId.',
+            usage: 'For a company not yet in the supplier registry, search with supply_chain_qcc_company_search first. Show every candidate and wait for the user to select; never auto-select. Only then create/verify the supplier and use QCC capability discovery plus cache-aware data reads. Submit social collection only for verified suppliers with a stable idempotencyKey and poll the original runId.',
           },
         }
       },
