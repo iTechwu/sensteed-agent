@@ -11,7 +11,7 @@ const FILES = [
   'src/head.js',
   'src/format.js',
   'src/components.js',
-  'src/styles.js',
+  'src/styles.js', 'src/workflows.js',
   'src/views/overview.js',
   'src/views/budget.js',
   'src/views/operations.js',
@@ -20,7 +20,7 @@ const FILES = [
   'src/views/datacenter.js',
   'src/views/entry.js',
   'src/views/analyze.js',
-  'src/views/bom.js',
+  'src/views/bom.js', 'src/views/notifications.js', 'src/views/permissions.js', 'src/views/review.js', 'src/views/sources.js', 'src/views/comparisons.js', 'src/views/facts.js', 'src/views/engine.js', 'src/views/filing.js',
   'src/shell.js',
 ]
 

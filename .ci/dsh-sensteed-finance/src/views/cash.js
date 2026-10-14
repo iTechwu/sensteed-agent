@@ -4,6 +4,9 @@ const PRIORITIES = [['HIGH', 'priHigh'], ['MEDIUM', 'priMid'], ['LOW', 'priLow']
 
 function CashView({ ctx, t, onDrill }) {
   const { year, orgId, departments, revision } = ctx
+  const canWrite = ctx.financeWriter && ctx.permissions.includes('cash.plan.write')
+  const canVerify = ctx.financeWriter && ctx.permissions.includes('cash.plan.verify')
+  const writeLock = useRef(false)
   const [tab, setTab] = useState(() => ['summary', 'plans', 'adjustments', 'revenue'].includes(ctx.drillParams?.view) ? ctx.drillParams.view : 'summary')
   const [cash, setCash] = useState(null)
   const [plans, setPlans] = useState(null)
@@ -28,12 +31,14 @@ function CashView({ ctx, t, onDrill }) {
   }
 
   const act = async (path, payload, doneMessage) => {
-    setBusy(true); setNotice(null)
+    if (writeLock.current) return false
+    writeLock.current = true; setBusy(true); setNotice(null)
     try {
       await post(path, payload)
       setNotice(doneMessage ?? t('submitted'))
       setReloadTick(value => value + 1)
-    } catch (error) { setNotice(`${t('opFailed')}: ${error.message}`) } finally { setBusy(false) }
+      return true
+    } catch (error) { setNotice(`${t('opFailed')}: ${error.message}`); return false } finally { writeLock.current = false; setBusy(false) }
   }
 
   useEffect(() => { setNotice(null) }, [revision])
@@ -66,9 +71,9 @@ function CashView({ ctx, t, onDrill }) {
     filterBar ? h('div', { className: 'sf-row-between' }, filterBar) : null,
 
     tab === 'summary' ? h(SummaryTab, { cash, t }) : null,
-    tab === 'plans' ? h(PlansTab, { rows: planRows, total: plans?.data?.total ?? plans?.total, page, onPage: setPage, t, busy, act, onDialog: setDialog }) : null,
-    tab === 'adjustments' ? h(PlanAdjustmentsTab, { t, revision, reloadTick, busy, act, onDialog: setDialog }) : null,
-    tab === 'revenue' ? h(RevenueTab, { revenues, page: revenuePage, onPage: setRevenuePage, t, onBackfill: row => setDialog({ kind: 'backfill', row }) }) : null,
+    tab === 'plans' ? h(PlansTab, { rows: planRows, total: plans?.data?.total ?? plans?.total, page, onPage: setPage, t, busy, act, canWrite, onDialog: setDialog }) : null,
+    tab === 'adjustments' ? h(PlanAdjustmentsTab, { t, revision, reloadTick, busy, act, canWrite, canVerify, onDialog: setDialog }) : null,
+    tab === 'revenue' ? h(RevenueTab, { revenues, page: revenuePage, onPage: setRevenuePage, t, canWrite, onBackfill: row => setDialog({ kind: 'backfill', row }) }) : null,
 
     dialog?.kind === 'schedule' ? h(ScheduleDialog, { plan: dialog.plan, t, onClose: () => setDialog(null), act }) : null,
     dialog?.kind === 'increase' ? h(IncreaseDialog, { plan: dialog.plan, t, onClose: () => setDialog(null), act }) : null,
@@ -158,7 +163,7 @@ function CashMatrix({ rows, t }) {
 
 // ---- 排款工作台 ----
 
-function PlansTab({ rows, total, page, onPage, t, busy, act, onDialog }) {
+function PlansTab({ rows, total, page, onPage, t, busy, act, canWrite = true, onDialog }) {
   return h(Card, { title: t('cashPlans'), unit: t('unitNote') },
     h(Table, { tableId: 'finance-PlansTab-1',
       columns: [
@@ -175,8 +180,8 @@ function PlansTab({ rows, total, page, onPage, t, busy, act, onDialog }) {
           label: t('actions'), key: 'actions', sortable: false,
           render: row => h('div', { className: 'sf-row', style: { flexWrap: 'nowrap', justifyContent: 'flex-end' } },
             h(LinkButton, { onClick: () => onDialog({ kind: 'planDetail', plan: row }) }, t('actDetail')),
-            h(LinkButton, { onClick: () => onDialog({ kind: 'schedule', plan: row }) }, t('schedule')),
-            h(LinkButton, { onClick: () => onDialog({ kind: 'increase', plan: row }) }, t('increase'))),
+            canWrite ? h(LinkButton, { disabled: busy, onClick: () => onDialog({ kind: 'schedule', plan: row }) }, t('schedule')) : null,
+            canWrite ? h(LinkButton, { disabled: busy, onClick: () => onDialog({ kind: 'increase', plan: row }) }, t('increase')) : null),
         },
       ],
       rows, empty: t('empty'),
@@ -190,15 +195,15 @@ function ScheduleDialog({ plan, t, onClose, act }) {
   const [accepts, setAccepts] = useState(Boolean(plan.acceptsAcceptance))
   const [cashAmount, setCashAmount] = useState(plan.plannedCashAmount != null ? String(plan.plannedCashAmount) : '')
   const [acceptanceAmount, setAcceptanceAmount] = useState(plan.plannedAcceptanceAmount != null ? String(plan.plannedAcceptanceAmount) : '')
-  const submit = () => {
-    act(`/payment-plans/${plan.id}/schedule`, {
+  const submit = async () => {
+    const saved = await act(`/payment-plans/${plan.id}/schedule`, {
       ...(scheduleDate ? { scheduleDate: new Date(`${scheduleDate}T00:00:00`).toISOString() } : {}),
       ...(priority ? { priority } : { priority: null }),
       acceptsAcceptance: accepts,
       ...(cashAmount ? { plannedCashAmount: Number(cashAmount) } : {}),
       ...(acceptanceAmount ? { plannedAcceptanceAmount: Number(acceptanceAmount) } : {}),
     })
-    onClose()
+    if (saved !== false) onClose()
   }
   return h(Dialog, { title: `${t('schedule')} · ${plan.description ?? ''}`, onClose, footer: [
     h(GhostButton, { key: 'cancel', onClick: onClose }, t('cancel')),
@@ -216,7 +221,7 @@ function IncreaseDialog({ plan, t, onClose, act }) {
   const [newAmount, setNewAmount] = useState('')
   const [reason, setReason] = useState('')
   const invalid = finite(newAmount) === null || Number(newAmount) <= Number(plan.plannedAmount ?? 0) || !reason.trim()
-  const submit = () => { if (invalid) return; act('/plan-adjustments', { planId: plan.id, newAmount: Number(newAmount), reason: reason.trim() }); onClose() }
+  const submit = async () => { if (invalid) return; const saved = await act('/plan-adjustments', { planId: plan.id, newAmount: Number(newAmount), reason: reason.trim() }); if (saved !== false) onClose() }
   return h(Dialog, { title: `${t('increase')} · ${plan.description ?? ''}`, onClose, footer: [
     h(GhostButton, { key: 'cancel', onClick: onClose }, t('cancel')),
     h(PrimaryButton, { key: 'ok', disabled: invalid, onClick: submit }, t('submit')),
@@ -243,7 +248,7 @@ function PlanDetailDialog({ plan, t, onClose }) {
 
 // ---- 调增审批台 ----
 
-function PlanAdjustmentsTab({ t, revision, reloadTick, busy, act, onDialog }) {
+function PlanAdjustmentsTab({ t, revision, reloadTick, busy, act, canWrite = true, canVerify = true, onDialog }) {
   const [status, setStatus] = useState('SUBMITTED')
   const [data, setData] = useState(null)
   const [page, setPage] = useState(1)
@@ -269,10 +274,10 @@ function PlanAdjustmentsTab({ t, revision, reloadTick, busy, act, onDialog }) {
             label: t('actions'), key: 'actions', sortable: false,
             render: row => h('div', { className: 'sf-row', style: { flexWrap: 'nowrap', justifyContent: 'flex-end' } },
               h(LinkButton, { onClick: () => onDialog({ kind: 'planAdjDetail', id: row.id }) }, t('actDetail')),
-              row.status === 'SUBMITTED' ? h(LinkButton, { onClick: () => act(`/plan-adjustments/${row.id}/approve`, {}) }, t('actApprove')) : null,
-              row.status === 'SUBMITTED' ? h(LinkButton, { onClick: () => onDialog({ kind: 'reason', title: t('actReject'), required: true, run: reason => act(`/plan-adjustments/${row.id}/reject`, { note: reason }) }) }, t('actReject')) : null,
-              row.status === 'APPROVED' ? h(LinkButton, { onClick: () => act(`/plan-adjustments/${row.id}/post`, {}) }, t('actPost')) : null,
-              row.status === 'DRAFT' || row.status === 'SUBMITTED' ? h(LinkButton, { onClick: () => onDialog({ kind: 'reason', title: t('actCancel'), required: false, run: reason => act(`/plan-adjustments/${row.id}/cancel`, reason ? { note: reason } : {}) }) }, t('actCancel')) : null),
+              canVerify && row.status === 'SUBMITTED' ? h(LinkButton, { onClick: () => act(`/plan-adjustments/${row.id}/approve`, {}) }, t('actApprove')) : null,
+              canVerify && row.status === 'SUBMITTED' ? h(LinkButton, { onClick: () => onDialog({ kind: 'reason', title: t('actReject'), required: true, run: reason => act(`/plan-adjustments/${row.id}/reject`, { note: reason }) }) }, t('actReject')) : null,
+              canVerify && row.status === 'APPROVED' ? h(LinkButton, { onClick: () => act(`/plan-adjustments/${row.id}/post`, {}) }, t('actPost')) : null,
+              row.status === 'DRAFT' || canVerify && row.status === 'SUBMITTED' ? h(LinkButton, { onClick: () => onDialog({ kind: 'reason', title: t('actCancel'), required: false, run: reason => act(`/plan-adjustments/${row.id}/cancel`, reason ? { note: reason } : {}) }) }, t('actCancel')) : null),
           },
         ],
         rows, empty: t('empty'),
@@ -284,7 +289,7 @@ function PlanAdjustmentsTab({ t, revision, reloadTick, busy, act, onDialog }) {
 
 // ---- 收入计划 ----
 
-function RevenueTab({ revenues, page, onPage, t, onBackfill }) {
+function RevenueTab({ revenues, page, onPage, t, canWrite = true, onBackfill }) {
   const rows = revenues?.data?.list || revenues?.list || []
   return h(Card, { title: t('revenueVs'), unit: t('unitNote') },
     h(Table, { tableId: 'finance-RevenueTab-1',
@@ -303,7 +308,7 @@ function RevenueTab({ revenues, page, onPage, t, onBackfill }) {
             return h('span', { className: value < 0 ? 'sf-neg' : 'sf-pos' }, wan(value))
           },
         },
-        { label: t('actions'), key: 'actions', sortable: false, render: row => h(LinkButton, { onClick: () => onBackfill(row) }, t('backfill')) },
+        { label: t('actions'), key: 'actions', sortable: false, render: row => canWrite ? h(LinkButton, { onClick: () => onBackfill(row) }, t('backfill')) : null },
       ],
       rows, empty: t('empty'),
     }),
@@ -313,13 +318,13 @@ function RevenueTab({ revenues, page, onPage, t, onBackfill }) {
 function BackfillDialog({ row, t, onClose, act }) {
   const [amount, setAmount] = useState(row.actualAmount != null ? String(row.actualAmount) : '')
   const [date, setDate] = useState(row.actualPaidAt?.slice(0, 10) ?? '')
-  const submit = event => {
+  const submit = async event => {
     event.preventDefault()
-    act(`/revenue-plans/${row.id}/actuals`, {
+    const saved = await act(`/revenue-plans/${row.id}/actuals`, {
       actualAmount: Number(amount),
       ...(date ? { actualPaidAt: new Date(`${date}T00:00:00`).toISOString() } : {}),
     })
-    onClose()
+    if (saved !== false) onClose()
   }
   return h(Dialog, { title: `${t('backfill')} · ${row.itemName ?? ''}`, width: 'sm', onClose, footer: [
     h(GhostButton, { key: 'cancel', onClick: onClose }, t('cancel')),

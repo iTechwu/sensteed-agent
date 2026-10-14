@@ -2,9 +2,9 @@
 
 const FINANCE_ROLES = ['DEPT_FILLER', 'DEPT_LEADER', 'DEPT_COLLABORATOR', 'BOSS', 'FINANCE_STAFF', 'FINANCE_OWNER', 'MANAGEMENT']
 
-function EntryView({ ctx, t }) {
+function EntryView({ ctx, t, directoryOnly }) {
   const { year, orgs, departments, revision } = ctx
-  const [section, setSection] = useState('filing')
+  const [section, setSection] = useState(directoryOnly ? 'org' : 'filing')
   const [tasks, setTasks] = useState(null)
   const [assignments, setAssignments] = useState(null)
   const [contacts, setContacts] = useState(null)
@@ -65,7 +65,7 @@ function EntryView({ ctx, t }) {
 
   return h('div', { className: 'sf-view' },
     h('div', { className: 'sf-row-between' },
-      h(PillTabs, { tabs: [['filing', 'filingTasks'], ['my', 'myFiling'], ['org', 'directory']], value: section, onChange: setSection, t }),
+      !directoryOnly ? h(PillTabs, { tabs: [['filing', 'filingTasks'], ['my', 'myFiling'], ['org', 'directory']], value: section, onChange: setSection, t }) : null,
       notice ? h(Notice, null, notice) : null),
 
     // 录入前检查（对齐前端录入前检查卡：未分配>0 时告警）
@@ -81,7 +81,7 @@ function EntryView({ ctx, t }) {
       h(MembersCard, { members, busy, t, act, onDialog: setDialog, onRetry: retryLists })) : null,
 
     // 录入面板常开内嵌（对齐前端 FinanceEntryPanel）
-    h(EntryPanel, { year, orgs, departments, t, act }),
+    !directoryOnly ? h(EntryPanel, { year, orgs, departments, t, act }) : null,
 
     dialog?.kind === 'createTask' ? h(CreateTaskDialog, { year, departments, members, busy, t, onClose: () => setDialog(null), act }) : null,
     dialog?.kind === 'assignment' ? h(AssignmentDialog, { assignment: dialog.assignment, busy, t, onClose: () => setDialog(null), act }) : null,
@@ -235,9 +235,9 @@ function MyFilingSection({ assignments, busy, t, act, onDialog, onRetry, onReope
 }
 
 /** 部门行编辑器：月份/说明/金额多行 + 暂存/提交；复核定稿在弹窗内完成，重开走外层 ReasonDialog */
-function AssignmentDialog({ assignment, busy, t, onClose, act }) {
+function AssignmentDialog({ assignment, canEdit = true, canVerify = true, busy, t, onClose, act }) {
   const task = assignment.task
-  const editable = task?.status === 'OPEN' && (!task.dueAt || new Date(task.dueAt).getTime() >= Date.now()) &&
+  const editable = canEdit && task?.status === 'OPEN' && (!task.dueAt || new Date(task.dueAt).getTime() >= Date.now()) &&
     (['PENDING', 'DRAFT', 'REJECTED'].includes(assignment.status) || (assignment.status === 'SUBMITTED' && task.allowModify === true))
   const emptyRow = () => ({ costItemId: '', month: String(task?.month ?? ''), description: '', plannedAmount: '' })
   const [rows, setRows] = useState(() => assignment.rows?.length ? assignment.rows.map(row => ({ ...row })) : [emptyRow()])
@@ -287,7 +287,7 @@ function AssignmentDialog({ assignment, busy, t, onClose, act }) {
   return h(Dialog, { title: t('assignmentTitle') + ' · ' + (assignment.departmentName ?? ''), width: 'lg', onClose, footer: [
     editable ? h(GhostButton, { key: 'save', disabled: busy || saving, onClick: () => persist(false) }, t('saveDraft')) : null,
     editable ? h(PrimaryButton, { key: 'submit', busy: busy || saving, onClick: () => persist(true) }, t('submitFiling')) : null,
-    assignment.status === 'SUBMITTED' ? h(PrimaryButton, {
+    canVerify && assignment.status === 'SUBMITTED' ? h(PrimaryButton, {
       key: 'commit', busy: busy || saving,
       onClick: async () => { if (await act('/filing-assignments/' + assignment.id + '/commit', {})) onClose() },
     }, t('commitFiling')) : null,
