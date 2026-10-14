@@ -16,6 +16,7 @@ const MAX_ARCHIVE_BYTES = 10 * 1024 * 1024
 const MAX_UNPACKED_BYTES = 25 * 1024 * 1024
 const MAX_ARCHIVE_FILES = 500
 const SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
+const SHARED_INSTALL_MARKER = '.sensteed-shared-skill.json'
 
 export const inject = ['webServer', 'skills', 'credentials']
 
@@ -273,17 +274,28 @@ async function packLocalSkill(ctx, name) {
   return { metadata, archive, sha256: createHash('sha256').update(archive).digest('hex') }
 }
 
-async function installArchive(root, expectedName, archive, expectedSha256) {
+async function installArchive(root, expectedName, archive, expectedSha256, version = 1) {
   if (createHash('sha256').update(archive).digest('hex') !== expectedSha256) throw new Error('Skill archive checksum does not match.')
   const names = validateZipArchive(archive)
   const entries = unzipSync(archive)
   const metadata = parseSkillFrontmatter(Buffer.from(entries['SKILL.md']).toString('utf8'))
   if (metadata.name !== expectedName) throw new Error('Skill archive name does not match the shared listing.')
+  if (!Number.isSafeInteger(version) || version < 1) throw new Error('Shared skill version is invalid.')
   await mkdir(root, { recursive: true, mode: 0o700 })
   const rootStat = await lstat(root)
   if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) throw new Error('The local skill directory is not a regular directory.')
   const destination = join(root, expectedName)
-  if (await exists(destination)) throw new Error(`The skill "${expectedName}" is already installed.`)
+  let backup
+  const destinationStat = await lstat(destination).catch(() => undefined)
+  if (destinationStat) {
+    if (!destinationStat.isDirectory() || destinationStat.isSymbolicLink()) throw new Error('The existing skill path is not a regular directory.')
+    let marker
+    try { marker = JSON.parse(await readFile(join(destination, SHARED_INSTALL_MARKER), 'utf8')) } catch {}
+    if (marker?.name !== expectedName || !/^[a-f0-9]{64}$/u.test(marker?.sha256 || '')) {
+      throw new Error(`The skill "${expectedName}" is already installed and is not managed by the company library.`)
+    }
+    backup = join(root, `.${expectedName}.${randomUUID()}.bak`)
+  }
   const staging = join(root, `.${expectedName}.${randomUUID()}.tmp`)
   try {
     for (const name of names) {
@@ -296,13 +308,44 @@ async function installArchive(root, expectedName, archive, expectedSha256) {
       await mkdir(dirname(target), { recursive: true, mode: 0o700 })
       await writeFile(target, entries[name], { mode: 0o600, flag: 'wx' })
     }
-    await rename(staging, destination)
+    await writeFile(join(staging, SHARED_INSTALL_MARKER), JSON.stringify({ name: expectedName, sha256: expectedSha256, version }), { mode: 0o600, flag: 'wx' })
+    if (backup) await rename(destination, backup)
+    try {
+      await rename(staging, destination)
+    } catch (error) {
+      if (backup) {
+        await rename(backup, destination)
+        backup = undefined
+      }
+      throw error
+    }
+    if (backup) {
+      await rm(backup, { recursive: true, force: true })
+      backup = undefined
+    }
     return metadata
   } finally {
     await rm(staging, { recursive: true, force: true })
+    if (backup) {
+      if (!await exists(destination)) await rename(backup, destination)
+      else await rm(backup, { recursive: true, force: true })
+    }
   }
 }
 
+async function readSharedInstallMarker(skill) {
+  if (skill.source === 'bundled' || typeof skill.path !== 'string') return undefined
+  try {
+    const root = await realpath(skillRoot())
+    const directory = await realpath(dirname(skill.path))
+    if (relative(root, directory) !== skill.name) return undefined
+    const marker = JSON.parse(await readFile(join(directory, SHARED_INSTALL_MARKER), 'utf8'))
+    if (marker?.name !== skill.name || !/^[a-f0-9]{64}$/u.test(marker?.sha256 || '') || !Number.isSafeInteger(marker.version)) return undefined
+    return { sha256: marker.sha256, version: marker.version }
+  } catch {
+    return undefined
+  }
+}
 async function resolveModelsKey(ctx) {
   const result = await ctx.credentials.resolve('MODELS_API_KEY')
   const value = typeof result === 'string' ? result : result?.value
@@ -355,12 +398,16 @@ function isSameOrigin(req, port) {
 
 export async function listSkills(ctx) {
   const skills = await ctx.skills.list()
-  return skills.map(skill => ({
-    name: skill.name,
-    description: skill.description,
-    source: skill.source,
-    provider: skill.provider,
-    path: skill.path,
+  return Promise.all(skills.map(async skill => {
+    const shared = await readSharedInstallMarker(skill)
+    return {
+      name: skill.name,
+      description: skill.description,
+      source: skill.source,
+      provider: skill.provider,
+      path: skill.path,
+      ...(shared ? { shared } : {}),
+    }
   }))
 }
 
@@ -403,7 +450,7 @@ export function apply(ctx, overrides = {}) {
         if (req.method === 'POST' && sharedName && requestPath === `${ROUTE}/shared/${sharedName}`) {
           const result = await callSharedSkills(ctx, `/${encodeURIComponent(sharedName)}/archive`, { fetch: overrides.fetch })
           const archive = Buffer.from(result.archiveBase64, 'base64')
-          const skill = await installArchive(skillRoot(), sharedName, archive, result.sha256)
+          const skill = await installArchive(skillRoot(), sharedName, archive, result.sha256, result.version)
           return respond(res, 201, { skill })
         }
         if (req.method === 'DELETE' && sharedName && requestPath === `${ROUTE}/shared/${sharedName}`) {

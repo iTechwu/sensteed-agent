@@ -91,6 +91,30 @@ test('validates shared skill archives and installs their complete directory atom
     assert.equal(await readFile(join(root, 'release-notes', 'scripts', 'check.mjs'), 'utf8'), 'export default true')
     await assert.rejects(__test.installArchive(root, 'different-name', archive, digest), /does not match/u)
     await assert.rejects(__test.installArchive(root, 'release-notes', archive, '0'.repeat(64)), /checksum/u)
+    const updateArchive = Buffer.from(zipSync({
+      'SKILL.md': new TextEncoder().encode('---\nname: release-notes\ndescription: Prepare release notes\n---\n'),
+      'scripts/check.mjs': new TextEncoder().encode('export default false'),
+    }))
+    const updateDigest = (await import('node:crypto')).createHash('sha256').update(updateArchive).digest('hex')
+    await __test.installArchive(root, 'release-notes', updateArchive, updateDigest, 2)
+    assert.equal(await readFile(join(root, 'release-notes', 'scripts', 'check.mjs'), 'utf8'), 'export default false')
+    assert.deepEqual(JSON.parse(await readFile(join(root, 'release-notes', '.sensteed-shared-skill.json'), 'utf8')), {
+      name: 'release-notes', sha256: updateDigest, version: 2,
+    })
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test('does not replace a same-name local skill without a company-library marker', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'skill-manager-local-conflict-'))
+  const archive = Buffer.from(zipSync({
+    'SKILL.md': new TextEncoder().encode('---\nname: release-notes\ndescription: Prepare release notes\n---\n'),
+  }))
+  const digest = (await import('node:crypto')).createHash('sha256').update(archive).digest('hex')
+  try {
+    await mkdir(join(root, 'release-notes'))
+    await writeFile(join(root, 'release-notes', 'SKILL.md'), 'locally maintained')
+    await assert.rejects(__test.installArchive(root, 'release-notes', archive, digest, 2), /not managed by the company library/u)
+    assert.equal(await readFile(join(root, 'release-notes', 'SKILL.md'), 'utf8'), 'locally maintained')
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 

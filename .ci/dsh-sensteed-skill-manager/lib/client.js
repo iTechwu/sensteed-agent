@@ -14,7 +14,7 @@ window.__ModuleLoader__.load({
         loading: '正在读取技能…', refreshing: '正在刷新技能…', refreshFailed: '技能列表刷新失败。', retry: '重试', repository: 'GitHub 仓库或技能目录链接',
         installAction: '安装', cancel: '取消', installing: '正在安装…', installed: '已安装',
         publish: '上传到公司', publishing: '正在上传…', publishSuccess: '已发布到公司技能库', publishError: '发布失败，请稍后重试。',
-        shared: '公司共享', sharedEmpty: '公司技能库还没有技能', sharedUnavailable: '暂时无法读取公司技能库', sharedInstall: '安装', sharedInstalled: '已安装', sharedLoading: '正在读取公司技能库…',
+        shared: '公司共享', sharedEmpty: '公司技能库还没有技能', sharedUnavailable: '暂时无法读取公司技能库', sharedInstall: '安装', sharedUpdate: '更新', sharedInstalled: '已安装', sharedLoading: '正在读取公司技能库…',
         withdraw: '撤回', withdrawing: '正在撤回…', withdrawSuccess: '已从公司技能库撤回',
         installHint: '可粘贴单技能仓库，或合集仓库中某个技能的 /tree/ 分支目录链接。来源可信后再安装。Skill 会在本机加载。',
         installError: '安装失败，请检查仓库地址和技能结构。', installSuccess: '已安装 {name}', bundled: '内置', local: '本机',
@@ -29,7 +29,7 @@ window.__ModuleLoader__.load({
         loading: 'Loading skills…', refreshing: 'Refreshing skills…', refreshFailed: 'Could not refresh the skill list.', retry: 'Retry', repository: 'GitHub repository or skill directory URL',
         installAction: 'Install', cancel: 'Cancel', installing: 'Installing…', installed: 'Installed',
         publish: 'Share with company', publishing: 'Publishing…', publishSuccess: 'Published to company skills', publishError: 'Could not publish this skill. Try again.',
-        shared: 'Company shared', sharedEmpty: 'No company skills yet', sharedUnavailable: 'Company skills are temporarily unavailable', sharedInstall: 'Install', sharedInstalled: 'Installed', sharedLoading: 'Loading company skills…',
+        shared: 'Company shared', sharedEmpty: 'No company skills yet', sharedUnavailable: 'Company skills are temporarily unavailable', sharedInstall: 'Install', sharedUpdate: 'Update', sharedInstalled: 'Installed', sharedLoading: 'Loading company skills…',
         withdraw: 'Withdraw', withdrawing: 'Withdrawing…', withdrawSuccess: 'Removed from company skills',
         installHint: 'Paste a single-skill repository or a /tree/ link to one skill in a collection. Install trusted sources only.',
         installError: 'Installation failed. Check the repository URL and skill structure.', installSuccess: 'Installed {name}', bundled: 'Built in', local: 'Local',
@@ -180,13 +180,15 @@ window.__ModuleLoader__.load({
             : sharedError ? h('p', { className: 'sm-inline-error', role: 'status' }, t('sharedUnavailable'))
               : sharedSkills.length === 0 ? h('p', { className: 'sm-state' }, t('sharedEmpty'))
               : h('div', { className: 'sm-list' }, sharedSkills.map(skill => {
-                const isInstalled = skills.some(local => local.name === skill.name)
+                const localSkill = skills.find(local => local.name === skill.name)
+                const isInstalled = Boolean(localSkill)
+                const canUpdate = Boolean(localSkill?.shared && localSkill.shared.sha256 !== skill.sha256)
                 return h('article', { className: 'sm-row', key: `shared:${skill.name}` },
                   h('div', { className: 'sm-glyph sm-shared-glyph', 'aria-hidden': true }, '✳'),
                   h('div', { className: 'sm-copy' }, h('strong', null, skill.name), h('p', null, skill.description)),
                   h('span', { className: 'sm-version' }, `v${skill.version}`),
                   skill.canManage ? h('button', { type: 'button', className: 'sm-row-action is-danger', disabled: busy, onClick: () => void withdraw(skill.name) }, t('withdraw')) : null,
-                  h('button', { type: 'button', className: 'sm-row-action', disabled: busy || isInstalled, onClick: () => void installShared(skill.name) }, isInstalled ? t('sharedInstalled') : t('sharedInstall'))
+                  h('button', { type: 'button', className: 'sm-row-action', disabled: busy || (isInstalled && !canUpdate), onClick: () => void installShared(skill.name) }, canUpdate ? t('sharedUpdate') : isInstalled ? t('sharedInstalled') : t('sharedInstall'))
                 )
               }))),
           error ? h('div', { className: 'sm-error', role: 'alert' }, error) : null),
