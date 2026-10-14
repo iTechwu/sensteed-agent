@@ -7,7 +7,7 @@ vi.mock('../src/generated-product-identity.ts', () => ({ BRAND_VARIANT: 'senstee
 function harness(overrides = {}) {
   let settings = {
     setupComplete: true, validationVersion: DOFE_ACCESS_VALIDATION_VERSION,
-    modelId: 'model-a', protocol: 'messages', enabledPlugins: ['media', 'openmontage'],
+    modelId: 'model-a', protocol: 'messages', enabledPlugins: ['media', 'openmontage', 'finance'],
     authMode: 'feishu', identity: { ssoSub: 'user-1', name: 'User' },
     entitlements: { plugins: ['media', 'openmontage'], allowedProtocols: ['messages'], defaultModel: '' },
     ...overrides,
@@ -70,10 +70,11 @@ describe('Sensteed startup authorization', () => {
         tenant: { tenantId: 'tenant', ssoTeamId: 'team', tenantSlug: 'sensteed' },
         entitlements: { plugins: ['media'], allowedProtocols: ['messages'] },
       })).mockResolvedValueOnce(json({ sub: 'user-1', name: 'User', picture: 'https://user.hozonauto.com/avatar/user-1.png' }))
+      .mockResolvedValueOnce(json({ code: 0, data: { allowed: true } }))
       .mockResolvedValueOnce(json({ code: 0, data: { allowed: true } })))
     await apply(h.ctx as never)
     expect(h.getSettings().setupComplete).toBe(true)
-    expect(h.getSettings().enabledPlugins).toEqual(['openmontage', 'media', 'opencli', 'connect-im'])
+    expect(h.getSettings().enabledPlugins).toEqual(['openmontage', 'media', 'opencli', 'connect-im', 'finance'])
     expect(h.ctx.plugin).toHaveBeenCalledTimes(3)
     expect(h.ctx.plugin).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({
       serverName: 'finance', url: 'https://ai.hozonauto.com/mcp/finance',
@@ -100,6 +101,7 @@ describe('Sensteed startup authorization', () => {
         entitlements: { plugins: ['media'], allowedProtocols: ['messages'] },
       }))
       .mockResolvedValueOnce(json({ sub: 'user-1', name: 'User' }))
+      .mockResolvedValueOnce(json({ code: 0, data: { allowed: false } }))
       .mockResolvedValueOnce(json({ code: 0, data: { allowed: false } })))
     await apply(h.ctx as never)
     expect(h.ctx.plugin).toHaveBeenCalledTimes(2)
@@ -183,7 +185,7 @@ it.each([true, false])('preserves setup completion (%s) while refreshing profile
     await vi.advanceTimersByTimeAsync(15 * 60_000)
     expect(h.getSettings().setupComplete).toBe(complete)
     expect(h.getSettings().modelId).toBe('model-a')
-    expect(h.getSettings().enabledPlugins).toEqual(['openmontage', 'media', 'opencli', 'connect-im'])
+    expect(h.getSettings().enabledPlugins).toEqual(['openmontage', 'media', 'opencli', 'connect-im', 'finance'])
     expect(h.getSettings().identity).toMatchObject({ name: 'Name 1', avatar: null, groups: ['department-1'], groupNames: { 'department-1': 'Department 1' } })
     expect(h.ctx.desktopRuntime.openExternal).not.toHaveBeenCalled()
   } finally { await h.dispose() }

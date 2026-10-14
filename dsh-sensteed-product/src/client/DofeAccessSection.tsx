@@ -7,11 +7,11 @@ import { ArrowRight, Check, LockKeyhole, Sparkles } from 'lucide-react'
 import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { DofeOnboardingModal } from './DofeOnboardingModal.tsx'
 import { DofeLoginSection } from './DofeLoginSection.tsx'
-import { DOFE_AUTH_LOGOUT_PATH, DOFE_AUTH_STATUS_PATH, type DofeAuthSnapshot } from '../dofe-auth-contract.ts'
+import { DOFE_AUTH_LOGOUT_PATH, DOFE_AUTH_REFRESH_PATH, DOFE_AUTH_STATUS_PATH, type DofeAuthSnapshot } from '../dofe-auth-contract.ts'
 import { heroBrandDataUrl } from '../generated-brand-assets.ts'
 import { BRAND_TENANT, BRAND_VARIANT } from '../generated-product-identity.ts'
 import { DOFE_ACCESS_KEY, type DofeAccessLocaleKey } from './dofe-access.ts'
-import { dofeCapabilitiesForBrand, dofePluginCanEnable, normalizeDofeEnabledPluginIds, normalizeDofePluginIds, DOFE_ACCESS_SETTINGS_NAMESPACE, DOFE_ACCESS_VALIDATION_VERSION, type DofeAccessSettings, type DofePluginId, DEFAULT_DOFE_PLUGIN_IDS } from '../dofe-plugins.ts'
+import { DOFE_CAPABILITY_GROUPS, dofeCapabilitiesForBrand, dofePluginCanEnable, normalizeDofeEnabledPluginIds, normalizeDofePluginIds, DOFE_ACCESS_SETTINGS_NAMESPACE, DOFE_ACCESS_VALIDATION_VERSION, type DofeAccessSettings, type DofePluginId, DEFAULT_DOFE_PLUGIN_IDS } from '../dofe-plugins.ts'
 import { DOFE_ACCESS_MODELS_PATH, DOFE_ACCESS_VALIDATE_PATH } from '../dofe-access-route.ts'
 import { DEFAULT_DOFE_PROTOCOL, DOFE_ANTHROPIC_BASE_URL, normalizeDofeUiProtocol, parseDofeModelCatalog, UI_DOFE_PROTOCOLS, type DofeModel, type DofeProtocol } from '../dofe-models.ts'
 
@@ -71,13 +71,21 @@ const CSS = `
 .dshDofeAccessError { color: var(--dsw-alias-state-error-primary, #c93636); background: rgba(201, 54, 54, .08); border-left: 3px solid var(--dsw-alias-state-error-primary, #c93636); padding: 10px 12px; margin: 0; font-size: 13px; line-height: 1.45; }
 .dshDofeAccessCapabilityGroups { display: grid; gap: 14px; }
 .dshDofeAccessCapabilityGroup { display: grid; gap: 8px; }
-.dshDofeAccessCapabilityGroupHeader { display: flex; align-items: center; gap: 7px; color: var(--dsw-alias-label-primary, #172033); font-size: 13px; font-weight: 650; }
+.dshDofeAccessCapabilityGroupHeader { margin: 0; display: flex; align-items: center; gap: 7px; color: var(--dsw-alias-label-primary, #172033); font-size: 13px; font-weight: 650; }
 .dshDofeAccessCapabilityGroupHeader svg { color: var(--dsw-alias-brand-primary, #245eea); }
 .dshDofeAccessCapabilityGroupHint { margin: -2px 0 0; color: var(--dsw-alias-label-secondary, #667085); font-size: 12px; line-height: 1.4; }
 .dshDofeAccessCapabilities { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .dshDofeAccessCapability { position: relative; display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 10px; min-height: 70px; align-items: start; padding: 12px; background: var(--dsw-alias-bg-layer-1, #fff); border: 1px solid var(--dsw-alias-border-l1, #e2e6ed); border-radius: 7px; cursor: pointer; }
-.dshDofeAccessCapability:hover:not(:has(input:disabled)) { border-color: var(--dsw-alias-brand-primary, #245eea); background: var(--dsw-alias-interactive-bg-hover, #f2f5f9); }
-.dshDofeAccessCapability:has(input:disabled) { opacity: .58; cursor: default; }
+label.dshDofeAccessCapability:hover:not(:has(input:disabled)) { border-color: var(--dsw-alias-brand-primary, #245eea); background: var(--dsw-alias-interactive-bg-hover, #f2f5f9); }
+.dshDofeAccessCapability:has(input:disabled) { cursor: default; }
+.dshDofeAccessCapabilityReadOnly { cursor: default; }
+.dshDofeAccessCapabilityReadOnly .dshDofeAccessCapabilityCheck { border-color: transparent; background: transparent; color: var(--dsw-alias-state-success-primary, #12805c); }
+.dshDofeAccessCapabilityReadOnly:not(.dshDofeAccessCapabilitySelected) .dshDofeAccessCapabilityCheck { color: var(--dsw-alias-label-secondary, #667085); }
+.dshDofeAccessCapabilityUnavailable { background: var(--dsw-alias-bg-layer-2, #f5f7fa); }
+.dshDofeAccessCapabilitySource { display: block; margin-top: 5px; color: var(--dsw-alias-label-secondary, #667085); font-size: 11px; }
+.dshDofeAccessPermissionActions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.dshDofeAccessTools { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+.dshDofeAccessTools input { accent-color: var(--dsw-alias-brand-primary, #245eea); width: 16px; height: 16px; }
 .dshDofeAccessCapability input { position: absolute; opacity: 0; pointer-events: none; }
 .dshDofeAccessCapabilityCheck { width: 20px; height: 20px; display: grid; place-items: center; color: transparent; background: var(--dsw-alias-bg-layer-1, #fff); border: 1px solid var(--dsw-alias-border-l2, #c7ced9); border-radius: 5px; }
 .dshDofeAccessCapabilitySelected .dshDofeAccessCapabilityCheck { color: var(--dsw-alias-label-primary-foreground, #fff); background: var(--dsw-alias-brand-primary, #245eea); border-color: var(--dsw-alias-brand-primary, #245eea); }
@@ -244,6 +252,7 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
   const entitledPlugins = settings.value?.entitlements?.plugins
   const defaultPluginIds = useMemo(() => normalizeDofePluginIds(DEFAULT_DOFE_PLUGIN_IDS, BRAND_VARIANT), [])
   const [enabledPlugins, setEnabledPlugins] = useState<DofePluginId[]>(() => normalizeDofeEnabledPluginIds(settings.value?.enabledPlugins ?? defaultPluginIds, BRAND_VARIANT, settings.value?.entitlements?.plugins))
+  const capabilityDraft = useRef({ subject: settings.value?.identity?.ssoSub, dirty: false })
   const [models, setModels] = useState<readonly DofeModel[]>([])
   const [selectedModel, setSelectedModel] = useState('')
   const [protocol, setProtocol] = useState<DofeProtocol>(() => normalizeDofeUiProtocol(settings.value?.protocol))
@@ -253,6 +262,9 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
   const busyRef = useRef(false)
   const [error, setError] = useState<string>()
   const [success, setSuccess] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const refreshingRef = useRef(false)
+  const [permissionMessage, setPermissionMessage] = useState<'success' | 'error'>()
   // The live SSO probe outranks the persisted identity: a definitively dead
   // session must render the login form, not a stale name and entitlements.
   const ssoBound = sessionDead !== true
@@ -273,6 +285,7 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
       { op: 'set', path: ['enabledPlugins'], value: plugins },
       { op: 'set', path: ['protocol'], value: nextProtocol },
     ])
+    capabilityDraft.current = { subject: status.user.ssoSub, dirty: false }
     setConfigured(true)
     setEnabledPlugins(plugins)
     setProtocol(nextProtocol)
@@ -282,8 +295,13 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
     await loadModels({ key: '', protocol: nextProtocol, configured: true, preferredModel: status.entitlements.defaultModel })
   }
   useEffect(() => {
-    if (settings.value?.enabledPlugins !== undefined) setEnabledPlugins(normalizeDofeEnabledPluginIds(settings.value.enabledPlugins, BRAND_VARIANT, settings.value.entitlements?.plugins))
-  }, [settings.value?.enabledPlugins, settings.value?.entitlements?.plugins])
+    const current = settings.value
+    if (current?.enabledPlugins === undefined) return
+    if (capabilityDraft.current.subject !== current.identity?.ssoSub) {
+      capabilityDraft.current = { subject: current.identity?.ssoSub, dirty: false }
+    }
+    setEnabledPlugins(draft => normalizeDofeEnabledPluginIds(capabilityDraft.current.dirty ? draft : current.enabledPlugins, BRAND_VARIANT, current.entitlements?.plugins))
+  }, [settings.value?.enabledPlugins, settings.value?.entitlements?.plugins, settings.value?.identity?.ssoSub])
   useEffect(() => {
     if (settings.value?.modelId !== undefined) setSelectedModel(settings.value.modelId)
   }, [settings.value?.modelId])
@@ -457,6 +475,7 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
     }
     busyRef.current = false
     setBusy(false)
+    capabilityDraft.current.dirty = false
     setDraft('')
     setConfigured(true)
     if (onDone) onDone()
@@ -483,7 +502,28 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
     // left the form rendering the revoked identity for a full minute.
     onSessionRevoked?.()
   }
-  const interactionBusy = busy || loadingModels
+  const refreshPermissions = async (): Promise<void> => {
+    if (refreshingRef.current) return
+    refreshingRef.current = true
+    setRefreshing(true)
+    setPermissionMessage(undefined)
+    try {
+      const response = await fetch(DOFE_AUTH_REFRESH_PATH, {
+        method: 'POST', credentials: 'same-origin', redirect: 'error',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: '{}', signal: AbortSignal.timeout(60_000),
+      })
+      const status = await response.json() as DofeAuthSnapshot
+      if (!response.ok || status.status !== 'bound' || !status.entitlements
+        || status.user?.ssoSub !== settings.value?.identity?.ssoSub) throw new Error('permission refresh failed')
+      // The Host synchronizes the settings store; do not reset model setup or
+      // replace unsaved capability choices with the login defaults here.
+      setEnabledPlugins(normalizeDofeEnabledPluginIds(enabledPlugins, BRAND_VARIANT, status.entitlements.plugins))
+      setPermissionMessage('success')
+    } catch { setPermissionMessage('error') }
+    finally { refreshingRef.current = false; setRefreshing(false) }
+  }
+  const interactionBusy = busy || loadingModels || refreshing
   return <div className={`dshDofeAccess${onboarding ? ' dshDofeAccessOnboarding' : ''}`} aria-busy={interactionBusy}>
     {!onboarding && <h2>{t('title')}</h2>}
     {success && <Toast text={t('loginSuccess')} icon={<Check size={18} />} onDone={() => setSuccess(false)} />}
@@ -494,22 +534,33 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
       {BRAND_VARIANT === 'sensteed' && ssoBound && <p className="dshDofeAccessHint">{t('sensteedSetupIntro')}{settings.value?.identity?.groups?.length ? ` · 企业授权：${settings.value.identity.groups.map(group => settings.value?.identity?.groupNames?.[group] ?? group).join('、')}` : ''}</p>}
       {showCapabilities && <div className="dshDofeAccessField">
         <div className="dshDofeAccessFieldHeader"><span className="dshDofeAccessLabel">{t('pluginsTitle')}</span><span className="dshDofeAccessCount">{t('selectedCount').replace('{count}', String(selectedCapabilityCount))}</span></div>
+        <p className="dshDofeAccessCapabilityGroupHint">{t('capabilityIntro')}</p>
+        <div className="dshDofeAccessPermissionActions">
+          <Button disabled={interactionBusy} onClick={() => void refreshPermissions()}>{t(refreshing ? 'capabilityRefreshing' : 'capabilityRefresh')}</Button>
+          {permissionMessage && <span className={permissionMessage === 'error' ? 'dshDofeAccessError' : 'dshDofeAccessHint'} role={permissionMessage === 'error' ? 'alert' : 'status'}>{t(permissionMessage === 'error' ? 'capabilityRefreshError' : 'capabilityRefreshSuccess')}</span>}
+        </div>
+        <label className="dshDofeAccessTools"><input type="checkbox" checked={enabledPlugins.includes('tools')} disabled={interactionBusy || !dofePluginCanEnable('tools', BRAND_VARIANT, entitledPlugins)} onChange={event => { const checked = event.currentTarget.checked; capabilityDraft.current.dirty = true; setEnabledPlugins(current => checked ? [...new Set([...current, 'tools' as const])] : current.filter(id => id !== 'tools')) }} />{t('capabilityToolsTitle')}</label>
+        <p className="dshDofeAccessCapabilityGroupHint">{t('capabilityToolsHint')}</p>
         <div className="dshDofeAccessCapabilityGroups dshDofeAccessPlugins">
-          {(['basic', 'business'] as const).map(kind => {
-            const items = capabilities.filter(capability => capability.kind === kind)
-            const titleKey = kind === 'basic' ? 'basicCapabilitiesTitle' : 'businessCapabilitiesTitle'
-            const hintKey = kind === 'basic' ? 'basicCapabilitiesHint' : 'businessCapabilitiesHint'
-            return <section className="dshDofeAccessCapabilityGroup" key={kind} aria-labelledby={`dofe-${kind}-capabilities-title`}>
-              <div className="dshDofeAccessCapabilityGroupHeader" id={`dofe-${kind}-capabilities-title`}><Sparkles size={15} aria-hidden="true" /><span>{t(titleKey)}</span></div>
-              <p className="dshDofeAccessCapabilityGroupHint">{t(hintKey)}</p>
+          {DOFE_CAPABILITY_GROUPS.map(group => {
+            const items = capabilities.filter(capability => capability.group === group)
+            const titleKey = { research: 'capabilityResearchTitle', creation: 'capabilityCreationTitle', collaboration: 'capabilityCollaborationTitle', business: 'capabilityBusinessTitle' } as const
+            return <section className="dshDofeAccessCapabilityGroup" key={group} aria-labelledby={`dofe-${group}-capabilities-title`}>
+              <h4 className="dshDofeAccessCapabilityGroupHeader" id={`dofe-${group}-capabilities-title`}><Sparkles size={15} aria-hidden="true" /><span>{t(titleKey[group])}</span></h4>
               <div className="dshDofeAccessCapabilities">{items.map(capability => {
                 const selectable = dofePluginCanEnable(capability.plugin, BRAND_VARIANT, entitledPlugins)
                 const required = capability.kind === 'basic'
                 const selected = required || (selectable && enabledPlugins.includes(capability.plugin))
-                return <label className={`dshDofeAccessCapability${selected ? ' dshDofeAccessCapabilitySelected' : ''}`} key={capability.id} title={selectable ? undefined : t('capabilityPermissionRequired')}>
-                  <input type="checkbox" checked={selected} disabled={interactionBusy || required || !selectable} onChange={event => { const checked = event.currentTarget.checked; setEnabledPlugins(current => checked ? [...new Set([...current, capability.plugin])] : current.filter(id => id !== capability.plugin)) }} />
+                const sharedTools = capability.plugin === 'tools'
+                const statusKey = !selectable ? capability.plugin === 'finance' && settings.value?.entitlements?.financeAccess === 'unavailable' ? 'capabilityUnavailable' : 'capabilityPermissionRequired' : required ? 'capabilityDefault' : selected ? 'capabilityEnabled' : 'capabilityOptional'
+                const content = <>
                   <span className="dshDofeAccessCapabilityCheck" aria-hidden="true">{selectable ? <Check size={14} strokeWidth={2.5} /> : <LockKeyhole size={13} strokeWidth={2.2} />}</span>
-                  <span><span className="dshDofeAccessCapabilityName">{capability.name}</span><span className="dshDofeAccessCapabilityDescription">{capability.description}</span><span className={`dshDofeAccessCapabilityStatus${selectable ? '' : ' dshDofeAccessCapabilityStatusUnavailable'}`}>{selectable ? <Check size={12} aria-hidden="true" /> : <LockKeyhole size={12} aria-hidden="true" />}{t(selectable ? 'capabilityAvailable' : 'capabilityPermissionRequired')}</span></span>
+                  <span><span className="dshDofeAccessCapabilityName">{capability.name}</span><span className="dshDofeAccessCapabilityDescription">{capability.description}</span>{sharedTools && <span className="dshDofeAccessCapabilitySource">Tools</span>}<span className={`dshDofeAccessCapabilityStatus${selectable ? '' : ' dshDofeAccessCapabilityStatusUnavailable'}`}>{selectable ? <Check size={12} aria-hidden="true" /> : <LockKeyhole size={12} aria-hidden="true" />}{t(statusKey)}</span></span>
+                </>
+                const className = `dshDofeAccessCapability${required || sharedTools ? ' dshDofeAccessCapabilityReadOnly' : ''}${selected ? ' dshDofeAccessCapabilitySelected' : ''}${selectable ? '' : ' dshDofeAccessCapabilityUnavailable'}`
+                return required || sharedTools ? <div className={className} key={capability.id}>{content}</div> : <label className={className} key={capability.id}>
+                  <input type="checkbox" checked={selected} disabled={interactionBusy || !selectable} onChange={event => { const checked = event.currentTarget.checked; capabilityDraft.current.dirty = true; setEnabledPlugins(current => checked ? [...new Set([...current, capability.plugin])] : current.filter(id => id !== capability.plugin)) }} />
+                  {content}
                 </label>
               })}</div>
             </section>

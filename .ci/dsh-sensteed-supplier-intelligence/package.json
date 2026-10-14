@@ -12,8 +12,16 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
-    }
-    ,"capabilities": [{"id": "supplier-intelligence", "kind": "business", "name": "供应商情报与风险", "description": "采集供应商情报，分析舆情并跟踪风险变化。"}]
+    },
+    "capabilities": [
+      {
+        "id": "supplier-intelligence",
+        "kind": "business",
+        "group": "business",
+        "name": "供应商情报与风险",
+        "description": "查询企业与供应商信息，采集舆情，分析关系与风险变化。"
+      }
+    ]
   },
   "files": [
     "cordis.patch.yml",

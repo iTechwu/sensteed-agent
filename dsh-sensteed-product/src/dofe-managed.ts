@@ -105,6 +105,7 @@ const ROUTES: readonly ManagedMcpRoute[] = [
     'hotspot-discovery', 'custom-car-monitoring', 'viral-video', 'browser-intelligence', 'tos-upload', 'xhs-operation',
     'douyin-operation',
   ].map(path => ({ plugin: 'tools' as const, serverName: `tools-${path}`, path: `tools/${path}`, timeoutMs: 60_000 })),
+  { plugin: 'supplier-intelligence', serverName: 'supply-chain', path: 'tools/supply-chain', timeoutMs: 120_000 },
 ]
 
 /**
@@ -127,7 +128,7 @@ export async function apply(ctx: Context): Promise<void> {
       protocol: z.union(['chat-completions', 'messages', 'responses']).default('chat-completions'),
       authMode: z.union(['feishu', 'manual']).default('feishu'),
       identity: z.any().default(undefined),
-      entitlements: z.object({ plugins: z.array(z.string()), defaultModel: z.string(), allowedProtocols: z.array(z.string()) }).default({ plugins: [], defaultModel: '', allowedProtocols: [] }),
+      entitlements: z.object({ plugins: z.array(z.string()), financeAccess: z.union(['allowed', 'denied', 'unavailable']).default('unavailable'), defaultModel: z.string(), allowedProtocols: z.array(z.string()) }).default({ plugins: [], defaultModel: '', allowedProtocols: [] }),
     }),
     {
       validate: value => {
@@ -327,7 +328,8 @@ export async function apply(ctx: Context): Promise<void> {
         financeAllowed = financeAccessCache.allowed
       } else {
         try {
-          const response = await globalThis.fetch(DATASOURCE_FINANCE_WORKSPACE_ACCESS_URL, {
+          const request = launcher?.requestDofeAuth?.bind(launcher) ?? globalThis.fetch
+          const response = await request(DATASOURCE_FINANCE_WORKSPACE_ACCESS_URL, {
             method: 'GET',
             headers: {
               Accept: 'application/json',
@@ -345,7 +347,7 @@ export async function apply(ctx: Context): Promise<void> {
         }
       }
     }
-    const ready = baseReady && financeAllowed
+    const ready = baseReady && financeAllowed && enabledPlugins(accessSettings).has('finance')
     financeAuthorized = ready
     const nextSignature = ready
       ? `${next}\0${session!.accessToken}`

@@ -15,7 +15,13 @@ const MAX_BODY_BYTES = 32 * 1024
 
 export const inject = ['webServer', 'credentials', 'tools', 'systemPrompt', 'dofeAuth', 'dofeAccess']
 export const capabilities = Object.freeze([
-  { id: 'finance-management', kind: 'business', name: '财务经营分析', description: '预算、台账、资金、预警、成本 BOM 和数据治理看板。' },
+  {
+    "id": "finance-management",
+    "kind": "business",
+    "group": "business",
+    "name": "财务经营分析",
+    "description": "分析预算、台账、资金、经营预警与成本 BOM，查看数据治理看板。"
+  }
 ])
 
 /** Resolve the live Feishu session on every call; never trust a browser-supplied identity. */

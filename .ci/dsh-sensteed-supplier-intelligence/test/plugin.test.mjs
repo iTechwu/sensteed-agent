@@ -35,8 +35,8 @@ test('loads the skill as system guidance and registers a read-only bootstrap', a
     'mcp__supply-chain__supply_chain_qcc_company_search',
   ])
   assert.equal(sections[0].name, 'sensteed:supplier-intelligence-skill')
-  assert.match(sections[0].text, /供应商全量归集与舆情分析/u)
-  assert.match(sections[0].text, /QCC_MCP_UNAVAILABLE/u)
+  assert.match(sections[0].text({}), /供应商全量归集与舆情分析/u)
+  assert.match(sections[0].text({}), /QCC_MCP_UNAVAILABLE/u)
   const bootstrap = tools.get('sensteed_supplier_intelligence_bootstrap')
   assert.ok(bootstrap)
   assert.equal(bootstrap.isConcurrencySafe(), true)
@@ -60,4 +60,36 @@ test('skill preserves cache, verification, idempotency, and evidence boundaries'
     '不能写成企业事实',
   ]) assert.match(skill, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'u'))
   assert.doesNotMatch(skill, /Bearer\s+[A-Za-z0-9]/u)
+})
+
+test('supplier guidance and bootstrap follow the live product gate and tool connection', async () => {
+  const { apply } = await import('../index.js')
+  const listeners = new Map()
+  const tools = new Map()
+  let enabled = false
+  let connected = true
+  let section
+  const dispose = apply({
+    dofeAccess: () => ({ ready: true, enabledPlugins: enabled ? ['supplier-intelligence'] : [] }),
+    on(name, callback) { listeners.set(name, callback); return () => listeners.delete(name) },
+    tools: {
+      schemas: scope => connected && scope !== 'restricted' ? [{ name: 'mcp__supply-chain__supply_chain_suppliers_list' }] : [],
+      register(tool) { tools.set(tool.name, tool); return () => tools.delete(tool.name) },
+    },
+    systemPrompt: { section(value) { section = value; return () => {} } },
+  })
+  assert.equal(tools.size, 0)
+  assert.equal(section.text({}), '')
+  enabled = true
+  listeners.get('dofe/access-changed')()
+  assert.equal(tools.size, 1)
+  assert.match(section.text({}), /供应商/u)
+  assert.equal(section.text({ scope: 'restricted' }), '')
+  connected = false
+  listeners.get('tools/change')()
+  assert.equal(tools.size, 0)
+  enabled = false
+  assert.equal(section.text({}), '')
+  dispose()
+  assert.equal(listeners.size, 0)
 })
