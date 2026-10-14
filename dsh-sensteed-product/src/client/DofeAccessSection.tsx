@@ -15,6 +15,10 @@ import { DOFE_CAPABILITY_GROUPS, dofeCapabilitiesForBrand, dofePluginCanEnable, 
 import { DOFE_ACCESS_MODELS_PATH, DOFE_ACCESS_VALIDATE_PATH } from '../dofe-access-route.ts'
 import { DEFAULT_DOFE_PROTOCOL, DOFE_ANTHROPIC_BASE_URL, normalizeDofeUiProtocol, parseDofeModelCatalog, UI_DOFE_PROTOCOLS, type DofeModel, type DofeProtocol } from '../dofe-models.ts'
 
+type SettingsPage = 'all' | 'account' | 'models' | 'capabilities'
+const capabilityDrafts = new Map<string, DofePluginId[]>()
+const CAPABILITY_GROUP_TITLE_KEYS = { research: 'capabilityResearchTitle', creation: 'capabilityCreationTitle', collaboration: 'capabilityCollaborationTitle', business: 'capabilityBusinessTitle' } as const
+
 const STYLE_ID = 'dsh-dofe-access-styles'
 // The Host performs tenant validation and catalog loading sequentially (10s each).
 const ACCESS_REQUEST_TIMEOUT_MS = 25000
@@ -31,6 +35,16 @@ const CSS = `
 .dshDofeModalDescription { margin: 7px 0 0; max-width: 540px; color: var(--dsw-alias-label-secondary, #667085); font-size: 14px; line-height: 1.55; }
 .dshDofeModalBody { min-height: 0; overflow: auto; padding: 22px 28px 26px; }
 .dshDofeAccess { display: grid; gap: 20px; max-width: 640px; }
+.dshDofeAccess h2 { margin: 0; font-size: 20px; line-height: 1.4; }
+.dshDofeAccessSearch { width: 100%; min-height: 40px; box-sizing: border-box; padding: 9px 12px; border: 1px solid var(--dsw-alias-border-l2, #c7ced9); border-radius: 6px; background: var(--dsw-alias-bg-layer-1, #fff); color: inherit; font: inherit; }
+.dshDofeAccessSearch:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary, #245eea); outline-offset: 2px; }
+.dshDofeAccessFilters { display: flex; flex-wrap: wrap; gap: 6px; }
+.dshDofeAccessFilters button { min-height: 32px; font-size: 12px; }
+.dshDofeAccessFilters button[aria-pressed="true"] { color: var(--dsw-alias-brand-primary, #245eea); border-color: currentColor; background: var(--dsw-alias-interactive-bg-hover, #f2f5f9); }
+.dshDofeAccessSaveBar { position: sticky; bottom: 0; z-index: 1; padding: 12px 0 0; border-top: 1px solid var(--dsw-alias-border-l1, #e2e6ed); background: var(--dsw-alias-bg-layer-1, #fff); }
+.dshDofeAccessIdentityDetails { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px 20px; margin: 0; font-size: 13px; line-height: 1.5; }
+.dshDofeAccessIdentityDetails dt { color: var(--dsw-alias-label-secondary, #667085); }
+.dshDofeAccessIdentityDetails dd { margin: 0; overflow-wrap: anywhere; }
 .dshDofeAccessSection { display: grid; gap: 16px; padding: 16px; background: var(--dsw-alias-bg-layer-1, #fff); border: 1px solid var(--dsw-alias-border-l1, #e2e6ed); border-radius: 8px; }
 .dshDofeAccessSectionHeader { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
 .dshDofeAccessSectionHeader h3 { margin: 0; color: var(--dsw-alias-label-primary, #172033); font-size: 16px; line-height: 1.35; }
@@ -47,6 +61,7 @@ const CSS = `
 .dshSensteedUserSettingsTrigger .dshDofeAccessAvatar { width: 24px; height: 24px; }
 .dshDofeAccessField { display: grid; gap: 9px; }
 .dshDofeAccessFieldHeader { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+.dshDofeAccessFieldHeader h3 { margin: 0; }
 .dshDofeAccessLabel { color: var(--dsw-alias-label-primary, #172033); font-size: 14px; font-weight: 650; }
 .dshDofeAccessHint, .dshDofeAccessCount { color: var(--dsw-alias-label-secondary, #667085); font-size: 12px; }
 .dshDofeAccessInputWrap { position: relative; }
@@ -243,16 +258,18 @@ export function blockDofeApplicationRoot(): () => void {
   }
 }
 
-function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, onDone, sessionDead, onSessionRevoked, onSessionBound }: DofeAccessInjected & { onboarding?: boolean; onDone?: () => void; sessionDead?: boolean; onSessionRevoked?: () => void; onSessionBound?: () => void }): ReactNode {
+function AccessForm({ credentials, settingsApi, settingsScope, t, page = 'all', onboarding, onDone, sessionDead, onSessionRevoked, onSessionBound }: DofeAccessInjected & { page?: SettingsPage; onboarding?: boolean; onDone?: () => void; sessionDead?: boolean; onSessionRevoked?: () => void; onSessionBound?: () => void }): ReactNode {
   const [configured, setConfigured] = useState<boolean | undefined>()
   const [draft, setDraft] = useState('')
   const settingsStore = useMemo(() => dofeAccessSettingsStore(settingsScope), [settingsScope])
   const settings = useSyncExternalStore(settingsStore.subscribe, settingsStore.getSnapshot, settingsStore.getSnapshot)
   const capabilities = useMemo(() => dofeCapabilitiesForBrand(BRAND_VARIANT), [])
   const entitledPlugins = settings.value?.entitlements?.plugins
+  const draftSubject = settings.value?.identity?.ssoSub
+  const restoredCapabilityDraft = draftSubject === undefined ? undefined : capabilityDrafts.get(draftSubject)
   const defaultPluginIds = useMemo(() => normalizeDofePluginIds(DEFAULT_DOFE_PLUGIN_IDS, BRAND_VARIANT), [])
-  const [enabledPlugins, setEnabledPlugins] = useState<DofePluginId[]>(() => normalizeDofeEnabledPluginIds(settings.value?.enabledPlugins ?? defaultPluginIds, BRAND_VARIANT, settings.value?.entitlements?.plugins))
-  const capabilityDraft = useRef({ subject: settings.value?.identity?.ssoSub, dirty: false })
+  const [enabledPlugins, setEnabledPlugins] = useState<DofePluginId[]>(() => normalizeDofeEnabledPluginIds(restoredCapabilityDraft ?? settings.value?.enabledPlugins ?? defaultPluginIds, BRAND_VARIANT, settings.value?.entitlements?.plugins))
+  const capabilityDraft = useRef({ subject: draftSubject, dirty: restoredCapabilityDraft !== undefined })
   const [models, setModels] = useState<readonly DofeModel[]>([])
   const [selectedModel, setSelectedModel] = useState('')
   const [protocol, setProtocol] = useState<DofeProtocol>(() => normalizeDofeUiProtocol(settings.value?.protocol))
@@ -264,13 +281,28 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
   const [success, setSuccess] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const refreshingRef = useRef(false)
+  const [query, setQuery] = useState('')
+  const [groupFilter, setGroupFilter] = useState<(typeof DOFE_CAPABILITY_GROUPS)[number] | 'all'>('all')
   const [permissionMessage, setPermissionMessage] = useState<'success' | 'error'>()
   // The live SSO probe outranks the persisted identity: a definitively dead
   // session must render the login form, not a stale name and entitlements.
   const ssoBound = sessionDead !== true
     && settings.value?.authMode === 'feishu' && Boolean(settings.value.identity?.ssoSub)
-  const showSetup = BRAND_VARIANT !== 'sensteed' || ssoBound
-  const showCapabilities = BRAND_VARIANT === 'sensteed' ? ssoBound : onboarding === true
+  const usesModels = page === 'all' || page === 'models'
+  const showAccount = page === 'all' || page === 'account'
+  const showSetup = usesModels && (BRAND_VARIANT !== 'sensteed' || ssoBound)
+  const showCapabilities = (page === 'all' || page === 'capabilities') && (BRAND_VARIANT === 'sensteed' ? ssoBound : onboarding === true)
+  const persistedPlugins = normalizeDofeEnabledPluginIds(settings.value?.enabledPlugins ?? defaultPluginIds, BRAND_VARIANT, entitledPlugins)
+  const updateCapabilityDraft = (update: (current: DofePluginId[]) => DofePluginId[]): void => {
+    setEnabledPlugins(current => {
+      const next = update(current)
+      capabilityDraft.current.dirty = true
+      if (capabilityDraft.current.subject !== undefined) capabilityDrafts.set(capabilityDraft.current.subject, next)
+      return next
+    })
+  }
+  const capabilitiesChanged = enabledPlugins.length !== persistedPlugins.length || enabledPlugins.some(id => !persistedPlugins.includes(id))
+  const filteredCapabilities = capabilities.filter(capability => (groupFilter === 'all' || capability.group === groupFilter) && `${capability.name} ${capability.description} ${capability.plugin} ${t(CAPABILITY_GROUP_TITLE_KEYS[capability.group])}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
   const selectedCapabilityCount = capabilities.filter(capability => enabledPlugins.includes(capability.plugin) && dofePluginCanEnable(capability.plugin, BRAND_VARIANT, entitledPlugins)).length
   const bindFeishuLogin = async (status: DofeAuthSnapshot): Promise<void> => {
     if (!status.user?.ssoSub || !status.entitlements) throw new Error('登录身份不完整')
@@ -285,6 +317,7 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
       { op: 'set', path: ['enabledPlugins'], value: plugins },
       { op: 'set', path: ['protocol'], value: nextProtocol },
     ])
+    capabilityDrafts.delete(status.user.ssoSub)
     capabilityDraft.current = { subject: status.user.ssoSub, dirty: false }
     setConfigured(true)
     setEnabledPlugins(plugins)
@@ -292,13 +325,16 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
     // A fresh bound snapshot is definitive proof the session is alive: clear
     // the revoked latch now instead of waiting for the 60-second probe.
     onSessionBound?.()
-    await loadModels({ key: '', protocol: nextProtocol, configured: true, preferredModel: status.entitlements.defaultModel })
+    if (usesModels) await loadModels({ key: '', protocol: nextProtocol, configured: true, preferredModel: status.entitlements.defaultModel })
   }
   useEffect(() => {
     const current = settings.value
     if (current?.enabledPlugins === undefined) return
     if (capabilityDraft.current.subject !== current.identity?.ssoSub) {
-      capabilityDraft.current = { subject: current.identity?.ssoSub, dirty: false }
+      const cachedDraft = current.identity?.ssoSub === undefined ? undefined : capabilityDrafts.get(current.identity.ssoSub)
+      capabilityDraft.current = { subject: current.identity?.ssoSub, dirty: cachedDraft !== undefined }
+      setEnabledPlugins(normalizeDofeEnabledPluginIds(cachedDraft ?? current.enabledPlugins, BRAND_VARIANT, current.entitlements?.plugins))
+      return
     }
     setEnabledPlugins(draft => normalizeDofeEnabledPluginIds(capabilityDraft.current.dirty ? draft : current.enabledPlugins, BRAND_VARIANT, current.entitlements?.plugins))
   }, [settings.value?.enabledPlugins, settings.value?.entitlements?.plugins, settings.value?.identity?.ssoSub])
@@ -309,6 +345,7 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
     if (settings.value?.protocol !== undefined) setProtocol(normalizeDofeUiProtocol(settings.value.protocol))
   }, [settings.value?.protocol])
   useEffect(() => {
+    if (!usesModels) return
     let cancelled = false
     void credentials.describe([DOFE_ACCESS_KEY]).then(result => {
       if (cancelled) return
@@ -318,14 +355,14 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
       if (!cancelled) setError(t('loadError'))
     })
     return () => { cancelled = true }
-  }, [credentials, t])
+  }, [credentials, t, usesModels])
   const loadModels = async (overrides: { key?: string; protocol?: DofeProtocol; configured?: boolean; preferredModel?: string } = {}): Promise<void> => {
     // An SSO-bound session implies the stored credential, same as `save`:
     // gating on the `configured` flag alone left a protocol switch stuck on
     // the placeholder whenever the flag lagged behind a remount.
     const storedUsable = ssoBound || (overrides.configured ?? configured) === true
     const request = dofeModelsRequestBody(overrides.key ?? draft, storedUsable, overrides.protocol ?? protocol)
-    const preferredModel = (overrides.preferredModel ?? settings.value?.entitlements?.defaultModel)?.trim()
+    const preferredModel = (overrides.preferredModel ?? settings.value?.modelId ?? settings.value?.entitlements?.defaultModel)?.trim()
     if ((!request.key && !request.useStored) || loadingRef.current || busyRef.current) return
     loadingRef.current = true
     setLoadingModels(true)
@@ -387,16 +424,16 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
   // automatic retry loop while protocol changes still trigger a fresh request.
   const autoLoadedRef = useRef(false)
   useEffect(() => {
-    if (configured !== true || (BRAND_VARIANT === 'sensteed' && !ssoBound) || autoLoadedRef.current) return
+    if (!usesModels || configured !== true || (BRAND_VARIANT === 'sensteed' && !ssoBound) || autoLoadedRef.current) return
     autoLoadedRef.current = true
-    const preferredModel = settings.value?.entitlements?.defaultModel
+    const preferredModel = settings.value?.modelId || settings.value?.entitlements?.defaultModel
     void loadModels(preferredModel === undefined ? {} : { preferredModel })
-  }, [configured, ssoBound])
+  }, [configured, ssoBound, usesModels])
   const save = async (): Promise<void> => {
     if (BRAND_VARIANT === 'sensteed' && (!ssoBound || !settings.value?.entitlements?.allowedProtocols.includes(protocol))) return
     const key = draft.trim()
     const useStoredCredential = key.length === 0 && (configured === true || ssoBound)
-    if (busyRef.current || loadingRef.current || (!key && !useStoredCredential) || enabledPlugins.length === 0 || !selectedModel || models.length === 0) {
+    if (busyRef.current || loadingRef.current || (!key && !useStoredCredential) || (page !== 'models' && enabledPlugins.length === 0) || !selectedModel || models.length === 0) {
       if (onboarding && !selectedModel) setError(t('modelRequired'))
       return
     }
@@ -461,7 +498,7 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
       await mutateDofeAccessSettings(settingsApi, [
         { op: 'set', path: ['setupComplete'], value: true },
         { op: 'set', path: ['validationVersion'], value: DOFE_ACCESS_VALIDATION_VERSION },
-        { op: 'set', path: ['enabledPlugins'], value: normalizeDofeEnabledPluginIds(enabledPlugins, BRAND_VARIANT, entitledPlugins) },
+        ...(page === 'models' ? [] : [{ op: 'set' as const, path: ['enabledPlugins'], value: normalizeDofeEnabledPluginIds(enabledPlugins, BRAND_VARIANT, entitledPlugins) }]),
         { op: 'set', path: ['modelId'], value: selectedModel },
         { op: 'set', path: ['protocol'], value: protocol },
         { op: 'set', path: ['authMode'], value: 'feishu' },
@@ -481,6 +518,22 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
     if (onDone) onDone()
     else setSuccess(true)
   }
+  const saveCapabilities = async (): Promise<void> => {
+    if (!ssoBound || busyRef.current || refreshingRef.current) return
+    busyRef.current = true
+    setBusy(true)
+    setSuccess(false)
+    setError(undefined)
+    try {
+      await mutateDofeAccessSettings(settingsApi, [
+        { op: 'set', path: ['enabledPlugins'], value: normalizeDofeEnabledPluginIds(enabledPlugins, BRAND_VARIANT, entitledPlugins) },
+      ])
+      capabilityDraft.current.dirty = false
+      if (capabilityDraft.current.subject !== undefined) capabilityDrafts.delete(capabilityDraft.current.subject)
+      setSuccess(true)
+    } catch { setError(t('capabilitySaveError')) }
+    finally { busyRef.current = false; setBusy(false) }
+  }
   const remove = async (): Promise<void> => {
     if (busyRef.current || loadingRef.current) return
     busyRef.current = true
@@ -498,6 +551,7 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
     busyRef.current = false
     setBusy(false)
     setConfigured(false)
+    if (capabilityDraft.current.subject !== undefined) capabilityDrafts.delete(capabilityDraft.current.subject)
     // Flip the live-session gate immediately; waiting for the 60-second probe
     // left the form rendering the revoked identity for a full minute.
     onSessionRevoked?.()
@@ -518,35 +572,53 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
         || status.user?.ssoSub !== settings.value?.identity?.ssoSub) throw new Error('permission refresh failed')
       // The Host synchronizes the settings store; do not reset model setup or
       // replace unsaved capability choices with the login defaults here.
-      setEnabledPlugins(normalizeDofeEnabledPluginIds(enabledPlugins, BRAND_VARIANT, status.entitlements.plugins))
+      const updatedDraft = normalizeDofeEnabledPluginIds(enabledPlugins, BRAND_VARIANT, status.entitlements.plugins)
+      setEnabledPlugins(updatedDraft)
+      if (capabilityDraft.current.dirty && capabilityDraft.current.subject !== undefined) capabilityDrafts.set(capabilityDraft.current.subject, updatedDraft)
       setPermissionMessage('success')
     } catch { setPermissionMessage('error') }
     finally { refreshingRef.current = false; setRefreshing(false) }
   }
   const interactionBusy = busy || loadingModels || refreshing
   return <div className={`dshDofeAccess${onboarding ? ' dshDofeAccessOnboarding' : ''}`} aria-busy={interactionBusy}>
-    {!onboarding && <h2>{t('title')}</h2>}
-    {success && <Toast text={t('loginSuccess')} icon={<Check size={18} />} onDone={() => setSuccess(false)} />}
-    <section className="dshDofeAccessSection" aria-labelledby="dofe-account-section-title">
+    {!onboarding && <><h2>{t(page === 'models' ? 'modelNav' : page === 'capabilities' ? 'capabilityNav' : 'title')}</h2>{page !== 'all' && <p className="dshDofeAccessIntro">{t(page === 'account' ? 'accountIntro' : page === 'models' ? 'modelIntro' : 'capabilityIntro')}</p>}</>}
+    {!showAccount && !ssoBound && <p className="dshDofeAccessHelp">{t('settingsLoginRequired')}</p>}
+    {success && <Toast text={t(page === 'models' ? 'modelSaved' : page === 'capabilities' ? 'capabilitySaved' : 'loginSuccess')} icon={<Check size={18} />} onDone={() => setSuccess(false)} />}
+    {showAccount && <section className="dshDofeAccessSection" aria-labelledby="dofe-account-section-title">
       <div className="dshDofeAccessSectionHeader"><h3 id="dofe-account-section-title">{t('accountSectionTitle')}</h3></div>
       {BRAND_VARIANT === 'sensteed' && <DofeLoginSection disabled={interactionBusy} name={ssoBound ? settings.value?.identity?.name || '用户' : undefined} avatar={ssoBound ? settings.value?.identity?.avatar : undefined} onBound={bindFeishuLogin} onLogout={remove} />}
       {BRAND_VARIANT === 'sensteed' && !ssoBound && <p className="dshDofeAccessIntro">{t('sensteedLoginIntro')}</p>}
-      {BRAND_VARIANT === 'sensteed' && ssoBound && <p className="dshDofeAccessHint">{t('sensteedSetupIntro')}{settings.value?.identity?.groups?.length ? ` · 企业授权：${settings.value.identity.groups.map(group => settings.value?.identity?.groupNames?.[group] ?? group).join('、')}` : ''}</p>}
-      {showCapabilities && <div className="dshDofeAccessField">
-        <div className="dshDofeAccessFieldHeader"><span className="dshDofeAccessLabel">{t('pluginsTitle')}</span><span className="dshDofeAccessCount">{t('selectedCount').replace('{count}', String(selectedCapabilityCount))}</span></div>
-        <p className="dshDofeAccessCapabilityGroupHint">{t('capabilityIntro')}</p>
+      {BRAND_VARIANT === 'sensteed' && ssoBound && page === 'all' && <p className="dshDofeAccessHint">{t('sensteedSetupIntro')}{settings.value?.identity?.groups?.length ? ` · 企业授权：${settings.value.identity.groups.map(group => settings.value?.identity?.groupNames?.[group] ?? group).join('、')}` : ''}</p>}
+      {page === 'account' && ssoBound && <dl className="dshDofeAccessIdentityDetails">
+        <dt>{t('accountIdentity')}</dt><dd>{settings.value?.identity?.ssoSub}</dd>
+        <dt>{t('accountGroups')}</dt><dd>{settings.value?.identity?.groups?.length ? settings.value.identity.groups.map(group => settings.value?.identity?.groupNames?.[group] ?? group).join('、') : t('accountNoGroups')}</dd>
+        <dt>{t('modelsTitle')}</dt><dd>{settings.value?.modelId || t('missing')}</dd>
+        <dt>{t('capabilityNav')}</dt><dd>{t('selectedCount').replace('{count}', String(selectedCapabilityCount))}</dd>
+      </dl>}
+      {page === 'account' && error && <p className="dshDofeAccessError" role="alert">{error}</p>}
+    </section>}
+      {showCapabilities && <section className="dshDofeAccessSection" aria-labelledby="dofe-capability-section-title"><div className="dshDofeAccessField">
+        <div className="dshDofeAccessFieldHeader"><h3 id="dofe-capability-section-title" className="dshDofeAccessLabel">{t('pluginsTitle')}</h3><span className="dshDofeAccessCount">{t('selectedCount').replace('{count}', String(selectedCapabilityCount))}</span></div>
+        {page !== 'capabilities' && <p className="dshDofeAccessCapabilityGroupHint">{t('capabilityIntro')}</p>}
         <div className="dshDofeAccessPermissionActions">
           <Button disabled={interactionBusy} onClick={() => void refreshPermissions()}>{t(refreshing ? 'capabilityRefreshing' : 'capabilityRefresh')}</Button>
           {permissionMessage && <span className={permissionMessage === 'error' ? 'dshDofeAccessError' : 'dshDofeAccessHint'} role={permissionMessage === 'error' ? 'alert' : 'status'}>{t(permissionMessage === 'error' ? 'capabilityRefreshError' : 'capabilityRefreshSuccess')}</span>}
         </div>
-        <label className="dshDofeAccessTools"><input type="checkbox" checked={enabledPlugins.includes('tools')} disabled={interactionBusy || !dofePluginCanEnable('tools', BRAND_VARIANT, entitledPlugins)} onChange={event => { const checked = event.currentTarget.checked; capabilityDraft.current.dirty = true; setEnabledPlugins(current => checked ? [...new Set([...current, 'tools' as const])] : current.filter(id => id !== 'tools')) }} />{t('capabilityToolsTitle')}</label>
+        <label className="dshDofeAccessTools"><input type="checkbox" checked={enabledPlugins.includes('tools')} disabled={interactionBusy || !dofePluginCanEnable('tools', BRAND_VARIANT, entitledPlugins)} onChange={event => { const checked = event.currentTarget.checked; updateCapabilityDraft(current => checked ? [...new Set([...current, 'tools' as const])] : current.filter(id => id !== 'tools')) }} />{t('capabilityToolsTitle')}</label>
         <p className="dshDofeAccessCapabilityGroupHint">{t('capabilityToolsHint')}</p>
+        {page === 'capabilities' && <>
+          <input className="dshDofeAccessSearch" type="search" aria-label={t('capabilitySearch')} placeholder={t('capabilitySearch')} value={query} onChange={event => setQuery(event.currentTarget.value)} />
+          <div className="dshDofeAccessFilters" role="group" aria-label={t('capabilityFilter')}>
+            {(['all', ...DOFE_CAPABILITY_GROUPS] as const).map(group => <Button key={group} aria-pressed={groupFilter === group} onClick={() => setGroupFilter(group)}>{t(group === 'all' ? 'capabilityAll' : CAPABILITY_GROUP_TITLE_KEYS[group])}</Button>)}
+          </div>
+          {filteredCapabilities.length === 0 && <p className="dshDofeAccessHint" role="status">{t('capabilityNoResults')}</p>}
+        </>}
         <div className="dshDofeAccessCapabilityGroups dshDofeAccessPlugins">
           {DOFE_CAPABILITY_GROUPS.map(group => {
-            const items = capabilities.filter(capability => capability.group === group)
-            const titleKey = { research: 'capabilityResearchTitle', creation: 'capabilityCreationTitle', collaboration: 'capabilityCollaborationTitle', business: 'capabilityBusinessTitle' } as const
+            const items = filteredCapabilities.filter(capability => capability.group === group)
+            if (items.length === 0) return null
             return <section className="dshDofeAccessCapabilityGroup" key={group} aria-labelledby={`dofe-${group}-capabilities-title`}>
-              <h4 className="dshDofeAccessCapabilityGroupHeader" id={`dofe-${group}-capabilities-title`}><Sparkles size={15} aria-hidden="true" /><span>{t(titleKey[group])}</span></h4>
+              <h4 className="dshDofeAccessCapabilityGroupHeader" id={`dofe-${group}-capabilities-title`}><Sparkles size={15} aria-hidden="true" /><span>{t(CAPABILITY_GROUP_TITLE_KEYS[group])}</span></h4>
               <div className="dshDofeAccessCapabilities">{items.map(capability => {
                 const selectable = dofePluginCanEnable(capability.plugin, BRAND_VARIANT, entitledPlugins)
                 const required = capability.kind === 'basic'
@@ -559,22 +631,29 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, onboarding, on
                 </>
                 const className = `dshDofeAccessCapability${required || sharedTools ? ' dshDofeAccessCapabilityReadOnly' : ''}${selected ? ' dshDofeAccessCapabilitySelected' : ''}${selectable ? '' : ' dshDofeAccessCapabilityUnavailable'}`
                 return required || sharedTools ? <div className={className} key={capability.id}>{content}</div> : <label className={className} key={capability.id}>
-                  <input type="checkbox" checked={selected} disabled={interactionBusy || !selectable} onChange={event => { const checked = event.currentTarget.checked; capabilityDraft.current.dirty = true; setEnabledPlugins(current => checked ? [...new Set([...current, capability.plugin])] : current.filter(id => id !== capability.plugin)) }} />
+                  <input type="checkbox" checked={selected} disabled={interactionBusy || !selectable} onChange={event => { const checked = event.currentTarget.checked; updateCapabilityDraft(current => checked ? [...new Set([...current, capability.plugin])] : current.filter(id => id !== capability.plugin)) }} />
                   {content}
                 </label>
               })}</div>
             </section>
           })}
         </div>
-      </div>}
-    </section>
+      </div>
+      {page === 'capabilities' && <>
+        {error && <p className="dshDofeAccessError" role="alert">{error}</p>}
+        <div className="dshDofeAccessActions dshDofeAccessSaveBar">
+          <Button className="dshDofeAccessPrimary" variant="primary" disabled={interactionBusy || !capabilitiesChanged} onClick={() => void saveCapabilities()}>{t(busy ? 'settingsSaving' : 'capabilitySave')}</Button>
+          <span className="dshDofeAccessStatus" role="status">{t(capabilitiesChanged ? 'settingsUnsaved' : success ? 'capabilitySaved' : 'settingsSynced')}</span>
+        </div>
+      </>}
+      </section>}
     {showSetup && <section className="dshDofeAccessSection" aria-labelledby="dofe-model-section-title">
       <div className="dshDofeAccessSectionHeader"><h3 id="dofe-model-section-title">{t('modelSectionTitle')}</h3></div>
       <div className="dshDofeAccessField"><div className="dshDofeAccessFieldHeader"><span className="dshDofeAccessLabel" id="dofe-protocol-label">{t('protocolTitle')}</span></div><div className="dshDofeAccessProtocols" role="radiogroup" aria-labelledby="dofe-protocol-label">{UI_DOFE_PROTOCOLS.map(p => <label key={p} className={`dshDofeAccessProtocol${protocol === p ? ' dshDofeAccessProtocolSelected' : ''}`}><input type="radio" name="dofe-protocol" value={p} checked={protocol === p} disabled={interactionBusy || (BRAND_VARIANT === 'sensteed' && !settings.value?.entitlements?.allowedProtocols.includes(p))} onChange={() => { setProtocol(p); setModels([]); setSelectedModel(''); setError(undefined); void loadModels({ protocol: p }) }} /><span>{p === 'messages' ? t('protocolMessages') : t('protocolChat')}</span></label>)}</div></div>
       <div className="dshDofeAccessField"><div className="dshDofeAccessFieldHeader"><label className="dshDofeAccessLabel" htmlFor="dofe-model-select">{t('modelsTitle')}</label></div>{loadingModels && <p className="dshDofeAccessHint" role="status">{t('loadingModels')}</p>}{!loadingModels && models.length === 0 && <p className="dshDofeAccessHint" role="status">{t('modelsPlaceholder')}</p>}<div className="dshDofeAccessModelRow"><select id="dofe-model-select" className="dshDofeAccessModelSelect" value={selectedModel} disabled={interactionBusy || models.length === 0} onChange={event => setSelectedModel(event.currentTarget.value)}><option value="">{models.length === 0 ? t('modelsPlaceholder') : t('modelsEmpty')}</option>{models.map(model => <option key={model.id} value={model.id}>{model.name} ({model.id})</option>)}</select></div></div>
       {error !== undefined && <p className="dshDofeAccessError" role="alert">{error}</p>}
       {error !== undefined && models.length === 0 && <Button disabled={interactionBusy} onClick={() => void loadModels()}>{t('loadModels')}</Button>}
-      <div className={`dshDofeAccessActions${onboarding ? ' dshDofeAccessActionsOnboarding' : ''}`}><Button className="dshDofeAccessPrimary" variant="primary" disabled={interactionBusy || (!draft.trim() && configured !== true) || models.length === 0 || !selectedModel || (onboarding && enabledPlugins.length === 0)} onClick={() => void save()}>{busy ? t('saving') : t('save')}{!busy && <ArrowRight size={16} aria-hidden="true" />}</Button>{!onboarding && <span className="dshDofeAccessStatus" role="status">{configured === true ? t('configured') : configured === false ? t('missing') : ''}</span>}</div>
+      <div className={`dshDofeAccessActions${onboarding ? ' dshDofeAccessActionsOnboarding' : ''}`}><Button className="dshDofeAccessPrimary" variant="primary" disabled={interactionBusy || (!draft.trim() && configured !== true && !ssoBound) || models.length === 0 || !selectedModel || (onboarding && enabledPlugins.length === 0)} onClick={() => void save()}>{busy ? t(page === 'models' ? 'settingsSaving' : 'saving') : t(page === 'models' ? 'modelSave' : 'save')}{!busy && <ArrowRight size={16} aria-hidden="true" />}</Button>{!onboarding && <span className="dshDofeAccessStatus" role="status">{configured === true ? t('configured') : configured === false ? t('missing') : ''}</span>}</div>
     </section>}
   </div>
 }
@@ -598,6 +677,16 @@ export function DofeAccessSection(props: DofeAccessSectionProps): ReactNode {
     {success && <Toast text={props.t('loginSuccess')} icon={<Check size={18} />} onDone={() => setSuccess(false)} />}
     <AccessForm credentials={props.credentials} settingsApi={props.settingsApi} settingsScope={props.settingsScope} t={props.t} {...(onDone === undefined ? {} : { onDone })} />
   </>
+}
+/** Independent sidebar pages; saving keeps Settings open. */
+export function DofeUserSection(props: DofeAccessSectionProps): ReactNode {
+  return <AccessForm {...props} page="account" />
+}
+export function DofeModelSection(props: DofeAccessSectionProps): ReactNode {
+  return <AccessForm {...props} page="models" />
+}
+export function DofeCapabilitiesSection(props: DofeAccessSectionProps): ReactNode {
+  return <AccessForm {...props} page="capabilities" />
 }
 export function DofeAccessGate({ credentials, settingsApi, settingsScope, t, onAuthorizationChange }: DofeAccessInjected & { onAuthorizationChange?: (authorized: boolean) => void }): ReactNode {
   const settingsStore = useMemo(() => dofeAccessSettingsStore(settingsScope), [settingsScope])

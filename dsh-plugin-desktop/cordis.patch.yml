@@ -58,7 +58,7 @@
     provider: deepseek-official
     model: deepseek-v4-flash
 
-# The DoFe Access page is the only model configuration surface in Desktop.
+# The product-owned Model settings page is the only model configuration surface in Desktop.
 # Users can still manage the key, but cannot select another provider, endpoint,
 # or catalog through the upstream Models editor.
 - id: ui-settings-models

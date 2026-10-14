@@ -193,7 +193,7 @@ describe('mandatory DoFe access gate', () => {
     expect(source).toContain('if (busyRef.current || loadingRef.current) return')
     expect(source).toContain('aria-busy={interactionBusy}')
     expect(source).toContain('disabled={interactionBusy}')
-    expect(source).toContain('const checked = event.currentTarget.checked; capabilityDraft.current.dirty = true; setEnabledPlugins(current => checked')
+    expect(source).toContain('const checked = event.currentTarget.checked; updateCapabilityDraft(current => checked')
     expect(source).not.toContain('setEnabledPlugins(current => event.currentTarget.checked')
   })
 
