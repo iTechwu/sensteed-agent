@@ -15,7 +15,7 @@ const MAX_BODY_BYTES = 32 * 1024
 
 export const inject = ['webServer', 'credentials', 'tools', 'systemPrompt', 'dofeAuth', 'dofeAccess']
 export const capabilities = Object.freeze([
-  { id: 'finance-management', kind: 'business', name: '财务经营分析', description: '预算、台账、资金、预警和数据治理看板。' },
+  { id: 'finance-management', kind: 'business', name: '财务经营分析', description: '预算、台账、资金、预警、成本 BOM 和数据治理看板。' },
 ])
 
 /** Resolve the live Feishu session on every call; never trust a browser-supplied identity. */
@@ -150,6 +150,12 @@ export function apply(ctx, overrides = {}) {
       const sub = pathname.slice(ROUTE_PREFIX.length) || '/'
       const allowed = await resolveWorkspaceAccess(config)
       if (allowed === undefined) return sendJson(res, 503, { ok: false, error: '财务权限服务暂不可用，请稍后重试。' })
+      if (sub === '/access' && new URL(req.url, rendererOrigin).searchParams.get('permission') === 'cost.engineering.read') {
+        if (!allowed) return sendJson(res, 200, { ok: true, allowed: false })
+        const result = await financeApiCall(fetchImpl, config, 'finance_get_permissions', {}, now(), ctx.logger)
+        if (!result.ok || !Array.isArray(result.data?.permissions)) return sendJson(res, 503, { ok: false, error: '成本 BOM 权限服务暂不可用，请稍后重试。' })
+        return sendJson(res, 200, { ok: true, allowed: result.data.permissions.includes('cost.engineering.read') })
+      }
       if (sub === '/access') return sendJson(res, 200, { ok: true, allowed })
       if (!allowed) {
         ctx.logger?.info?.(`sensteed finance: ${req.method} ${sub} rejected — finance workspace access denied`)
@@ -192,6 +198,14 @@ async function dispatchGet(fetchImpl, config, sub, url, res, logger) {
     return operator ? { operator } : {}
   }
   let calls
+  // 成本 BOM 仅暴露明确的只读端点；租户、能力与对象归属由 CE API 再次校验。
+  if (sub === '/bom/packages') {
+    return runGet([['finance_ce_packages', { page: query.page, limit: query.limit }]], res, logger, config, fetchImpl)
+  }
+  const bomDetail = sub.match(/^\/bom\/packages\/([\w-]+)(\/rollup)?$/)
+  if (bomDetail) {
+    return runGet([[bomDetail[2] ? 'finance_ce_rollup' : 'finance_ce_package', { id: bomDetail[1] }]], res, logger, config, fetchImpl)
+  }
   // 路径含 ID 的详情路由（调整单/调增单状态流水）
   const detail = sub.match(/^\/budget-adjustments\/([\w-]+)$/)
   if (detail) {
@@ -595,6 +609,10 @@ function buildBudgetAvailability(data = {}) {
 
 function resolveFinanceRoute(toolName, args = {}) {
   const routes = {
+    finance_get_permissions: ['GET', '/finance/permissions/me'],
+    finance_ce_packages: ['GET', '/ce/packages'],
+    finance_ce_package: ['GET', `/ce/packages/${args.id}`],
+    finance_ce_rollup: ['GET', `/ce/packages/${args.id}/rollup`],
     finance_get_orgs: ['GET', '/finance/orgs'],
     finance_get_departments: ['GET', '/finance/departments'],
     finance_get_members: ['GET', '/finance/members'],

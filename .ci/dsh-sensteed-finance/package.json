@@ -1,7 +1,7 @@
 {
   "name": "@dofe/dsh-sensteed-finance",
   "version": "0.1.0",
-  "description": "Sensteed 财务专业看板：预算/台账/资金/预警/数据治理/录入工作台 + 深度分析入口（调用财务数据中心 MCP）",
+  "description": "Sensteed 财务专业看板：预算/台账/资金/预警/成本 BOM/数据治理/录入工作台 + 深度分析入口（调用财务数据中心 MCP）",
   "type": "module",
   "main": "./index.js",
   "exports": {
@@ -14,7 +14,7 @@
     "bundle": {
       "patch": "./cordis.patch.yml"
     },
-    "capabilities": [{"id": "finance-management", "kind": "business", "name": "财务经营分析", "description": "预算、台账、资金、预警和数据治理看板。"}],
+    "capabilities": [{"id": "finance-management", "kind": "business", "name": "财务经营分析", "description": "预算、台账、资金、预警、成本 BOM 和数据治理看板。"}],
     "client": {
       "platform": "web",
       "inject": [

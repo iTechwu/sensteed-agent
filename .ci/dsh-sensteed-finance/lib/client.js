@@ -45,7 +45,7 @@ window.__ModuleLoader__.load({
     const TABS = [
       ['overview', 'tabOverview'], ['budget', 'tabBudget'], ['operations', 'tabOperations'],
       ['cash', 'tabCash'], ['alerts', 'tabAlerts'], ['datacenter', 'tabDatacenter'],
-      ['entry', 'tabEntry'], ['analyze', 'tabAnalyze'],
+      ['entry', 'tabEntry'], ['bom', 'tabBom'], ['analyze', 'tabAnalyze'],
     ]
     const EXPENSE_TYPES = [
       ['PROJECT_OPERATION', 'expenseProject'], ['FIXED_OPERATION', 'expenseFixed'],
@@ -76,6 +76,7 @@ window.__ModuleLoader__.load({
 
     const copy = {
       zh: {
+        bomStatus: '状态', tabBom: '成本 BOM', descBom: '按成本包查看物料明细、估算与成本汇总', bomPackages: '成本包', bomVersion: '版本', bomModel: '车型 / 项目', bomTarget: '目标成本', bomTotal: '估算总成本', bomPart: '零件号', bomName: '物料名称', bomQty: '数量', bomLevel: '层级', bomUnit: '单位成本', bomExtended: '展开成本', bomSelect: '请选择成本包查看物料明细', bomScope: '成本包按项目与版本管理，不受年度和主体筛选影响。', bomDetail: '物料明细', bomRollupError: '成本汇总加载失败，物料明细仍可查看。', bomNodeCount: '节点数', bomLeafCount: '叶子节点数', bomStatusDRAFT: '草稿', bomStatusIN_REVIEW: '评审中', bomStatusAPPROVED: '已审定', bomStatusOBSOLETE: '已作废',
         copyFailed: '无法复制分析指令，请重试。',
         open: '财务管理', title: '财务管理', eyebrow: '财务数据中心',
         descOverview: '集团核心财务指标、预算进度与异常事项', scopeAll: '集团合并口径', scopeOrg: '当前主体口径', scopeYear: '年', planCol: '计划', achieve: '达成', severity: '级别', typeOverrun: '预算超支', typeSlow: '执行偏慢', typeCashGap: '资金缺口', typeQuality: '数据质量', descBudget: '查看已发布预算、实际付款与责任中心差异', descOperations: '预算执行、费用构成与计划实际收支对比', descCash: '资金余额、收支计划与流动性风险', descAlerts: '集中处理预算、资金与数据质量异常', descDatacenter: '财务数据源、质量规则与主数据覆盖', descEntry: '财务数据录入、回填与复核', descAnalyze: '基于财务数据中心 MCP 的可信深度分析', close: '关闭财务管理', refresh: '刷新数据', operatorAs: '当前操作者',
@@ -131,6 +132,7 @@ window.__ModuleLoader__.load({
         submit: '提交', cancel: '取消', submitted: '已提交', saved: '已保存', deleted: '已删除', confirm: '确认', close: '关闭', actions: '操作', runEngine: '触发预警引擎', running: '执行中', runDone: '已触发：新建 {created} · 更新 {updated} · 关闭 {resolved}', backfill: '回填', backfillActual: '回填实际值', submitConfirm: '确认提交？', opFailed: '操作失败', refreshed: '已刷新', required: '必填', invalidJson: '表映射必须是合法 JSON。',
       },
       en: {
+        bomStatus: 'Status', tabBom: 'Cost BOM', descBom: 'Material details, estimates and cost rollups by cost package', bomPackages: 'Cost packages', bomVersion: 'Version', bomModel: 'Model / project', bomTarget: 'Target cost', bomTotal: 'Estimated total cost', bomPart: 'Part number', bomName: 'Material', bomQty: 'Quantity', bomLevel: 'Level', bomUnit: 'Unit cost', bomExtended: 'Extended cost', bomSelect: 'Select a cost package to view its materials', bomScope: 'Cost packages are scoped by project and version; year and organization filters do not apply.', bomDetail: 'Material details', bomRollupError: 'Cost rollup failed to load; material details remain available.', bomNodeCount: 'Nodes', bomLeafCount: 'Leaf nodes', bomStatusDRAFT: 'Draft', bomStatusIN_REVIEW: 'In review', bomStatusAPPROVED: 'Approved', bomStatusOBSOLETE: 'Obsolete',
         copyFailed: 'Could not copy the analysis prompt. Please retry.',
         open: 'Finance', title: 'Finance Workspace', eyebrow: 'Finance data center',
         descOverview: 'Group-level financial metrics, budget progress and exceptions', scopeAll: 'Group consolidated', scopeOrg: 'Current org', scopeYear: '', planCol: 'Plan', achieve: 'attained', severity: 'Severity', typeOverrun: 'Budget overrun', typeSlow: 'Slow execution', typeCashGap: 'Cash gap', typeQuality: 'Data quality', descBudget: 'Published budgets, actual payments and responsibility-center variance', descOperations: 'Budget execution, cost mix and plan-vs-actual comparison', descCash: 'Cash balance, payment plans and liquidity risk', descAlerts: 'Central handling of budget, cash and data-quality anomalies', descDatacenter: 'Finance data sources, quality rules and master-data coverage', descEntry: 'Finance data entry, backfill and review', descAnalyze: 'Trusted deep analysis on the finance data center MCP', close: 'Close finance workspace', refresh: 'Refresh', operatorAs: 'Operating as',
@@ -3167,6 +3169,73 @@ window.__ModuleLoader__.load({
         h('p', { className: 'sf-note' }, t('analyzingNote')))
     }
 
+    // 成本 BOM 读视图：复用 CE 契约，金额为元，汇总只采用服务端成本树正算结果。
+    function BomView({ ctx, t }) {
+      const [page, setPage] = useState(1)
+      const [selected, setSelected] = useState(null)
+      const [packages, setPackages] = useState(null)
+      const [listError, setListError] = useState(null)
+      const [detail, setDetail] = useState(null)
+      const [detailError, setDetailError] = useState(null)
+      const [rollup, setRollup] = useState(null)
+      const [rollupError, setRollupError] = useState(false)
+      const [retry, setRetry] = useState(0)
+
+      useEffect(() => {
+        let cancelled = false
+        setPackages(null); setListError(null)
+        api(`/bom/packages?page=${page}&limit=${PAGE_SIZE}`)
+          .then(result => { if (!cancelled) setPackages(result.data) })
+          .catch(error => { if (!cancelled) setListError(error.message) })
+        return () => { cancelled = true }
+      }, [page, ctx.revision, retry])
+
+      useEffect(() => {
+        let cancelled = false
+        setDetail(null); setDetailError(null); setRollup(null); setRollupError(false)
+        if (!selected) return undefined
+        const path = `/bom/packages/${encodeURIComponent(selected)}`
+        void api(path).then(result => { if (!cancelled) setDetail(result.data) })
+          .catch(error => { if (!cancelled) setDetailError(error.message) })
+        void api(`${path}/rollup`).then(result => { if (!cancelled) setRollup(result.data) })
+          .catch(() => { if (!cancelled) setRollupError(true) })
+        return () => { cancelled = true }
+      }, [selected, ctx.revision, retry])
+
+      const amount = value => formatNumber(value) ?? t('dash')
+      const errorBlock = message => h('div', { role: 'alert', className: 'sf-fatal' }, h('strong', null, t('loadError')), h('span', null, message), h(GhostButton, { onClick: () => setRetry(value => value + 1) }, t('retry')))
+      const loading = h('div', { className: 'sf-loading', role: 'status' }, t('loading'))
+      const entries = new Map((rollup?.entries || []).map(entry => [entry.nodeId, entry]))
+      return h('div', null,
+        h('p', { className: 'sf-desc' }, t('bomScope')),
+        h(Card, { title: t('bomPackages'), unit: t('unitYuan') },
+          listError ? errorBlock(listError) : !packages ? loading : h(React.Fragment, null,
+            h(Table, { tableId: 'bom-packages', rows: packages.list || [], empty: t('empty'), columns: [
+              { key: 'name', label: t('bomPackages'), render: row => h(GhostButton, { onClick: () => setSelected(row.id), 'aria-pressed': row.id === selected }, row.name) },
+              { key: 'modelCode', label: t('bomModel') },
+              { key: 'version', label: t('bomVersion') },
+              { key: 'status', label: t('bomStatus'), render: row => t(`bomStatus${row.status}`) },
+              { key: 'targetCost', label: `${t('bomTarget')} (${t('unitYuan')})`, render: row => amount(row.targetCost) },
+            ] }),
+            h(Pager, { page, total: packages.total, limit: PAGE_SIZE, onPage: setPage }))),
+        selected ? h(Card, { title: detail?.package?.name || t('bomDetail'), unit: t('unitYuan') },
+          detailError ? errorBlock(detailError) : !detail ? loading : h(React.Fragment, null,
+            h('div', { className: 'sf-kpis' },
+              h(KpiCard, { label: t('bomTotal'), value: amount(detail.totalCost) }),
+              h(KpiCard, { label: t('bomTarget'), value: amount(detail.targetCost) }),
+              h(KpiCard, { label: t('bomNodeCount'), value: detail.nodeCount }),
+              h(KpiCard, { label: t('bomLeafCount'), value: detail.leafCount })),
+            rollupError ? h('p', { role: 'alert' }, t('bomRollupError'), ' ', h(GhostButton, { onClick: () => setRetry(value => value + 1) }, t('retry'))) : null,
+            h(Table, { tableId: 'bom-nodes', rows: detail.nodes || [], empty: t('empty'), columns: [
+              { key: 'partNo', label: t('bomPart') },
+              { key: 'name', label: t('bomName') },
+              { key: 'level', label: t('bomLevel') },
+              { key: 'qty', label: t('bomQty') },
+              { key: 'unitCost', label: `${t('bomUnit')} (${t('unitYuan')})`, render: row => amount(row.unitCost) },
+              { key: 'extendedCost', label: `${t('bomExtended')} (${t('unitYuan')})`, sortValue: row => entries.get(row.id)?.extendedCost, render: row => amount(entries.get(row.id)?.extendedCost) },
+            ] }))) : h('p', { className: 'sf-desc' }, t('bomSelect')))
+    }
+
     // 片段 6/7：外壳（tab 导航/全局筛选/上下文加载）、入口按钮、样式注入与插件挂载点
 
     const sfAnalysisGrid = '.sf-analysis-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}.sf-analysis-card{display:grid;gap:10px;align-content:start;padding:16px}.sf-analysis-head{display:flex;align-items:center;gap:8px}.sf-analysis-head h2{margin:0;font-size:13px}.sf-analysis-card>p{margin:0;color:var(--sf-ink2);font-size:12px;line-height:1.55}.sf-analysis-card>div:last-child{justify-self:start}'
@@ -3181,9 +3250,11 @@ window.__ModuleLoader__.load({
       datacenter: ['tabDatacenter', 'descDatacenter'],
       entry: ['tabEntry', 'descEntry'],
       analyze: ['tabAnalyze', 'descAnalyze'],
+      bom: ['tabBom', 'descBom'],
     }
 
     function Dashboard({ t }) {
+      const bomAllowed = useFinanceWorkspaceAccess('cost.engineering.read')
       const [tab, setTab] = useState('overview')
       // 下钻参数：onDrill(target, params) 切 tab 时可带子视图/月份等初始状态
       const [drillParams, setDrillParams] = useState(null)
@@ -3263,6 +3334,7 @@ window.__ModuleLoader__.load({
       const departments = context?.data?.departments || []
       const ctx = { year, orgId, orgs, departments, revision, drillParams }
       const onDrill = (target, params) => { setDrillParams(params ?? null); if (params?.orgId) setOrgId(params.orgId); setTab(target) }
+      useEffect(() => { if (tab === 'bom' && bomAllowed === false) setTab('overview') }, [tab, bomAllowed])
       const briefProps = { brief, t, onDrill, orgId }
 
       // 各 tab 的错误/空态由视图内部处理；这里只处理 brief 类视图的加载与失败
@@ -3278,6 +3350,7 @@ window.__ModuleLoader__.load({
             tab === 'alerts' ? h(AlertsView, { ctx, t, onDrill }) : null,
             tab === 'datacenter' ? h(DataCenterView, { ctx, t }) : null,
             tab === 'entry' ? h(EntryView, { ctx, t }) : null,
+            tab === 'bom' && bomAllowed === true ? h(BomView, { ctx, t }) : null,
             tab === 'analyze' ? h(AnalyzeView, { ctx, t }) : null)
 
       return h('div', { className: 'sf-overlay sf-root', role: 'dialog', 'aria-modal': true, 'aria-labelledby': 'sf-title' },
@@ -3296,7 +3369,7 @@ window.__ModuleLoader__.load({
               h('div', { className: 'sf-header-buttons' },
                 h(Tooltip, { label: t('refresh') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('refresh'), onClick: refresh }, h(IconRefreshOutlineRegular, { size: 16 }))),
                 h(Tooltip, { label: t('close') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('close'), onClick: closeOverlay }, h(IconCloseOutlineRegular, { size: 16 })))))),
-          h('nav', { className: 'sf-tabs', 'aria-label': t('title') }, ...TABS.map(([id, key]) =>
+          h('nav', { className: 'sf-tabs', 'aria-label': t('title') }, ...TABS.filter(([id]) => id !== 'bom' || bomAllowed === true).map(([id, key]) =>
             h('button', { type: 'button', key: id, 'aria-current': tab === id ? 'page' : undefined, onClick: () => { setTab(id); setDrillParams(null) } }, t(key)))),
           h('div', { className: `sf-content${briefState === 'loading' && !brief ? ' sf-refreshing' : ''}`, 'aria-busy': briefState === 'loading' && !brief }, body)))
     }
@@ -3351,7 +3424,7 @@ window.__ModuleLoader__.load({
       return allowed === true && visible ? h(Dashboard, { t }) : null
     }
 
-    function useFinanceWorkspaceAccess() {
+    function useFinanceWorkspaceAccess(permission) {
       const [allowed, setAllowed] = useState(null)
       useEffect(() => {
         let cancelled = false
@@ -3364,7 +3437,7 @@ window.__ModuleLoader__.load({
           clearTimeout(timer)
           let nextCheckMs = 5000
           try {
-            const response = await fetch(`${BASE}/access`, {
+            const response = await fetch(`${BASE}/access${permission ? `?permission=${encodeURIComponent(permission)}` : ''}`, {
               credentials: 'same-origin', redirect: 'error',
               headers: { Accept: 'application/json' },
               signal: AbortSignal.any([controller.signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]),
@@ -3400,7 +3473,7 @@ window.__ModuleLoader__.load({
           window.removeEventListener('online', refresh)
           document.removeEventListener('visibilitychange', onVisible)
         }
-      }, [])
+      }, [permission])
       return allowed
     }
 

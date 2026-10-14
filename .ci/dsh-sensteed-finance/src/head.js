@@ -41,7 +41,7 @@ const BASE = '/api/desktop/sensteed/finance'
 const TABS = [
   ['overview', 'tabOverview'], ['budget', 'tabBudget'], ['operations', 'tabOperations'],
   ['cash', 'tabCash'], ['alerts', 'tabAlerts'], ['datacenter', 'tabDatacenter'],
-  ['entry', 'tabEntry'], ['analyze', 'tabAnalyze'],
+  ['entry', 'tabEntry'], ['bom', 'tabBom'], ['analyze', 'tabAnalyze'],
 ]
 const EXPENSE_TYPES = [
   ['PROJECT_OPERATION', 'expenseProject'], ['FIXED_OPERATION', 'expenseFixed'],
@@ -72,6 +72,7 @@ const ANALYSIS_ENTRIES = [
 
 const copy = {
   zh: {
+    bomStatus: '状态', tabBom: '成本 BOM', descBom: '按成本包查看物料明细、估算与成本汇总', bomPackages: '成本包', bomVersion: '版本', bomModel: '车型 / 项目', bomTarget: '目标成本', bomTotal: '估算总成本', bomPart: '零件号', bomName: '物料名称', bomQty: '数量', bomLevel: '层级', bomUnit: '单位成本', bomExtended: '展开成本', bomSelect: '请选择成本包查看物料明细', bomScope: '成本包按项目与版本管理，不受年度和主体筛选影响。', bomDetail: '物料明细', bomRollupError: '成本汇总加载失败，物料明细仍可查看。', bomNodeCount: '节点数', bomLeafCount: '叶子节点数', bomStatusDRAFT: '草稿', bomStatusIN_REVIEW: '评审中', bomStatusAPPROVED: '已审定', bomStatusOBSOLETE: '已作废',
     copyFailed: '无法复制分析指令，请重试。',
     open: '财务管理', title: '财务管理', eyebrow: '财务数据中心',
     descOverview: '集团核心财务指标、预算进度与异常事项', scopeAll: '集团合并口径', scopeOrg: '当前主体口径', scopeYear: '年', planCol: '计划', achieve: '达成', severity: '级别', typeOverrun: '预算超支', typeSlow: '执行偏慢', typeCashGap: '资金缺口', typeQuality: '数据质量', descBudget: '查看已发布预算、实际付款与责任中心差异', descOperations: '预算执行、费用构成与计划实际收支对比', descCash: '资金余额、收支计划与流动性风险', descAlerts: '集中处理预算、资金与数据质量异常', descDatacenter: '财务数据源、质量规则与主数据覆盖', descEntry: '财务数据录入、回填与复核', descAnalyze: '基于财务数据中心 MCP 的可信深度分析', close: '关闭财务管理', refresh: '刷新数据', operatorAs: '当前操作者',
@@ -127,6 +128,7 @@ const copy = {
     submit: '提交', cancel: '取消', submitted: '已提交', saved: '已保存', deleted: '已删除', confirm: '确认', close: '关闭', actions: '操作', runEngine: '触发预警引擎', running: '执行中', runDone: '已触发：新建 {created} · 更新 {updated} · 关闭 {resolved}', backfill: '回填', backfillActual: '回填实际值', submitConfirm: '确认提交？', opFailed: '操作失败', refreshed: '已刷新', required: '必填', invalidJson: '表映射必须是合法 JSON。',
   },
   en: {
+    bomStatus: 'Status', tabBom: 'Cost BOM', descBom: 'Material details, estimates and cost rollups by cost package', bomPackages: 'Cost packages', bomVersion: 'Version', bomModel: 'Model / project', bomTarget: 'Target cost', bomTotal: 'Estimated total cost', bomPart: 'Part number', bomName: 'Material', bomQty: 'Quantity', bomLevel: 'Level', bomUnit: 'Unit cost', bomExtended: 'Extended cost', bomSelect: 'Select a cost package to view its materials', bomScope: 'Cost packages are scoped by project and version; year and organization filters do not apply.', bomDetail: 'Material details', bomRollupError: 'Cost rollup failed to load; material details remain available.', bomNodeCount: 'Nodes', bomLeafCount: 'Leaf nodes', bomStatusDRAFT: 'Draft', bomStatusIN_REVIEW: 'In review', bomStatusAPPROVED: 'Approved', bomStatusOBSOLETE: 'Obsolete',
     copyFailed: 'Could not copy the analysis prompt. Please retry.',
     open: 'Finance', title: 'Finance Workspace', eyebrow: 'Finance data center',
     descOverview: 'Group-level financial metrics, budget progress and exceptions', scopeAll: 'Group consolidated', scopeOrg: 'Current org', scopeYear: '', planCol: 'Plan', achieve: 'attained', severity: 'Severity', typeOverrun: 'Budget overrun', typeSlow: 'Slow execution', typeCashGap: 'Cash gap', typeQuality: 'Data quality', descBudget: 'Published budgets, actual payments and responsibility-center variance', descOperations: 'Budget execution, cost mix and plan-vs-actual comparison', descCash: 'Cash balance, payment plans and liquidity risk', descAlerts: 'Central handling of budget, cash and data-quality anomalies', descDatacenter: 'Finance data sources, quality rules and master-data coverage', descEntry: 'Finance data entry, backfill and review', descAnalyze: 'Trusted deep analysis on the finance data center MCP', close: 'Close finance workspace', refresh: 'Refresh', operatorAs: 'Operating as',

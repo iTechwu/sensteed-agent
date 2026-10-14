@@ -669,8 +669,44 @@ const CLIENT_FILES = [
   'src/head.js', 'src/format.js', 'src/components.js', 'src/styles.js',
   'src/views/overview.js', 'src/views/budget.js', 'src/views/operations.js', 'src/views/cash.js',
   'src/views/alerts.js', 'src/views/datacenter.js', 'src/views/entry.js', 'src/views/analyze.js',
+  'src/views/bom.js',
   'src/shell.js',
 ]
+
+test('BOM entry checks the effective cost permission separately from workspace access', async () => {
+  for (const permissions of [[], ['cost.engineering.read']]) {
+    const { routes } = await loadHost({ fetch: async url => String(url).endsWith('/permissions/me')
+      ? mcpJson({ permissions }) : mcpJson({ allowed: true }) })
+    const response = await invokeRoute(routes.get(BASE), 'GET', BASE + '/access?permission=cost.engineering.read')
+    assert.equal(response.status, 200)
+    assert.equal(response.body.allowed, permissions.length > 0)
+  }
+  const { routes } = await loadHost({ fetch: async url => String(url).endsWith('/permissions/me')
+    ? mcpJson({}, 503) : mcpJson({ allowed: true }) })
+  assert.equal((await invokeRoute(routes.get(BASE), 'GET', BASE + '/access?permission=cost.engineering.read')).status, 503)
+})
+
+test('BOM list and detail reuse the live session and expose only CE read routes', async () => {
+  const calls = []
+  const { routes } = await loadHost({ fetch: async (url, init) => {
+    calls.push({ url: String(url), init })
+    return mcpJson({ list: [], nodes: [], total: 0 })
+  } })
+  const route = routes.get(BASE)
+  for (const [path, upstream] of [
+    ['/bom/packages?page=2&limit=20&tenantId=forged&year=2026', '/api/ce/packages?page=2&limit=20'],
+    ['/bom/packages/pkg-1', '/api/ce/packages/pkg-1'],
+    ['/bom/packages/pkg-1/rollup', '/api/ce/packages/pkg-1/rollup'],
+  ]) {
+    const result = await invokeRoute(route, 'GET', BASE + path)
+    assert.equal(result.status, 200)
+    const call = calls.at(-1)
+    assert.equal(new URL(call.url).pathname + new URL(call.url).search, upstream)
+    assert.equal(call.init.headers.authorization, 'Bearer feishu-test-token')
+  }
+  assert.equal((await invokeRoute(route, 'POST', BASE + '/bom/packages', {})).status, 404)
+  assert.equal((await invokeRoute(route, 'GET', BASE + '/bom/packages/pkg-1/delete')).status, 404)
+})
 async function readClientSource() {
   const chunks = []
   for (const file of CLIENT_FILES) chunks.push(await readFile(new URL(file, root), 'utf8'))

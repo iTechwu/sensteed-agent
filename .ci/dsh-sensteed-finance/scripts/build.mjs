@@ -20,6 +20,7 @@ const FILES = [
   'src/views/datacenter.js',
   'src/views/entry.js',
   'src/views/analyze.js',
+  'src/views/bom.js',
   'src/shell.js',
 ]
 
