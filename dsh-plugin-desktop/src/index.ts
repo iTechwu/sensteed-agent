@@ -131,12 +131,15 @@ function desktopLocalePreference(preference: string | undefined): DesktopLocale 
  * @returns the URL loaded by the BrowserWindow.
  */
 export function desktopRendererUrl(
-  port: number,
+  port: number | undefined,
   mode: DesktopShellMode,
   platform: Context['desktopRuntime']['platform'],
   appVersion: string,
   material: DesktopWindowMaterial = 'off',
 ): string {
+  if (!Number.isSafeInteger(port) || port! < 1 || port! > 65_535) {
+    throw new TypeError('dsh-plugin-desktop: renderer URL requires an assigned Web server port')
+  }
   const url = new URL(`http://127.0.0.1:${String(port)}/`)
   url.searchParams.set('sensteed-agent-mode', mode)
   url.searchParams.set('sensteed-agent-platform', platform)
