@@ -369,7 +369,7 @@ describe('published package surface', () => {
     ] as const) {
       expect(manifest.dependencies?.[specifier]).toBe('workspace:*')
       const installedManifest = fileURLToPath(new URL(`node_modules/${specifier}/package.json`, packageRoot))
-      expect(realpathSync(installedManifest)).toBe(resolve(root, '..', 'deepseek-harness', relativePackage, 'package.json'))
+      expect(realpathSync(installedManifest)).toBe(realpathSync(resolve(root, '..', 'deepseek-harness', relativePackage, 'package.json')))
     }
   })
 
@@ -1506,11 +1506,11 @@ describe('published package surface', () => {
       'node_modules/@deepseek-ai/dsh-sandbox-windows-acl/package.json',
       packageRoot,
     ))
-    expect(realpathSync(installedManifest)).toBe(resolve(
+    expect(realpathSync(installedManifest)).toBe(realpathSync(resolve(
       fileURLToPath(workspaceRoot),
       '..',
       'deepseek-harness/packages/sandbox/sandbox-windows-acl/package.json',
-    ))
+    )))
     expect(lockfile).toContain('link:../deepseek-harness/packages/sandbox/sandbox-windows-acl')
   })
 })
