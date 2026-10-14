@@ -95,6 +95,10 @@ const COMMON_APP_FILES = [
   'node_modules/execa/**',
   'node_modules/got/**',
   'node_modules/turndown/**',
+  // sensteed-im 的 qrcode 依赖链叶子:图收集器在 force install 后的
+  // 虚拟仓库布局下解析不到,经直接依赖 junction + glob 独立进入 ASAR。
+  'node_modules/dijkstrajs/**',
+  'node_modules/pngjs/**',
   '!node_modules/koffi-darwin-*-3-1-1/**',
   '!node_modules/node-pty/build/**',
   ...RUNTIME_DEBUG_EXCLUSIONS,

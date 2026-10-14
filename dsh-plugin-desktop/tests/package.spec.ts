@@ -863,6 +863,8 @@ describe('published package surface', () => {
       'node_modules/execa/**',
       'node_modules/got/**',
       'node_modules/turndown/**',
+      'node_modules/dijkstrajs/**',
+      'node_modules/pngjs/**',
       '!node_modules/koffi-darwin-*-3-1-1/**',
       '!node_modules/node-pty/build/**',
       '!**/*.{js,cjs,mjs,ts,cts,mts,css}.map',
