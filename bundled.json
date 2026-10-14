@@ -2,6 +2,15 @@
   "version": 1,
   "skills": [
     {
+      "name": "skill-creator",
+      "repository": "https://github.com/openai/skills",
+      "ref": null,
+      "source": "sibling",
+      "siblingDir": "../docker-helm.dofe.ai/skills/skill-creator",
+      "snapshotDir": "dsh-plugin-desktop/bundled/skills/skill-creator",
+      "resolvedSha": "49f948faa9258a0c61caceaf225e179651397431"
+    },
+    {
       "name": "dashi-ppt-skill",
       "repository": "https://github.com/chuspeeism/dashi-ppt-skill",
       "ref": null,
@@ -81,6 +90,12 @@
       "package": "@dofe/dsh-sensteed-supplier-intelligence",
       "source": "sibling",
       "snapshotDir": ".ci/dsh-sensteed-supplier-intelligence"
+    },
+    {
+      "name": "dsh-sensteed-skill-manager",
+      "package": "@dofe/dsh-sensteed-skill-manager",
+      "source": "sibling",
+      "snapshotDir": ".ci/dsh-sensteed-skill-manager"
     },
     {
       "name": "dsh-sensteed-video-notes",

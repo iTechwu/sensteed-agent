@@ -78,10 +78,12 @@ async function diffSnapshot(name) {
   return problems
 }
 
-// The snapshot set is the authoritative registry of preinstalled plugins.
+// Keep newly introduced sibling snapshots addressable before their first copy.
+const manifest = JSON.parse(await readFile(join(root, 'bundled.json'), 'utf8'))
 const snapshotPlugins = (await readdir(resolve(root, '.ci'), { withFileTypes: true }))
   .filter(entry => entry.isDirectory() && existsSync(join(root, '.ci', entry.name, 'package.json')))
   .map(entry => entry.name)
+  .concat(manifest.plugins.filter(plugin => plugin.source === 'sibling' && plugin.snapshotDir.startsWith('.ci/')).map(plugin => plugin.name))
   .concat([...specialSnapshots.keys()])
 // Optional positional filter: sync/verify only the named plugins.
 const requested = process.argv.slice(2).filter(arg => !arg.startsWith('--'))
