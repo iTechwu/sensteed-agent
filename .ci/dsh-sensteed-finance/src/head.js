@@ -41,7 +41,7 @@ const BASE = '/api/desktop/sensteed/finance'
 const TABS = [
   ['overview', 'tabOverview'], ['budget', 'tabBudget'], ['operations', 'tabOperations'],
   ['cash', 'tabCash'], ['alerts', 'tabAlerts'], ['datacenter', 'tabDatacenter'],
-  ['entry', 'tabEntry'], ['bom', 'tabBom'], ['analyze', 'tabAnalyze'],
+  ['entry', 'tabEntry'], ['engine', 'tabEngine'], ['comparisons', 'tabComparisons'], ['review', 'tabReview'], ['sources', 'tabSources'], ['facts', 'tabFacts'], ['bom', 'tabBom'], ['analyze', 'tabAnalyze'], ['notifications', 'tabNotifications'], ['permissions', 'tabPermissions'],
 ]
 const EXPENSE_TYPES = [
   ['PROJECT_OPERATION', 'expenseProject'], ['FIXED_OPERATION', 'expenseFixed'],
@@ -72,6 +72,7 @@ const ANALYSIS_ENTRIES = [
 
 const copy = {
   zh: {
+    tabEngine: '预算编制', tabComparisons: '预算比较', tabReview: '复核中心', tabSources: '来源记录', tabFacts: '已发布事实', tabNotifications: '通知中心', tabPermissions: '权限中心', descEngine: '业务假设、销量输入、预算计算与滚动预测', descComparisons: '月结滚动、跨年与版本明细比较', descReview: '填报、事实批次与调整单集中复核', descSources: '来源暂存明细与财务归类追溯', descFacts: '审核发布口径与草稿分列', descNotifications: '待我处理、与我相关与系统通知', descPermissions: '生效权限、数据范围与授权管理',
     bomStatus: '状态', tabBom: '成本 BOM', descBom: '按成本包查看物料明细、估算与成本汇总', bomPackages: '成本包', bomVersion: '版本', bomModel: '车型 / 项目', bomTarget: '目标成本', bomTotal: '估算总成本', bomPart: '零件号', bomName: '物料名称', bomQty: '数量', bomLevel: '层级', bomUnit: '单位成本', bomExtended: '展开成本', bomSelect: '请选择成本包查看物料明细', bomScope: '成本包按项目与版本管理，不受年度和主体筛选影响。', bomDetail: '物料明细', bomRollupError: '成本汇总加载失败，物料明细仍可查看。', bomNodeCount: '节点数', bomLeafCount: '叶子节点数', bomStatusDRAFT: '草稿', bomStatusIN_REVIEW: '评审中', bomStatusAPPROVED: '已审定', bomStatusOBSOLETE: '已作废',
     copyFailed: '无法复制分析指令，请重试。',
     open: '财务管理', title: '财务管理', eyebrow: '财务数据中心',
@@ -128,6 +129,7 @@ const copy = {
     submit: '提交', cancel: '取消', submitted: '已提交', saved: '已保存', deleted: '已删除', confirm: '确认', close: '关闭', actions: '操作', runEngine: '触发预警引擎', running: '执行中', runDone: '已触发：新建 {created} · 更新 {updated} · 关闭 {resolved}', backfill: '回填', backfillActual: '回填实际值', submitConfirm: '确认提交？', opFailed: '操作失败', refreshed: '已刷新', required: '必填', invalidJson: '表映射必须是合法 JSON。',
   },
   en: {
+    tabEngine: 'Budget planning', tabComparisons: 'Budget comparisons', tabReview: 'Review center', tabSources: 'Source records', tabFacts: 'Published facts', tabNotifications: 'Notifications', tabPermissions: 'Permissions', descEngine: 'Assumptions, sales inputs, calculation and rolling forecasts', descComparisons: 'Monthly, yearly and version comparisons', descReview: 'Review submissions, batches and adjustments', descSources: 'Source data and classification traceability', descFacts: 'Published facts and draft data shown separately', descNotifications: 'Action required, related and system messages', descPermissions: 'Effective permissions, scopes and grants',
     bomStatus: 'Status', tabBom: 'Cost BOM', descBom: 'Material details, estimates and cost rollups by cost package', bomPackages: 'Cost packages', bomVersion: 'Version', bomModel: 'Model / project', bomTarget: 'Target cost', bomTotal: 'Estimated total cost', bomPart: 'Part number', bomName: 'Material', bomQty: 'Quantity', bomLevel: 'Level', bomUnit: 'Unit cost', bomExtended: 'Extended cost', bomSelect: 'Select a cost package to view its materials', bomScope: 'Cost packages are scoped by project and version; year and organization filters do not apply.', bomDetail: 'Material details', bomRollupError: 'Cost rollup failed to load; material details remain available.', bomNodeCount: 'Nodes', bomLeafCount: 'Leaf nodes', bomStatusDRAFT: 'Draft', bomStatusIN_REVIEW: 'In review', bomStatusAPPROVED: 'Approved', bomStatusOBSOLETE: 'Obsolete',
     copyFailed: 'Could not copy the analysis prompt. Please retry.',
     open: 'Finance', title: 'Finance Workspace', eyebrow: 'Finance data center',

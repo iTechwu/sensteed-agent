@@ -22,6 +22,8 @@ const CAPABILITY_GROUP_TITLE_KEYS = { research: 'capabilityResearchTitle', creat
 const STYLE_ID = 'dsh-dofe-access-styles'
 // The Host performs tenant validation and catalog loading sequentially (10s each).
 const ACCESS_REQUEST_TIMEOUT_MS = 25000
+// Explicit permission refresh performs SSO renewal and entitlement resolution.
+const ACCESS_REFRESH_TIMEOUT_MS = 60_000
 const CSS = `
 #dsh-dofe-access-gate { position: fixed; inset: 0; z-index: 2147483000; pointer-events: none; }
 .dshDofeAccessLoading { position: absolute; left: 50%; top: 24px; transform: translateX(-50%); padding: 12px 20px; border-radius: 8px; background: var(--dsw-alias-bg-layer-1, #fff); color: var(--dsw-alias-label-primary, #172033); box-shadow: 0 2px 8px rgba(5, 10, 18, .12); }
@@ -565,7 +567,7 @@ function AccessForm({ credentials, settingsApi, settingsScope, t, page = 'all', 
       const response = await fetch(DOFE_AUTH_REFRESH_PATH, {
         method: 'POST', credentials: 'same-origin', redirect: 'error',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: '{}', signal: AbortSignal.timeout(60_000),
+        body: '{}', signal: AbortSignal.timeout(ACCESS_REFRESH_TIMEOUT_MS),
       })
       const status = await response.json() as DofeAuthSnapshot
       if (!response.ok || status.status !== 'bound' || !status.entitlements

@@ -666,10 +666,10 @@ async function invokeRoute(route, method, url, body, headers = {}) {
 
 // 客户端片段清单（与 scripts/build.mjs 的 FILES 保持一致；顺序即依赖顺序）
 const CLIENT_FILES = [
-  'src/head.js', 'src/format.js', 'src/components.js', 'src/styles.js',
+  'src/head.js', 'src/format.js', 'src/components.js', 'src/styles.js', 'src/workflows.js',
   'src/views/overview.js', 'src/views/budget.js', 'src/views/operations.js', 'src/views/cash.js',
   'src/views/alerts.js', 'src/views/datacenter.js', 'src/views/entry.js', 'src/views/analyze.js',
-  'src/views/bom.js',
+  'src/views/bom.js', 'src/views/notifications.js', 'src/views/permissions.js', 'src/views/review.js', 'src/views/sources.js', 'src/views/comparisons.js', 'src/views/facts.js', 'src/views/engine.js', 'src/views/filing.js',
   'src/shell.js',
 ]
 
@@ -1009,14 +1009,14 @@ test('scope changes replace group totals with the selected organization', async 
   assert.equal(result.body.data.overview.selectedOrg, 'org-1')
   assert.equal(result.body.data.budget.selectedOrg, 'org-1')
   assert.equal(result.body.data.cash.selectedOrg, 'org-1')
-  assert.equal(calls.filter(path => !path.endsWith('/permissions/workspace-access')).length, 10)
+  assert.equal(calls.filter(path => !path.endsWith('/permissions/workspace-access')).length, 7)
 })
 
 test('keeps the secret out of URLs and never fabricates upstream data', async () => {
   const { routes } = await loadHost({ fetch: async () => new Response('denied', { status: 403 }) })
   const route = routes.get(BASE)
   const response = await invokeRoute(route, 'GET', BASE + '/brief')
-  assert.equal(response.status, 502)
+  assert.equal(response.status, 403)
   assert.equal(response.body.ok, false)
   assert.match(response.body.error, /财务操作权限/)
   const source = await readFile(new URL('index.js', root), 'utf8')
@@ -1345,4 +1345,104 @@ test('client build concatenates every registered fragment', async () => {
   // 防回归：新增 src 片段必须登记进 build.mjs 的 FILES（列表与测试 CLIENT_FILES 同步）
   const build = await readFile(new URL('scripts/build.mjs', root), 'utf8')
   for (const file of CLIENT_FILES) assert.match(build, new RegExp(file.replace(/\//g, '\\/'), 'u'), file)
+})
+
+test('public contract adapter exposes finance workflows without accepting arbitrary upstream paths or identities', async () => {
+  const calls = []
+  const { routes } = await loadHost({ fetch: async (url, init) => {
+    calls.push({ url: String(url), init }); return mcpJson({ list: [], permissions: ['cash.plan.read'] })
+  } })
+  const route = routes.get(BASE)
+  for (const [method, path, body] of [
+    ['GET', '/rest/finance/notifications?category=SYSTEM&unread=true&recipientId=forged', null],
+    ['POST', '/rest/ce/packages/pkg-1/nodes', { nodes: [{ name: '物料', partNo: 'A', qty: 1 }], tenantId: 'forged', operator: 'forged' }],
+    ['PUT', '/rest/budget-engine/versions/v-1/params', { version: 'P1', params: { openingBalance: 1, safetyLine: 0 } }],
+    ['PATCH', '/rest/finance/alerts/a-1/status', { status: 'RESOLVED', note: '已处理' }],
+  ]) {
+    const result = await invokeRoute(route, method, BASE + path, body, { 'content-type': 'application/json' })
+    assert.equal(result.status, 200)
+    const call = calls.at(-1)
+    assert.equal(new URL(call.url).origin, 'https://ds.hozonauto.com')
+    assert.equal(call.init.method, method)
+    assert.equal(new URL(call.url).searchParams.has('recipientId'), false)
+    assert.equal(call.init.headers.authorization, 'Bearer feishu-test-token')
+    if (body) assert.equal(JSON.parse(call.init.body).tenantId, undefined)
+  }
+  assert.equal((await invokeRoute(route, 'GET', BASE + '/rest/internal/users')).status, 404)
+  assert.equal((await invokeRoute(route, 'POST', BASE + '/rest/ce/packages/pkg-1/delete', {})).status, 404)
+})
+
+test('overview tolerates unavailable optional datasets and scopes every aggregate consistently', async () => {
+  const calls = []
+  const { routes } = await loadHost({ fetch: async url => {
+    const path = new URL(url); calls.push(path)
+    if (path.pathname.endsWith('/data-quality')) return mcpJson({}, 403)
+    return mcpJson({ list: [], metrics: {} })
+  } })
+  const result = await invokeRoute(routes.get(BASE), 'GET', BASE + '/brief?year=2026&orgId=org-1')
+  assert.equal(result.status, 200)
+  assert.equal(result.body.ok, true)
+  assert.ok(result.body.data.errors.dataQuality)
+  for (const path of calls.filter(path => /overview|budget\/summary|cash-summary/.test(path.pathname))) {
+    assert.equal(path.searchParams.get('orgId'), 'org-1')
+  }
+})
+
+test('public writes retain upstream authorization failures and reject cross-origin mutations', async () => {
+  let requested = 0
+  const { routes } = await loadHost({ fetch: async () => { requested++; return mcpJson({}, 403) } })
+  const route = routes.get(BASE)
+  const denied = await invokeRoute(route, 'PUT', BASE + '/rest/budget-engine/versions/v-1/params', { version: 'P1', params: {} }, { 'content-type': 'application/json' })
+  assert.equal(denied.status, 403)
+  const before = requested
+  const foreign = await invokeRoute(route, 'PATCH', BASE + '/rest/finance/alerts/a-1/status', { status: 'RESOLVED' }, { 'content-type': 'application/json', origin: 'https://other.example' })
+  assert.equal(foreign.status, 403)
+  assert.equal(requested, before)
+})
+
+test('query changes discard stale financial results and recover after a failed request', async () => {
+  const source = await readFile(new URL('src/workflows.js', root), 'utf8')
+  const requests = []
+  const harness = clientHarness(source + '\nfunction ResourceHarness({ path }) { return useFinanceResource(path, 0) }', 'ResourceHarness', { api: path => new Promise((resolve, reject) => requests.push({ path, resolve, reject })) })
+  harness.render({ path: '/data-source/records?scope=HEADQUARTERS' }); harness.flushEffects()
+  harness.render({ path: '/data-source/records?scope=HEZHONG' }); harness.flushEffects()
+  requests[1].resolve({ data: { list: ['合众'] } }); await Promise.resolve()
+  requests[0].resolve({ data: { list: ['总部'] } }); await Promise.resolve()
+  assert.deepEqual(harness.render({ path: '/data-source/records?scope=HEZHONG' }).data.list, ['合众'])
+  harness.render({ path: '/data-source/records?scope=HEADQUARTERS' }); harness.flushEffects()
+  requests[2].reject(new Error('暂不可用')); await Promise.resolve(); await Promise.resolve()
+  const failed = harness.render({ path: '/data-source/records?scope=HEADQUARTERS' })
+  assert.equal(failed.data, null)
+  assert.equal(failed.error, '暂不可用')
+  failed.retry(); harness.render({ path: '/data-source/records?scope=HEADQUARTERS' }); harness.flushEffects()
+  requests[3].resolve({ data: { list: ['恢复'] } }); await Promise.resolve()
+  assert.deepEqual(harness.render({ path: '/data-source/records?scope=HEADQUARTERS' }).data.list, ['恢复'])
+})
+
+test('payment facts hide unpublished amounts and separate scope and currency without client sums', async () => {
+  let data = { batches: 0, payable: { amount: '999' } }
+  const isolated = clientHarness(await readFile(new URL('src/views/facts.js', root), 'utf8'), 'FactsView', {
+    useFinanceResource: () => ({ data, loading: false }), FinanceResource() {}, Card() {}, Table() {}, EmptyState() {}, Select() {}, React: { Fragment: 'fragment' }, financeColumns: value => value,
+  })
+  let tree = isolated.render({ ctx: { year: '2026', revision: 0 } })
+  assert(clientNodes(tree).some(node => node.children.includes('尚无已发布批次，暂不展示金额。')))
+  assert.equal(clientNodes(tree).filter(node => node.type?.name === 'Table').length, 0)
+  data = { batches: 2, byScope: [{ scope: 'HEADQUARTERS', byCurrency: [{ currency: 'CNY', payableAmount: '100', paidAmount: '50' }, { currency: 'USD', payableAmount: '10', paidAmount: '5' }] }, { scope: 'HEZHONG', byCurrency: [{ currency: 'CNY', payableAmount: '80', paidAmount: '20' }] }] }
+  tree = isolated.render({ ctx: { year: '2026', revision: 0 } })
+  const table = clientNodes(tree).find(node => node.props.tableId === 'finance-facts-currency')
+  assert.deepEqual(table.props.rows.map(row => [row.scope, row.currency, row.payableAmount]), [['总部', 'CNY', '100'], ['总部', 'USD', '10'], ['合众', 'CNY', '80']])
+})
+
+test('cash viewers cannot schedule, increase or backfill plans', async () => {
+  const source = (await Promise.all(['src/components.js', 'src/format.js', 'src/views/cash.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  for (const [component, props, forbidden] of [
+    ['PlansTab', { rows: [{ id: 'p-1' }], page: 1 }, ['schedule', 'increase']],
+    ['RevenueTab', { revenues: { list: [{ id: 'r-1' }] }, page: 1 }, ['backfill']],
+  ]) {
+    const harness = clientHarness(source, component, { PAGE_SIZE: 20 })
+    const tree = harness.render({ ...props, canWrite: false, t: key => key, onPage() {} })
+    const table = clientNodes(tree).find(node => node.type?.name === 'Table')
+    const actions = table.props.columns.find(column => column.key === 'actions').render(table.props.rows[0])
+    assert(!clientNodes(actions).some(node => node.children.some(child => forbidden.includes(child))))
+  }
 })

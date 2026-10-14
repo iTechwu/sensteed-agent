@@ -16,6 +16,11 @@ page.setDefaultTimeout(10000)
 page.setDefaultNavigationTimeout(15000)
 const errors = []
 const requests = []
+const mutations = []
+let financeRole = 'FINANCE_OWNER'
+let failCreate = false
+const deniedPermissions = new Set()
+const permissionCodes = ['budget.activity.read', 'budget.activity.manage', 'budget.activity.reopen', 'budget.submission.read', 'budget.submission.edit', 'budget.submission.verify', 'budget.adjustment.approve', 'budget.version.manage', 'budget.version.publish', 'budget.compare.read', 'budget.execution.read', 'cash.plan.read', 'cash.plan.write', 'cash.plan.verify', 'finance.source.review', 'finance.assistant.read', 'finance.permission.manage']
 page.on('pageerror', e => errors.push(e.message))
 const year = new Date().getFullYear()
 let failBrief = false
@@ -34,9 +39,29 @@ const recheckAccess = async () => {
 try {
   await page.route('**/api/desktop/**', async route => {
     const url = new URL(route.request().url()); requests.push(url.pathname + url.search)
+    const method = route.request().method()
+    const pathname = url.pathname.replace('/api/desktop/sensteed/finance/rest', '')
+    if (['POST', 'PUT', 'PATCH'].includes(method) && url.pathname.includes('/rest/')) mutations.push({ path: pathname, method, body: route.request().postDataJSON() })
     let body = { ok: true, data: { list: [], total: 0 } }
     const bomAccess = url.searchParams.get('permission') === 'cost.engineering.read'
-    const status = url.pathname.endsWith('/access') ? bomAccess ? bomAccessStatus : accessStatus : url.pathname.endsWith('/rollup') ? bomRollupStatus : failBrief && url.pathname.endsWith('/brief') ? 502 : 200
+    let status = url.pathname.endsWith('/access') ? bomAccess ? bomAccessStatus : accessStatus : url.pathname.endsWith('/rollup') ? bomRollupStatus : failBrief && url.pathname.endsWith('/brief') ? 502 : 200
+
+    if (pathname === '/finance/permissions/me') { status = bomAccessStatus; body = { ok: status === 200, data: { permissions: [...permissionCodes.filter(code => !deniedPermissions.has(code)), ...(bomAllowed ? ['cost.engineering.read'] : [])], scopes: [] } } }
+    if (pathname === '/finance/members/me') body.data = { role: financeRole, fullAccess: true, departmentIds: [] }
+    if (pathname === '/finance/budget/versions') body.data = { list: [{ id: 'version-1', name: '测试预算草稿', status: 'DRAFT', isPrimary: false, year, lineCount: 1 }] }
+    if (pathname.endsWith('/params') && method === 'GET') body.data = [{ id: 'param-1', version: 'P1', params: { openingBalance: 100, safetyLine: 50 } }]
+    if (pathname.endsWith('/runs') && method === 'GET') body.data = [{ id: 'run-1', status: 'SUCCESS', formulaVersion: 'formula-v3', startedAt: '2026-10-14T00:00:00Z' }]
+    if (pathname.endsWith('/sales-inputs') && method === 'GET') body.data = [{ id: 'input-1', product: '测试产品', quantity: 2, unitPrice: 100, receiptRate: 0.5 }]
+    if (pathname.endsWith('/outputs')) body.data = [{ id: 'out-1', kind: 'REVENUE', amount: 200, year, month: 1 }]
+    if (pathname.endsWith('/statements')) body.data = { income: [{ year, month: 1, revenue: 200, profit: 20 }], cashflow: [], balance: [] }
+    if (pathname === '/ce/packages' && method === 'GET') body.data = { list: [{ id: 'pkg-1', name: '测试车型 BOM', status: 'APPROVED', version: 'V1' }], total: 1 }
+    if (pathname === '/ce/packages' && method === 'POST') { status = failCreate ? 502 : 200; body = failCreate ? { ok: false, error: '创建暂不可用' } : { ok: true, data: { id: 'pkg-1' } } }
+    if (/\/ce\/packages\/pkg-1\/(changes|quotes|param-versions|approvals)$/.test(pathname)) body.data = []
+    if (pathname === '/finance/review/summary') body.data = { sources: [{ source: 'FILING', pending: 1 }], total: 1 }
+    if (pathname === '/finance/notifications/summary') body.data = { total: 1, unread: 1, pending: 1 }
+    if (pathname === '/finance/notifications') body.data = { list: [{ id: 'notification-1', title: '测试通知', category: 'ACTION_REQUIRED', status: 'PENDING', readAt: null }], total: 1 }
+    if (pathname === '/finance/members') body.data = { list: [{ id: 'member-1', userId: 'user-1', name: '测试成员', role: 'FINANCE_STAFF', enabled: true }] }
+    if (pathname === '/data-source/records') body.data = { list: [{ id: 'record-1', sourceDocNo: 'OA-1', fields: [{ key: 'source-name', label: '业务描述', value: '测试来源单据' }], financialAnalysis: { category: '采购支出' } }], total: 1 }
     if (url.pathname.endsWith('/access')) body = { ok: status === 200, allowed: bomAccess ? bomAllowed : financeAllowed }
     if (url.pathname.endsWith('/bom/packages')) {
       bomPage = Number(url.searchParams.get('page'))
@@ -44,7 +69,7 @@ try {
       assert.equal(url.searchParams.has('year'), false)
       assert.equal(url.searchParams.has('orgId'), false)
     }
-    if (url.pathname.endsWith('/bom/packages/pkg-1')) body.data = { package: { name: '测试车型 BOM' }, totalCost: 800, targetCost: 1000, nodeCount: 2, leafCount: 1, nodes: [{ id: 'node-1', partNo: 'EV-001', name: '测试电池', level: 1, qty: 2, unitCost: 400 }] }
+    if (url.pathname.endsWith('/bom/packages/pkg-1')) body.data = { package: { id: 'pkg-1', name: '测试车型 BOM', status: 'DRAFT' }, totalCost: 800, targetCost: 1000, nodeCount: 2, leafCount: 1, nodes: [{ id: 'node-1', partNo: 'EV-001', name: '测试电池', level: 1, qty: 2, unitCost: 400 }] }
     if (url.pathname.endsWith('/rollup')) body = bomRollupStatus === 200 ? { ok: true, data: { entries: [{ nodeId: 'node-1', extendedCost: 800 }] } } : { ok: false, error: '汇总暂不可用' }
     if (url.pathname.endsWith('/status')) body = { status: 'bound', user: { name: '测试用户' } }
     if (url.pathname.endsWith('/context')) body.data = { orgs: [{ id: 'org-1', name: '测试主体' }], departments: [{ id: 'dept-1', name: '测试部门' }] }
@@ -95,11 +120,54 @@ try {
   await recheckAccess()
   await page.locator('.sf-tabs').getByRole('button', { name: '成本 BOM', exact: true }).waitFor({ state: 'hidden' })
   await page.getByRole('heading', { name: '经营总览', exact: true }).waitFor()
+  // BOM creation keeps input on failure and allows retry; writes use the public CE contract.
+  bomAllowed = true
+  await recheckAccess()
+  await page.locator('.sf-tabs').getByRole('button', { name: '成本 BOM', exact: true }).click()
+  await page.getByRole('button', { name: '新建成本包', exact: true }).click()
+  const createDialog = page.getByRole('dialog', { name: '新建成本包', exact: true })
+  await createDialog.getByLabel('项目 / 车型名称', { exact: true }).fill('回归成本项目')
+  failCreate = true
+  await createDialog.getByRole('button', { name: '确认', exact: true }).click()
+  await createDialog.getByText('创建暂不可用', { exact: true }).waitFor()
+  assert.equal(await createDialog.getByLabel('项目 / 车型名称', { exact: true }).inputValue(), '回归成本项目')
+  failCreate = false
+  await createDialog.getByRole('button', { name: '确认', exact: true }).click()
+  await createDialog.waitFor({ state: 'hidden' })
+  assert.equal(mutations.at(-1).body.name, '回归成本项目')
+  financeRole = 'BOSS'
+  await recheckAccess()
+  await page.getByRole('button', { name: '新建成本包', exact: true }).waitFor({ state: 'hidden' })
+  await page.getByText('测试电池', { exact: true }).waitFor()
+  financeRole = 'FINANCE_OWNER'
+  await recheckAccess()
+  await page.getByRole('button', { name: '新建成本包', exact: true }).waitFor()
   // Every top-level section must render, including empty-data state.
-  for (const tab of ['预算执行', '经营分析', '资金分析', '预警中心', '数据中心', '录入', '深度分析']) {
+  for (const tab of ['预算执行', '经营分析', '资金分析', '预警中心', '数据中心', '录入', '预算编制', '预算比较', '复核中心', '来源记录', '已发布事实', '通知中心', '权限中心', '深度分析']) {
     await page.locator('.sf-tabs').getByRole('button', { name: tab, exact: true }).click()
     await page.screenshot({ path: resolve(evidence, `tab-${tab}.png`) })
   }
+  await page.locator('.sf-tabs').getByRole('button', { name: '预算编制', exact: true }).click()
+  await page.getByLabel('编制预算版本', { exact: true }).selectOption('version-1')
+  await page.getByLabel('预算参数版本', { exact: true }).selectOption('param-1')
+  await page.getByRole('button', { name: '计算预算', exact: true }).waitFor()
+  await page.getByLabel('计算结果批次', { exact: true }).selectOption('run-1')
+  await page.getByRole('cell', { name: '200', exact: true }).first().waitFor()
+  await page.screenshot({ path: resolve(evidence, 'engine-results.png') })
+  await page.locator('.sf-tabs').getByRole('button', { name: '来源记录', exact: true }).click()
+  await page.getByText('测试来源单据', { exact: true }).waitFor()
+  await Promise.all([page.waitForResponse(response => response.url().includes('/data-source/records?scope=HEZHONG')), page.getByLabel('来源范围', { exact: true }).selectOption('HEZHONG')])
+  await page.locator('.sf-tabs').getByRole('button', { name: '通知中心', exact: true }).click()
+  await page.getByRole('button', { name: '标为已读', exact: true }).click()
+  assert(mutations.some(call => call.path === '/finance/notifications/notification-1/read'))
+  await page.locator('.sf-tabs').getByRole('button', { name: '来源记录', exact: true }).click()
+  deniedPermissions.add('finance.source.review')
+  await recheckAccess()
+  await page.locator('.sf-tabs').getByRole('button', { name: '来源记录', exact: true }).waitFor({ state: 'hidden' })
+  await page.getByRole('heading', { name: '经营总览', exact: true }).waitFor()
+  deniedPermissions.clear()
+  await recheckAccess()
+  await page.locator('.sf-tabs').getByRole('button', { name: '深度分析', exact: true }).click()
   const analyses = page.locator('.sf-analysis-card button')
   const count = await analyses.count()
   assert(count >= 7)
@@ -142,5 +210,5 @@ try {
   await page.screenshot({ path: resolve(evidence, 'recovered.png') })
   assert.equal(await page.locator('vite-error-overlay').count(), 0)
   assert.deepEqual(errors, [])
-  console.log(JSON.stringify({ passed: true, sections: 9, bom: 'permission, pagination, detail, partial failure, retry, revocation', analyses: count, requests: requests.length, evidence }))
+  console.log(JSON.stringify({ passed: true, sections: 16, workflows: 'planning, source scope, notification read, failed creation retry, read-only role, permission revocation', bom: 'permission, pagination, detail, partial failure, retry, revocation', analyses: count, requests: requests.length, evidence }))
 } finally { await browser.close(); await vite.close() }

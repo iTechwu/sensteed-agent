@@ -19,6 +19,8 @@ const lineLabel = line => [line.orgName, line.departmentName, line.costItemName,
 
 function BudgetView({ ctx, t }) {
   const { year, orgId, orgs, departments, revision } = ctx
+  const availableViews = BUDGET_VIEWS.filter(([id]) => ctx.financeWriter || !['adjustments', 'allocations', 'versions'].includes(id))
+  useEffect(() => { if (!availableViews.some(([id]) => id === view)) setView('matrix') }, [ctx.financeWriter])
   const [view, setView] = useState(() => BUDGET_VIEWS.map(([id]) => id).includes(ctx.drillParams?.view) ? ctx.drillParams.view : 'matrix')
   const [filters, setFilters] = useState({ expenseType: '', departmentId: '', versionId: '', month: ctx.drillParams?.month ? String(ctx.drillParams.month) : '', unassigned: false })
   const [page, setPage] = useState(1)
@@ -96,8 +98,9 @@ function BudgetView({ ctx, t }) {
 
   return h('div', { className: 'sf-view' },
     h('div', { className: 'sf-row-between' },
-      h(PillTabs, { tabs: BUDGET_VIEWS, value: view, onChange: id => { setView(id); setPage(1) }, t }),
+      h(PillTabs, { tabs: availableViews, value: view, onChange: id => { setView(id); setPage(1) }, t }),
       savedViewsBar),
+    budget?.summary?.budgetVersionId === null ? h('p', { role: 'status', className: 'sf-banner sf-banner-amber' }, '当前年度没有已发布预算；空汇总不代表已批准零预算。') : null,
     h('div', { className: 'sf-row-between' }, filterBar, notice ? h(Notice, null, notice) : null),
 
     view === 'matrix' ? h(MatrixView, { budget, t, onCell: cell => { setFilters(f => ({ ...f, month: cell.month ? String(cell.month) : '' })); setView('lines') } }) : null,
@@ -205,7 +208,7 @@ function MonthView({ budget, t }) {
         { label: t('kpiBudget'), key: 'budgetAmount', render: row => wan(row.budgetAmount) ?? '—', num: true },
         { label: t('kpiPrSubmitted'), key: 'prSubmittedAmount', render: row => wan(row.prSubmittedAmount) ?? '—', num: true },
         { label: t('kpiPaid'), key: 'paidAmount', render: row => wan(row.paidAmount) ?? '—', num: true },
-        { label: t('available'), key: 'available', sortValue: row => (finite(row.budgetAmount) ?? 0) - (finite(row.prSubmittedAmount) ?? 0) - (finite(row.paidAmount) ?? 0), render: row => { const value = (finite(row.budgetAmount) ?? 0) - (finite(row.prSubmittedAmount) ?? 0) - (finite(row.paidAmount) ?? 0); return h('span', { className: value < 0 ? 'sf-neg' : '' }, wan(value) ?? '—') }, num: true },
+        { label: t('available') + '（累计）', key: 'available', sortValue: row => finite(row.availableCumulative), render: row => { const value = finite(row.availableCumulative); return h('span', { className: value < 0 ? 'sf-neg' : '' }, wan(value) ?? '—') }, num: true },
       ],
       rows, empty: t('empty'),
     })))
@@ -238,7 +241,7 @@ function LineDetailDialog({ line, t, onClose }) {
     h('dl', { className: 'sf-evidence' },
       ...[['org', line.orgName ?? t('unassigned')], ['department', line.departmentName ?? '—'], ['costItem', line.costItemName ?? '—'], ['month', mm(line.month)], ['expenseType', EXPENSE_LABELS[line.expenseType] ?? '—']].map(([key, value]) =>
         h('div', { key, className: 'sf-evidence-item' }, h('small', null, t(key)), h('strong', null, value))),
-      ...[[t('kpiBudget'), line.budgetAmount], [t('kpiPrSubmitted'), line.prSubmittedAmount], [t('kpiPrEstimated'), line.prEstimatedAmount], [t('kpiPaid'), line.paidAmount], [t('available'), (finite(line.budgetAmount) ?? 0) - occupied]].map(([label, value]) =>
+      ...[[t('kpiBudget'), line.budgetAmount], [t('kpiPrSubmitted'), line.prSubmittedAmount], [t('kpiPrEstimated'), line.prEstimatedAmount], [t('kpiPaid'), line.paidAmount], [t('available'), line.availableAmount]].map(([label, value]) =>
         h('div', { key: label, className: 'sf-evidence-item' }, h('small', null, label), h('strong', null, wan(value) ?? '—')))))
 }
 

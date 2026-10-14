@@ -18,6 +18,7 @@ function AlertsView({ ctx, t, onDrill }) {
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState(null)
   const [detail, setDetail] = useState(null)
+  const [statusDialog, setStatusDialog] = useState(null)
 
   const load = () => {
     api(`/alerts-summary?year=${year}${orgId ? `&orgId=${orgId}` : ''}`).then(value => setSummary(value.data ?? {})).catch(() => setSummary({}))
@@ -29,10 +30,12 @@ function AlertsView({ ctx, t, onDrill }) {
     if (orgId) params.set('orgId', orgId)
     if (filters.severity) params.set('severity', filters.severity)
     if (filters.status) params.set('status', filters.status)
+    if (filters.alertType) params.set('alertType', filters.alertType)
+    if (filters.month) params.set('month', filters.month)
     api(`/alerts?${params}`).then(value => setRows(value)).catch(() => setRows({ error: true }))
   }
   useEffect(() => { load() }, [year, orgId, revision]) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { fetchRows() }, [page, filters.severity, filters.status]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { fetchRows() }, [page, filters.severity, filters.status, filters.alertType, filters.month]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const runEngine = async () => {
     setBusy(true); setNotice(null)
@@ -72,15 +75,17 @@ function AlertsView({ ctx, t, onDrill }) {
             setFilters(f => ({ ...f, severity, status: key === 'resolved' ? 'RESOLVED' : 'OPEN' }))
           },
         }))),
-      h(PrimaryButton, { busy, onClick: runEngine }, h(Glyph, { name: 'refresh', size: 12 }), busy ? t('running') : t('runEngine'))),
+      ctx.financeWriter ? h(PrimaryButton, { busy, onClick: runEngine }, h(Glyph, { name: 'refresh', size: 12 }), busy ? t('running') : t('runEngine')) : null),
     notice ? h(Notice, null, notice) : null,
     rules ? h('div', { className: `sf-banner ${activeRuleSet ? 'sf-banner-green' : 'sf-banner-amber'}`, role: 'status' },
       h(Glyph, { name: 'shield', size: 14 }),
       activeRuleSet
         ? t('rulesConfirmed').replace('{v}', String(activeRuleSet.version)).replace('{date}', shortDate(activeRuleSet.confirmedAt) ?? '—')
         : t('rulesUnconfirmed'),
-      !activeRuleSet ? h(PrimaryButton, { onClick: () => post('/alert-rules/confirm', {}).then(() => api('/alert-rules').then(value => setRules(value.data ?? { list: [], activeVersion: null })).catch(() => {})).catch(error => setNotice(`${t('opFailed')}: ${error.message}`)) }, t('confirmDefaultRules')) : null) : null,
+      !activeRuleSet && ctx.role === 'FINANCE_OWNER' ? h(PrimaryButton, { onClick: () => post('/alert-rules/confirm', {}).then(() => api('/alert-rules').then(value => setRules(value.data ?? { list: [], activeVersion: null })).catch(() => {})).catch(error => setNotice(`${t('opFailed')}: ${error.message}`)) }, t('confirmDefaultRules')) : null) : null,
     h('div', { className: 'sf-filters' },
+      h(Select, { 'aria-label': '预警类型', value: filters.alertType, onChange: value => { setPage(1); setFilters(f => ({ ...f, alertType: value })) }, options: ALERT_TYPES.map(([id, key]) => [id, t(key)]), placeholder: '全部类型' }),
+      h(Select, { 'aria-label': '预警月份', value: filters.month, onChange: value => { setPage(1); setFilters(f => ({ ...f, month: value })) }, options: Array.from({ length: 12 }, (_, i) => [String(i + 1), `${i + 1}月`]), placeholder: '全部月份' }),
       h(Select, { value: filters.severity, onChange: value => { setPage(1); setFilters(f => ({ ...f, severity: value })) }, options: [['CRITICAL', t('sevCritical')], ['WARN', t('sevWarn')], ['INFO', t('sevInfo')]], placeholder: t('severity') }),
       h(Select, { value: filters.status, onChange: value => { setPage(1); setFilters(f => ({ ...f, status: value })) }, options: ALERT_STATUS_OPTIONS.map(([id, key]) => [id, t(key)]), placeholder: t('stAll') })),
     h(Card, { title: t('alertsTitle') }, h(Table, { tableId: 'finance-AlertsView-1',
@@ -90,11 +95,13 @@ function AlertsView({ ctx, t, onDrill }) {
         { label: t('alertTitleCol'), key: 'title', stickyLeft: false },
         { label: t('detail'), key: 'detail', render: row => h('span', { style: { whiteSpace: 'normal', wordBreak: 'break-all', display: 'block', maxWidth: 420, textAlign: 'left' } }, row.detail ?? '—') },
         { label: t('org'), key: 'orgName' },
+        { key: 'actions', label: '处理状态', sortable: false, render: row => h(GhostButton, { onClick: event => { event.stopPropagation(); setStatusDialog(row) } }, '处理预警') },
         { label: t('lastSeen'), key: 'lastSeenAt', render: row => shortDate(row.lastSeenAt) ?? '—', num: true },
       ],
-      rows: alertRows, empty: t('empty'),
+      rows: alertRows, empty: rows?.error ? h(ListLoadError, { label: '预警', onRetry: fetchRows }) : t('empty'),
       onRowClick: row => setDetail(row), rowKey: 'id',
     }), h(Pager, { page, total: rows?.data?.total ?? rows?.total, limit: PAGE_SIZE, onPage: setPage })),
+    statusDialog ? h(FinanceFormDialog, { title: '更新预警处理状态', initial: { status: statusDialog.status }, fields: [{ key: 'status', label: '处理状态', options: [['OPEN', '待处理'], ['CONFIRMED', '已确认'], ['RESOLVED', '已解决'], ['IGNORED', '已忽略']], required: true }, { key: 'note', label: '处理说明' }], onClose: () => setStatusDialog(null), onSubmit: async body => { await financeRest(`/finance/alerts/${statusDialog.id}/status`, 'PATCH', body); load() } }) : null,
     detail ? h(Dialog, { title: t('alertDetail'), onClose: () => setDetail(null) },
       h('div', { className: 'sf-stack' },
         h('div', { className: 'sf-row' }, h(SeverityBadge, { severity: detail.severity, t }), h(Pill, { tone: 'muted' }, alertTypeLabel(detail.alertType, t) ?? '—'), h('span', { className: 'sf-note' }, `${shortDate(detail.firstSeenAt) ?? '—'} → ${shortDate(detail.lastSeenAt) ?? '—'}`)),

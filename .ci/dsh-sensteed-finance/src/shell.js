@@ -13,10 +13,14 @@ const SECTION_META = {
   entry: ['tabEntry', 'descEntry'],
   analyze: ['tabAnalyze', 'descAnalyze'],
   bom: ['tabBom', 'descBom'],
+  engine: ['tabEngine', 'descEngine'], comparisons: ['tabComparisons', 'descComparisons'], review: ['tabReview', 'descReview'], sources: ['tabSources', 'descSources'], facts: ['tabFacts', 'descFacts'], notifications: ['tabNotifications', 'descNotifications'], permissions: ['tabPermissions', 'descPermissions'],
 }
 
 function Dashboard({ t }) {
-  const bomAllowed = useFinanceWorkspaceAccess('cost.engineering.read')
+  const capabilities = useFinanceCapabilities()
+  const financeWriter = ['FINANCE_STAFF', 'FINANCE_OWNER'].includes(capabilities.role)
+  const identity = { ...capabilities, financeWriter }
+  const canOpen = section => financeSectionAllowed(section, identity)
   const [tab, setTab] = useState('overview')
   // 下钻参数：onDrill(target, params) 切 tab 时可带子视图/月份等初始状态
   const [drillParams, setDrillParams] = useState(null)
@@ -94,26 +98,33 @@ function Dashboard({ t }) {
 
   const orgs = context?.data?.orgs || []
   const departments = context?.data?.departments || []
-  const ctx = { year, orgId, orgs, departments, revision, drillParams }
+  const ctx = { year, orgId, orgs, departments, revision, drillParams, permissions: capabilities.permissions || [], financeWriter, role: capabilities.role, fullAccess: capabilities.fullAccess }
   const onDrill = (target, params) => { setDrillParams(params ?? null); if (params?.orgId) setOrgId(params.orgId); setTab(target) }
-  useEffect(() => { if (tab === 'bom' && bomAllowed === false) setTab('overview') }, [tab, bomAllowed])
+  useEffect(() => { if (capabilities.permissions !== null && !canOpen(tab)) { setTab('overview'); setDrillParams(null) } }, [tab, capabilities.permissions, financeWriter])
   const briefProps = { brief, t, onDrill, orgId }
 
   // 各 tab 的错误/空态由视图内部处理；这里只处理 brief 类视图的加载与失败
-  const body = (tab === 'overview' || tab === 'operations') && briefState === 'loading' && !brief
+  const body = !canOpen(tab) ? h('p', { role: 'alert' }, '当前账号没有此页面权限') : (tab === 'overview' || tab === 'operations') && briefState === 'loading' && !brief
     ? h('div', { className: 'sf-loading', role: 'status' }, h(Glyph, { name: 'loading' }), t('loading'))
     : (tab === 'overview' || tab === 'operations') && briefState === 'error' && !brief
       ? h('div', { className: 'sf-fatal', role: 'alert' }, h(Glyph, { name: 'warning' }), h('strong', null, t('loadError')), h(GhostButton, { onClick: refresh }, t('retry')))
       : h(React.Fragment, null,
         tab === 'overview' ? h(OverviewView, { key: `ov-${year}-${orgId}-${revision}`, ...briefProps, workQueue }) : null,
         tab === 'operations' ? h(OperationsView, { key: `op-${year}-${orgId}-${revision}`, ...briefProps }) : null,
-        tab === 'budget' ? h(BudgetView, { ctx, t }) : null,
+        tab === 'budget' ? h(BudgetView, { ctx: { ...ctx, orgId: '' }, t }) : null,
         tab === 'cash' ? h(CashView, { ctx, t, onDrill }) : null,
         tab === 'alerts' ? h(AlertsView, { ctx, t, onDrill }) : null,
         tab === 'datacenter' ? h(DataCenterView, { ctx, t }) : null,
-        tab === 'entry' ? h(EntryView, { ctx, t }) : null,
-        tab === 'bom' && bomAllowed === true ? h(BomView, { ctx, t }) : null,
-        tab === 'analyze' ? h(AnalyzeView, { ctx, t }) : null)
+        tab === 'entry' ? h(FilingParityView, { ctx, t }) : null,
+        tab === 'bom' && canOpen('bom') ? h(BomView, { ctx, t }) : null,
+        tab === 'analyze' ? h(AnalyzeView, { ctx, t }) : null,
+        tab === 'engine' ? h(EngineView, { ctx, t }) : null,
+        tab === 'comparisons' ? h(ComparisonsView, { ctx, t }) : null,
+        tab === 'review' ? h(ReviewView, { ctx, t }) : null,
+        tab === 'sources' ? h(SourcesView, { ctx, t }) : null,
+        tab === 'facts' ? h(FactsView, { ctx, t }) : null,
+        tab === 'notifications' ? h(NotificationsView, { ctx, t, onDrill }) : null,
+        tab === 'permissions' ? h(PermissionsView, { ctx, t }) : null)
 
   return h('div', { className: 'sf-overlay sf-root', role: 'dialog', 'aria-modal': true, 'aria-labelledby': 'sf-title' },
     h('main', { className: 'sf-shell', 'aria-labelledby': 'sf-title', ref: shellRef, tabIndex: -1 },
@@ -126,12 +137,12 @@ function Dashboard({ t }) {
           h('h1', { id: 'sf-title' }, t(SECTION_META[tab]?.[0] ?? 'title')),
           h('p', { className: 'sf-desc' }, operator ? `${t('operatorAs')} ${operator} · ${t(SECTION_META[tab]?.[1] ?? 'subtitle')}` : t(SECTION_META[tab]?.[1] ?? 'subtitle'))),
         h('div', { className: 'sf-header-side' },
-          h('label', { className: 'sf-filter' }, h('span', null, t('year')), h(Select, { value: year, onChange: value => { setYear(value); setDrillParams(null) }, options: yearOptions(year) })),
-          h('label', { className: 'sf-filter' }, h('span', null, t('org')), h(SearchSelect, { value: orgId, onChange: value => { setOrgId(value); setDrillParams(null) }, options: orgs.filter(org => org.type !== 'GROUP').map(org => [org.id, org.name]), placeholder: t('allOrgs') })),
+          !['bom', 'sources', 'datacenter', 'review', 'notifications', 'permissions'].includes(tab) ? h('label', { className: 'sf-filter' }, h('span', null, t('year')), h(Select, { value: year, onChange: value => { setYear(value); setDrillParams(null) }, options: yearOptions(year) })) : null,
+          ['overview', 'operations', 'cash', 'alerts'].includes(tab) ? h('label', { className: 'sf-filter' }, h('span', null, t('org')), h(SearchSelect, { value: orgId, onChange: value => { setOrgId(value); setDrillParams(null) }, options: orgs.filter(org => org.type !== 'GROUP').map(org => [org.id, org.name]), placeholder: t('allOrgs') })) : null,
           h('div', { className: 'sf-header-buttons' },
             h(Tooltip, { label: t('refresh') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('refresh'), onClick: refresh }, h(IconRefreshOutlineRegular, { size: 16 }))),
             h(Tooltip, { label: t('close') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('close'), onClick: closeOverlay }, h(IconCloseOutlineRegular, { size: 16 })))))),
-      h('nav', { className: 'sf-tabs', 'aria-label': t('title') }, ...TABS.filter(([id]) => id !== 'bom' || bomAllowed === true).map(([id, key]) =>
+      h('nav', { className: 'sf-tabs', 'aria-label': t('title') }, ...TABS.filter(([id]) => canOpen(id)).map(([id, key]) =>
         h('button', { type: 'button', key: id, 'aria-current': tab === id ? 'page' : undefined, onClick: () => { setTab(id); setDrillParams(null) } }, t(key)))),
       h('div', { className: `sf-content${briefState === 'loading' && !brief ? ' sf-refreshing' : ''}`, 'aria-busy': briefState === 'loading' && !brief }, body)))
 }
