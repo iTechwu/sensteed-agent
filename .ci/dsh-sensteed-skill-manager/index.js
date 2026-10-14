@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { lstatSync } from 'node:fs'
 import { access, cp, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { promisify } from 'node:util'
 import { parse as parseYaml } from 'yaml'
 
@@ -34,22 +34,58 @@ function safeGitHubUrl(value) {
   let url
   try { url = new URL(value) } catch { throw new Error('Enter a public GitHub repository URL.') }
   const parts = url.pathname.split('/').filter(Boolean)
-  if (url.protocol !== 'https:' || url.hostname !== 'github.com' || url.username || url.password
-    || url.search || url.hash || parts.length !== 2) {
-    throw new Error('Only public https://github.com/owner/repository URLs are supported.')
+  if (url.protocol !== 'https:' || url.hostname !== 'github.com' || url.username || url.password || url.search || url.hash) {
+    throw new Error('Use a public GitHub repository or skill-directory URL.')
   }
   const repository = parts[1].replace(/\.git$/u, '')
-  if (!/^[A-Za-z0-9_.-]+$/u.test(parts[0]) || !/^[A-Za-z0-9_.-]+$/u.test(repository)) {
+  if (!parts[0] || !repository || !/^[A-Za-z0-9_.-]+$/u.test(parts[0]) || !/^[A-Za-z0-9_.-]+$/u.test(repository)) {
     throw new Error('The GitHub repository URL is invalid.')
   }
-  return `https://github.com/${parts[0]}/${repository}.git`
+  if (parts.length === 2) return { repository: `https://github.com/${parts[0]}/${repository}.git` }
+  const kind = parts[2]
+  if ((kind !== 'tree' && kind !== 'blob') || parts.length < 5) {
+    throw new Error('Use a GitHub /tree/<branch>/<skill-path> URL or a repository root URL.')
+  }
+  const ref = parts[3]
+  const path = parts.slice(4).map(segment => {
+    let decoded
+    try { decoded = decodeURIComponent(segment) } catch { throw new Error('The GitHub skill path is invalid.') }
+    if (!decoded || decoded === '.' || decoded === '..' || decoded.includes('/') || decoded.includes('\\') || decoded.includes('\0')) {
+      throw new Error('The GitHub skill path is invalid.')
+    }
+    return decoded
+  })
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/u.test(ref)) throw new Error('The GitHub branch name is invalid.')
+  if (kind === 'blob') {
+    if (path.at(-1) !== 'SKILL.md') throw new Error('A GitHub file URL must point to SKILL.md.')
+    path.pop()
+  }
+  if (path.length === 0) throw new Error('Select a skill directory, not the repository root.')
+  return { repository: `https://github.com/${parts[0]}/${repository}.git`, ref, path: path.join('/') }
 }
 
 async function exists(path) {
   try { await access(path); return true } catch { return false }
 }
 
-async function skillSource(repositoryDir) {
+async function skillSource(repositoryDir, requestedPath) {
+  if (requestedPath) {
+    const source = resolve(repositoryDir, requestedPath)
+    const relativePath = relative(repositoryDir, source)
+    if (!relativePath || relativePath === '..' || relativePath.startsWith(`..${sep}`) || isAbsolute(relativePath)) {
+      throw new Error('The GitHub skill path is invalid.')
+    }
+    let current = repositoryDir
+    for (const segment of requestedPath.split('/')) {
+      current = join(current, segment)
+      const entry = await lstat(current).catch(() => undefined)
+      if (!entry?.isDirectory() || entry.isSymbolicLink()) throw new Error('The selected GitHub path is not a skill directory.')
+    }
+    const skillFile = join(source, 'SKILL.md')
+    const skillStat = await lstat(skillFile).catch(() => undefined)
+    if (!skillStat?.isFile() || skillStat.isSymbolicLink()) throw new Error('No regular SKILL.md was found in the selected GitHub directory.')
+    return source
+  }
   const rootFile = join(repositoryDir, 'SKILL.md')
   if (await exists(rootFile)) {
     const entry = await lstat(rootFile)
@@ -84,17 +120,24 @@ async function skillSource(repositoryDir) {
 }
 
 async function installSkill(url, options = {}) {
-  const repository = safeGitHubUrl(url)
+  const sourceSpec = safeGitHubUrl(url)
   const root = options.root || skillRoot()
   const temporaryRoot = await mkdtemp(join(options.tempRoot || tmpdir(), 'sensteed-skill-'))
   const checkout = join(temporaryRoot, 'repo')
   let staging
   try {
-    await execFileAsync('git', ['clone', '--depth', '1', '--', repository, checkout], {
+    const cloneArgs = ['clone', '--depth', '1']
+    if (sourceSpec.path) cloneArgs.push('--filter=blob:none', '--sparse')
+    if (sourceSpec.ref) cloneArgs.push('--branch', sourceSpec.ref)
+    cloneArgs.push('--', sourceSpec.repository, checkout)
+    await execFileAsync('git', cloneArgs, {
       timeout: 120_000,
       maxBuffer: 2 * 1024 * 1024,
     })
-    const source = await skillSource(checkout)
+    if (sourceSpec.path) {
+      await execFileAsync('git', ['-C', checkout, 'sparse-checkout', 'set', '--', sourceSpec.path], { timeout: 30_000 })
+    }
+    const source = await skillSource(checkout, sourceSpec.path)
     const metadata = parseSkillFrontmatter(await readFile(join(source, 'SKILL.md'), 'utf8'))
     await mkdir(root, { recursive: true, mode: 0o700 })
     const rootStat = await lstat(root)
