@@ -366,11 +366,14 @@ function requestContext(req: IncomingMessage, expectedPort: number): MarketReque
   }
 }
 
-function requestAllowed(req: IncomingMessage, expectedPort: number): boolean {
+function requestAllowed(req: IncomingMessage, expectedPort: number | undefined): boolean {
+  // webServer 未监听时 port 为 undefined,回环来源无从校验,直接拒绝。
+  if (expectedPort === undefined) return false
   return marketRequestAllowed(requestContext(req, expectedPort))
 }
 
-function mutationAllowed(req: IncomingMessage, expectedPort: number): boolean {
+function mutationAllowed(req: IncomingMessage, expectedPort: number | undefined): boolean {
+  if (expectedPort === undefined) return false
   return marketMutationAllowed({
     ...requestContext(req, expectedPort),
   })
