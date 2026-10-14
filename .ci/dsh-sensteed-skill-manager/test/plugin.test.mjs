@@ -2,9 +2,13 @@ import assert from 'node:assert/strict'
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import test from 'node:test'
 import { zipSync } from 'fflate'
 import { __test, listSkills, parseSkillFrontmatter, skillRoot } from '../index.js'
+
+const execFileAsync = promisify(execFile)
 
 test('resolves the local DSH skills directory and validates skill metadata', () => {
   assert.equal(skillRoot({ DSH_HOME: '/tmp/dsh-home' }), '/tmp/dsh-home/skills')
@@ -124,4 +128,48 @@ test('rejects traversal and symbolic-link entries in shared skill archives', () 
     '../escape.txt': new TextEncoder().encode('outside'),
   }))
   assert.throws(() => __test.validateZipArchive(traversal), /unsafe/u)
+})
+
+test('rejects archive path collisions and the install marker filename', () => {
+  const frontmatter = new TextEncoder().encode('---\nname: unsafe\ndescription: Unsafe\n---\n')
+  const conflicts = [
+    zipSync({ 'SKILL.md': frontmatter, 'SKILL.md/child.txt': new TextEncoder().encode('collision') }),
+    zipSync({ 'SKILL.md': frontmatter, '.sensteed-shared-skill.json': new TextEncoder().encode('{}') }),
+    zipSync({ 'SKILL.md': frontmatter, 'Docs/a.txt': new TextEncoder().encode('a'), 'docs/A.txt': new TextEncoder().encode('b') }),
+  ]
+  for (const archive of conflicts) assert.throws(() => __test.validateZipArchive(Buffer.from(archive)))
+})
+
+test('bounds third-party skill trees and excludes Git metadata from installed content', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'skill-manager-tree-limit-'))
+  try {
+    await mkdir(join(root, '.git'), { recursive: true })
+    await writeFile(join(root, '.git', 'ignored'), 'metadata')
+    await writeFile(join(root, 'SKILL.md'), 'skill')
+    assert.equal(await __test.validateSkillTree(root), undefined)
+    const largePath = join(root, 'large.bin')
+    await writeFile(largePath, Buffer.alloc(25 * 1024 * 1024 + 1))
+    await assert.rejects(__test.validateSkillTree(root), /25 MiB/u)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test('preflights Git tree sizes before checking out skill blobs', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'skill-manager-git-preflight-'))
+  try {
+    await mkdir(join(root, 'skills', 'review'), { recursive: true })
+    await writeFile(join(root, 'skills', 'review', 'SKILL.md'), '---\nname: review\ndescription: Review\n---\n')
+    await execFileAsync('git', ['init', root])
+    await execFileAsync('git', ['-C', root, 'config', 'user.email', 'skill-test@example.invalid'])
+    await execFileAsync('git', ['-C', root, 'config', 'user.name', 'Skill Test'])
+    await execFileAsync('git', ['-C', root, 'add', '.'])
+    await execFileAsync('git', ['-C', root, 'commit', '-m', 'fixture'])
+    assert.equal(await __test.inspectGitSkill(root), join('skills', 'review'))
+    await mkdir(join(root, 'skills', 'review', 'resources'), { recursive: true })
+    await Promise.all(Array.from({ length: 500 }, (_, index) =>
+      writeFile(join(root, 'skills', 'review', 'resources', `${index}.txt`), ''),
+    ))
+    await execFileAsync('git', ['-C', root, 'add', '.'])
+    await execFileAsync('git', ['-C', root, 'commit', '-m', 'oversized fixture'])
+    await assert.rejects(__test.inspectGitSkill(root), /too many files/u)
+  } finally { await rm(root, { recursive: true, force: true }) }
 })

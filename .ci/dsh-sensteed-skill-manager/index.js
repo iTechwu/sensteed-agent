@@ -125,6 +125,46 @@ async function skillSource(repositoryDir, requestedPath) {
   return candidates[0]
 }
 
+async function inspectGitSkill(checkout, requestedPath) {
+  const { stdout } = await execFileAsync('git', ['-C', checkout, 'ls-tree', '--full-tree', '-r', '-l', '-z', 'HEAD'], {
+    timeout: 30_000,
+    maxBuffer: 16 * 1024 * 1024,
+  })
+  const entries = stdout.toString().split('\0').filter(Boolean).map(entry => {
+    const [metadata, path] = entry.split('\t', 2)
+    const fields = metadata.split(' ')
+    return { path, size: fields[3] === '-' ? 0 : Number(fields[3]), type: fields[1] }
+  }).filter(entry => entry.type === 'blob')
+  const files = new Set(entries.map(entry => entry.path))
+  let sourcePath = requestedPath
+  if (!sourcePath) {
+    if (files.has('SKILL.md')) sourcePath = ''
+    else {
+      const candidates = entries.map(entry => entry.path).filter(path => /^skills\/(?!\.)[^/]+\/SKILL\.md$/u.test(path))
+      const selected = candidates.length > 0
+        ? candidates
+        : entries.map(entry => entry.path).filter(path => /^(?!\.)[^/]+\/SKILL\.md$/u.test(path))
+      if (selected.length !== 1) {
+        throw new Error(selected.length > 1
+          ? 'This repository contains multiple skills. Install a repository with a single skill.'
+          : 'No SKILL.md was found at the repository root or in its skills/ directory.')
+      }
+      sourcePath = dirname(selected[0])
+    }
+  }
+  if (!files.has([sourcePath, 'SKILL.md'].filter(Boolean).join('/'))) {
+    throw new Error('No regular SKILL.md was found in the selected GitHub directory.')
+  }
+  const selectedEntries = entries.filter(entry =>
+    sourcePath ? entry.path.startsWith(`${sourcePath}/`) : true,
+  )
+  const totalSize = selectedEntries.reduce((sum, entry) => sum + entry.size, 0)
+  if (selectedEntries.length > MAX_ARCHIVE_FILES || totalSize > MAX_UNPACKED_BYTES) {
+    throw new Error('Skill contains too many files or exceeds the 25 MiB limit.')
+  }
+  return sourcePath
+}
+
 async function installSkill(url, options = {}) {
   const sourceSpec = safeGitHubUrl(url)
   const root = options.root || skillRoot()
@@ -132,19 +172,29 @@ async function installSkill(url, options = {}) {
   const checkout = join(temporaryRoot, 'repo')
   let staging
   try {
-    const cloneArgs = ['clone', '--depth', '1']
-    if (sourceSpec.path) cloneArgs.push('--filter=blob:none', '--sparse')
+    const cloneArgs = ['clone', '--depth', '1', '--filter=blob:none', '--no-checkout']
     if (sourceSpec.ref) cloneArgs.push('--branch', sourceSpec.ref)
     cloneArgs.push('--', sourceSpec.repository, checkout)
-    await execFileAsync('git', cloneArgs, {
-      timeout: 120_000,
-      maxBuffer: 2 * 1024 * 1024,
-    })
-    if (sourceSpec.path) {
-      await execFileAsync('git', ['-C', checkout, 'sparse-checkout', 'set', '--', sourceSpec.path], { timeout: 30_000 })
+    try {
+      await execFileAsync('git', cloneArgs, {
+        timeout: 120_000,
+        maxBuffer: 2 * 1024 * 1024,
+      })
+    } catch (error) {
+      throw Object.assign(new Error('GitHub repository could not be downloaded.'), { statusCode: 502, cause: error })
     }
-    const source = await skillSource(checkout, sourceSpec.path)
+    let sourcePath
+    try {
+      sourcePath = await inspectGitSkill(checkout, sourceSpec.path)
+      await execFileAsync('git', ['-C', checkout, 'checkout', 'HEAD', '--', sourcePath || '.'], { timeout: 60_000 })
+    } catch (error) {
+      if (Number.isInteger(error?.statusCode)) throw error
+      if (error instanceof Error && /No SKILL\.md|multiple skills|selected GitHub directory|25 MiB/u.test(error.message)) throw error
+      throw Object.assign(new Error('GitHub skill files could not be downloaded.'), { statusCode: 502, cause: error })
+    }
+    const source = await skillSource(checkout, sourcePath || undefined)
     const metadata = parseSkillFrontmatter(await readFile(join(source, 'SKILL.md'), 'utf8'))
+    await validateSkillTree(source)
     await mkdir(root, { recursive: true, mode: 0o700 })
     const rootStat = await lstat(root)
     if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) throw new Error('The local skill directory is not a regular directory.')
@@ -154,6 +204,7 @@ async function installSkill(url, options = {}) {
     await cp(source, staging, {
       recursive: true,
       filter: path => {
+        if (basename(path) === '.git' || basename(path) === 'node_modules') return false
         try { return !lstatSync(path).isSymbolicLink() } catch { return false }
       },
     })
@@ -164,6 +215,28 @@ async function installSkill(url, options = {}) {
     if (staging) await rm(staging, { recursive: true, force: true })
     await rm(temporaryRoot, { recursive: true, force: true })
   }
+}
+
+async function validateSkillTree(root) {
+  let count = 0
+  let totalSize = 0
+  const visit = async directory => {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      if (entry.name === '.git' || entry.name === 'node_modules') continue
+      const path = join(directory, entry.name)
+      const info = await lstat(path)
+      if (info.isSymbolicLink()) continue
+      if (info.isDirectory()) await visit(path)
+      else if (info.isFile()) {
+        count += 1
+        totalSize += info.size
+        if (count > MAX_ARCHIVE_FILES || totalSize > MAX_UNPACKED_BYTES) {
+          throw new Error('Skill contains too many files or exceeds the 25 MiB limit.')
+        }
+      }
+    }
+  }
+  await visit(root)
 }
 
 async function readJsonBody(req) {
@@ -204,6 +277,9 @@ function validateZipArchive(archive) {
   const directoryOffset = archive.readUInt32LE(eocd + 16)
   if (!count || count > MAX_ARCHIVE_FILES || directoryOffset + directorySize > eocd) throw new Error('Skill archive directory is invalid.')
   const names = new Set()
+  const files = new Set()
+  const directories = new Set()
+  const portableNames = new Set()
   let totalSize = 0
   let offset = directoryOffset
   for (let index = 0; index < count; index += 1) {
@@ -217,13 +293,32 @@ function validateZipArchive(archive) {
     const commentLength = archive.readUInt16LE(offset + 32)
     const externalAttributes = archive.readUInt32LE(offset + 38)
     const name = archive.subarray(offset + 46, offset + 46 + nameLength).toString('utf8')
+    const pathName = name.endsWith('/') ? name.slice(0, -1) : name
+    const segments = pathName.split('/')
+    const portableName = pathName.normalize('NFC').toLocaleLowerCase('en-US')
     const fileType = (externalAttributes >>> 16) & 0o170000
     if (
       !name || name.includes('\\') || name.includes('\0') || name.includes(':') || name.startsWith('/') || /^[A-Za-z]:/u.test(name) ||
-      name.split('/').some(part => part === '..' || part === '.' || part.endsWith('.') || part.endsWith(' ')) || names.has(name) ||
+      segments.some(part => part === '..' || part === '.' || part.endsWith('.') || part.endsWith(' ')) ||
+      segments.some(part => /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/iu.test(part)) ||
+      portableName === SHARED_INSTALL_MARKER.toLocaleLowerCase('en-US') || portableNames.has(portableName) || names.has(name) ||
       flags & 1 || ![0, 8].includes(method) || fileType === 0o120000 ||
       compressedSize === 0xffffffff || uncompressedSize === 0xffffffff
     ) throw new Error('Skill archive contains an unsafe or unsupported entry.')
+    let parent = ''
+    for (const rawSegment of segments.slice(0, -1)) {
+      const segment = rawSegment.normalize('NFC').toLocaleLowerCase('en-US')
+      parent = parent ? `${parent}/${segment}` : segment
+      if (files.has(parent)) throw new Error('Skill archive contains conflicting file and directory paths.')
+      directories.add(parent)
+    }
+    const isDirectory = name.endsWith('/')
+    if ((isDirectory && files.has(portableName)) || (!isDirectory && directories.has(portableName))) {
+      throw new Error('Skill archive contains conflicting file and directory paths.')
+    }
+    if (isDirectory) directories.add(portableName)
+    else files.add(portableName)
+    portableNames.add(portableName)
     names.add(name)
     totalSize += uncompressedSize
     if (totalSize > MAX_UNPACKED_BYTES || (compressedSize > 0 && uncompressedSize / compressedSize > 200)) {
@@ -468,4 +563,4 @@ export function apply(ctx, overrides = {}) {
   return () => route?.()
 }
 
-export const __test = { safeGitHubUrl, skillSource, installSkill, validateZipArchive, installArchive, packLocalSkill, SHARED_SKILLS_URL }
+export const __test = { safeGitHubUrl, skillSource, inspectGitSkill, installSkill, validateSkillTree, validateZipArchive, installArchive, packLocalSkill, SHARED_SKILLS_URL }
