@@ -1,6 +1,6 @@
 # Sensteed 财务管理
 
-Sensteed Agent 侧边栏「财务管理」提供与 datasource 网页工作台对应的八个模块：经营总览、预算、经营分析、资金、预警、数据中心、填报录入、深度分析。
+Sensteed Agent 侧边栏「财务管理」提供与 datasource 网页工作台对应的九个模块：经营总览、预算、经营分析、资金、预警、数据中心、填报录入、成本 BOM、深度分析。
 
 ## 登录与数据连接
 
@@ -9,6 +9,8 @@ Sensteed Agent 侧边栏「财务管理」提供与 datasource 网页工作台�
 使用桌面端飞书登录即可。宿主内存保存短期 SSO access token，财务界面每次请求读取当前会话；服务端验证 token 并固定租户和操作者。不再要求用户配置 `DATASOURCE_INTERNAL_API_SECRET`、租户或操作者环境变量。token 不进入渲染进程、状态 API、构建产物或日志。
 
 Datasource 公共服务必须支持 SSO Bearer 鉴权。未登录/过期时显示飞书登录提示；没有财务角色时保留服务端拒绝信息。`DATASOURCE_API_BASE_URL` 仅接受同一公开 Datasource origin 的 `/api` 地址，非法或私有地址会回退到默认地址。
+
+成本 BOM 读取 `https://ds.hozonauto.com/api/ce/packages` 的公开 CE 契约，复用同一飞书会话。入口单独查询 `/finance/permissions/me` 的生效权限（含角色基线与显式授权），不将财务工作区访问权等同于成本工程权限；权限暂不可用时保留已确认的入口，明确撤销后隐藏入口并退出 BOM 页面。CE 服务端继续核验能力、租户及成本包归属。本次桌面视图提供查询，导入、估算维护及评审写入仍由 Datasource 成本工程控制台承载。
 
 ## 交互覆盖
 
@@ -20,6 +22,7 @@ Datasource 公共服务必须支持 SSO Bearer 鉴权。未登录/过期时显�
 | 预警 | 严重度/状态筛选、分页、详情与来源下钻、规则确认、触发引擎 |
 | 数据中心 | 数据质量、导入批次、数据源与运行记录 |
 | 录入 | 填报任务、部门填报、通讯录、人员归属、成员角色、预算及收支录入；主体、部门、年度、月份等受控维度使用选择器，预算部门按 departmentId 提交 |
+| 成本 BOM | 按 `cost.engineering.read` 生效权限显示；成本包分页、物料明细、目标成本和服务端正算汇总；年度/主体筛选不适用于成本包 |
 | 深度分析 | 风险、成本、预算执行、收入、质量、预测、版本和规则分析，投递到当前会话；无会话时创建会话 |
 
 财务界面仅访问同源 `/api/desktop/sensteed/finance`，宿主再调用 Datasource REST API。所有写入由服务端会话绑定操作者和租户，并保留幂等语义；业务错误不会作为成功返回，客户端无法覆盖操作者/租户。
@@ -36,4 +39,4 @@ Datasource 公共服务必须支持 SSO Bearer 鉴权。未登录/过期时显�
 BRAND=sensteed npm run check
 ```
 
-桌面构建会先重新生成本插件浏览器模块并刷新已安装的 file 依赖。桌面仓库的 `tests/browser/finance.browser.mjs` 使用受控数据覆盖八页、分析指令、下钻和失败重试；真实财务写入仍应使用测试租户验收。
+桌面构建会先重新生成本插件浏览器模块并刷新已安装的 file 依赖。桌面仓库的 `tests/browser/finance.browser.mjs` 使用受控数据覆盖九页、分析指令、下钻和失败重试；真实财务写入仍应使用测试租户验收。
