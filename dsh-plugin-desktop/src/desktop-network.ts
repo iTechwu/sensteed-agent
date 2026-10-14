@@ -66,7 +66,10 @@ export function desktopWebServerHost(_exposure: DesktopNetworkExposure): WebServ
 }
 
 /** Marker-free URL suitable for an ordinary local browser. */
-export function desktopLoopbackBrowserUrl(port: number): string {
+export function desktopLoopbackBrowserUrl(port: number | undefined): string {
+  if (!Number.isSafeInteger(port) || port! < 1 || port! > 65_535) {
+    throw new TypeError('dsh-plugin-desktop: loopback browser URL requires an assigned Web server port')
+  }
   return `http://127.0.0.1:${String(port)}/`
 }
 

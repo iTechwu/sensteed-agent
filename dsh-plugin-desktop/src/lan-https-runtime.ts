@@ -95,7 +95,10 @@ export class DesktopLanHttpsRuntime {
   }
 
   /** Attach exactly once to the actual loopback WebServer port. */
-  attach(targetPort: number): void {
+  attach(targetPort: number | undefined): void {
+    if (!Number.isSafeInteger(targetPort) || targetPort! < 1 || targetPort! > 65_535) {
+      throw new TypeError('dsh-plugin-desktop: LAN HTTPS attach requires an assigned Web server port')
+    }
     if (this.targetPort !== undefined) {
       if (this.targetPort === targetPort) return
       throw new Error('dsh-plugin-desktop: LAN HTTPS runtime is already attached to another port')
