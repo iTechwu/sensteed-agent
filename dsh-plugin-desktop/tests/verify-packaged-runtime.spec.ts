@@ -922,6 +922,7 @@ describe('packaged desktop runtime verification', () => {
     expect(ALLOWED_SMART_UNPACK_PACKAGE_PREFIXES).toContain('node_modules/@deepseek-ai/node-addon-system-')
     expect(ALLOWED_SMART_UNPACK_PACKAGE_PREFIXES).toContain('node_modules/@vscode/ripgrep-')
     expect(ALLOWED_SMART_UNPACK_PACKAGE_PREFIXES).toContain('node_modules/@img/sharp-')
+    expect(ALLOWED_SMART_UNPACK_PACKAGE_PREFIXES).toContain('node_modules/@tencent-qqmail/agently-cli-')
   })
 
   it('accepts pnpm as an indivisible smart-unpacked package with native helpers', () => {
