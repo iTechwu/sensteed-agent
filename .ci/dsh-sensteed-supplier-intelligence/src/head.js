@@ -42,14 +42,23 @@ async function api(action, args = {}, signal) {
 
 function useRemembered(key, initial) {
   const storageKey = `${currentScopeId}:${key}`
-  const [value, setValue] = useState(() => Object.hasOwn(panelMemory, storageKey) ? panelMemory[storageKey] : initial)
+  const [state, setState] = useState(() => ({
+    key: storageKey,
+    value: Object.hasOwn(panelMemory, storageKey) ? panelMemory[storageKey] : initial,
+  }))
+  const value = state.key === storageKey
+    ? state.value
+    : Object.hasOwn(panelMemory, storageKey) ? panelMemory[storageKey] : initial
   useEffect(() => {
-    setValue(Object.hasOwn(panelMemory, storageKey) ? panelMemory[storageKey] : initial)
+    setState({ key: storageKey, value })
   }, [storageKey])
-  const update = next => setValue(previous => {
+  const update = next => setState(previousState => {
+    const previous = previousState.key === storageKey
+      ? previousState.value
+      : Object.hasOwn(panelMemory, storageKey) ? panelMemory[storageKey] : initial
     const value = typeof next === 'function' ? next(previous) : next
     panelMemory[storageKey] = value
-    return value
+    return { key: storageKey, value }
   })
   useEffect(() => { panelMemory[storageKey] = value }, [storageKey, value])
   return [value, update]
