@@ -7,6 +7,10 @@
  *   are produced ONLY by this script — every packaging entry refreshes (or
  *   verifies) them before its check gate, so packaged content is always the
  *   latest snapshot;
+ * - skills come from `source: "sibling"` (vendored checkout under
+ *   `../docker-helm.dofe.ai/skills/<name>`, the maintenance home) or
+ *   `source: "github"` (default, fetched at refresh time). A missing sibling
+ *   checkout degrades to the committed snapshot like a network failure;
  * - `source: "github"` plugin entries are written back into their sibling
  *   checkout (source of truth stays the sibling repository), then the existing
  *   `scripts/sync-dofe-plugin-snapshot.mjs` re-syncs the `.ci` snapshot;
@@ -67,6 +71,21 @@ export async function loadManifest(root, manifestPath = 'bundled.json') {
       if (typeof skill[field] !== 'string' || skill[field].length === 0) {
         throw new Error(`bundled.json: skill ${skill.name ?? '?'} misses string field ${field}`)
       }
+    }
+    const source = skill.source ?? 'github'
+    if (source !== 'github' && source !== 'sibling') {
+      throw new Error(`bundled.json: skill ${skill.name} has unknown source ${source}`)
+    }
+    if (source === 'sibling') {
+      if (typeof skill.siblingDir !== 'string' || skill.siblingDir.length === 0) {
+        throw new Error(`bundled.json: sibling skill ${skill.name} needs siblingDir`)
+      }
+      if (typeof skill.resolvedSha !== 'string' || skill.resolvedSha.length === 0) {
+        throw new Error(`bundled.json: sibling skill ${skill.name} needs a resolvedSha vendored baseline`)
+      }
+    }
+    if (skill.siblingRepository !== undefined && (typeof skill.siblingRepository !== 'string' || skill.siblingRepository.length === 0)) {
+      throw new Error(`bundled.json: skill ${skill.name} has non-string siblingRepository`)
     }
   }
   for (const plugin of manifest.plugins) {
@@ -209,6 +228,17 @@ export async function refreshBundledContents(root, options = {}) {
 
   const fetchedSkills = []
   for (const skill of selectedSkills) {
+    if ((skill.source ?? 'github') === 'sibling') {
+      const siblingDir = resolve(root, skill.siblingDir)
+      if (!existsSync(siblingDir)) {
+        summary.degraded.push(skill.name)
+        warn(`sibling checkout missing at ${siblingDir}; using committed snapshot for ${skill.name}`)
+        continue
+      }
+      emit(`vendored ${skill.siblingDir} @ ${skill.resolvedSha}`)
+      fetchedSkills.push({ skill, fetched: { cache: siblingDir, sha: skill.resolvedSha } })
+      continue
+    }
     if (!network) {
       summary.degraded.push(skill.name)
       continue
@@ -252,8 +282,12 @@ export async function refreshBundledContents(root, options = {}) {
       skill.snapshotDir = targets.length === 1 && targets[0].kind === 'dir'
         ? `${BUNDLED_SKILLS_ROOT}/${targets[0].name}`
         : BUNDLED_SKILLS_ROOT
-      skill.resolvedSha = fetched.sha
-      skill.refreshedAt = new Date().toISOString()
+      // Sibling skills keep their vendored `resolvedSha` baseline; only
+      // github-sourced skills advance it to the freshly fetched commit.
+      if ((skill.source ?? 'github') === 'github') {
+        skill.resolvedSha = fetched.sha
+        skill.refreshedAt = new Date().toISOString()
+      }
       summary.refreshed.push(skill.name)
       summary.shaByRepository.set(skill.repository, fetched.sha)
     }

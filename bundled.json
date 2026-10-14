@@ -5,6 +5,8 @@
       "name": "dashi-ppt-skill",
       "repository": "https://github.com/chuspeeism/dashi-ppt-skill",
       "ref": null,
+      "source": "sibling",
+      "siblingDir": "../docker-helm.dofe.ai/skills/dashi-ppt",
       "snapshotDir": "dsh-plugin-desktop/bundled/skills/dashi-ppt",
       "resolvedSha": "21dc7e5fc8c3a0d7f6a94948153dd1ee954f4e64",
       "refreshedAt": "2026-10-10T17:43:27.335Z"
@@ -13,6 +15,8 @@
       "name": "humanizer",
       "repository": "https://github.com/blader/humanizer",
       "ref": null,
+      "source": "sibling",
+      "siblingDir": "../docker-helm.dofe.ai/skills/humanizer",
       "snapshotDir": "dsh-plugin-desktop/bundled/skills/humanizer",
       "resolvedSha": "225a6f39ac85f76ee48dbad772ea4abe4ed6c9d8",
       "refreshedAt": "2026-10-10T17:43:27.344Z"
@@ -21,6 +25,8 @@
       "name": "huashu-art-motion",
       "repository": "https://github.com/alchaincyf/huashu-art-motion",
       "ref": null,
+      "source": "sibling",
+      "siblingDir": "../docker-helm.dofe.ai/skills/huashu-art-motion",
       "snapshotDir": "dsh-plugin-desktop/bundled/skills/huashu-art-motion",
       "resolvedSha": "9ff59339f934e08483ba0a5b1db20f4c2c421b35",
       "refreshedAt": "2026-10-10T17:43:27.507Z"
@@ -29,9 +35,20 @@
       "name": "text-to-cad",
       "repository": "https://github.com/earthtojake/text-to-cad",
       "ref": null,
+      "source": "sibling",
+      "siblingDir": "../docker-helm.dofe.ai/skills/text-to-cad",
       "snapshotDir": "dsh-plugin-desktop/bundled/skills",
       "resolvedSha": "b48ff49e00968ac07af08572b0595483dae07c85",
       "refreshedAt": "2026-10-10T17:43:27.546Z"
+    },
+    {
+      "name": "machine",
+      "repository": "https://github.com/iTechwu/sensteed-machine-skill",
+      "ref": null,
+      "source": "sibling",
+      "siblingDir": "../docker-helm.dofe.ai/skills/machine",
+      "snapshotDir": "dsh-plugin-desktop/bundled/skills/machine",
+      "resolvedSha": "d82eab1d3f7216d4cdc0761c80197e4ec819bcfd"
     }
   ],
   "plugins": [
