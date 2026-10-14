@@ -112,7 +112,7 @@ window.__ModuleLoader__.load({
         alertsTitle: '预警清单', sevCritical: '重大', sevWarn: '警告', sevInfo: '提示', sevResolved: '已解决', stPending: '待处理', stConfirmed: '已确认', stResolved: '已解决', stIgnored: '已忽略', alertType: '类型', alertTitleCol: '标题', detail: '说明', firstSeen: '首次发现', lastSeen: '最近出现', alertMonth: '月份',
         rulesUnconfirmed: '预警规则集尚未确认生效：当前不生成正式告警。以内置默认阈值确认后规则引擎才开始产出。', rulesConfirmed: '预警规则集 v{v} 已生效（{date} 确认）', confirmDefaultRules: '以内置默认阈值确认生效', confirmRulesTitle: '确认预警规则集', alertDetail: '预警详情', evidence: '证据快照', viewSource: '查看源数据', sourceBudget: '下钻预算', sourceCash: '下钻资金', sourceQuality: '下钻数据质量',
         // 数据中心
-        dsConfigs: '数据源配置', dsScope: '范围', scopeHq: '总部', scopeHezhong: '合众', dsKind: '类型', kindDss: 'DSS', kindFeishu: '飞书', dsEndpoint: '端点', dsEnabled: '启用', dsEnable: '启用', dsDisable: '停用', dsRuns: '同步批次', dsFallback: '回退原因', dsManualSync: '手动同步', dsRouteHint: 'DSS 优先、飞书兜底', dsSyncHint: '失败原因会写入批次留痕，成功不代表已发布财务事实。', syncNow: '触发同步', syncDone: '同步已完成', syncFetched: '采集', dsTransport: '实际通道', dsMetrics: '可观测性指标', last7Days: '近 7 天', successRate: '成功率', fallbackRate: '回退率', emptyRate: '空结果率', avgDuration: '平均时长', updatedAt: '更新时间', processingStage: '处理阶段', batchId: '批次', dataSummary: '数据摘要', errorSummary: '失败摘要', dsAdd: '新增配置', dsEdit: '编辑数据源配置', edit: '编辑', save: '保存', secretRef: '凭证引用', secretRefHint: '仅保存引用名，不存明文凭证。', tableMappings: '表映射（JSON，可选）', tableMapping: '表映射键', dsNamePlaceholder: '如：总部 DSS 采购流程', dsEndpointPlaceholder: 'https://…（飞书可留空）', docPurchase: '采购', docReimbursement: '报销', docIncome: '收入',
+        dsConfigs: '数据源配置', dsScope: '范围', scopeHq: '总部', scopeHezhong: '合众', dsKind: '类型', kindDss: 'DSS', kindFeishu: '飞书', dsEndpoint: '端点', dsEnabled: '启用', dsEnable: '启用', dsDisable: '停用', dsRuns: '同步批次', dsFallback: '回退原因', dsManualSync: '手动同步', dsRouteHint: 'DSS 优先、飞书兜底', dsSyncHint: '失败原因会写入批次留痕，成功不代表已发布财务事实。', syncNow: '触发同步', syncDone: '同步已完成', syncFetched: '采集', dsTransport: '实际通道', dsMetrics: '可观测性指标', last7Days: '近 7 天', successRate: '成功率', fallbackRate: '回退率', emptyRate: '空结果率', avgDuration: '平均时长', updatedAt: '更新时间', processingStage: '处理阶段', batchId: '批次', dataSummary: '数据摘要', errorSummary: '失败摘要', dsAdd: '新增配置', dsEdit: '编辑数据源配置', edit: '编辑', save: '保存', secretRef: '凭证引用', secretRefHint: '仅保存引用名，不存明文凭证。', tableMappings: '表映射（JSON，可选）', tableMapping: '表映射键', bizSystem: '业务系统', docType: '单据类型', dsNamePlaceholder: '如：总部 DSS 采购流程', dsEndpointPlaceholder: 'https://…（飞书可留空）', docPurchase: '采购', docReimbursement: '报销', docIncome: '收入',
         datasetScale: '数据集入库规模', qualityTitle: '数据质量清单', batchesTitle: '导入批次', issue: '问题', dataset: '数据集', count: '数量', sourceFile: '来源文件', rows: '行数', successRows: '成功', failedRows: '失败', batchStatus: '状态', startedAt: '开始时间', runAt: '批次时间', bizType: '业务类型',
         // 录入
         filingTasks: '任务管理（财务）', myFiling: '我的填报（部门）', createTask: '发起任务', taskTitle: '任务名称', taskType: '类型', typeBudget: '预算', typePlan: '排款', taskYear: '年度', taskMonth: '月份', taskDue: '截止时间', taskDepartments: '指派部门（可多选）', selectAll: '全选', taskInstructions: '填报说明', taskOwner: '负责人', taskReviewer: '财务审核人', taskAllowModify: '允许窗口内修改', taskFreezeMonth: '冻结当前自然月', taskStartDraft: '存为草稿（发布前部门不可见）', taskPublish: '创建并发布', taskProgress: '任务进度', closeTask: '关闭任务', taskClosed: '已关闭', departmentCol: '部门', progressCol: '进度', dueCol: '截止', assignmentTitle: '填报明细', rowsEditor: '行编辑（月份 / 说明 / 金额）', addRow: '加一行', saveDraft: '暂存草稿', submitFiling: '提交', commitFiling: '复核定稿', reopenFiling: '重开', reopenReason: '重开原因（必填，并入审计）', overdue: '已超期', assignee: '填报人',
@@ -160,7 +160,7 @@ window.__ModuleLoader__.load({
         revenueVs: 'Planned vs actual',
         alertsTitle: 'Alerts', sevCritical: 'Critical', sevWarn: 'Warn', sevInfo: 'Info', sevResolved: 'Resolved', stPending: 'Open', stConfirmed: 'Confirmed', stResolved: 'Resolved', stIgnored: 'Ignored', alertType: 'Type', alertTitleCol: 'Title', detail: 'Detail', firstSeen: 'First seen', lastSeen: 'Last seen', alertMonth: 'Month',
         rulesUnconfirmed: 'Alert rule set is not confirmed yet: no formal alerts are generated. Confirm with built-in defaults to start the engine.', rulesConfirmed: 'Alert rule set v{v} active (confirmed {date})', confirmDefaultRules: 'Confirm with built-in defaults', confirmRulesTitle: 'Confirm alert rules', alertDetail: 'Alert detail', evidence: 'Evidence', viewSource: 'View source data', sourceBudget: 'Budget', sourceCash: 'Cash', sourceQuality: 'Data quality',
-        dsConfigs: 'Data source configs', dsScope: 'Scope', scopeHq: 'HQ', scopeHezhong: 'Hezhong', dsKind: 'Kind', kindDss: 'DSS', kindFeishu: 'Feishu', dsEndpoint: 'Endpoint', dsEnabled: 'Enabled', dsEnable: 'Enable', dsDisable: 'Disable', dsRuns: 'Sync runs', dsFallback: 'Fallback', dsManualSync: 'Manual sync', dsRouteHint: 'DSS first, Feishu fallback', dsSyncHint: 'Failures are recorded in the run; success does not mean financial facts are published.', syncNow: 'Run sync', syncDone: 'Sync completed', syncFetched: 'Fetched', dsTransport: 'Transport', dsMetrics: 'Observability', last7Days: 'Last 7 days', successRate: 'Success rate', fallbackRate: 'Fallback rate', emptyRate: 'Empty rate', avgDuration: 'Avg duration', updatedAt: 'Updated', processingStage: 'Processing stage', batchId: 'Batch', dataSummary: 'Data summary', errorSummary: 'Error summary', dsAdd: 'Add config', dsEdit: 'Edit data source', edit: 'Edit', save: 'Save', secretRef: 'Credential ref', secretRefHint: 'Store a reference only; never enter a plaintext credential.', tableMappings: 'Table mappings (JSON, optional)', tableMapping: 'Table mapping key', dsNamePlaceholder: 'e.g. HQ DSS procurement', dsEndpointPlaceholder: 'https://… (optional for Feishu)', docPurchase: 'Purchase', docReimbursement: 'Reimbursement', docIncome: 'Income',
+        dsConfigs: 'Data source configs', dsScope: 'Scope', scopeHq: 'HQ', scopeHezhong: 'Hezhong', dsKind: 'Kind', kindDss: 'DSS', kindFeishu: 'Feishu', dsEndpoint: 'Endpoint', dsEnabled: 'Enabled', dsEnable: 'Enable', dsDisable: 'Disable', dsRuns: 'Sync runs', dsFallback: 'Fallback', dsManualSync: 'Manual sync', dsRouteHint: 'DSS first, Feishu fallback', dsSyncHint: 'Failures are recorded in the run; success does not mean financial facts are published.', syncNow: 'Run sync', syncDone: 'Sync completed', syncFetched: 'Fetched', dsTransport: 'Transport', dsMetrics: 'Observability', last7Days: 'Last 7 days', successRate: 'Success rate', fallbackRate: 'Fallback rate', emptyRate: 'Empty rate', avgDuration: 'Avg duration', updatedAt: 'Updated', processingStage: 'Processing stage', batchId: 'Batch', dataSummary: 'Data summary', errorSummary: 'Error summary', dsAdd: 'Add config', dsEdit: 'Edit data source', edit: 'Edit', save: 'Save', secretRef: 'Credential ref', secretRefHint: 'Store a reference only; never enter a plaintext credential.', tableMappings: 'Table mappings (JSON, optional)', tableMapping: 'Table mapping key', bizSystem: 'Business system', docType: 'Document type', dsNamePlaceholder: 'e.g. HQ DSS procurement', dsEndpointPlaceholder: 'https://… (optional for Feishu)', docPurchase: 'Purchase', docReimbursement: 'Reimbursement', docIncome: 'Income',
         datasetScale: 'Dataset scale', qualityTitle: 'Data quality', batchesTitle: 'Import batches', issue: 'Issue', dataset: 'Dataset', count: 'Count', sourceFile: 'Source file', rows: 'Rows', successRows: 'OK', failedRows: 'Failed', batchStatus: 'Status', startedAt: 'Started', runAt: 'Run at', bizType: 'Biz type',
         filingTasks: 'Tasks (finance)', myFiling: 'My filing (dept)', createTask: 'New task', taskTitle: 'Title', taskType: 'Type', typeBudget: 'Budget', typePlan: 'Payment plan', taskYear: 'Year', taskMonth: 'Month', taskDue: 'Due', taskDepartments: 'Departments', selectAll: 'Select all', taskInstructions: 'Filing instructions', taskOwner: 'Owner', taskReviewer: 'Finance reviewer', taskAllowModify: 'Allow changes while open', taskFreezeMonth: 'Freeze the current month', taskStartDraft: 'Save as draft (hidden until published)', taskPublish: 'Create and publish', taskProgress: 'Progress', closeTask: 'Close task', taskClosed: 'Closed', departmentCol: 'Department', progressCol: 'Progress', dueCol: 'Due', assignmentTitle: 'Assignment detail', rowsEditor: 'Rows (month / note / amount)', addRow: 'Add row', saveDraft: 'Save draft', submitFiling: 'Submit', commitFiling: 'Finalize', reopenFiling: 'Reopen', reopenReason: 'Reopen reason (required, audited)', overdue: 'Overdue', assignee: 'Assignee',
         directory: 'Feishu directory', dirSync: 'Sync directory', dirSearch: 'Search name/phone/email', mapUser: 'Map user', systemUserId: 'System user ID', unmappedOnly: 'Unmapped only', employmentRecords: 'Employment records', empCreate: 'Add record', empUser: 'User', empDept: 'Department', empStart: 'Start date', membersTitle: 'Members & roles', role: 'Role', roleNameDEPT_FILLER: 'Dept filler', roleNameDEPT_LEADER: 'Dept leader', roleNameDEPT_COLLABORATOR: 'Collaborator', roleNameBOSS: 'Boss', roleNameFINANCE_STAFF: 'Finance staff', roleNameFINANCE_OWNER: 'Finance owner', roleNameMANAGEMENT: 'Management', removeMember: 'Remove', memberUser: 'User', memberDept: 'Dept', enabledCol: 'Enabled',
@@ -1087,7 +1087,7 @@ window.__ModuleLoader__.load({
         if (value === null || value === undefined) return '—'
         if (typeof value === 'number') return formatNumber(value)
         if (key === 'changeRate') return `${formatNumber(Number(value) * 100)}%`
-        if (['status', 'scope', 'changeType', 'action', 'expenseType', 'type'].includes(key)) return FINANCE_VALUE_LABELS[value] || String(value)
+        if (['status', 'scope', 'changeType', 'action', 'expenseType', 'planType', 'type', 'kind', 'category', 'bizSystem', 'docType', 'transport', 'dataset', 'stage', 'severity', 'formulaVersion'].includes(key)) return financeLabel(value)
         if (/At$/.test(key)) return new Date(value).toLocaleString('zh-CN', { hour12: false })
         if (typeof value === 'object') return h(FinanceEvidence, { value })
         return String(value)
@@ -1095,11 +1095,24 @@ window.__ModuleLoader__.load({
     }
     function FinanceEvidence({ value }) {
       if (value === null || value === undefined) return h('span', null, '—')
-      if (typeof value !== 'object') return h('span', null, FINANCE_VALUE_LABELS[value] || String(value))
+      if (typeof value !== 'object') return h('span', null, financeLabel(value))
       return h('div', { className: 'sf-evidence' }, ...Object.entries(value).map(([key, item]) =>
         h('div', { key, className: 'sf-evidence-item' }, h('small', null, FINANCE_FIELD_LABELS[key] || key), h(FinanceEvidence, { value: item }))))
     }
-    const FINANCE_VALUE_LABELS = { GLOBAL: '全域', ORG: '指定主体', DEPARTMENT: '指定部门', SELF: '本人', DRAFT: '草稿', CONFIRMED: '已确认', PUBLISHED: '已发布', LOCKED: '已锁定', OPEN: '开放中', CLOSED: '已关闭', PENDING: '待填写', SUBMITTED: '已提交', REJECTED: '已退回', VOIDED: '已作废', SUCCESS: '成功', FAILED: '失败', RUNNING: '处理中', APPROVED: '已批准', IN_REVIEW: '评审中', OBSOLETE: '已作废', PROPOSED: '提案', APPLIED: '已落账', CANCELLED: '已撤销', HEADQUARTERS: '总部', HEZHONG: '合众', ADDED: '新增', REMOVED: '移除', INCREASED: '调增', DECREASED: '调减', MOVED: '移位', SUBMIT_REVIEW: '提交评审', APPROVE: '批准', REJECT: '驳回', BUDGET: '预算', PAYMENT_PLAN: '付款计划', REVENUE_PLAN: '收入计划' }
+    const FINANCE_VALUE_LABELS = {
+      GLOBAL: '全域', ORG: '指定主体', DEPARTMENT: '指定部门', SELF: '本人', HEADQUARTERS: '总部', HEZHONG: '合众',
+      DRAFT: '草稿', CONFIRMED: '已确认', PUBLISHED: '已发布', LOCKED: '已锁定', OPEN: '开放中', CLOSED: '已关闭',
+      PENDING: '待处理', SUBMITTED: '已提交', REJECTED: '已退回', VOIDED: '已作废', SUCCESS: '成功', FAILED: '失败', RUNNING: '处理中',
+      APPROVED: '已批准', IN_REVIEW: '评审中', OBSOLETE: '已作废', PROPOSED: '待落账', APPLIED: '已落账', CANCELLED: '已撤销',
+      ADDED: '新增', REMOVED: '移除', INCREASED: '调增', DECREASED: '调减', MOVED: '转移', SUBMIT_REVIEW: '提交评审', APPROVE: '批准', REJECT: '驳回',
+      PURCHASE: '采购', REIMBURSEMENT: '报销', INCOME: '收入', PAYROLL: '薪酬', TAX: '税费', OTHER: '其他',
+      PR_PAYMENT: 'PR付款', NEW_RETAIL: '新零售', DIRECT_PARTS: '直采零件', PROJECT_OPERATION: '项目运营', FIXED_OPERATION: '固定运营', MODEL_SPECIFIC: '模型专项', NON_PROJECT: '非项目',
+      BUDGET: '预算', PAYMENT_PLAN: '付款计划', REVENUE_PLAN: '收入计划', BUDGET_LINE: '预算明细', CASH_SUMMARY: '资金汇总',
+      FINANCE_PLAN: '财务计划', OA: 'OA系统', NC: 'NC系统', ERP: 'ERP系统', TREASURY: '资金系统', DSS: 'DSS', FEISHU: '飞书',
+      FEISHU_RAW_SNAPSHOT: '飞书原始快照', FEISHU_CSV_SNAPSHOT: '飞书 CSV 快照', FETCH: '采集', NORMALIZE: '标准化', VALIDATE: '校验', PERSIST: '入库',
+      INFO: '提示', WARN: '警告', CRITICAL: '重大', ACTIVE: '已生效',
+    }
+    function financeLabel(value) { return value === null || value === undefined || value === '' ? '—' : FINANCE_VALUE_LABELS[value] || String(value) }
     const FINANCE_FIELD_LABELS = { scopeType: '数据范围', yearFrom: '起始年度', yearTo: '截止年度', openingBalance: '期初余额', safetyLine: '现金安全线', linkedCePackageId: '关联成本包', monthlyOutflows: '月度支出假设', tax: '税费假设', outputRate: '销项税率', inputRate: '进项税率', workingCapital: '营运资金假设', payableMonths: '应付账期（月）', inventoryDays: '存货周转（天）', labor: '人工假设', hoursPerUnit: '单台人工时', ratePerHour: '人工费率', overhead: '制造费用假设', kwhPerUnit: '单台电耗', pricePerKwh: '综合电价', otherPerUnit: '其他单台费用', materialCost: '材料费', laborCost: '人工费', processCost: '加工费', otherCost: '其他费用', year: '年度', month: '月份', note: '说明', title: '名称', rows: '明细', plannedAmount: '计划金额', actualAmount: '实际金额', costItemId: '费用项目', description: '业务说明', task: '活动', taskId: '活动记录', departmentId: '部门记录', orgId: '主体记录', reason: '原因', submittedAt: '提交时间', createdAt: '创建时间', submissionNo: '提交版本', submittedByName: '提交人', changes: '变更明细', payload: '审计证据', laborRate: '人工费率', overheadRate: '制造费率', committed: '已确认', failed: '失败', accepted: '已接收', rejected: '异常行', error: '错误', id: '记录', totalAmount: '金额（元）', totalDelta: '总成本差额（元）', amount: '金额（元）', count: '条数', field: '字段', before: '变更前', after: '变更后', nodeId: '物料节点', diff: '差额', total: '总计', run: '计算批次', status: '状态', created: '新建', skipped: '跳过', results: '逐条回执', outputs: '输出', sourceRef: '来源引用', totalCost: '总成本', qty: '数量', estimate: '估算' }
     function financeFieldValue(values, key) { return key.split('.').reduce((value, part) => value?.[part], values) }
     function financeSetField(values, key, value) {
@@ -1402,7 +1415,7 @@ window.__ModuleLoader__.load({
 
       const activeCount = ['expenseType', 'departmentId', 'versionId', 'month'].filter(key => filters[key]).length + (filters.unassigned ? 1 : 0)
       const filterBar = h('div', { className: 'sf-filters sf-budget-filters' },
-        h(Select, { value: filters.expenseType, onChange: value => { setPage(1); setFilters(f => ({ ...f, expenseType: value })) }, options: EXPENSE_TYPES, placeholder: t('expenseType') }),
+        h(Select, { value: filters.expenseType, onChange: value => { setPage(1); setFilters(f => ({ ...f, expenseType: value })) }, options: EXPENSE_TYPES.map(([id, label]) => [id, t(label)]), placeholder: t('expenseType') }),
         h(SearchSelect, { value: filters.departmentId, onChange: value => { setPage(1); setFilters(f => ({ ...f, departmentId: value })) }, options: (departments || []).map(d => [d.id, d.name]), placeholder: t('department') }),
         h(Select, { value: filters.month, onChange: value => { setPage(1); setFilters(f => ({ ...f, month: value })) }, options: Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1} 月`]), placeholder: t('monthCol') }),
         view === 'matrix' || view === 'lines' ? h(SearchSelect, { value: filters.versionId, onChange: value => { setPage(1); setFilters(f => ({ ...f, versionId: value })) }, options: (versions?.list || []).map(version => [version.id, budgetVersionLabel(version)]), placeholder: t('version') }) : null,
@@ -1457,7 +1470,7 @@ window.__ModuleLoader__.load({
       const groups = new Map()
       for (const row of rows) {
         const key = `${row.orgName ?? t('unassigned')}|${row.expenseType ?? ''}|${row.departmentName ?? ''}`
-        if (!groups.has(key)) groups.set(key, { label: [row.orgName ?? t('unassigned'), EXPENSE_LABELS[row.expenseType] ?? '', row.departmentName].filter(Boolean).join(' / '), months: {}, total: { budget: 0, pr: 0, paid: 0, prEstimated: 0 } })
+        if (!groups.has(key)) groups.set(key, { label: [row.orgName ?? t('unassigned'), row.expenseType ? t(EXPENSE_LABELS[row.expenseType] ?? row.expenseType) : '', row.departmentName].filter(Boolean).join(' / '), months: {}, total: { budget: 0, pr: 0, paid: 0, prEstimated: 0 } })
         const group = groups.get(key)
         const month = row.month ?? 0
         group.months[month] = {
@@ -1529,7 +1542,7 @@ window.__ModuleLoader__.load({
         h(Card, { title: `${month} ${t('monthCol')} · ${t('orgSummaryFull')}`, unit: t('unitNote') }, h(Table, { tableId: 'finance-MonthView-1',
           columns: [
             { label: t('org'), key: 'orgName', render: row => row.orgName ?? t('unassigned'), stickyLeft: true },
-            { label: t('expenseType'), key: 'expenseType', render: row => EXPENSE_LABELS[row.expenseType] ?? row.expenseType ?? '—' },
+            { label: t('expenseType'), key: 'expenseType', render: row => row.expenseType ? t(EXPENSE_LABELS[row.expenseType] ?? row.expenseType) : '—' },
             { label: t('kpiBudget'), key: 'budgetAmount', render: row => wan(row.budgetAmount) ?? '—', num: true },
             { label: t('kpiPrSubmitted'), key: 'prSubmittedAmount', render: row => wan(row.prSubmittedAmount) ?? '—', num: true },
             { label: t('kpiPaid'), key: 'paidAmount', render: row => wan(row.paidAmount) ?? '—', num: true },
@@ -1549,7 +1562,7 @@ window.__ModuleLoader__.load({
             { label: t('org'), key: 'orgName', render: row => row.orgName ?? h(Badge, { tone: 'amber' }, t('unassigned')), stickyLeft: true },
             { label: t('department'), key: 'departmentName' },
             { label: t('costItem'), key: 'costItemName' },
-            { label: t('expenseType'), key: 'expenseType', render: row => EXPENSE_LABELS[row.expenseType] ?? row.expenseType ?? '—' },
+            { label: t('expenseType'), key: 'expenseType', render: row => row.expenseType ? t(EXPENSE_LABELS[row.expenseType] ?? row.expenseType) : '—' },
             { label: t('monthCol'), key: 'month', sortValue: row => row.month, render: row => mm(row.month), num: true },
             { label: t('kpiBudget'), key: 'budgetAmount', render: row => wan(row.budgetAmount) ?? '—', num: true },
             { label: t('kpiPrSubmitted'), key: 'prSubmittedAmount', render: row => wan(row.prSubmittedAmount) ?? '—', num: true },
@@ -1564,7 +1577,7 @@ window.__ModuleLoader__.load({
       const occupied = (finite(line.prSubmittedAmount) ?? 0) + (finite(line.paidAmount) ?? 0) + (finite(line.allocatedAmount) ?? 0)
       return h(Dialog, { title: t('budgetLinesTitle'), onClose },
         h('dl', { className: 'sf-evidence' },
-          ...[['org', line.orgName ?? t('unassigned')], ['department', line.departmentName ?? '—'], ['costItem', line.costItemName ?? '—'], ['month', mm(line.month)], ['expenseType', EXPENSE_LABELS[line.expenseType] ?? '—']].map(([key, value]) =>
+          ...[['org', line.orgName ?? t('unassigned')], ['department', line.departmentName ?? '—'], ['costItem', line.costItemName ?? '—'], ['month', mm(line.month)], ['expenseType', line.expenseType ? t(EXPENSE_LABELS[line.expenseType] ?? line.expenseType) : '—']].map(([key, value]) =>
             h('div', { key, className: 'sf-evidence-item' }, h('small', null, t(key)), h('strong', null, value))),
           ...[[t('kpiBudget'), line.budgetAmount], [t('kpiPrSubmitted'), line.prSubmittedAmount], [t('kpiPrEstimated'), line.prEstimatedAmount], [t('kpiPaid'), line.paidAmount], [t('available'), line.availableAmount]].map(([label, value]) =>
             h('div', { key: label, className: 'sf-evidence-item' }, h('small', null, label), h('strong', null, wan(value) ?? '—')))))
@@ -1583,7 +1596,7 @@ window.__ModuleLoader__.load({
           { label: t('department'), key: 'departmentName' },
           { label: t('monthCol'), key: 'month', sortValue: row => row.month, render: row => mm(row.month), num: true },
           { label: t('amount'), key: 'budgetAmount', render: row => wan(row.budgetAmount) ?? '—', num: true },
-          { label: t('statusCol'), key: 'status', render: row => row.status ? h(Pill, { tone: /完成|已批|通过/.test(row.status) ? 'green' : /审批|待|处理/.test(row.status) ? 'blue' : 'muted' }, row.status) : '—' },
+          { label: t('statusCol'), key: 'status', render: row => row.status ? h(Pill, { tone: /完成|已批|通过|已发布|已生效/.test(financeLabel(row.status)) ? 'green' : /审批|待|处理/.test(financeLabel(row.status)) ? 'blue' : 'muted' }, financeLabel(row.status)) : '—' },
         ],
         rows, empty: t('empty'),
       }), h(Pager, { page, total: pr?.data?.total ?? pr?.total, limit: PAGE_SIZE, onPage }))
@@ -1725,7 +1738,7 @@ window.__ModuleLoader__.load({
       ] },
         h('div', { className: 'sf-stack' },
           h('div', { className: 'sf-filters' },
-            h(FormRow, { label: t('adjType') }, h(Select, { value: type, onChange: setType, options: ADJ_TYPES })),
+            h(FormRow, { label: t('adjType') }, h(Select, { value: type, onChange: setType, options: ADJ_TYPES.map(([id, label]) => [id, t(label)]) })),
             h(FormRow, { label: `${t('year')}` }, h(Field, { value: year, disabled: true }))),
           h(FormRow, { label: t('adjReason'), wide: true }, h(Textarea, { value: reason, onChange: setReason, maxLength: 1000, required: true })),
           h('div', { className: 'sf-stack' },
@@ -1768,7 +1781,7 @@ window.__ModuleLoader__.load({
           flow.length ? h('div', null, h('strong', null, t('flow')), h('div', { className: 'sf-timeline' }, ...flow.map((item, index) =>
             h('div', { key: index, className: 'sf-timeline-row' },
               h('span', { className: 'sf-timeline-dot' }),
-              h('div', { className: 'sf-timeline-main' }, h('span', null, `${item.action ?? item.toStatus ?? ''} · ${item.operatorName ?? item.operator ?? '—'}`), h('small', null, shortDate(item.at ?? item.createdAt) ?? '')),
+              h('div', { className: 'sf-timeline-main' }, h('span', null, `${financeLabel(item.action ?? item.toStatus)} · ${item.operatorName ?? item.operator ?? '—'}`), h('small', null, shortDate(item.at ?? item.createdAt) ?? '')),
               h('span', { className: 'sf-note' }, item.note ?? ''))))) : null))
     }
 
@@ -1878,7 +1891,7 @@ window.__ModuleLoader__.load({
       }, [revision, reloadTick])
       return h(Card, { title: t('carryoverRules'), actions: [h(LinkButton, { key: 'add', onClick: () => onDialog({ kind: 'carryover' }) }, h(Glyph, { name: 'plus', size: 12 }), t('ruleAdd'))] }, h(Table, { tableId: 'finance-CarryoverCard-1',
         columns: [
-          { label: t('expenseType'), key: 'expenseType', render: row => row.expenseType ? EXPENSE_LABELS[row.expenseType] ?? row.expenseType : t('all') },
+          { label: t('expenseType'), key: 'expenseType', render: row => row.expenseType ? t(EXPENSE_LABELS[row.expenseType] ?? row.expenseType) : t('all') },
           { label: t('carryoverMode'), key: 'mode', render: row => row.mode === 'FULL' ? t('modeFull') : row.mode === 'PERCENT' ? `${t('modePercent')} ${row.percent ?? 100}%` : `${t('modeExpire')} ${t('expireMonth')} ${row.expireMonth ?? '—'}` },
           { label: t('statusCol'), key: 'enabled', render: row => h(Pill, { tone: row.enabled ? 'green' : 'muted' }, row.enabled ? t('ruleEnabled') : t('ruleDisabled')) },
           { label: t('actions'), key: 'actions', sortable: false, render: row => h('div', { className: 'sf-row', style: { justifyContent: 'flex-end', flexWrap: 'nowrap' } },
@@ -1909,7 +1922,7 @@ window.__ModuleLoader__.load({
       ] },
         h('div', { className: 'sf-stack' },
           h(FormRow, { label: t('carryoverMode') }, h(Select, { value: mode, onChange: setMode, options: [['FULL', 'modeFull'], ['PERCENT', 'modePercent'], ['EXPIRE', 'modeExpire']] })),
-          h(FormRow, { label: t('expenseType') }, h(Select, { value: expenseType, onChange: setExpenseType, options: EXPENSE_TYPES, placeholder: t('all') })),
+          h(FormRow, { label: t('expenseType') }, h(Select, { value: expenseType, onChange: setExpenseType, options: EXPENSE_TYPES.map(([id, label]) => [id, t(label)]), placeholder: t('all') })),
           mode === 'PERCENT' ? h(FormRow, { label: t('percent') }, h(Field, { type: 'number', min: 1, max: 100, value: percent, onChange: setPercent })) : null,
           mode === 'EXPIRE' ? h(FormRow, { label: t('expireMonth') }, h(Field, { type: 'number', min: 1, max: 12, value: expireMonth, onChange: setExpireMonth })) : null))
     }
@@ -1935,7 +1948,7 @@ window.__ModuleLoader__.load({
           h(Table, { tableId: 'finance-VersionDiffDialog-1',
             columns: [
               { label: t('org'), key: 'orgName', render: row => row.orgName ?? '—', stickyLeft: true },
-              { label: t('expenseType'), key: 'expenseType', render: row => EXPENSE_LABELS[row.expenseType] ?? row.expenseType ?? '—' },
+              { label: t('expenseType'), key: 'expenseType', render: row => row.expenseType ? t(EXPENSE_LABELS[row.expenseType] ?? row.expenseType) : '—' },
               { label: t('diffAmount'), key: 'diffAmount', render: row => { const value = finite(row.diffAmount); return h('span', { className: value < 0 ? 'sf-neg' : 'sf-pos' }, wan(value) ?? '—') }, num: true },
             ],
             rows, empty: t('empty'),
@@ -2014,7 +2027,7 @@ window.__ModuleLoader__.load({
       }
       const shareTones = ['a', 'b', 'c', 'd']
       const shareSegments = Object.entries(byType).map(([key, value], index) => ({
-        label: EXPENSE_LABELS[key] ?? key, value, tone: shareTones[index % shareTones.length],
+        label: t(EXPENSE_LABELS[key] ?? key), value, tone: shareTones[index % shareTones.length],
       }))
 
       const netByMonth = new Map()
@@ -2119,7 +2132,7 @@ window.__ModuleLoader__.load({
       }, [tab, page, revenuePage, year, orgId, filters.planType, filters.departmentId, filters.month, filters.unassigned, revision, reloadTick])
 
       const filterBar = tab === 'plans' ? h('div', { className: 'sf-filters' },
-        h(Select, { value: filters.planType, onChange: value => { setPage(1); setFilters(f => ({ ...f, planType: value })) }, options: PLAN_TYPES, placeholder: t('planType') }),
+        h(Select, { value: filters.planType, onChange: value => { setPage(1); setFilters(f => ({ ...f, planType: value })) }, options: PLAN_TYPES.map(([id, label]) => [id, t(label)]), placeholder: t('planType') }),
         h(SearchSelect, { value: filters.departmentId, onChange: value => { setPage(1); setFilters(f => ({ ...f, departmentId: value })) }, options: (departments || []).map(d => [d.id, d.name]), placeholder: t('department') }),
         h(Select, { value: filters.month, onChange: value => { setPage(1); setFilters(f => ({ ...f, month: value })) }, options: Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1} 月`]), placeholder: t('monthCol') }),
         h('label', { className: 'sf-row', style: { gap: 6, fontSize: 12, color: 'var(--sf-ink2)' } },
@@ -2164,7 +2177,7 @@ window.__ModuleLoader__.load({
           flow.length ? h('div', null, h('strong', null, t('flow')), h('div', { className: 'sf-timeline' }, ...flow.map((item, index) =>
             h('div', { key: index, className: 'sf-timeline-row' },
               h('span', { className: 'sf-timeline-dot' }),
-              h('div', { className: 'sf-timeline-main' }, h('span', null, `${item.action ?? item.toStatus ?? ''} · ${item.operatorName ?? item.operator ?? '—'}`), h('small', null, shortDate(item.at ?? item.createdAt) ?? '')),
+              h('div', { className: 'sf-timeline-main' }, h('span', null, `${financeLabel(item.action ?? item.toStatus)} · ${item.operatorName ?? item.operator ?? '—'}`), h('small', null, shortDate(item.at ?? item.createdAt) ?? '')),
               h('span', { className: 'sf-note' }, item.note ?? ''))))) : null))
     }
 
@@ -2301,7 +2314,7 @@ window.__ModuleLoader__.load({
         [t('planned'), wan(plan.plannedAmount)], [t('actual'), wan(plan.actualAmount)], [t('variance'), wan(plan.varianceAmount)],
         [t('remaining'), wan(plan.remainingAmount)], [t('scheduleDate'), shortDate(plan.scheduleDate)], [t('priority'), plan.priority ? t(PRIORITIES.find(([id]) => id === plan.priority)?.[1] ?? plan.priority) : '—'],
         [t('acceptAcceptance'), plan.acceptsAcceptance ? '✓' : '—'], [t('cashAmount'), wan(plan.plannedCashAmount)], [t('acceptanceAmount'), wan(plan.plannedAcceptanceAmount)],
-        [t('payee'), plan.payeeName], [t('statusCol'), plan.status],
+        [t('payee'), plan.payeeName], [t('statusCol'), financeLabel(plan.status)],
       ]
       return h(Dialog, { title: t('planDetail'), onClose },
         h('dl', { className: 'sf-evidence' }, ...fields.map(([label, value], index) =>
@@ -2621,7 +2634,7 @@ window.__ModuleLoader__.load({
               h(FormRow, { label: t('tableMapping') }, h(SearchSelect, { value: syncForm.tableMappingKey, onChange: value => setSyncForm(current => ({ ...current, tableMappingKey: value })), options: mappingOptions, allowCustom: true, placeholder: t('tableMapping') })),
             ),
             h('div', { className: 'sf-row-between' }, h('span', { className: 'sf-note' }, t('dsSyncHint')), h(PrimaryButton, { busy, disabled: !syncForm.bizSystem.trim(), onClick: sync }, t('syncNow'))),
-            syncResult ? h('div', { className: 'sf-note', role: 'status' }, `${t('syncFetched')} ${syncResult.fetched ?? 0} · ${t('dsTransport')} ${syncResult.transport ?? '—'} · ${t('batchStatus')} ${syncResult.stage ?? '—'}${syncResult.batchId ? ` · ${syncResult.batchId}` : ''}`) : null,
+            syncResult ? h('div', { className: 'sf-note', role: 'status' }, `${t('syncFetched')} ${syncResult.fetched ?? 0} · ${t('dsTransport')} ${financeLabel(syncResult.transport)} · ${t('processingStage')} ${financeLabel(syncResult.stage)}${syncResult.batchId ? ` · ${syncResult.batchId}` : ''}`) : null,
           )) : null,
         h(Card, { title: t('dsConfigs'), actions: canManage ? h(PrimaryButton, { busy, onClick: () => setConfigDialog({}) }, h(Glyph, { name: 'plus', size: 12 }), t('dsAdd')) : null }, h(React.Fragment, null,
           h(Table, { tableId: 'finance-DataCenterView-configs', minColumns: '900px',
@@ -2652,12 +2665,12 @@ window.__ModuleLoader__.load({
             columns: [
               { label: t('startedAt'), key: 'startedAt', render: row => shortDate(row.startedAt) ?? '—' },
               { label: t('dsScope'), key: 'scope', render: row => row.scope === 'HEADQUARTERS' ? t('scopeHq') : t('scopeHezhong') },
-              { label: t('bizSystem'), key: 'bizSystem' },
-              { label: t('docType'), key: 'docType', render: row => row.docType ?? '—' },
-              { label: t('dsTransport'), key: 'transportUsed' },
+              { label: t('bizSystem'), key: 'bizSystem', render: row => financeLabel(row.bizSystem) },
+              { label: t('docType'), key: 'docType', render: row => financeLabel(row.docType) },
+              { label: t('dsTransport'), key: 'transportUsed', render: row => financeLabel(row.transportUsed) },
               { label: t('dsFallback'), key: 'fallbackReason', render: row => row.fallbackReason ? h(Badge, { tone: 'amber' }, row.fallbackReason) : '—' },
-              { label: t('batchStatus'), key: 'status', render: row => h(Pill, { tone: runTone(row) }, row.status ?? '—') },
-              { label: t('processingStage'), key: 'stage' },
+              { label: t('batchStatus'), key: 'status', render: row => h(Pill, { tone: runTone(row) }, financeLabel(row.status)) },
+              { label: t('processingStage'), key: 'stage', render: row => financeLabel(row.stage) },
               { label: t('batchId'), key: 'batchId', render: row => row.batchId ?? '—' },
               { label: t('dataSummary'), key: 'stats', render: row => runStats(row.stats) },
               { label: t('errorSummary'), key: 'errorSummary', render: row => row.errorSummary ? h('span', { className: 'sf-text-danger' }, row.errorSummary) : '—' },
@@ -2665,7 +2678,7 @@ window.__ModuleLoader__.load({
           })),
           h(Card, { title: t('qualityTitle') }, h(Table, { tableId: 'finance-DataCenterView-quality',
             columns: [
-              { label: t('dataset'), key: 'dataset' },
+              { label: t('dataset'), key: 'dataset', render: row => financeLabel(row.dataset) },
               { label: t('issue'), key: 'label' },
               { label: t('count'), key: 'count', num: true },
               { label: t('severity'), key: 'severity', sortValue: row => ({ INFO: 0, WARN: 1, CRITICAL: 2 }[row.severity] ?? 0), render: row => h(SeverityBadge, { severity: row.severity === 'CRITICAL' ? 'CRITICAL' : row.severity === 'WARN' ? 'WARN' : 'INFO', t }) },
@@ -2678,7 +2691,7 @@ window.__ModuleLoader__.load({
             { label: t('rows'), key: 'totalRows', num: true },
             { label: t('successRows'), key: 'successRows', num: true },
             { label: t('failedRows'), key: 'failedRows', num: true },
-            { label: t('batchStatus'), key: 'status' },
+              { label: t('batchStatus'), key: 'status', render: row => financeLabel(row.status) },
             { label: t('startedAt'), key: 'startedAt', render: row => shortDate(row.startedAt) ?? '—', num: true },
           ], rows: batchList, empty: t('empty'),
         })),
@@ -3656,11 +3669,11 @@ window.__ModuleLoader__.load({
       const fieldLabels = new Map(rows.flatMap(row => (row.fields || []).map(field => [field.key, field.label])))
       return h('div', { className: 'sf-stack' }, h('p', { className: 'sf-banner sf-banner-amber' }, '来源暂存用于核对与追溯，采集成功不代表已审核发布，不计入正式财务指标。'),
         h('div', { className: 'sf-row' }, h(Select, { 'aria-label': '来源范围', value: scope, options: [['HEADQUARTERS', '总部'], ['HEZHONG', '合众']], onChange: value => { setScope(value); setRunId(''); setPage(1); setSelected(null) } }),
-          h(Select, { 'aria-label': '同步批次', value: runId, options: financeRows(runs.data).map(row => [row.id, `${row.bizSystem} ${row.batchId || row.startedAt}`]), placeholder: '全部批次', onChange: value => { setRunId(value); setPage(1) } }),
+          h(Select, { 'aria-label': '同步批次', value: runId, options: financeRows(runs.data).map(row => [row.id, `${financeLabel(row.bizSystem)} ${row.batchId || row.startedAt}`]), placeholder: '全部批次', onChange: value => { setRunId(value); setPage(1) } }),
           h('form', { className: 'sf-row', onSubmit: event => { event.preventDefault(); setSearch(searchInput.trim()); setPage(1) } }, h(Field, { 'aria-label': '来源记录搜索', value: searchInput, onChange: setSearchInput, placeholder: '单据号或关键词', maxLength: 100 }), h(GhostButton, { type: 'submit' }, '搜索'))),
         h(Card, { title: '来源记录' }, h(FinanceResource, { resource: records }, h(Table, { tableId: `finance-source-${scope}`, rows, empty: '暂无来源记录', onRowClick: setSelected, columns: [
           ...financeColumns([['sourceDocNo', '单据号'], ['tableName', '来源表'], ['revision', '修订版本'], ['createdAt', '入库时间']]),
-          { key: 'category', label: '财务分类', render: row => row.financialAnalysis?.category || '未分类' },
+          { key: 'category', label: '财务分类', render: row => financeLabel(row.financialAnalysis?.category || '未分类') },
           ...[...fieldLabels].map(([key, label]) => ({ key: `field:${key}`, label, sortValue: row => sourceCellText(row.fields?.find(field => field.key === key)?.value), render: row => sourceCellText(row.fields?.find(field => field.key === key)?.value, label) })),
         ] })), h(Pager, { page, total: records.data?.total, limit: 20, onPage: setPage })),
         selected ? h(Dialog, { title: `来源详情：${selected.sourceDocNo}`, onClose: () => setSelected(null) }, h(FinanceEvidence, { value: selected.financialAnalysis }), h(Table, { tableId: 'finance-source-detail', rows: selected.fields || [], columns: [{ key: 'label', label: '字段' }, { key: 'value', label: '值', render: row => sourceCellText(row.value, row.label) }], empty: '无来源字段' })) : null)
@@ -3694,7 +3707,7 @@ window.__ModuleLoader__.load({
       const path = validA && validB ? mode === 'monthly' ? `/finance/budget-snapshots/compare?snapshotAId=${validA}&snapshotBId=${validB}` : mode === 'versions' ? `/finance/budget-versions/detail-diff?baseVersionId=${validA}&targetVersionId=${validB}` : `/finance/budget/versions/diff?baseVersionId=${validA}&targetVersionId=${validB}` : null
       const comparison = useFinanceResource(path, revision)
       useEffect(() => { setA(''); setB(''); setDialog(null) }, [mode, ctx.year, targetYear])
-      const versionLabel = row => mode === 'monthly' ? `${row.label} · ${row.frozenThroughMonth}+${12 - row.frozenThroughMonth}` : `${row.name} · ${row.status}${row.isPrimary ? ' · 主版本' : ''}`
+      const versionLabel = row => mode === 'monthly' ? `${row.label} · ${row.frozenThroughMonth}+${12 - row.frozenThroughMonth}` : `${row.name} · ${financeLabel(row.status)}${row.isPrimary ? ' · 主版本' : ''}`
       const selectedVersions = [baseRows.find(row => row.id === validA), targetRows.find(row => row.id === validB)]
       const trial = mode !== 'monthly' && selectedVersions.some(row => row?.status === 'DRAFT' || row?.status === 'CONFIRMED')
       const rows = financeRows(comparison.data)
@@ -3777,9 +3790,9 @@ window.__ModuleLoader__.load({
       const resultTable = (resource, title, columns) => h(Card, { title, unit: '元' }, h(FinanceResource, { resource }, h(Table, { tableId: `engine-${title}`, rows: financeRows(resource.data), empty: validId ? '暂无记录' : '请选择预算版本', columns: financeColumns(columns) })))
       const run = async (target, body, method) => { const result = await action.run(target, body, method); setReceipt(result); return result }
       return h('div', { className: 'sf-stack' },
-        h(FinanceResource, { resource: versions }, h(FormRow, { label: '预算版本' }, h(Select, { 'aria-label': '编制预算版本', value: validId || '', options: rows.map(row => [row.id, `${row.name} · ${row.status}${row.isPrimary ? ' · 主版本' : ''}`]), placeholder: '选择预算版本', onChange: selectVersion }))),
+        h(FinanceResource, { resource: versions }, h(FormRow, { label: '预算版本' }, h(Select, { 'aria-label': '编制预算版本', value: validId || '', options: rows.map(row => [row.id, `${row.name} · ${financeLabel(row.status)}${row.isPrimary ? ' · 主版本' : ''}`]), placeholder: '选择预算版本', onChange: selectVersion }))),
         h(Notice, null, action.notice),
-        version ? h('p', { className: 'sf-note' }, `${version.status} · ${version.lineCount ?? 0} 行。草稿可编辑；确认、发布和锁定以服务端状态与发布检查为准。`) : null,
+        version ? h('p', { className: 'sf-note' }, `${financeLabel(version.status)} · ${version.lineCount ?? 0} 行。草稿可编辑；确认、发布和锁定以服务端状态与发布检查为准。`) : null,
         validId && (canEdit || canPublish) ? h('div', { className: 'sf-row' },
           canEdit ? h(GhostButton, { disabled: action.busy, onClick: () => setDialog({ kind: 'roll', title: '创建滚动预测草稿' }) }, '创建滚动草稿') : null,
           draft && canEdit ? h(GhostButton, { disabled: action.busy, onClick: () => setDialog({ kind: 'params', title: '新建/更新预算参数' }) }, '维护预算参数') : null,
@@ -3796,7 +3809,7 @@ window.__ModuleLoader__.load({
           { key: 'actions', label: '操作', sortable: false, render: row => canEdit && draft && canEdit ? h(GhostButton, { disabled: action.busy, onClick: () => setDialog({ kind: 'remove', title: '移除草稿销量输入', row }) }, '移除输入') : null },
         ] }))),
         resultTable(runs, '计算批次历史', [['formulaVersion', '公式版本'], ['status', '状态'], ['paramVersionId', '参数版本'], ['startedAt', '计算时间'], ['errorSummary', '失败原因']]),
-        h('div', { className: 'sf-row' }, h(Select, { 'aria-label': '计算结果批次', value: validRun, onChange: setRunId, options: runRows.map(row => [row.id, `${row.formulaVersion} ${row.startedAt} ${row.status}`]), placeholder: '选择计算结果' }), h(Select, { 'aria-label': '差异基准批次', value: validBase, onChange: setBaseRunId, options: runRows.map(row => [row.id, `${row.formulaVersion} ${row.startedAt}`]), placeholder: '选择差异基准' })),
+        h('div', { className: 'sf-row' }, h(Select, { 'aria-label': '计算结果批次', value: validRun, onChange: setRunId, options: runRows.map(row => [row.id, `${row.formulaVersion} ${row.startedAt} ${financeLabel(row.status)}`]), placeholder: '选择计算结果' }), h(Select, { 'aria-label': '差异基准批次', value: validBase, onChange: setBaseRunId, options: runRows.map(row => [row.id, `${row.formulaVersion} ${row.startedAt}`]), placeholder: '选择差异基准' })),
         resultTable(outputs, '计算结果', [['kind', '指标'], ['year', '年度'], ['month', '月份'], ['amount', '金额']]),
         resultTable(diff, '计算批次差异', [['kind', '指标'], ['year', '年度'], ['month', '月份'], ['before', '基准'], ['after', '对比'], ['delta', '差额']]),
         h(FinanceResource, { resource: statements }, ...[['income', '管理利润表', [['revenue', '收入'], ['expense', '费用'], ['tax', '税费'], ['profit', '利润']]], ['cashflow', '管理现金流量表', [['inflow', '流入'], ['outflow', '流出'], ['endingBalance', '月末余额']]], ['balance', '简化资产负债表', [['cash', '现金'], ['receivable', '应收'], ['payable', '应付'], ['inventory', '存货'], ['equity', '权益']]]].map(([key, title, columns]) => h(Card, { key, title, unit: '元' }, h(Table, { tableId: `engine-${key}`, rows: statements.data?.[key] || [], columns: financeColumns([['year', '年度'], ['month', '月份'], ...columns]), empty: '请选择计算结果批次' })))),
