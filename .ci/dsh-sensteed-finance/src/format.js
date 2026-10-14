@@ -48,10 +48,26 @@ function shortDate(value) {
   return String(value).slice(0, 10)
 }
 
-function yearOptions() {
+function yearOptions(selectedYear) {
   const year = new Date().getFullYear()
-  // 近 7 年倒序，对齐前端全局年度筛选
-  return Array.from({ length: 7 }, (_, index) => [String(year - index), String(year - index)])
+  const years = new Set(Array.from({ length: 7 }, (_, index) => year - 4 + index))
+  if (Number.isInteger(Number(selectedYear)) && Number(selectedYear) > 0) years.add(Number(selectedYear))
+  return [...years].sort((left, right) => right - left).map(value => [String(value), String(value)])
+}
+
+function budgetVersionLabel(version) {
+  const types = { INITIAL: '初始', ADJUSTED: '调整', ROLLING: '滚动', MERGED: '合并' }
+  const statuses = { DRAFT: '草稿', CONFIRMED: '已确认', PUBLISHED: '已发布', LOCKED: '已锁定' }
+  const frozen = version.frozenThroughMonth > 0 ? `（冻结至 ${version.frozenThroughMonth} 月）` : ''
+  const name = version.year && version.type
+    ? `${version.year} 年${types[version.type] || ''}预算 · ${statuses[version.status] || version.status}${frozen}`
+    : version.name
+  const amount = finite(version.budgetTotal)
+  const parts = [name, version.isPrimary ? '主版本' : null,
+    version.lineCount != null ? `${Number(version.lineCount).toLocaleString('zh-CN')} 行` : null,
+    amount !== null ? `${amount < 0 ? '-' : ''}¥${Math.abs(amount).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}` : null,
+    version.publishedAt ? `发布于 ${String(version.publishedAt).slice(0, 10)}` : null]
+  return parts.filter(Boolean).join(' · ')
 }
 
 /** 执行率热力分档：>100 超支 / ≥70 健康 / ≥30 偏慢 / 其余早期 */

@@ -1,6 +1,6 @@
 {
   "name": "dsh-desktop-next",
-  "version": "2.0.14-next",
+  "version": "2.0.17-next",
   "private": true,
   "description": "Experimental upstream-inspired DSH Desktop with Profiles, recovery, remote control and Community Market",
   "license": "MIT",
@@ -21,11 +21,12 @@
     "verify:protocol": "electron scripts/verify-protocol.mjs",
     "verify:sidebar-browser": "electron scripts/verify-sidebar-browser.mjs",
     "check": "pnpm run build && pnpm run typecheck && pnpm run test && pnpm run verify:frontend && pnpm run verify:host && pnpm run verify:desktop-runtime && pnpm run verify:safe-cleanup",
-    "dev": "pnpm run build && node scripts/start.mjs",
-    "start": "node scripts/start.mjs",
+    "dev": "pnpm run build && pnpm run prepare:runtime && node scripts/start.mjs",
+    "start": "pnpm run prepare:runtime && node scripts/start.mjs",
     "verify:desktop-runtime": "node scripts/verify-desktop-runtime.mjs",
     "verify:safe-cleanup": "node scripts/verify-safe-cleanup.mjs",
     "icons:export": "node ../scripts/export-app-icons.mjs --channel next",
+    "prepare:runtime": "node scripts/prepare-runtime.ts",
     "package:dir": "pnpm run build && node scripts/package.ts dir",
     "dist:mac": "node scripts/package.ts mac",
     "dist:mac-smoke": "node scripts/package.ts mac-smoke",
@@ -64,6 +65,7 @@
     "@deepseek-ai/dsh-client-file-upload": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-client-locale": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-client-modules": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-client-shortcuts": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-client-store": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-client-ui-approval": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-client-ui-attachment": "0.2.1-alpha.2",
@@ -109,7 +111,9 @@
     "@deepseek-ai/dsh-experimental-session-titles-bundle": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-experimental-terminal-bundle": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-experimental-tool-worktree": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-experimental-translator": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-experimental-voice-input-bundle": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-experimental-worktree": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-file-reference": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-fs": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-fs-local": "0.2.1-alpha.2",
@@ -128,6 +132,8 @@
     "@deepseek-ai/dsh-launch-environment": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-llm": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-llm-deepseek": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-llm-deepseek-account": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-llm-deepseek-api-key": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-llm-retry": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-mcp-client": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-message-feedback": "0.2.1-alpha.2",
@@ -161,6 +167,7 @@
     "@deepseek-ai/dsh-shell-env": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-skill": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-skill-filesystem": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-skill-office": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-spill": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-storage": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-storage-domain": "0.2.1-alpha.2",
@@ -182,6 +189,7 @@
     "@deepseek-ai/dsh-tool-skill": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-tool-todo": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-tool-workflow": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-tool-workspace-dependencies": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-tools": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-typert-protocol": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-typert-registry": "0.2.1-alpha.2",
@@ -196,26 +204,31 @@
     "@deepseek-ai/dsh-web-frontend": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-webhook": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-workflow": "0.2.1-alpha.2",
+    "@deepseek-ai/dsh-working-directory": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-workspace": "0.2.1-alpha.2",
     "@deepseek-ai/schemastery": "^3.18.5-alpha.1",
     "dsh-community-market": "0.1.0-dev.0",
-    "dshmarket": "1.66.7",
+    "dshmarket": "1.66.20",
+    "mdast-util-from-markdown": "^2.0.3",
+    "mdast-util-gfm": "^3.1.0",
+    "mdast-util-to-string": "^4.0.0",
+    "micromark-extension-gfm": "^3.0.0",
     "pnpm": "11.28.5",
     "react": "18.3.1",
     "selfsigned": "5.5.0",
-    "yaml": "^2.9.0"
+    "yaml": "^2.9.0",
+    "@deepseek-ai/libreoffice-kit": "0.1.5"
   },
   "devDependencies": {
     "@base-ui/react": "^1.7.0",
-    "@deepseek-ai/dsh-client-shortcuts": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-client-ui-sidebar-browser": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-client-ui-sidebar-right": "0.2.1-alpha.2",
     "@deepseek-ai/dsh-host-open-in-app": "0.2.1-alpha.2",
     "@fontsource-variable/inter": "^5.3.0",
     "@shikijs/langs": "^4.3.1",
     "@tailwindcss/vite": "^4",
-    "@types/mdast": "^4.0.0",
     "@types/node": "^22.20.0",
+    "@types/papaparse": "^5.3.0",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "@vitejs/plugin-react": "^6",
@@ -225,21 +238,20 @@
     "diff": "^9.0.0",
     "electron": "44.0.0",
     "electron-builder": "26.15.7",
+    "extract-zip": "2.0.1",
+    "fflate": "0.8.2",
     "immer": "^10.1.1",
     "katex": "^0.16.47",
     "lucide-react": "^1.33.0",
-    "mdast-util-from-markdown": "^2.0.3",
-    "mdast-util-gfm": "^3.1.0",
     "mdast-util-math": "^3.0.0",
-    "mdast-util-to-string": "^4.0.0",
     "micromark-core-commonmark": "^2.0.3",
-    "micromark-extension-gfm": "^3.0.0",
     "micromark-extension-math": "^3.1.0",
     "micromark-factory-space": "^2.0.1",
     "micromark-util-character": "^2.1.1",
     "micromark-util-classify-character": "^2.0.1",
     "micromark-util-sanitize-uri": "^2.0.1",
     "micromark-util-symbol": "^2.0.1",
+    "papaparse": "^5.5.0",
     "playwright": "1.63.0",
     "react-dom": "18.3.1",
     "shadcn": "^4.18.0",
@@ -248,12 +260,15 @@
     "sonner": "^2.0.8",
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4",
+    "tar": "7.5.22",
     "tsdown": "0.22.2",
     "tw-animate-css": "^1.4.0",
     "typescript": "6.0.3",
     "vite": "8.2.1",
     "vitest": "4.1.8",
-    "zustand": "~4.4.7"
+    "zustand": "~4.4.7",
+    "@electron/asar": "3.4.1",
+    "@types/mdast": "^4.0.0"
   },
   "exports": {
     ".": "./lib/extensions.js",
@@ -293,8 +308,9 @@
   "build": {
     "appId": "ai.deepseek.dsh.desktop.next",
     "productName": "DSH NEXT",
-    "asar": false,
+    "asar": true,
     "npmRebuild": false,
+    "beforePack": "./scripts/prepare-pack.ts",
     "afterPack": "./scripts/verify-packaged.ts",
     "afterAllArtifactBuild": "./scripts/verify-fuses.ts",
     "electronFuses": {
@@ -320,6 +336,10 @@
       "lib/**",
       "package.json",
       "scripts/node-bin/**",
+      "!**/*.{js,cjs,mjs,ts,cts,mts,css}.map",
+      "!**/*.d.{ts,cts,mts}",
+      "!**/*.tsbuildinfo",
+      "!**/.yarn-state.yml",
       "!node_modules/node-pty/build/**",
       "!node_modules/fs-ext/build/**"
     ],
@@ -344,13 +364,22 @@
         }
       },
       "hardenedRuntime": true,
+      "entitlements": "../deepseek-harness/apps/desktop/scripts/macos-entitlements.plist",
+      "entitlementsInherit": "../deepseek-harness/apps/desktop/scripts/macos-entitlements.plist",
       "icon": "build/app-icon.icon",
+      "extraResources": [
+        {
+          "from": ".desktop-build/runtime",
+          "to": "runtime"
+        }
+      ],
       "mergeASARs": false,
       "notarize": true,
       "signIgnore": [
-        "\\.(?:pak|dat|wasm)$"
+        "\\.(?:pak|dat|wasm)$",
+        "/Contents/Resources/runtime/(?:arm64|x64)/primary-runtime(?:/|$)"
       ],
-      "asar": false
+      "x64ArchFiles": "{**/node_modules/{@deepseek-ai/node-addon-system-darwin-*/**,node-pty/prebuilds/darwin-*/**,fs-ext/prebuilds/darwin-*/**,node-addon-require-builtin-darwin-*/**,@vscode/ripgrep-darwin-*/**,@img/sharp-darwin-*/**,@img/sharp-libvips-darwin-*/**,@koromix/koffi-darwin-*/**,@dataiku/uv-darwin-*/**,@deepseek-ai/libreoffice-kit-darwin-*/**,sherpa-onnx-darwin-*/**,@trycua/cua-driver-darwin-*/**,@ubjs/node-darwin-*/**},Contents/Resources/runtime/**}"
     },
     "win": {
       "compression": "normal",
@@ -364,7 +393,12 @@
       ],
       "artifactName": "DSH-NEXT-${version}-${arch}-Portable.${ext}",
       "icon": "build/app-icon.ico",
-      "asar": false
+      "extraResources": [
+        {
+          "from": ".desktop-build/runtime",
+          "to": "runtime"
+        }
+      ]
     },
     "nsis": {
       "oneClick": false,
@@ -385,11 +419,25 @@
       "target": [
         "dir"
       ],
-      "icon": "build/app-icon.png",
-      "asar": false
+      "icon": "build/app-icon.png"
     },
     "dmg": {
       "icon": "build/app-icon.icns"
-    }
+    },
+    "asarUnpack": [
+      "**/*.{node,dylib,dll,so,exe}",
+      "**/*.so.*",
+      "**/spawn-helper",
+      "**/@vscode/ripgrep-*/bin/rg",
+      "**/@dataiku/uv-*/bin/uv",
+      "**/node_modules/@deepseek-ai/libreoffice-kit-*/**/*",
+      "**/node_modules/@trycua/cua-driver-*/**/*",
+      "**/node_modules/sherpa-onnx-*/**/*",
+      "**/node_modules/@agents-anywhere/dsh-bridge-next/lib/bundled-connector/**/*",
+      "**/node_modules/pnpm/**/*",
+      "scripts/node-bin/**/*",
+      "assets/**/*",
+      "build/**/*"
+    ]
   }
 }

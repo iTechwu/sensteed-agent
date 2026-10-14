@@ -7,6 +7,7 @@
   "exports": { ".": "./index.js", "./client": "./lib/client.js", "./package.json": "./package.json" },
   "dsh": {
     "bundle": { "patch": "./cordis.patch.yml" },
+    "capabilities": [{"id": "knowledge-memory", "kind": "business", "name": "企业知识与 Memory", "description": "检索企业知识，管理记忆，并维护知识图谱关系。"}],
     "client": {
       "platform": "web",
       "inject": ["@deepseek-ai/dsh-client-locale", "@deepseek-ai/dsh-client-ui-primitives", "@deepseek-ai/dsh-client-ui-sidebar"]

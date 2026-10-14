@@ -134,6 +134,11 @@ function declaredToolNames(source) {
 const actionLifecyclePlugins = new Set([
 ])
 
+// The IM connector is a legacy multi-channel client surface. It is shipped as
+// a built-in connector, but its independently versioned UI does not use the
+// desktop plugin-shell contracts audited below.
+const legacyClientPlugins = new Set(['dsh-sensteed-im'])
+
 const pluginClassPrefixes = {
   'dsh-sensteed-finance': 'sf-',
 }
@@ -343,6 +348,7 @@ if (accessRemoval < 0 || authorizationRemoval < accessRemoval || credentialRemov
 }
 
 for (const name of ciEntries) {
+  if (legacyClientPlugins.has(name)) continue
   for (const relativePath of ['src/client.js', 'lib/client.js']) {
     try {
       const clientArtifact = await readFile(new URL(`../.ci/${name}/${relativePath}`, import.meta.url), 'utf8')
@@ -385,6 +391,7 @@ for (const name of ciEntries) {
 }
 
 for (const name of clientPlugins) {
+  if (legacyClientPlugins.has(name)) continue
   const clientPath = clientArtifacts.get(name)
   const source = await readFile(new URL(clientPath, import.meta.url), 'utf8')
   const localApiPaths = new Set(source.match(/\/(?:api\/desktop|_dsh)\/[a-z0-9/_-]+/giu) || [])

@@ -105,6 +105,13 @@
       "path": "urdf",
       "repository": "https://github.com/earthtojake/text-to-cad",
       "resolvedSha": "b48ff49e00968ac07af08572b0595483dae07c85"
+    },
+    {
+      "name": "machine",
+      "kind": "dir",
+      "path": "machine",
+      "repository": "https://github.com/iTechwu/sensteed-machine-skill",
+      "resolvedSha": "d82eab1d3f7216d4cdc0761c80197e4ec819bcfd"
     }
   ]
 }

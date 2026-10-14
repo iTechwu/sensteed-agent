@@ -2,6 +2,7 @@
 
 ## Read path
 
+- `supply_chain_qcc_company_search`: free-form company entity search through QCC `company.get_company_by_query`; no supplier master row is required. A normalized query has a 30-minute database-first cache; a cache miss may consume QCC credits. Results are candidates, not verified supplier facts.
 - `supply_chain_suppliers_list`: database-only supplier inventory; paginate until exhausted.
 - `supply_chain_qcc_capabilities_get`: local catalog; no QCC connection or charge.
 - `supply_chain_qcc_company_data_list`: database-only QCC records.
@@ -10,6 +11,7 @@
 
 ## External path
 
+- `supply_chain_qcc_company_search`: exactly one external QCC MCP call on a cache miss, protected by a PostgreSQL advisory single-flight lock; no automatic retry. Show all returned candidates and require explicit user selection before any supplier creation or follow-on collection.
 - `supply_chain_qcc_company_data_get`: database-first 30-minute cache. A stale or missing key may make one QCC MCP call, then persists success before returning the stored record.
 - `supply_chain_social_monitoring_collect`: command for approved sources and verified suppliers. Use `confirm=true`, a stable `idempotencyKey`, and poll `supply_chain_run_get` to a terminal state.
 

@@ -37,12 +37,14 @@ const manifest = JSON.parse(readFileSync(new URL('package.json', packageRoot), '
     asar?: unknown
     afterPack?: unknown
     afterAllArtifactBuild?: unknown
+    extraResources?: unknown
     electronFuses?: unknown
     toolsets?: Record<string, unknown>
     files?: unknown
     dmg?: { icon?: unknown }
     mac?: {
       extendInfo?: unknown
+      extraResources?: unknown
       hardenedRuntime?: unknown
       icon?: unknown
       asarUnpack?: unknown
@@ -52,11 +54,12 @@ const manifest = JSON.parse(readFileSync(new URL('package.json', packageRoot), '
       target?: unknown
       x64ArchFiles?: unknown
     }
-    win?: { asar?: unknown; compression?: unknown; icon?: unknown; asarUnpack?: unknown; target?: unknown; artifactName?: unknown }
+    win?: { asar?: unknown; compression?: unknown; extraResources?: unknown; icon?: unknown; asarUnpack?: unknown; target?: unknown; artifactName?: unknown }
     nsis?: Record<string, unknown>
     portable?: Record<string, unknown>
     linux?: {
       icon?: unknown
+      extraResources?: unknown
       asarUnpack?: unknown
       synopsis?: unknown
       syncDesktopName?: unknown
@@ -82,6 +85,7 @@ const builderConfig = JSON.parse(readFileSync(new URL('electron-builder.json', p
   mac?: {
     files?: unknown
     asarUnpack?: unknown
+    extraResources?: unknown
     extendInfo?: unknown
     hardenedRuntime?: unknown
     icon?: unknown
@@ -91,7 +95,7 @@ const builderConfig = JSON.parse(readFileSync(new URL('electron-builder.json', p
     target?: unknown
     x64ArchFiles?: unknown
   }
-  win?: { icon?: unknown; files?: unknown; target?: unknown; artifactName?: unknown }
+  win?: { icon?: unknown; files?: unknown; target?: unknown; artifactName?: unknown; extraResources?: unknown }
   nsis?: Record<string, unknown>
   portable?: Record<string, unknown>
   linux?: { files?: unknown; icon?: unknown; target?: unknown; artifactName?: unknown; executableName?: unknown }
@@ -142,6 +146,7 @@ describe('published package surface', () => {
       ['@dofe/dsh-sensteed-finance', 'dsh-sensteed-finance'],
       ['@dofe/dsh-sensteed-supplier-intelligence', 'dsh-sensteed-supplier-intelligence'],
       ['@dofe/dsh-sensteed-video-notes', 'dsh-sensteed-video-notes'],
+      ['sensteed-im', 'dsh-sensteed-im'],
       ['@lyhue1991/dsh-soup', 'dsh-soup'],
     ] as const
     for (const [name, directory] of plugins) {
@@ -168,7 +173,7 @@ describe('published package surface', () => {
     for (const overlayed of ['@dofe/dsh-sensteed-finance']) {
       expect(productNames.has(overlayed), `product cordis.patch.yml must insert ${overlayed}`).toBe(true)
     }
-    for (const overlayed of ['@dofe/dsh-sensteed-supplier-intelligence', '@dofe/dsh-sensteed-video-notes', '@lyhue1991/dsh-soup']) {
+    for (const overlayed of ['@dofe/dsh-sensteed-supplier-intelligence', '@dofe/dsh-sensteed-video-notes', 'sensteed-im', '@lyhue1991/dsh-soup']) {
       expect(overlayNames.has(overlayed), `cordis.patch.yml must insert ${overlayed}`).toBe(true)
     }
     expect(workspaceManifest.scripts?.['dofe-ui:build'])
@@ -189,6 +194,7 @@ describe('published package surface', () => {
       ['dsh-sensteed-finance', 'index.js'],
       ['dsh-sensteed-supplier-intelligence', 'index.js'],
       ['dsh-sensteed-video-notes', 'index.js'],
+      ['dsh-sensteed-im', 'lib/index.js'],
       ['dsh-soup', 'lib/index.js'],
     ])
     for (const [name, main] of pluginMains) {
@@ -875,7 +881,7 @@ describe('published package surface', () => {
       'node_modules/node-addon-require-builtin-darwin-x64/**',
     ])
     expect(builderConfig?.mac?.mergeASARs).toBe(true)
-    expect(builderConfig?.mac?.signIgnore).toEqual(['\\.(?:pak|dat|wasm)$'])
+    expect(builderConfig?.mac?.signIgnore).toEqual(['\\.(?:pak|dat|wasm)$', '/Contents/Resources/runtime/arm64/primary-runtime(?:/|$)'])
     expect(builderConfig?.win?.icon).toBe('build/app-icon.ico')
     expect(builderConfig?.win?.files).toEqual(expect.arrayContaining([
       'node_modules/@agents-anywhere/dsh-bridge-next/**',
@@ -956,7 +962,8 @@ describe('published package surface', () => {
     expect(manifest.scripts?.['generate:brand']).toContain('node scripts/generate-windows-app-icon.mjs')
     expect(manifest.scripts?.['generate:brand']).toContain('node scripts/generate-mac-app-icon.mjs')
     expect(manifest.scripts?.['generate:brand']).toContain('node scripts/generate-brand-assets.mjs')
-    expect(manifest.scripts?.['package:dir']).toBe('corepack pnpm run build && node scripts/package-dir.mjs')
+    expect(manifest.scripts?.['package:dir']).toBe('corepack pnpm run build && corepack pnpm run prepare:runtime && node scripts/package-dir.mjs')
+    expect(manifest.scripts?.['prepare:runtime']).toBe('node scripts/prepare-runtime.ts')
     expect(manifest.scripts?.['dist:linux']).toBe('node scripts/package-linux.ts')
     expect(manifest.scripts?.['check:linux-package']).toContain('tests/package-linux.spec.ts')
     expect(manifest.scripts?.['check:linux-package']).toContain('tests/verify-linux-artifacts.spec.ts')
@@ -1018,7 +1025,7 @@ describe('published package surface', () => {
       hardenedRuntime: true,
       mergeASARs: true,
       notarize: true,
-      signIgnore: ['\\.(?:pak|dat|wasm)$'],
+      signIgnore: ['\\.(?:pak|dat|wasm)$', '/Contents/Resources/runtime/arm64/primary-runtime(?:/|$)'],
       target: [{ target: 'dir', arch: ['arm64'] }],
       x64ArchFiles: expect.stringContaining('node-pty/prebuilds/darwin-*'),
     }))
@@ -1027,6 +1034,20 @@ describe('published package surface', () => {
     expect(builderConfig?.mac?.x64ArchFiles).toContain('@dataiku/uv-darwin-*')
     expect(builderConfig?.files).toContain('!node_modules/node-pty/build/**')
     expect(manifest.devDependencies?.['@electron/asar']).toBe('3.4.1')
+  })
+
+  it('carries the primary runtime beside the application like upstream Desktop', () => {
+    // Sensteed ships the arm64 payload beside the application as an extra resource; Linux ships none.
+    for (const platform of ['mac', 'win'] as const) {
+      expect(builderConfig?.[platform]?.extraResources, platform).toEqual([{ from: '.desktop-build/runtime', to: 'runtime' }])
+    }
+    expect(builderConfig?.linux).not.toHaveProperty('extraResources')
+    // electron-builder must not re-sign the pre-signed payload.
+    expect(builderConfig?.mac?.signIgnore).toContain('/Contents/Resources/runtime/arm64/primary-runtime(?:/|$)')
+    expect(manifest.scripts?.['prepare:runtime']).toBe('node scripts/prepare-runtime.ts')
+    for (const name of ['@deepseek-ai/dsh-skill-office', '@deepseek-ai/dsh-tool-workspace-dependencies']) {
+      expect(manifest.dependencies?.[name], name).toBe('workspace:*')
+    }
   })
 
   it('runs platform package gates before reusing native packaging outputs', () => {

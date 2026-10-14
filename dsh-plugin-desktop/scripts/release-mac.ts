@@ -2,7 +2,7 @@ import { assertPackagingRelease } from '../../scripts/release-contract.mjs'
 /** Build a signed and notarized macOS DMG from validated release credentials. */
 
 import { spawnSync } from 'node:child_process'
-import { rmSync } from 'node:fs'
+import { readFileSync, rmSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
@@ -14,6 +14,8 @@ import { prepareInstalledMacUniversalRuntime } from './mac-universal.ts'
 import { prepareFsExtForElectron } from './prepare-fs-ext.ts'
 import { electronBuilderEnvironment } from './electron-builder-environment.ts'
 import { refreshBundledForPackaging } from './refresh-bundled-cli.ts'
+import { desktopRuntimeTargets, prepareDesktopInterpreters, primaryRuntimeDirectory, verifyPreparedDesktopRuntime } from './prepare-runtime.ts'
+import { signMacRuntime, withMacSigningIdentity } from './sign-runtime.ts'
 
 /** Injectable release boundary used by focused tests. */
 export interface MacReleaseOptions {
@@ -81,6 +83,7 @@ function defaultReleaseOptions(): MacReleaseOptions {
     prepareRuntime: () => {
       prepareFsExtForElectron({ platform: 'darwin', arch: 'arm64', desktopRoot })
       prepareInstalledMacUniversalRuntime(desktopRoot, ['arm64'])
+      verifyPreparedDesktopRuntime(desktopRoot, 'darwin')
     },
     // Signed releases are hermetic: verify the committed snapshot, no network.
     refreshBundled: () => refreshBundledForPackaging('verify', resolve(desktopRoot, '..')),
@@ -138,6 +141,26 @@ const invokedPath = process.argv[1]
 if (invokedPath !== undefined && resolve(invokedPath) === fileURLToPath(import.meta.url)) {
   try {
     assertPackagingRelease()
+    const desktopRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+    // The preflight the release flow repeats; the payload signatures must carry the identity it selects.
+    const releaseEnvironment = adaptMacReleaseEnvironment(process.env)
+    const ready = assertMacReleaseReady({
+      env: releaseEnvironment,
+      platform: process.platform,
+      listCodeSigningIdentities: () => listCodeSigningIdentities(withoutMacReleaseSecrets(releaseEnvironment)),
+    })
+    const appId = (JSON.parse(readFileSync(resolve(desktopRoot, 'package.json'), 'utf8')) as { build: { appId: string } }).build.appId
+    // Like upstream Desktop, every Mach-O payload file is signed before electron-builder runs; osx-sign would leave the Python extension modules unsigned.
+    await prepareDesktopInterpreters({
+      desktopRoot,
+      sign: runtimeRoot => withMacSigningIdentity(releaseEnvironment, ready.identity, async (signer) => {
+        // Sensteed stable releases are Apple Silicon arm64 only; upstream signs every desktopRuntimeTargets CPU.
+        for (const { arch } of desktopRuntimeTargets('darwin').filter(target => target.arch === 'arm64')) {
+          const signed = await signMacRuntime(primaryRuntimeDirectory(runtimeRoot, arch), appId, signer, arch)
+          console.log(`Signed ${String(signed)} native files of the ${arch} primary runtime as ${ready.identity}`)
+        }
+      }),
+    })
     releaseMac()
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error))

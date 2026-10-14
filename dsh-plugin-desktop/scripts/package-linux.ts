@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { prepareFsExtForElectron } from './prepare-fs-ext.ts'
 import { electronBuilderEnvironment } from './electron-builder-environment.ts'
 import { refreshBundledForPackaging } from './refresh-bundled-cli.ts'
+import { prepareDesktopInterpreters, verifyPreparedDesktopRuntime } from './prepare-runtime.ts'
 
 const LINUX_SIGNING_KEYS = [
   'CSC_IDENTITY_AUTO_DISCOVERY',
@@ -95,6 +96,8 @@ export function createLinuxPackageOptions(verifier = './verify-linux-artifacts.t
     builderCli: require.resolve('electron-builder/cli.js'),
     prepareRuntime: () => {
       prepareFsExtForElectron({ platform: 'linux', arch: 'x64', desktopRoot })
+      // Linux ships no interpreter payload; the check confirms the tree declares none.
+      verifyPreparedDesktopRuntime(desktopRoot, 'linux')
     },
     verifier: fileURLToPath(new URL(verifier, import.meta.url)),
     nodeExecutable: process.execPath,
@@ -175,6 +178,7 @@ const invokedPath = process.argv[1]
 if (invokedPath !== undefined && resolve(invokedPath) === fileURLToPath(import.meta.url)) {
   try {
     assertPackagingRelease()
+    await prepareDesktopInterpreters({ desktopRoot: resolve(dirname(fileURLToPath(import.meta.url)), '..') })
     packageLinuxArtifacts()
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error))

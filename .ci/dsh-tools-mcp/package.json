@@ -11,6 +11,7 @@
     "./package.json": "./package.json"
   },
   "dsh": {
-    "bundle": {"patch": "./cordis.patch.yml"}
+    "bundle": {"patch": "./cordis.patch.yml"},
+    "capabilities": [{"id": "tools-market-research", "kind": "business", "name": "商业调研与热点分析", "description": "围绕行业、竞品和热点事件形成结构化调研。"}]
   }
 }

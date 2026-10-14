@@ -73,14 +73,14 @@ function OverviewView({ brief, t, onDrill, orgId, workQueue }) {
           ],
           onBarClick: point => onDrill('budget', { view: 'month', month: Number(point.label) }),
         })),
-      h(Card, { title: t('orgSummary') }, h(Table, {
+      h(Card, { title: t('orgSummary') }, h(Table, { tableId: 'finance-OverviewView-1',
         columns: [
           { label: t('org'), key: 'orgName', stickyLeft: true },
-          { label: t('kpiBudget'), render: row => wan(row.budgetAmount) ?? '—', num: true },
-          { label: t('kpiPrSubmitted'), render: row => wan(row.prSubmittedAmount) ?? '—', num: true },
-          { label: t('kpiPaid'), render: row => wan(row.paidAmount) ?? '—', num: true },
+          { label: t('kpiBudget'), key: 'budgetAmount', render: row => wan(row.budgetAmount) ?? '—', num: true },
+          { label: t('kpiPrSubmitted'), key: 'prSubmittedAmount', render: row => wan(row.prSubmittedAmount) ?? '—', num: true },
+          { label: t('kpiPaid'), key: 'paidAmount', render: row => wan(row.paidAmount) ?? '—', num: true },
           {
-            label: t('kpiExecRate'), num: true,
+            label: t('kpiExecRate'), key: 'execRate', sortValue: row => execRateOf(row.prSubmittedAmount, row.prEstimatedAmount, row.budgetAmount), num: true,
             render: row => {
               const rate = execRateOf(row.prSubmittedAmount, row.prEstimatedAmount, row.budgetAmount)
               if (rate === null) return '—'
@@ -104,9 +104,9 @@ function OverviewView({ brief, t, onDrill, orgId, workQueue }) {
           h('div', { className: 'sf-stack' },
             h('div', null, h('div', { className: 'sf-row-between' }, h('span', { className: 'sf-kpi-value' }, yuan(cashTotals.actualIncome) ?? '—'), h('span', { className: 'sf-note' }, `${t('planCol')} ${yuan(cashTotals.plannedIncome) ?? '—'} · ${t('achieve')} ${ratio(cashTotals.plannedIncome ? cashTotals.actualIncome / cashTotals.plannedIncome : null, 1) ?? '—'}`)), h(Progress, { value: cashTotals.plannedIncome ? cashTotals.actualIncome / cashTotals.plannedIncome : null, tone: 'green' })),
             h('div', null, h('div', { className: 'sf-row-between' }, h('span', { className: 'sf-kpi-value' }, yuan(cashTotals.actualExpense) ?? '—'), h('span', { className: 'sf-note' }, `${t('planCol')} ${yuan(cashTotals.plannedExpense) ?? '—'} · ${t('achieve')} ${ratio(cashTotals.plannedExpense ? cashTotals.actualExpense / cashTotals.plannedExpense : null, 1) ?? '—'}`)), h(Progress, { value: cashTotals.plannedExpense ? cashTotals.actualExpense / cashTotals.plannedExpense : null, tone: 'amber' })))),
-        h(Card, { title: t('alertSummary'), actions: [h(LinkButton, { key: 'more', onClick: () => onDrill('alerts') }, t('drill'))] }, h(Table, {
+        h(Card, { title: t('alertSummary'), actions: [h(LinkButton, { key: 'more', onClick: () => onDrill('alerts') }, t('drill'))] }, h(Table, { tableId: 'finance-OverviewView-2',
           columns: [
-            { label: t('severity'), render: row => h(SeverityBadge, { severity: row.severity, t }) },
+            { label: t('severity'), key: 'severity', sortValue: row => ({ INFO: 0, WARN: 1, CRITICAL: 2 }[row.severity] ?? 0), render: row => h(SeverityBadge, { severity: row.severity, t }) },
             { label: t('alertTitleCol'), key: 'title' },
             { label: t('org'), key: 'orgName' },
           ],

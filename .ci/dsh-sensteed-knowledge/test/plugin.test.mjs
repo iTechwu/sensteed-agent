@@ -30,6 +30,10 @@ test('aligns Memory and Knowledge permissions with the shared access gate', asyn
 
 test('exposes full Knowledge, Memory, Ontology, and graph management surfaces in the client', async () => {
   const source = await readFile(new URL('src/client.js', root), 'utf8')
+  assert.match(source, /memoriesTab:\s*"Memory 召回"/u)
+  assert.match(source, /memoryManageTab:\s*"Memory 采集"/u)
+  assert.match(source, /memoriesTab:\s*"Memory recall"/u)
+  assert.match(source, /memoryManageTab:\s*"Capture Memory"/u)
   for (const token of ['knowledgeTab', 'memoryManageTab', 'consoleTab', 'yk-management-console', 'ingest_file', 'fileUrl', 'knowledge.promote', 'knowledge.remember', 'knowledge.entity_assertions', 'knowledge.relation_assertions', 'knowledge.entity_merges', 'knowledge.provenance_lineage', 'knowledge.create_space', 'knowledge.create_source', 'knowledge.create_ontology_version', 'knowledge.publish_ontology', 'knowledge.export_ontology', 'knowledge.import_ontology', 'knowledge.grant_acl', 'knowledge.grant_document_principal', 'knowledge.rebuild_graph', 'memoryCaptureTitle', 'ingestTitle', 'promoteTitle', 'entityId', 'capabilityAllowed']) assert.match(source, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'u'))
   assert.match(source, /style\.textContent = css \+ stateCss \+ themeCss \+ themeRefinementCss \+ contentLayoutCss \+ managementCss/u)
 })

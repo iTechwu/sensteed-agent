@@ -12,7 +12,7 @@ import {
   DOFE_ACCESS_VALIDATION_VERSION,
   type DofeAccessSettings,
   type DofePluginId,
-  normalizeDofePluginIds,
+  normalizeDofeEnabledPluginIds,
 } from './dofe-plugins.ts'
 import { BRAND_TENANT, BRAND_VARIANT } from './generated-product-identity.ts'
 import { managedCapabilitiesPrompt } from './managed-capabilities.ts'
@@ -147,8 +147,7 @@ export async function apply(ctx: Context): Promise<void> {
     return {
       ready: current.setupComplete && current.validationVersion === DOFE_ACCESS_VALIDATION_VERSION && current.authMode === 'feishu' && Boolean(current.identity?.ssoSub),
       financeAllowed: financeAuthorized,
-      enabledPlugins: normalizeDofePluginIds(current.enabledPlugins, BRAND_VARIANT)
-        .filter(plugin => current.entitlements?.plugins.includes(plugin)),
+      enabledPlugins: normalizeDofeEnabledPluginIds(current.enabledPlugins, BRAND_VARIANT, current.entitlements?.plugins),
       entitlements: current.entitlements === undefined ? undefined : {
         ...current.entitlements,
         knowledge: granted ? { plugin: 'knowledge', permissionVersion: 1, accesses: ['read', 'write'] } : undefined,
@@ -182,8 +181,7 @@ export async function apply(ctx: Context): Promise<void> {
           groups: snapshot.groups ?? [], groupNames: snapshot.groupNames ?? {},
         },
         entitlements,
-        enabledPlugins: normalizeDofePluginIds(sameUser ? current.enabledPlugins : entitlements.plugins, BRAND_VARIANT)
-          .filter(plugin => entitlements.plugins.includes(plugin)),
+        enabledPlugins: normalizeDofeEnabledPluginIds(sameUser ? current.enabledPlugins : entitlements.plugins, BRAND_VARIANT, entitlements.plugins),
         // A successful tenant-bound renewal validates an existing setup across
         // desktop upgrades; profile refresh must never complete an unfinished setup.
         validationVersion: sameUser && current.setupComplete ? DOFE_ACCESS_VALIDATION_VERSION : current.validationVersion,
@@ -242,13 +240,7 @@ export async function apply(ctx: Context): Promise<void> {
   })
 
   const enabledPlugins = (accessSettings: DofeAccessSettings): Set<DofePluginId> => {
-    const enabled = new Set(normalizeDofePluginIds(accessSettings.enabledPlugins, BRAND_VARIANT))
-    if (BRAND_VARIANT === 'sensteed') {
-      for (const plugin of enabled) {
-        if (!accessSettings.entitlements?.plugins.includes(plugin)) enabled.delete(plugin)
-      }
-    }
-    return enabled
+    return new Set(normalizeDofeEnabledPluginIds(accessSettings.enabledPlugins, BRAND_VARIANT, accessSettings.entitlements?.plugins))
   }
 
   const accessReady = (accessSettings: DofeAccessSettings): boolean => accessSettings.setupComplete

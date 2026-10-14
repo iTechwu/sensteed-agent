@@ -31,6 +31,9 @@ const TOOL_OUTPUT = {
 
 export const name = 'sensteed-knowledge-tools'
 export const inject = ['tools', 'systemPrompt', 'credentials', 'webServer', 'sensteedAudit', 'dofeAccess']
+export const capabilities = Object.freeze([
+  { id: 'knowledge-memory', kind: 'business', name: '企业知识与 Memory', description: '检索企业知识，管理记忆，并维护知识图谱关系。' },
+])
 
 const UUID = { type: 'string', format: 'uuid' }
 const INTEGER = (minimum, maximum) => ({ type: 'integer', minimum, ...(maximum === undefined ? {} : { maximum }) })

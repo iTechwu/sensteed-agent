@@ -14,6 +14,9 @@ const REQUEST_TIMEOUT_MS = 30000
 const MAX_BODY_BYTES = 32 * 1024
 
 export const inject = ['webServer', 'credentials', 'tools', 'systemPrompt', 'dofeAuth', 'dofeAccess']
+export const capabilities = Object.freeze([
+  { id: 'finance-management', kind: 'business', name: '财务经营分析', description: '预算、台账、资金、预警和数据治理看板。' },
+])
 
 /** Resolve the live Feishu session on every call; never trust a browser-supplied identity. */
 async function resolveConfig(ctx) {
@@ -41,12 +44,13 @@ export function apply(ctx, overrides = {}) {
         headers: { Accept: 'application/json', Authorization: `Bearer ${config.token}` },
       })
       const payload = await response.json().catch(() => null)
-      const allowed = response.ok && payload?.data?.allowed === true
-      accessCache = { key: cacheKey, allowed, expiresAt: Date.now() + 5000 }
+      const allowed = response.status === 401 || response.status === 403 ? false
+        : response.ok && typeof payload?.data?.allowed === 'boolean' ? payload.data.allowed : undefined
+      accessCache = { key: cacheKey, allowed, expiresAt: Date.now() + (allowed === undefined ? 1000 : 5000) }
       return allowed
     } catch {
-      accessCache = { key: cacheKey, allowed: false, expiresAt: Date.now() + 1000 }
-      return false
+      accessCache = { key: cacheKey, allowed: undefined, expiresAt: Date.now() + 1000 }
+      return undefined
     }
   }
 
@@ -82,7 +86,9 @@ export function apply(ctx, overrides = {}) {
           if (!config.tenantId) {
             return { ok: false, error: '请先使用飞书登录，再打开财务管理。' }
           }
-          if (!(await resolveWorkspaceAccess(config))) {
+          const allowed = await resolveWorkspaceAccess(config)
+          if (allowed === undefined) return { ok: false, error: '财务权限服务暂不可用，请稍后重试。' }
+          if (!allowed) {
             return { ok: false, error: '当前账号没有财务团队权限，无法使用财务管理。' }
           }
           const orgs = await financeApiCall(fetchImpl, config, 'finance_get_orgs', {}, now(), ctx.logger)
@@ -143,6 +149,7 @@ export function apply(ctx, overrides = {}) {
       const pathname = safePathname(req.url)
       const sub = pathname.slice(ROUTE_PREFIX.length) || '/'
       const allowed = await resolveWorkspaceAccess(config)
+      if (allowed === undefined) return sendJson(res, 503, { ok: false, error: '财务权限服务暂不可用，请稍后重试。' })
       if (sub === '/access') return sendJson(res, 200, { ok: true, allowed })
       if (!allowed) {
         ctx.logger?.info?.(`sensteed finance: ${req.method} ${sub} rejected — finance workspace access denied`)
@@ -172,7 +179,7 @@ export function apply(ctx, overrides = {}) {
 
 const QUERY_KEYS = [
   'year', 'month', 'page', 'limit', 'severity', 'status', 'orgId', 'expenseType', 'recordType', 'planType',
-  'versionId', 'departmentId', 'unassigned', 'operator', 'keyword', 'onlyUnmapped', 'systemUserId',
+  'versionId', 'departmentId', 'unassigned', 'operator', 'keyword', 'onlyUnmapped', 'systemUserId', 'days',
   'baseVersionId', 'targetVersionId', 'planId', 'type', 'scope', 'kind', 'bizSystem', 'transport',
 ]
 
@@ -283,6 +290,9 @@ async function dispatchGet(fetchImpl, config, sub, url, res, logger) {
       break
     case '/data-source-runs':
       calls = [['finance_get_data_source_runs', { ...tenant(), scope: query.scope, status: query.status, bizSystem: query.bizSystem, transport: query.transport, page: query.page, limit: query.limit }]]
+      break
+    case '/data-source-metrics':
+      calls = [['finance_get_data_source_metrics', { ...tenant(), scope: query.scope, days: query.days }]]
       break
     case '/budget-adjustments':
       calls = [['finance_budget_adjustment_list', { ...tenant(), status: query.status, page: query.page, limit: query.limit }]]
@@ -395,6 +405,8 @@ const WRITE_ROUTES = [
   { pattern: /^\/allocations$/, tool: 'finance_allocation_confirm' },
   { pattern: /^\/allocations\/([\w-]+)\/remove$/, tool: 'finance_allocation_remove', map: m => ({ id: m[1] }) },
   { pattern: /^\/data-source-configs\/([\w-]+)\/active$/, tool: 'finance_toggle_data_source_config', map: m => ({ id: m[1] }), needsOperator: false },
+  { pattern: /^\/data-source-configs$/, tool: 'finance_upsert_data_source_config', needsOperator: false },
+  { pattern: /^\/data-source-sync$/, tool: 'finance_sync_data_source', needsOperator: false },
 ]
 
 async function dispatchPost(fetchImpl, config, sub, req, res, logger) {
@@ -644,6 +656,9 @@ function resolveFinanceRoute(toolName, args = {}) {
     finance_get_alert_summary: ['GET', '/finance/alerts/summary'],
     finance_get_data_source_configs: ['GET', '/data-source/configs'],
     finance_get_data_source_runs: ['GET', '/data-source/runs'],
+    finance_get_data_source_metrics: ['GET', '/data-source/metrics'],
+    finance_upsert_data_source_config: ['PUT', '/data-source/configs'],
+    finance_sync_data_source: ['POST', '/data-source/runs/sync'],
     finance_toggle_data_source_config: ['PATCH', `/data-source/configs/${args.id}/active`],
   }
   if (toolName === 'finance_patch_payment_plan_schedule') return { method: 'PATCH', path: `/finance/payment-plans/${args.id}/schedule`, body: args }

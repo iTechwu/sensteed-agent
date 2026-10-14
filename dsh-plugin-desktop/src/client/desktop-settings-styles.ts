@@ -4,6 +4,16 @@ import { DESKTOP_PACKAGE_NAME } from '../product-identity.ts'
 const STYLE_ID = 'sensteed-agent-settings-styles'
 
 const CSS = `
+/* Market and remote-control are configured in Desktop settings. Keep their
+   legacy panel registrations addressable, but remove duplicate sidebar rows. */
+body [data-slot="sidebar.panellist"] button[aria-label="插件市场"],
+body [data-slot="sidebar.panellist"] button[aria-label="Plugin market"],
+body [data-slot="sidebar.panellist"] button[aria-label="手机连接"],
+body [data-slot="sidebar.panellist"] button[aria-label="Phone connection"],
+body [data-slot="sidebar.panellist"] button[aria-label="远程控制"],
+body [data-slot="sidebar.panellist"] button[aria-label="Remote control"] {
+  display: none !important;
+}
 .sensteedAgentSettings {
   display: flex;
   flex-direction: column;

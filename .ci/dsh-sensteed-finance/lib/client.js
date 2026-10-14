@@ -8,7 +8,7 @@ window.__ModuleLoader__.load({
     const React = require('react')
     const PLUGIN_BRAND = globalThis.__DSH_PLUGIN_BRAND__ || { tenant: 'sensteed', company: '山子' }
     const REQUEST_TIMEOUT_MS = 30000
-    const { createElement: h, useEffect, useState, useRef, useCallback, useMemo, useSyncExternalStore } = React
+    const { createElement: h, useEffect, useState, useRef, useId, useCallback, useMemo, useSyncExternalStore } = React
     const {
       IconAlarmClockOutlineRegular,
       IconGaugeOutlineRegular,
@@ -110,7 +110,8 @@ window.__ModuleLoader__.load({
         alertsTitle: '预警清单', sevCritical: '重大', sevWarn: '警告', sevInfo: '提示', sevResolved: '已解决', stPending: '待处理', stConfirmed: '已确认', stResolved: '已解决', stIgnored: '已忽略', alertType: '类型', alertTitleCol: '标题', detail: '说明', firstSeen: '首次发现', lastSeen: '最近出现', alertMonth: '月份',
         rulesUnconfirmed: '预警规则集尚未确认生效：当前不生成正式告警。以内置默认阈值确认后规则引擎才开始产出。', rulesConfirmed: '预警规则集 v{v} 已生效（{date} 确认）', confirmDefaultRules: '以内置默认阈值确认生效', confirmRulesTitle: '确认预警规则集', alertDetail: '预警详情', evidence: '证据快照', viewSource: '查看源数据', sourceBudget: '下钻预算', sourceCash: '下钻资金', sourceQuality: '下钻数据质量',
         // 数据中心
-        dsConfigs: '数据源配置', dsScope: '范围', scopeHq: '总部', scopeHezhong: '合众', dsKind: '类型', kindDss: 'DSS', kindFeishu: '飞书', dsEndpoint: '端点', dsEnabled: '启用', dsEnable: '启用', dsDisable: '停用', dsRuns: '同步批次', dsFallback: '回退原因', datasetScale: '数据集入库规模', qualityTitle: '数据质量清单', batchesTitle: '导入批次', issue: '问题', dataset: '数据集', count: '数量', sourceFile: '来源文件', rows: '行数', successRows: '成功', failedRows: '失败', batchStatus: '状态', startedAt: '开始时间', runAt: '批次时间', bizType: '业务类型',
+        dsConfigs: '数据源配置', dsScope: '范围', scopeHq: '总部', scopeHezhong: '合众', dsKind: '类型', kindDss: 'DSS', kindFeishu: '飞书', dsEndpoint: '端点', dsEnabled: '启用', dsEnable: '启用', dsDisable: '停用', dsRuns: '同步批次', dsFallback: '回退原因', dsManualSync: '手动同步', dsRouteHint: 'DSS 优先、飞书兜底', dsSyncHint: '失败原因会写入批次留痕，成功不代表已发布财务事实。', syncNow: '触发同步', syncDone: '同步已完成', syncFetched: '采集', dsTransport: '实际通道', dsMetrics: '可观测性指标', last7Days: '近 7 天', successRate: '成功率', fallbackRate: '回退率', emptyRate: '空结果率', avgDuration: '平均时长', updatedAt: '更新时间', processingStage: '处理阶段', batchId: '批次', dataSummary: '数据摘要', errorSummary: '失败摘要', dsAdd: '新增配置', dsEdit: '编辑数据源配置', edit: '编辑', save: '保存', secretRef: '凭证引用', secretRefHint: '仅保存引用名，不存明文凭证。', tableMappings: '表映射（JSON，可选）', tableMapping: '表映射键', dsNamePlaceholder: '如：总部 DSS 采购流程', dsEndpointPlaceholder: 'https://…（飞书可留空）', docPurchase: '采购', docReimbursement: '报销', docIncome: '收入',
+        datasetScale: '数据集入库规模', qualityTitle: '数据质量清单', batchesTitle: '导入批次', issue: '问题', dataset: '数据集', count: '数量', sourceFile: '来源文件', rows: '行数', successRows: '成功', failedRows: '失败', batchStatus: '状态', startedAt: '开始时间', runAt: '批次时间', bizType: '业务类型',
         // 录入
         filingTasks: '任务管理（财务）', myFiling: '我的填报（部门）', createTask: '发起任务', taskTitle: '任务名称', taskType: '类型', typeBudget: '预算', typePlan: '排款', taskYear: '年度', taskMonth: '月份', taskDue: '截止时间', taskDepartments: '指派部门（可多选）', selectAll: '全选', taskInstructions: '填报说明', taskOwner: '负责人', taskReviewer: '财务审核人', taskAllowModify: '允许窗口内修改', taskFreezeMonth: '冻结当前自然月', taskStartDraft: '存为草稿（发布前部门不可见）', taskPublish: '创建并发布', taskProgress: '任务进度', closeTask: '关闭任务', taskClosed: '已关闭', departmentCol: '部门', progressCol: '进度', dueCol: '截止', assignmentTitle: '填报明细', rowsEditor: '行编辑（月份 / 说明 / 金额）', addRow: '加一行', saveDraft: '暂存草稿', submitFiling: '提交', commitFiling: '复核定稿', reopenFiling: '重开', reopenReason: '重开原因（必填，并入审计）', overdue: '已超期', assignee: '填报人',
         directory: '飞书通讯录', dirSync: '同步通讯录', dirSearch: '搜索姓名/手机/邮箱', mapUser: '绑定用户', systemUserId: '系统用户 ID', unmappedOnly: '只看未绑定', employmentRecords: '归属记录（调岗切分）', empCreate: '登记归属', empUser: '系统用户', empDept: '归属部门', empStart: '起始日期', membersTitle: '成员与角色', role: '角色', roleNameDEPT_FILLER: '部门填报人', roleNameDEPT_LEADER: '部门负责人', roleNameDEPT_COLLABORATOR: '信息协同人', roleNameBOSS: '老板', roleNameFINANCE_STAFF: '财务专员', roleNameFINANCE_OWNER: '财务负责人', roleNameMANAGEMENT: '管理层', removeMember: '移除', memberUser: '用户', memberDept: '部门', enabledCol: '启用',
@@ -127,7 +128,7 @@ window.__ModuleLoader__.load({
         analysis_rules: '预警规则核查', analysis_rules_desc: '规则集生效状态、默认阈值与近 30 天告警量核对。',
         analyzeTitle: '深度分析入口', analyzeHint: '以下入口会把预制指令发送到当前会话，由 Agent 调用财务数据中心 MCP（mcp__finance__*）完成深度分析，产出财务口吻的风险与成本预判。', send: '开始分析', sent: '已发送到会话', sendFail: '发送失败，指令已复制到剪贴板', sendFailReason: '发送失败（{reason}），指令已复制到剪贴板', analyzingNote: '分析会读取真实账面数据；录入/回填类操作 Agent 会先与你确认再执行。审批与过账由财务本人执行，Agent 不代批。',
         // 通用动作
-        submit: '提交', cancel: '取消', submitted: '已提交', saved: '已保存', deleted: '已删除', confirm: '确认', close: '关闭', actions: '操作', runEngine: '触发预警引擎', running: '执行中', runDone: '已触发：新建 {created} · 更新 {updated} · 关闭 {resolved}', backfill: '回填', backfillActual: '回填实际值', submitConfirm: '确认提交？', opFailed: '操作失败', refreshed: '已刷新', required: '必填',
+        submit: '提交', cancel: '取消', submitted: '已提交', saved: '已保存', deleted: '已删除', confirm: '确认', close: '关闭', actions: '操作', runEngine: '触发预警引擎', running: '执行中', runDone: '已触发：新建 {created} · 更新 {updated} · 关闭 {resolved}', backfill: '回填', backfillActual: '回填实际值', submitConfirm: '确认提交？', opFailed: '操作失败', refreshed: '已刷新', required: '必填', invalidJson: '表映射必须是合法 JSON。',
       },
       en: {
         copyFailed: 'Could not copy the analysis prompt. Please retry.',
@@ -155,7 +156,8 @@ window.__ModuleLoader__.load({
         revenueVs: 'Planned vs actual',
         alertsTitle: 'Alerts', sevCritical: 'Critical', sevWarn: 'Warn', sevInfo: 'Info', sevResolved: 'Resolved', stPending: 'Open', stConfirmed: 'Confirmed', stResolved: 'Resolved', stIgnored: 'Ignored', alertType: 'Type', alertTitleCol: 'Title', detail: 'Detail', firstSeen: 'First seen', lastSeen: 'Last seen', alertMonth: 'Month',
         rulesUnconfirmed: 'Alert rule set is not confirmed yet: no formal alerts are generated. Confirm with built-in defaults to start the engine.', rulesConfirmed: 'Alert rule set v{v} active (confirmed {date})', confirmDefaultRules: 'Confirm with built-in defaults', confirmRulesTitle: 'Confirm alert rules', alertDetail: 'Alert detail', evidence: 'Evidence', viewSource: 'View source data', sourceBudget: 'Budget', sourceCash: 'Cash', sourceQuality: 'Data quality',
-        dsConfigs: 'Data source configs', dsScope: 'Scope', scopeHq: 'HQ', scopeHezhong: 'Hezhong', dsKind: 'Kind', kindDss: 'DSS', kindFeishu: 'Feishu', dsEndpoint: 'Endpoint', dsEnabled: 'Enabled', dsEnable: 'Enable', dsDisable: 'Disable', dsRuns: 'Sync runs', dsFallback: 'Fallback', datasetScale: 'Dataset scale', qualityTitle: 'Data quality', batchesTitle: 'Import batches', issue: 'Issue', dataset: 'Dataset', count: 'Count', sourceFile: 'Source file', rows: 'Rows', successRows: 'OK', failedRows: 'Failed', batchStatus: 'Status', startedAt: 'Started', runAt: 'Run at', bizType: 'Biz type',
+        dsConfigs: 'Data source configs', dsScope: 'Scope', scopeHq: 'HQ', scopeHezhong: 'Hezhong', dsKind: 'Kind', kindDss: 'DSS', kindFeishu: 'Feishu', dsEndpoint: 'Endpoint', dsEnabled: 'Enabled', dsEnable: 'Enable', dsDisable: 'Disable', dsRuns: 'Sync runs', dsFallback: 'Fallback', dsManualSync: 'Manual sync', dsRouteHint: 'DSS first, Feishu fallback', dsSyncHint: 'Failures are recorded in the run; success does not mean financial facts are published.', syncNow: 'Run sync', syncDone: 'Sync completed', syncFetched: 'Fetched', dsTransport: 'Transport', dsMetrics: 'Observability', last7Days: 'Last 7 days', successRate: 'Success rate', fallbackRate: 'Fallback rate', emptyRate: 'Empty rate', avgDuration: 'Avg duration', updatedAt: 'Updated', processingStage: 'Processing stage', batchId: 'Batch', dataSummary: 'Data summary', errorSummary: 'Error summary', dsAdd: 'Add config', dsEdit: 'Edit data source', edit: 'Edit', save: 'Save', secretRef: 'Credential ref', secretRefHint: 'Store a reference only; never enter a plaintext credential.', tableMappings: 'Table mappings (JSON, optional)', tableMapping: 'Table mapping key', dsNamePlaceholder: 'e.g. HQ DSS procurement', dsEndpointPlaceholder: 'https://… (optional for Feishu)', docPurchase: 'Purchase', docReimbursement: 'Reimbursement', docIncome: 'Income',
+        datasetScale: 'Dataset scale', qualityTitle: 'Data quality', batchesTitle: 'Import batches', issue: 'Issue', dataset: 'Dataset', count: 'Count', sourceFile: 'Source file', rows: 'Rows', successRows: 'OK', failedRows: 'Failed', batchStatus: 'Status', startedAt: 'Started', runAt: 'Run at', bizType: 'Biz type',
         filingTasks: 'Tasks (finance)', myFiling: 'My filing (dept)', createTask: 'New task', taskTitle: 'Title', taskType: 'Type', typeBudget: 'Budget', typePlan: 'Payment plan', taskYear: 'Year', taskMonth: 'Month', taskDue: 'Due', taskDepartments: 'Departments', selectAll: 'Select all', taskInstructions: 'Filing instructions', taskOwner: 'Owner', taskReviewer: 'Finance reviewer', taskAllowModify: 'Allow changes while open', taskFreezeMonth: 'Freeze the current month', taskStartDraft: 'Save as draft (hidden until published)', taskPublish: 'Create and publish', taskProgress: 'Progress', closeTask: 'Close task', taskClosed: 'Closed', departmentCol: 'Department', progressCol: 'Progress', dueCol: 'Due', assignmentTitle: 'Assignment detail', rowsEditor: 'Rows (month / note / amount)', addRow: 'Add row', saveDraft: 'Save draft', submitFiling: 'Submit', commitFiling: 'Finalize', reopenFiling: 'Reopen', reopenReason: 'Reopen reason (required, audited)', overdue: 'Overdue', assignee: 'Assignee',
         directory: 'Feishu directory', dirSync: 'Sync directory', dirSearch: 'Search name/phone/email', mapUser: 'Map user', systemUserId: 'System user ID', unmappedOnly: 'Unmapped only', employmentRecords: 'Employment records', empCreate: 'Add record', empUser: 'User', empDept: 'Department', empStart: 'Start date', membersTitle: 'Members & roles', role: 'Role', roleNameDEPT_FILLER: 'Dept filler', roleNameDEPT_LEADER: 'Dept leader', roleNameDEPT_COLLABORATOR: 'Collaborator', roleNameBOSS: 'Boss', roleNameFINANCE_STAFF: 'Finance staff', roleNameFINANCE_OWNER: 'Finance owner', roleNameMANAGEMENT: 'Management', removeMember: 'Remove', memberUser: 'User', memberDept: 'Dept', enabledCol: 'Enabled',
         entryTitle: 'Finance data entry', entryPaymentPlan: 'Payment plan', entryRevenuePlan: 'Revenue plan', entryBudgetLine: 'Budget line', entryBackfill: 'Backfill actuals', description: 'Description', planType: 'Plan type', note: 'Note', itemName: 'Item', payer: 'Payer', incomeType: 'Income type', recordType: 'PR type', prSubmittedL: 'Submitted', prEstimatedL: 'Estimated', selectPlan: 'Pick a plan', actualAmountL: 'Actual amount (CNY)', actualDateL: 'Actual date (optional)', entryHint: 'Entries write to the finance data center directly. Verify amounts and periods before submitting; run the alert engine afterwards.', entryRules: 'Entry rules', entryRulesList: 'Amounts in CNY; plan month required; budget lines attach to the primary version; backfill recalculates variance and remaining.', preCheck: 'Pre-check', preCheckOk: 'Data quality OK, safe to enter', preCheckBad: '{n} unassigned-org records; assign them first',
@@ -169,7 +171,7 @@ window.__ModuleLoader__.load({
         analysis_version: 'Version health', analysis_version_desc: 'Primary vs adjusted diff, stale drafts, and version progression advice.',
         analysis_rules: 'Alert rules check', analysis_rules_desc: 'Rule set status, default thresholds, and 30-day alert volume check.',
         analyzeTitle: 'Deep analysis entries', analyzeHint: 'Each entry sends a prepared instruction to the current conversation; the agent calls finance MCP tools (mcp__finance__*) and returns CFO-tone forecasts.', send: 'Analyze', sent: 'Sent to conversation', sendFail: 'Send failed; copied to clipboard', sendFailReason: 'Send failed ({reason}); copied to clipboard', analyzingNote: 'Analysis reads real ledger data; write actions always require your confirmation first. Approvals and posting are done by finance users, never the agent.',
-        submit: 'Submit', cancel: 'Cancel', submitted: 'Submitted', saved: 'Saved', deleted: 'Deleted', confirm: 'Confirm', close: 'Close', actions: 'Actions', runEngine: 'Run alert engine', running: 'Running...', runDone: 'Done: created {created} · updated {updated} · resolved {resolved}', backfill: 'Backfill', backfillActual: 'Backfill actuals', submitConfirm: 'Confirm submit?', opFailed: 'Operation failed', refreshed: 'Refreshed', required: 'required',
+        submit: 'Submit', cancel: 'Cancel', submitted: 'Submitted', saved: 'Saved', deleted: 'Deleted', confirm: 'Confirm', close: 'Close', actions: 'Actions', runEngine: 'Run alert engine', running: 'Running...', runDone: 'Done: created {created} · updated {updated} · resolved {resolved}', backfill: 'Backfill', backfillActual: 'Backfill actuals', submitConfirm: 'Confirm submit?', opFailed: 'Operation failed', refreshed: 'Refreshed', required: 'required', invalidJson: 'Table mappings must be valid JSON.',
       },
     }
 
@@ -189,7 +191,11 @@ window.__ModuleLoader__.load({
     async function api(path, options) {
       const response = await fetch(`${BASE}${path}`, { credentials: 'same-origin', redirect: 'error', headers: { Accept: 'application/json', ...(options?.body ? { 'Content-Type': 'application/json' } : {}) }, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS), ...options })
       const body = await response.json().catch(() => null)
-      if (!response.ok || !body || (body.ok === false && !Object.keys(body).some(key => !['ok', 'error'].includes(key) && body[key] && !body[key].error))) throw new Error(body?.error || `http_${response.status}`)
+      if (!response.ok || !body || (body.ok === false && !Object.keys(body).some(key => !['ok', 'error'].includes(key) && body[key] && !body[key].error))) {
+        const error = new Error(body?.error || `http_${response.status}`)
+        error.status = response.status
+        throw error
+      }
       return body
     }
 
@@ -254,10 +260,26 @@ window.__ModuleLoader__.load({
       return String(value).slice(0, 10)
     }
 
-    function yearOptions() {
+    function yearOptions(selectedYear) {
       const year = new Date().getFullYear()
-      // 近 7 年倒序，对齐前端全局年度筛选
-      return Array.from({ length: 7 }, (_, index) => [String(year - index), String(year - index)])
+      const years = new Set(Array.from({ length: 7 }, (_, index) => year - 4 + index))
+      if (Number.isInteger(Number(selectedYear)) && Number(selectedYear) > 0) years.add(Number(selectedYear))
+      return [...years].sort((left, right) => right - left).map(value => [String(value), String(value)])
+    }
+
+    function budgetVersionLabel(version) {
+      const types = { INITIAL: '初始', ADJUSTED: '调整', ROLLING: '滚动', MERGED: '合并' }
+      const statuses = { DRAFT: '草稿', CONFIRMED: '已确认', PUBLISHED: '已发布', LOCKED: '已锁定' }
+      const frozen = version.frozenThroughMonth > 0 ? `（冻结至 ${version.frozenThroughMonth} 月）` : ''
+      const name = version.year && version.type
+        ? `${version.year} 年${types[version.type] || ''}预算 · ${statuses[version.status] || version.status}${frozen}`
+        : version.name
+      const amount = finite(version.budgetTotal)
+      const parts = [name, version.isPrimary ? '主版本' : null,
+        version.lineCount != null ? `${Number(version.lineCount).toLocaleString('zh-CN')} 行` : null,
+        amount !== null ? `${amount < 0 ? '-' : ''}¥${Math.abs(amount).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}` : null,
+        version.publishedAt ? `发布于 ${String(version.publishedAt).slice(0, 10)}` : null]
+      return parts.filter(Boolean).join(' · ')
     }
 
     /** 执行率热力分档：>100 超支 / ≥70 健康 / ≥30 偏慢 / 其余早期 */
@@ -366,11 +388,17 @@ window.__ModuleLoader__.load({
     function Table({ columns, rows, empty, onRowClick, rowKey, minColumns, tableId }) {
       const storageKey = `dofe-finance-table:${tableId || columns.map(col => col.key || col.label).join('|')}`
       const columnIds = columns.map((col, index) => col.key || `column-${index}`)
+      const requiredIds = columns.flatMap((col, index) => col.key === 'actions' || col.hideable === false ? [columnIds[index]] : [])
+      const normalizeColumns = ids => {
+        const valid = Array.isArray(ids) ? [...new Set(ids)].filter(id => columnIds.includes(id)) : []
+        if (!valid.some(id => !requiredIds.includes(id))) return columnIds
+        return [...new Set([...valid, ...requiredIds])]
+      }
       const columnSignature = columnIds.join('|')
       const [visibleIds, setVisibleIds] = useState(() => {
         try {
           const saved = JSON.parse(localStorage.getItem(storageKey) || 'null')
-          return Array.isArray(saved) && saved.length ? saved.filter(id => columnIds.includes(id)) : columnIds
+          return normalizeColumns(saved)
         } catch { return columnIds }
       })
       const sortStorageKey = `${storageKey}:sort`
@@ -380,26 +408,50 @@ window.__ModuleLoader__.load({
           return saved && typeof saved.id === 'string' && (saved.direction === 'asc' || saved.direction === 'desc') ? saved : null
         } catch { return null }
       })
+      const [fieldKeyword, setFieldKeyword] = useState('')
+      const preferenceKey = storageKey + ':' + columnSignature
+      const [loadedKey, setLoadedKey] = useState(null)
+      const fieldMenuRef = useRef(null)
+      const closeFields = () => {
+        const menu = fieldMenuRef.current
+        if (!menu?.open) return
+        menu.open = false
+        setFieldKeyword('')
+      }
       useEffect(() => {
-        setVisibleIds(current => {
-          const next = current.filter(id => columnIds.includes(id))
-          return next.length ? next : columnIds
-        })
-      }, [storageKey, columnSignature])
+        const outside = event => { if (!fieldMenuRef.current?.contains(event.target)) closeFields() }
+        document.addEventListener('pointerdown', outside)
+        return () => document.removeEventListener('pointerdown', outside)
+      }, [])
       useEffect(() => {
+        let nextColumns = columnIds
+        let nextSort = null
+        try {
+          const savedColumns = JSON.parse(localStorage.getItem(storageKey) || 'null')
+          nextColumns = normalizeColumns(savedColumns)
+          const savedSort = JSON.parse(localStorage.getItem(sortStorageKey) || 'null')
+          if (savedSort && nextColumns.includes(savedSort.id) && (savedSort.direction === 'asc' || savedSort.direction === 'desc')) nextSort = savedSort
+        } catch {}
+        setVisibleIds(nextColumns)
+        setSort(nextSort)
+        setLoadedKey(preferenceKey)
+      }, [storageKey, columnSignature, preferenceKey])
+      useEffect(() => {
+        if (loadedKey !== preferenceKey) return
         try { localStorage.setItem(storageKey, JSON.stringify(visibleIds)) } catch {}
-      }, [storageKey, visibleIds])
+      }, [loadedKey, preferenceKey, storageKey, visibleIds])
       useEffect(() => {
+        if (loadedKey !== preferenceKey) return
         try {
           if (sort) localStorage.setItem(sortStorageKey, JSON.stringify(sort))
           else localStorage.removeItem(sortStorageKey)
         } catch {}
-      }, [sortStorageKey, sort])
+      }, [loadedKey, preferenceKey, sortStorageKey, sort])
 
       const visibleColumns = columns
         .map((column, index) => ({ column, id: column.key || `column-${index}` }))
         .filter(({ id }) => visibleIds.includes(id))
-      const activeSort = sort && columns.some((col, index) =>
+      const activeSort = sort && visibleIds.includes(sort.id) && columns.some((col, index) =>
         (col.key || `column-${index}`) === sort.id && col.sortable !== false && (col.sortKey || col.sortValue || col.key))
         ? sort
         : null
@@ -426,26 +478,46 @@ window.__ModuleLoader__.load({
       const toggleSort = id => setSort(current => current?.id === id
         ? { id, direction: current.direction === 'asc' ? 'desc' : 'asc' }
         : { id, direction: 'asc' })
-      const fieldMenu = h('details', { className: 'sf-table-fields' },
-        h('summary', { className: 'sf-table-tool' }, h(Glyph, { name: 'data', size: 13 }), '字段'),
+      const filteredColumns = columns.filter(col => `${col.label} ${col.key || ''}`.toLocaleLowerCase('zh-CN').includes(fieldKeyword.trim().toLocaleLowerCase('zh-CN')))
+      const fieldMenu = h('details', { ref: fieldMenuRef, className: 'sf-table-fields', onToggle: event => {
+        if (!event.currentTarget.open) setFieldKeyword('')
+        else requestAnimationFrame(() => fieldMenuRef.current?.querySelector('input[type="search"]')?.focus())
+      }, onBlur: event => { if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) closeFields() }, onKeyDown: event => {
+        if (event.nativeEvent?.isComposing) { event.stopPropagation(); return }
+        if (event.key === 'Escape' && event.currentTarget.open) {
+          event.preventDefault(); event.stopPropagation(); closeFields()
+          event.currentTarget.querySelector('summary')?.focus()
+        } else if (event.target.type === 'search' && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+          event.preventDefault(); event.stopPropagation()
+          const choices = event.currentTarget.querySelectorAll('input[type="checkbox"]:not(:disabled)')
+          choices[event.key === 'ArrowDown' ? 0 : choices.length - 1]?.focus()
+        }
+      } },
+        h('summary', { className: 'sf-table-tool' }, h(Glyph, { name: 'data', size: 13 }), '字段设置'),
         h('div', { className: 'sf-table-fields-menu' },
           h('strong', null, `显示字段（${visibleIds.length}/${columns.length}）`),
           h('span', { className: 'sf-table-fields-hint' }, '至少保留 1 个字段'),
-          ...columns.map((col, index) => {
-            const id = col.key || `column-${index}`
+          h('input', { type: 'search', className: 'sf-table-field-search', value: fieldKeyword, placeholder: '搜索字段名称', 'aria-label': '搜索展示字段', onChange: event => setFieldKeyword(event.target.value) }),
+          ...(filteredColumns.length ? filteredColumns : [null]).map(col => {
+            if (!col) return h('span', { key: 'no-fields', className: 'sf-table-fields-hint' }, '没有匹配字段')
+            const columnIndex = columns.indexOf(col)
+            const id = col.key || `column-${columnIndex}`
             const checked = visibleIds.includes(id)
             return h('label', { key: id, className: 'sf-table-field-option' },
               h('input', {
                 type: 'checkbox', checked,
-                disabled: checked && visibleIds.length === 1,
-                onChange: () => setVisibleIds(current => checked ? current.filter(value => value !== id) : [...current, id]),
+                disabled: requiredIds.includes(id) || (checked && visibleIds.filter(value => !requiredIds.includes(value)).length === 1),
+                onChange: () => {
+                  setVisibleIds(current => checked ? current.filter(value => value !== id) : [...current, id])
+                  if (checked && sort?.id === id) setSort(null)
+                },
               }), h('span', null, col.label))
           }),
           h('button', { type: 'button', className: 'sf-link-button', onClick: () => setVisibleIds(columnIds) }, '恢复全部字段')))
       const headerCells = visibleColumns.map(({ column: col, id }) => {
         const sortable = col.sortable !== false && (col.sortKey || col.sortValue || col.key)
         const header = sortable
-          ? h('button', { type: 'button', className: `sf-table-sort-button${activeSort?.id === id ? ' is-active' : ''}`, 'aria-label': `按${col.label}排序${activeSort?.id === id ? (activeSort.direction === 'asc' ? '，当前升序' : '，当前降序') : ''}`, onClick: () => toggleSort(id) }, col.label, h(Glyph, { name: activeSort?.id === id && activeSort.direction === 'desc' ? 'down' : 'up', size: 11 }))
+          ? h('button', { type: 'button', className: `sf-table-sort-button${activeSort?.id === id ? ' is-active' : ''}`, title: `按${col.sortLabel || col.label}排序`, 'aria-label': `按${col.sortLabel || col.label}排序${activeSort?.id === id ? (activeSort.direction === 'asc' ? '，当前升序' : '，当前降序') : ''}`, onClick: () => toggleSort(id) }, col.label, h(Glyph, { name: activeSort?.id === id && activeSort.direction === 'desc' ? 'down' : 'up', size: 11 }))
           : col.label
         return h('th', { key: id, 'aria-sort': activeSort?.id === id ? (activeSort.direction === 'asc' ? 'ascending' : 'descending') : (sortable ? 'none' : undefined), className: `${col.num ? 'sf-num' : ''}${col.stickyLeft ? ' sf-sticky-col' : ''}`, style: col.width ? { width: col.width } : undefined }, header)
       })
@@ -482,12 +554,12 @@ window.__ModuleLoader__.load({
 
     function Field(props) {
       const { value, onChange, ...rest } = props
-      return h('input', { ...rest, value: value ?? '', onChange: event => onChange(event.target.value) })
+      return h('input', { ...rest, ...(value !== undefined ? { value: value ?? '' } : {}), onChange: event => onChange?.(event.target.value) })
     }
 
     function Textarea(props) {
       const { value, onChange, ...rest } = props
-      return h('textarea', { ...rest, value: value ?? '', onChange: event => onChange(event.target.value) })
+      return h('textarea', { ...rest, ...(value !== undefined ? { value: value ?? '' } : {}), onChange: event => onChange?.(event.target.value) })
     }
 
     function Select({ value, onChange, options, placeholder, disabled, ...rest }) {
@@ -498,98 +570,136 @@ window.__ModuleLoader__.load({
         ...options.map(([id, label]) => h('option', { key: id, value: id }, label)))
     }
 
-    function SearchSelect({ value, onChange, options = [], placeholder, disabled, allowCustom = false, customLabel = '使用当前输入值', ...rest }) {
+    function useFinancePopupPosition(open, anchorRef) {
+      const [style, setStyle] = useState(null)
+      useEffect(() => {
+        if (!open) return undefined
+        const position = () => {
+          const rect = anchorRef.current?.getBoundingClientRect()
+          if (!rect) return
+          const viewportWidth = window.innerWidth, viewportHeight = window.innerHeight
+          const below = viewportHeight - rect.bottom - 12, above = rect.top - 12
+          const upwards = below < 220 && above > below
+          const width = Math.min(Math.max(rect.width, 280), viewportWidth - 16)
+          setStyle({ position: 'fixed', left: Math.max(8, Math.min(rect.left, viewportWidth - width - 8)), right: 'auto',
+            top: upwards ? 'auto' : rect.bottom + 4, bottom: upwards ? viewportHeight - rect.top + 4 : 'auto',
+            width, minWidth: 0, maxHeight: Math.max(80, Math.min(360, upwards ? above : below)), overflowY: 'auto' })
+        }
+        position()
+        window.addEventListener('resize', position)
+        window.addEventListener('scroll', position, true)
+        return () => { window.removeEventListener('resize', position); window.removeEventListener('scroll', position, true) }
+      }, [open, anchorRef])
+      return style
+    }
+
+    function SearchSelect({ value, onChange, options = [], placeholder, disabled, required, allowCustom = false, customLabel = '使用当前输入值', ...rest }) {
       const [query, setQuery] = useState('')
       const [open, setOpen] = useState(false)
-      const [selection, setSelection] = useState(value ?? '')
+      const [selection, setSelection] = useState('')
       const rootRef = useRef(null)
       const inputRef = useRef(null)
+      const menuId = useId()
+      const popupStyle = useFinancePopupPosition(open, inputRef)
       const chosen = value === undefined ? selection : value
-      const selectedLabel = options.find(([id]) => id === chosen)?.[1] ?? (allowCustom && chosen ? String(chosen) : '')
-      const displayValue = query || selectedLabel
+      const selectedLabel = options.find(([id]) => id === chosen)?.[1] ?? (chosen ? String(chosen) : '')
       const normalizedQuery = query.trim().toLocaleLowerCase()
-      const filteredOptions = options.filter(([, label]) => !normalizedQuery || String(label).toLocaleLowerCase().includes(normalizedQuery))
-      const exactMatch = options.find(([, label]) => String(label) === query)
-      const menuId = `sf-search-menu-${String(rest.name || placeholder).replace(/[^a-z0-9_-]/gi, '-')}`
+      const filteredOptions = options.filter(([id, label]) => !normalizedQuery || (String(label) + ' ' + String(id)).toLocaleLowerCase().includes(normalizedQuery))
+      const exactMatch = options.some(([id, label]) => String(id) === query.trim() || String(label) === query.trim())
+      const customAvailable = allowCustom && query.trim() && !exactMatch
+
+      const closeMenu = () => {
+        setOpen(false)
+        setQuery('')
+      }
+
+      useEffect(() => { if (disabled) closeMenu() }, [disabled])
 
       useEffect(() => {
         const handleOutsidePointerDown = event => {
-          if (!rootRef.current?.contains(event.target)) setOpen(false)
+          if (!rootRef.current?.contains(event.target)) closeMenu()
         }
         document.addEventListener('pointerdown', handleOutsidePointerDown)
-        return () => document.removeEventListener('pointerdown', handleOutsidePointerDown)
+        const form = inputRef.current?.form
+        const reset = () => { setSelection(''); closeMenu() }
+        form?.addEventListener('reset', reset)
+        return () => {
+          document.removeEventListener('pointerdown', handleOutsidePointerDown)
+          form?.removeEventListener('reset', reset)
+        }
       }, [])
 
-      const selectOption = (id, label) => {
+      useEffect(() => {
+        inputRef.current?.setCustomValidity(required && !chosen ? '请选择' + placeholder + (allowCustom ? '，或确认自定义值' : '') : '')
+      }, [chosen, required, placeholder, allowCustom])
+
+      const selectOption = id => {
         setSelection(id)
-        setQuery(String(label))
-        setOpen(false)
         onChange?.(id)
-        inputRef.current?.setCustomValidity('')
+        inputRef.current?.focus()
+        closeMenu()
       }
 
-      const selectCustom = () => {
-        const next = query.trim()
-        if (!next) return
-        setSelection(next)
-        setQuery(next)
-        setOpen(false)
-        onChange?.(next)
-        inputRef.current?.setCustomValidity('')
+      const handleKeyDown = event => {
+        if (disabled) return
+        if (event.nativeEvent?.isComposing) return
+        if (event.key === 'Escape' && open) {
+          event.preventDefault()
+          event.stopPropagation()
+          inputRef.current?.focus()
+          closeMenu()
+        } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+          event.preventDefault()
+          setOpen(true)
+          const direction = event.key === 'ArrowDown' ? 1 : -1
+          requestAnimationFrame(() => {
+            const items = Array.from(rootRef.current?.querySelectorAll('.sf-search-option') || [])
+            const current = items.indexOf(document.activeElement)
+            const next = current < 0 ? (direction > 0 ? 0 : items.length - 1) : (current + direction + items.length) % items.length
+            items[next]?.focus()
+          })
+        } else if (event.key === 'Enter' && event.target === inputRef.current && open) {
+          event.preventDefault()
+          if (filteredOptions.length === 1 && !customAvailable) selectOption(filteredOptions[0][0])
+          else if (customAvailable && !filteredOptions.length) selectOption(query.trim())
+        }
       }
 
-      const clearSelection = () => {
-        setSelection('')
-        setQuery('')
-        setOpen(false)
-        onChange?.('')
-        inputRef.current?.setCustomValidity('')
-      }
-
-      return h('div', { ref: rootRef, className: 'sf-search-select' },
+      return h('div', {
+        ref: rootRef, className: 'sf-search-select', onKeyDown: handleKeyDown,
+        onBlur: event => { if (!event.currentTarget.contains(event.relatedTarget)) closeMenu() },
+      },
         h('div', { className: 'sf-search-input-wrap' },
-          h('input', { ...rest, ref: inputRef, name: undefined, type: 'search', value: displayValue, disabled, 'aria-label': `搜索${placeholder}`, placeholder: `搜索${placeholder}`, 'aria-expanded': open, 'aria-controls': menuId, 'aria-invalid': Boolean(query && !exactMatch && chosen !== query), onFocus: () => {
-            setOpen(true)
-            if (selectedLabel) {
-              setQuery('')
-              requestAnimationFrame(() => inputRef.current?.select())
-            }
-          }, onKeyDown: event => {
-            if (event.key === 'Escape') {
-              setOpen(false)
-              event.currentTarget.blur()
-            } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-              setOpen(true)
-              event.preventDefault()
-              requestAnimationFrame(() => {
-                const optionsInMenu = rootRef.current?.querySelectorAll('.sf-search-option')
-                const option = event.key === 'ArrowUp' ? optionsInMenu?.[optionsInMenu.length - 1] : optionsInMenu?.[0]
-                option?.focus()
-              })
-            }
-          }, onChange: event => {
-            const next = event.target.value
-            setQuery(next)
-            setOpen(true)
-            const exact = options.find(([, label]) => String(label) === next)
-            event.target.setCustomValidity(next && !exact ? '请选择列表中的选项，或确认自定义值' : '')
-            if (exact) { setSelection(exact[0]); onChange?.(exact[0]); setQuery(String(exact[1])) }
-            else { setSelection(''); onChange?.('') }
-          }}),
-          chosen && !disabled ? h('button', { type: 'button', className: 'sf-search-clear', onClick: clearSelection, 'aria-label': `清除${placeholder}` }, '×') : null),
-        h('div', { className: 'sf-search-menu', id: menuId, role: 'listbox', hidden: !open },
-          filteredOptions.length ? filteredOptions.map(([id, label]) => h('button', {
-            key: id, type: 'button', role: 'option', 'aria-selected': String(id) === String(chosen), className: 'sf-search-option' + (String(id) === String(chosen) ? ' is-selected' : ''),
-            onMouseDown: event => event.preventDefault(), onClick: () => selectOption(id, label),
-          }, h('span', null, label), String(id) === String(chosen) ? h(Glyph, { name: 'check', size: 13 }) : null)) : h('p', { className: 'sf-search-empty' }, '没有匹配的选项'),
-          allowCustom && query.trim() && !exactMatch ? h('button', {
-            type: 'button', className: 'sf-search-custom', onMouseDown: event => event.preventDefault(), onClick: selectCustom,
-          }, customLabel, `“${query.trim()}”`) : null),
-        h('input', { type: 'hidden', name: rest.name, value: chosen }))
+          h('input', {
+            ...rest, ref: inputRef, name: undefined, type: 'search', role: 'combobox',
+            value: open ? query : selectedLabel, disabled,
+            'aria-label': '搜索' + placeholder, placeholder: '搜索' + placeholder,
+            'aria-expanded': open, 'aria-controls': menuId, 'aria-autocomplete': 'list', 'aria-required': required || undefined,
+            onFocus: () => setOpen(true), onClick: () => setOpen(true),
+            onInvalid: () => setOpen(true),
+            onChange: event => { setQuery(event.target.value); setOpen(true) },
+          }),
+          chosen && !disabled ? h('button', { type: 'button', className: 'sf-search-clear', onClick: () => selectOption(''), 'aria-label': '清除' + placeholder }, '×') : null),
+        h('div', { className: 'sf-search-menu', style: popupStyle, id: menuId, role: 'listbox', 'aria-label': placeholder, hidden: !open || disabled },
+          customAvailable ? h('button', {
+            type: 'button', className: 'sf-search-option sf-search-custom', role: 'option', 'aria-selected': false,
+            onMouseDown: event => event.preventDefault(), onClick: () => selectOption(query.trim()),
+          }, customLabel + '：“' + query.trim() + '”') : null,
+          ...filteredOptions.map(([id, label]) => h('button', {
+            key: id, type: 'button', role: 'option', 'aria-selected': id === chosen,
+            className: 'sf-search-option' + (id === chosen ? ' is-selected' : ''),
+            onMouseDown: event => event.preventDefault(), onClick: () => selectOption(id),
+          }, label)),
+          !filteredOptions.length ? h('p', { className: 'sf-note' }, '没有匹配项') : null),
+        h('input', { type: 'hidden', name: rest.name, value: chosen, disabled }))
     }
 
     function MultiSearchSelect({ value = [], onChange, options = [], placeholder = '选项', disabled }) {
       const [query, setQuery] = useState('')
+      const [open, setOpen] = useState(false)
+      const rootRef = useRef(null)
+      const triggerRef = useRef(null)
+      const popupStyle = useFinancePopupPosition(open, triggerRef)
       const selectedIds = new Set(value)
       const normalizedQuery = query.trim().toLocaleLowerCase()
       const filteredOptions = options.filter(([id, label]) => {
@@ -603,40 +713,86 @@ window.__ModuleLoader__.load({
           : [...value, id]
         onChange?.(next)
       }
-      return h('div', { className: 'sf-multi-search-select' },
-        h('div', { className: 'sf-multi-search-input' },
-          h('input', {
-            type: 'search', value: query, disabled,
-            placeholder: '搜索' + placeholder,
-            'aria-label': '搜索' + placeholder,
-            onChange: event => setQuery(event.target.value),
-          }),
-          query ? h('button', { type: 'button', className: 'sf-multi-clear', disabled, onClick: () => setQuery(''), 'aria-label': '清除搜索' }, '×') : null),
-        h('div', { className: 'sf-multi-summary', 'aria-live': 'polite' },
-          h('span', null, '已选 ' + selectedOptions.length + ' / ' + options.length),
-          selectedOptions.slice(0, 6).map(([id, label]) => h('button', {
-            key: id, type: 'button', className: 'sf-multi-chip', disabled,
-            onClick: () => toggle(id), 'aria-label': '移除' + label,
-          }, label, ' ×')),
-          selectedOptions.length > 6 ? h('span', { className: 'sf-multi-more' }, '另有 ' + (selectedOptions.length - 6) + ' 个') : null),
-        h('div', { className: 'sf-multi-options', role: 'listbox', 'aria-multiselectable': true, 'aria-label': placeholder },
-          filteredOptions.length ? filteredOptions.map(([id, label]) => h('button', {
-            key: id, type: 'button', role: 'option', 'aria-selected': selectedIds.has(id),
-            className: 'sf-multi-option' + (selectedIds.has(id) ? ' is-selected' : ''), disabled,
-            onClick: () => toggle(id),
-          }, h('span', { className: 'sf-multi-check', 'aria-hidden': true }, selectedIds.has(id) ? '✓' : ''), h('span', null, label)))
-            : h('p', { className: 'sf-note' }, '没有匹配的部门')))
+      const selectAllFiltered = () => {
+        onChange?.([...new Set([...value, ...filteredOptions.map(([id]) => id)])])
+      }
+      const close = () => {
+        setOpen(false)
+        setQuery('')
+      }
+      useEffect(() => { if (disabled) close() }, [disabled])
+      useEffect(() => {
+        if (!open) return undefined
+        const handleOutsidePointerDown = event => {
+          if (!rootRef.current?.contains(event.target)) close()
+        }
+        document.addEventListener('pointerdown', handleOutsidePointerDown)
+        return () => document.removeEventListener('pointerdown', handleOutsidePointerDown)
+      }, [open])
+      const handleKeyDown = event => {
+        if (disabled) return
+        if (event.nativeEvent?.isComposing) return
+        if (event.key === 'Escape' && open) {
+          event.preventDefault()
+          event.stopPropagation?.()
+          rootRef.current?.querySelector('.sf-multi-trigger')?.focus()
+          close()
+        } else if (open && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+          event.preventDefault()
+          event.stopPropagation?.()
+          const items = Array.from(rootRef.current?.querySelectorAll('[role="option"]:not(:disabled)') || [])
+          const current = items.indexOf(document.activeElement)
+          const direction = event.key === 'ArrowDown' ? 1 : -1
+          const next = current < 0 ? (direction > 0 ? 0 : items.length - 1) : (current + direction + items.length) % items.length
+          items[next]?.focus()
+        }
+      }
+      return h('div', { ref: rootRef, className: 'sf-multi-search-select', onKeyDown: handleKeyDown,
+        onBlur: event => { if (!event.currentTarget.contains(event.relatedTarget)) close() },
+      },
+        h('button', {
+          ref: triggerRef, type: 'button', className: 'sf-multi-trigger', disabled,
+          'aria-haspopup': 'listbox', 'aria-expanded': open, 'aria-label': placeholder,
+          onClick: () => { if (open) close(); else setOpen(true) },
+          onKeyDown: event => { if (event.key === 'Escape') handleKeyDown(event) },
+        },
+          h('span', { className: selectedOptions.length ? 'is-selected' : '' }, selectedOptions.length ? '已选 ' + selectedOptions.length + ' 项' : placeholder),
+          h(Glyph, { name: 'down', size: 13 })),
+        open && !disabled ? h('div', { className: 'sf-multi-menu', style: popupStyle, role: 'dialog', 'aria-label': '搜索' + placeholder },
+          h('div', { className: 'sf-multi-search-input' },
+            h('input', {
+              type: 'search', value: query, disabled, autoFocus: true,
+              placeholder: '搜索' + placeholder,
+              'aria-label': '搜索' + placeholder,
+              onChange: event => setQuery(event.target.value),
+            }),
+            query ? h('button', { type: 'button', className: 'sf-multi-clear', disabled, onClick: () => setQuery(''), 'aria-label': '清除搜索' }, '×') : null),
+          h('div', { className: 'sf-multi-summary', 'aria-live': 'polite' },
+            h('span', null, '已选 ' + selectedOptions.length + ' / ' + options.length),
+            selectedOptions.slice(0, 6).map(([id, label]) => h('button', {
+              key: id, type: 'button', className: 'sf-multi-chip', disabled,
+              onClick: () => toggle(id), 'aria-label': '移除' + label,
+              title: label,
+            }, label, ' ×')),
+            selectedOptions.length > 6 ? h('span', { className: 'sf-multi-more' }, '另有 ' + (selectedOptions.length - 6) + ' 个') : null),
+          h('div', { className: 'sf-multi-actions' },
+            h('button', { type: 'button', disabled: disabled || !filteredOptions.length, onClick: selectAllFiltered }, '全选当前结果'),
+            h('button', { type: 'button', disabled: disabled || !value.length, onClick: () => onChange?.([]) }, '清空已选')),
+          h('div', { className: 'sf-multi-options', role: 'listbox', 'aria-multiselectable': true, 'aria-label': placeholder },
+            filteredOptions.length ? filteredOptions.map(([id, label]) => h('button', {
+              key: id, type: 'button', role: 'option', 'aria-selected': selectedIds.has(id),
+              className: 'sf-multi-option' + (selectedIds.has(id) ? ' is-selected' : ''), disabled,
+              onClick: () => toggle(id),
+            }, h('span', { className: 'sf-multi-check', 'aria-hidden': true }, selectedIds.has(id) ? '✓' : ''), h('span', null, label)))
+              : h('p', { className: 'sf-note' }, '没有匹配项'))
+          ) : null)
     }
 
     function CustomizableTextSelect({ name, options = [], placeholder, required }) {
-      const customValue = '__custom__'
-      const [value, setValue] = useState('')
-      return h('div', { className: 'sf-custom-select' },
-        h('select', { name: `${name}Choice`, value, required, onChange: event => setValue(event.target.value) },
-          h('option', { value: '' }, placeholder),
-          ...options.map(option => h('option', { key: option, value: option }, option)),
-          h('option', { value: customValue }, '自定义值…')),
-        value === customValue ? h(Field, { name: `${name}Custom`, required, placeholder: '仅本次记录使用' }) : null)
+      return h(SearchSelect, {
+        name: name + 'Choice', required, placeholder, allowCustom: true,
+        options: [...new Set(options)].map(option => [option, option]),
+      })
     }
 
     function Switch({ checked, onChange, label }) {
@@ -646,17 +802,30 @@ window.__ModuleLoader__.load({
 
     /** 居中 Dialog：遮罩 + Escape 关闭 + 焦点移入；宽档 sm/md/lg */
     function Dialog({ title, width = 'md', onClose, children, footer }) {
-      useEffect(() => {
-        const key = event => { if (event.key === 'Escape') onClose?.() }
-        window.addEventListener('keydown', key)
-        return () => window.removeEventListener('keydown', key)
-      }, [onClose])
       const panelRef = useRef(null)
-      useEffect(() => { requestAnimationFrame(() => panelRef.current?.focus?.()) }, [])
+      useEffect(() => {
+        const previous = document.activeElement
+        requestAnimationFrame(() => panelRef.current?.focus?.())
+        return () => previous?.focus?.()
+      }, [])
+      const handleKeyDown = event => {
+        if (event.nativeEvent?.isComposing) return
+        if (event.key === 'Escape') {
+          event.preventDefault(); event.stopPropagation(); onClose?.()
+        } else if (event.key === 'Tab') {
+          const items = Array.from(panelRef.current?.querySelectorAll('button:not(:disabled), input:not(:disabled):not([type="hidden"]), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex="0"]') || [])
+            .filter(item => !item.closest('[hidden]') && item.getClientRects().length)
+          const first = items[0], last = items[items.length - 1]
+          const current = document.activeElement
+          if (!first) { event.preventDefault(); panelRef.current?.focus() }
+          else if (event.shiftKey && (current === first || !items.includes(current))) { event.preventDefault(); last.focus() }
+          else if (!event.shiftKey && (current === last || !items.includes(current))) { event.preventDefault(); first.focus() }
+        }
+      }
       return h('div', { className: 'sf-dialog-mask', onMouseDown: event => { if (event.target === event.currentTarget) onClose?.() } },
-        h('div', { className: `sf-dialog sf-dialog-${width}`, role: 'dialog', 'aria-modal': true, 'aria-label': title, ref: panelRef, tabIndex: -1 },
+        h('div', { className: `sf-dialog sf-dialog-${width}`, role: 'dialog', 'aria-modal': true, 'aria-label': title, ref: panelRef, tabIndex: -1, onKeyDown: handleKeyDown },
           h('header', { className: 'sf-dialog-head' }, h('h3', null, title),
-            h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': 'close', onClick: onClose }, h(Glyph, { name: 'close', size: 14 }))),
+            h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': '关闭', onClick: onClose }, h(Glyph, { name: 'close', size: 14 }))),
           h('div', { className: 'sf-dialog-body' }, children),
           footer ? h('footer', { className: 'sf-dialog-foot' }, footer) : null))
     }
@@ -667,8 +836,8 @@ window.__ModuleLoader__.load({
     }
 
     /** 主按钮 */
-    function PrimaryButton({ children, busy, ...rest }) {
-      return h('button', { type: 'button', className: 'sf-btn sf-btn-primary', disabled: busy, ...rest }, children)
+    function PrimaryButton({ children, busy, disabled, ...rest }) {
+      return h('button', { type: 'button', className: 'sf-btn sf-btn-primary', ...rest, disabled: Boolean(busy || disabled), 'aria-busy': busy || undefined }, children)
     }
     function GhostButton({ children, ...rest }) {
       return h('button', { type: 'button', className: 'sf-btn sf-btn-ghost', ...rest }, children)
@@ -806,7 +975,7 @@ window.__ModuleLoader__.load({
     .sf-pill{display:inline-flex;align-items:center;padding:2px 9px;border-radius:999px;font-size:11px;white-space:nowrap}.sf-pill-muted{background:var(--sf-hover);color:var(--sf-ink2)}.sf-pill-rose{background:color-mix(in srgb,var(--sf-rose) 14%,transparent);color:color-mix(in srgb,var(--sf-rose) 78%,var(--sf-ink))}.sf-pill-amber{background:color-mix(in srgb,var(--sf-amber) 16%,transparent);color:color-mix(in srgb,var(--sf-amber) 78%,var(--sf-ink))}.sf-pill-green{background:color-mix(in srgb,var(--sf-green) 14%,transparent);color:color-mix(in srgb,var(--sf-green) 78%,var(--sf-ink))}.sf-pill-blue{background:color-mix(in srgb,var(--sf-blue) 14%,transparent);color:color-mix(in srgb,var(--sf-blue) 78%,var(--sf-ink))}
     /* 表格：无斑马纹，行 border-b + hover，数字右对齐，可选 sticky 首列 */
     .sf-table-scroll{max-width:100%;overflow-x:auto}.sf-table{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}.sf-table th,.sf-table td{padding:8px 10px;border-bottom:1px solid var(--sf-line);text-align:right;white-space:nowrap}.sf-table th:first-child,.sf-table td:first-child{text-align:left}.sf-table th{color:var(--sf-ink3);font-weight:500;font-size:11px}.sf-table tbody tr{background:transparent}.sf-table tbody tr:hover{background:var(--sf-hover)}.sf-table tbody tr:last-child td{border-bottom:0}.sf-table tr.is-clickable{cursor:pointer}.sf-num{font-variant-numeric:tabular-nums}.sf-sticky-col{position:sticky;left:0;background:var(--sf-card);z-index:1;text-align:left}.sf-table tbody tr:hover .sf-sticky-col{background:var(--sf-hover)}
-    .sf-table-wrap{display:grid;gap:4px}.sf-table-toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:28px;color:var(--sf-ink3);font-size:11px}.sf-table-fields{position:relative}.sf-table-tool{display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border:1px solid var(--sf-line2);border-radius:6px;background:var(--sf-card);color:var(--sf-ink2);cursor:pointer;list-style:none}.sf-table-tool::-webkit-details-marker{display:none}.sf-table-fields[open] .sf-table-tool{border-color:var(--sf-brand);color:var(--sf-brand)}.sf-table-fields-menu{position:absolute;top:34px;left:0;z-index:4;display:grid;gap:6px;min-width:180px;padding:10px;border:1px solid var(--sf-line2);border-radius:8px;background:var(--sf-card);box-shadow:0 8px 24px color-mix(in srgb,var(--sf-ink) 12%,transparent)}.sf-table-fields-menu strong{font-size:12px;color:var(--sf-ink)}.sf-table-fields-hint{color:var(--sf-ink3);font-size:10px}.sf-table-field-option{display:flex;align-items:center;gap:7px;padding:3px 0;color:var(--sf-ink2);cursor:pointer}.sf-table-field-option input{accent-color:var(--sf-brand)}.sf-table-sort-note{margin-left:auto}.sf-table-sort-button{display:inline-flex;align-items:center;gap:4px;padding:0;border:0;background:transparent;color:inherit;font:inherit;font-weight:600;cursor:pointer}.sf-table-sort-button:hover,.sf-table-sort-button:focus-visible{color:var(--sf-brand)}.sf-link-button{padding:0;border:0;background:transparent;color:var(--sf-brand);font:inherit;text-align:left;cursor:pointer}
+    .sf-table-wrap{display:grid;gap:4px}.sf-table-toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:28px;color:var(--sf-ink3);font-size:11px}.sf-table-fields{position:relative}.sf-table-tool{display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border:1px solid var(--sf-line2);border-radius:6px;background:var(--sf-card);color:var(--sf-ink2);cursor:pointer;list-style:none}.sf-table-tool::-webkit-details-marker{display:none}.sf-table-fields[open] .sf-table-tool{border-color:var(--sf-brand);color:var(--sf-brand)}.sf-table-fields-menu{position:absolute;top:34px;left:0;z-index:4;display:grid;gap:6px;min-width:180px;max-width:min(280px,calc(100vw - 32px));max-height:min(420px,70vh);overflow:auto;padding:10px;border:1px solid var(--sf-line2);border-radius:8px;background:var(--sf-card);box-shadow:0 8px 24px color-mix(in srgb,var(--sf-ink) 12%,transparent)}.sf-table-fields-menu strong{font-size:12px;color:var(--sf-ink)}.sf-table-fields-hint{color:var(--sf-ink3);font-size:10px}.sf-table-field-search{width:100%;min-width:0;height:32px;padding:5px 8px;border:1px solid var(--sf-line2);border-radius:5px;background:var(--sf-bg);color:var(--sf-ink);font:inherit}.sf-table-field-search:focus-visible{outline:2px solid var(--sf-brand);outline-offset:1px}.sf-table-field-option{display:flex;align-items:center;gap:7px;padding:3px 0;color:var(--sf-ink2);cursor:pointer}.sf-table-field-option input{accent-color:var(--sf-brand)}.sf-table-sort-note{margin-left:auto}.sf-table-sort-button{display:inline-flex;align-items:center;gap:4px;padding:0;border:0;background:transparent;color:inherit;font:inherit;font-weight:600;cursor:pointer}.sf-table-sort-button:hover,.sf-table-sort-button:focus-visible{color:var(--sf-brand)}.sf-link-button{padding:0;border:0;background:transparent;color:var(--sf-brand);font:inherit;text-align:left;cursor:pointer}
     /* 热力格（执行率） */
     .sf-heat{display:inline-flex;align-items:center;padding:2px 8px;border-radius:6px;font-weight:650}.sf-heat-over{background:color-mix(in srgb,var(--sf-rose) 16%,transparent);color:color-mix(in srgb,var(--sf-rose) 80%,var(--sf-ink))}.sf-heat-healthy{background:color-mix(in srgb,var(--sf-green) 14%,transparent);color:color-mix(in srgb,var(--sf-green) 80%,var(--sf-ink))}.sf-heat-slow{background:color-mix(in srgb,var(--sf-amber) 16%,transparent);color:color-mix(in srgb,var(--sf-amber) 80%,var(--sf-ink))}.sf-heat-early{background:var(--sf-hover);color:var(--sf-ink2)}
     .sf-neg{color:color-mix(in srgb,var(--sf-rose) 70%,var(--sf-ink));font-weight:650}.sf-pos{color:color-mix(in srgb,var(--sf-green) 70%,var(--sf-ink))}
@@ -842,6 +1011,7 @@ window.__ModuleLoader__.load({
     .sf-pager{display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:8px 2px;color:var(--sf-ink2);font-size:12px}.sf-pager button{display:grid;place-items:center;width:26px;height:26px;border:1px solid var(--sf-line2);border-radius:6px;background:var(--sf-card);color:inherit;cursor:pointer}.sf-pager button:disabled{opacity:.4;cursor:default}
     .sf-inline-form{display:grid;gap:10px;margin-bottom:12px;padding:12px;border:1px solid var(--sf-line2);border-radius:8px}
     .sf-multi-search-select{display:grid;gap:7px;min-width:0;padding:8px;border:1px solid var(--sf-line2);border-radius:8px;background:var(--sf-card)}.sf-multi-search-input{display:flex;align-items:center;gap:6px}.sf-multi-search-input input{min-width:0;flex:1;min-height:30px;padding:4px 10px;border:1px solid var(--sf-line2);border-radius:6px;background:var(--sf-card);color:inherit;font:inherit;font-size:12px}.sf-multi-clear{display:grid;place-items:center;width:24px;height:24px;border:0;background:transparent;color:var(--sf-ink3);font-size:18px;line-height:1;cursor:pointer}.sf-multi-clear:disabled{cursor:default;opacity:.5}.sf-multi-summary{display:flex;align-items:center;gap:5px;min-width:0;flex-wrap:wrap;color:var(--sf-ink3);font-size:11px}.sf-multi-chip{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:3px 7px;border:1px solid color-mix(in srgb,var(--sf-brand) 25%,var(--sf-line));border-radius:999px;background:color-mix(in srgb,var(--sf-brand) 7%,var(--sf-card));color:var(--sf-brand);font:inherit;font-size:11px;cursor:pointer}.sf-multi-chip:hover{background:color-mix(in srgb,var(--sf-brand) 14%,var(--sf-card))}.sf-multi-chip:disabled{cursor:default;opacity:.5}.sf-multi-more{color:var(--sf-ink3)}.sf-multi-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;max-height:154px;overflow:auto;padding-right:2px}.sf-multi-option{display:flex;align-items:center;gap:7px;min-width:0;padding:6px 7px;border:1px solid transparent;border-radius:6px;background:transparent;color:inherit;text-align:left;font:inherit;font-size:12px;cursor:pointer}.sf-multi-option:hover{background:var(--sf-hover)}.sf-multi-option.is-selected{border-color:color-mix(in srgb,var(--sf-brand) 25%,var(--sf-line));background:color-mix(in srgb,var(--sf-brand) 7%,var(--sf-card))}.sf-multi-option>span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.sf-multi-check{display:grid;flex:none;place-items:center;width:15px;height:15px;border:1px solid var(--sf-line2);border-radius:3px;color:var(--sf-on-brand);font-size:10px}.sf-multi-option.is-selected .sf-multi-check{border-color:var(--sf-brand);background:var(--sf-brand)}
+    .sf-multi-search-select{position:relative;padding:0;border:0;background:transparent}.sf-multi-trigger{display:flex;width:100%;min-height:32px;align-items:center;justify-content:space-between;gap:8px;padding:5px 10px;border:1px solid var(--sf-line2);border-radius:6px;background:var(--sf-card);color:var(--sf-ink2);font:inherit;font-size:12px;text-align:left;cursor:pointer}.sf-multi-trigger:hover,.sf-multi-trigger[aria-expanded=true]{border-color:var(--sf-brand)}.sf-multi-trigger:disabled{cursor:default;opacity:.5}.sf-multi-trigger span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.sf-multi-trigger span.is-selected{color:var(--sf-brand);font-weight:600}.sf-multi-menu{position:absolute;z-index:30;top:calc(100% + 4px);right:0;left:0;display:grid;gap:7px;min-width:280px;padding:8px;border:1px solid var(--sf-line2);border-radius:8px;background:var(--sf-card);box-shadow:0 8px 24px color-mix(in srgb,var(--sf-ink) 12%,transparent)}
     .sf-task-options{display:grid;gap:8px}.sf-task-options label{display:flex;align-items:center;gap:8px;font-size:12px}.sf-task-options input{accent-color:var(--sf-brand)}
     .sf-workbench{display:grid;gap:12px;padding:14px 16px;border:1px solid var(--sf-line);border-radius:10px;background:var(--sf-card)}.sf-workbench-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.sf-workbench-head h2{margin:0;font-size:14px}.sf-workbench-head p{margin:4px 0 0;color:var(--sf-ink3);font-size:12px}.sf-workbench-status{color:var(--sf-amber);font-size:12px}.sf-work-items{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.sf-work-item{display:grid;grid-template-columns:30px minmax(0,1fr) auto;align-items:center;gap:10px;min-width:0;padding:12px;border:1px solid var(--sf-line);border-radius:8px;background:var(--sf-hover);color:var(--sf-ink);text-align:left;cursor:pointer;transition:border-color .15s ease,background .15s ease,transform .15s ease}.sf-work-item:hover{border-color:var(--sf-brand);background:var(--sf-card);transform:translateY(-1px)}.sf-work-item:focus-visible{outline:2px solid var(--sf-brand);outline-offset:2px}.sf-work-item b{font-size:20px;font-variant-numeric:tabular-nums}.sf-work-icon{display:grid;place-items:center;width:30px;height:30px;border-radius:8px;background:color-mix(in srgb,var(--sf-brand) 12%,transparent);color:var(--sf-brand)}.sf-work-item.is-amber .sf-work-icon{background:color-mix(in srgb,var(--sf-amber) 16%,transparent);color:var(--sf-amber)}.sf-work-item.is-rose .sf-work-icon{background:color-mix(in srgb,var(--sf-rose) 14%,transparent);color:var(--sf-rose)}.sf-work-copy{display:grid;gap:3px;min-width:0}.sf-work-copy strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}.sf-work-copy small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--sf-ink3);font-size:11px}.sf-work-items.is-loading{min-height:56px}.sf-work-skeleton{height:56px;border-radius:8px;background:linear-gradient(90deg,var(--sf-hover),var(--sf-card),var(--sf-hover));background-size:200% 100%;animation:sf-shimmer 1.2s ease-in-out infinite}.sf-dc-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.sf-dc-stat{display:grid;gap:4px;padding:12px 14px;border:1px solid var(--sf-line);border-radius:8px;background:var(--sf-card)}.sf-dc-stat span{color:var(--sf-ink2);font-size:12px}.sf-dc-stat strong{font-size:20px;font-variant-numeric:tabular-nums}.sf-dc-stat small{color:var(--sf-ink3);font-size:11px}.sf-banner .sf-btn{margin-left:auto}
     /* 侧栏布局与 datasource 网页端保持一致，主内容独立滚动，避免横向页签占用首屏。 */
@@ -852,6 +1022,11 @@ window.__ModuleLoader__.load({
     @media(max-width:900px){.sf-shell{grid-template-columns:1fr;grid-template-rows:auto auto auto 1fr}.sf-sidebar-brand{grid-column:1;grid-row:1}.sf-header{grid-column:1;grid-row:2}.sf-tabs{grid-column:1;grid-row:3;flex-direction:row;margin:0;padding:8px 16px;border-right:0;border-bottom:1px solid var(--sf-line);max-width:none;overflow-x:auto}.sf-tabs button{width:auto}.sf-content{grid-column:1;grid-row:4}}
     @media(max-width:560px){.sf-multi-options{grid-template-columns:1fr}.sf-multi-chip{max-width:120px}}
     .sf-search-select{position:relative}.sf-search-input-wrap{position:relative;display:flex;align-items:center}.sf-search-input-wrap input{padding-right:30px!important}.sf-search-clear{position:absolute;right:4px;display:grid;place-items:center;width:24px;height:24px;border:0;border-radius:4px;background:transparent;color:var(--sf-ink3);font:inherit;font-size:17px;line-height:1;cursor:pointer}.sf-search-clear:hover{background:var(--sf-hover);color:var(--sf-ink)}.sf-search-menu{position:absolute;z-index:30;top:calc(100% + 4px);right:0;left:0;display:grid;gap:2px;max-height:220px;overflow:auto;padding:4px;border:1px solid var(--sf-line2);border-radius:6px;background:var(--sf-card)}.sf-search-menu[hidden]{display:none}.sf-search-option{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;padding:7px 8px;border:1px solid transparent;border-radius:4px;background:transparent;color:inherit;text-align:left;font:inherit;font-size:12px;cursor:pointer}.sf-search-option:hover,.sf-search-option.is-selected{border-color:color-mix(in srgb,var(--sf-brand) 24%,var(--sf-line));background:color-mix(in srgb,var(--sf-brand) 8%,var(--sf-card))}.sf-search-option:focus-visible,.sf-search-custom:focus-visible,.sf-search-clear:focus-visible{outline:2px solid var(--sf-brand);outline-offset:1px}.sf-search-empty{margin:0;padding:8px;color:var(--sf-ink3);font-size:12px;text-align:center}
+    .sf-multi-actions{display:flex;justify-content:flex-end;gap:10px}.sf-multi-actions button{padding:2px 0;border:0;background:transparent;color:var(--sf-brand);font:inherit;font-size:11px;cursor:pointer}.sf-multi-actions button:disabled{cursor:default;opacity:.45}.sf-multi-actions button:hover:not(:disabled){text-decoration:underline}
+    .sf-dialog{border-radius:8px}.sf-table-tool:focus-visible,.sf-table-field-option input:focus-visible,.sf-link-button:focus-visible{outline:2px solid var(--sf-brand);outline-offset:2px}.sf-table-field-option:has(input:disabled){cursor:default;opacity:.55}
+    .sf-fieldset{margin:0;padding:0;border:0}.sf-search-option{white-space:normal;overflow-wrap:anywhere}.sf-multi-options{grid-template-columns:minmax(0,1fr)}.sf-multi-option>span:last-child{min-width:0;white-space:normal;overflow-wrap:anywhere}.sf-multi-check{align-self:flex-start;margin-top:2px}
+    .sf-link:disabled{opacity:.5;cursor:default}.sf-link:focus-visible,.sf-multi-actions button:focus-visible,.sf-multi-chip:focus-visible{outline:2px solid var(--sf-brand);outline-offset:2px}
+    @media(max-width:520px){.sf-employment-form .sf-form-row{grid-template-columns:minmax(0,1fr);gap:6px}}
     `
 
     // 片段 5/7 视图：总览（对齐前端 overview-section：5 KPI + 月度趋势 + 主体执行 + 收支达成 + 预警 TOP5）
@@ -929,14 +1104,14 @@ window.__ModuleLoader__.load({
               ],
               onBarClick: point => onDrill('budget', { view: 'month', month: Number(point.label) }),
             })),
-          h(Card, { title: t('orgSummary') }, h(Table, {
+          h(Card, { title: t('orgSummary') }, h(Table, { tableId: 'finance-OverviewView-1',
             columns: [
               { label: t('org'), key: 'orgName', stickyLeft: true },
-              { label: t('kpiBudget'), render: row => wan(row.budgetAmount) ?? '—', num: true },
-              { label: t('kpiPrSubmitted'), render: row => wan(row.prSubmittedAmount) ?? '—', num: true },
-              { label: t('kpiPaid'), render: row => wan(row.paidAmount) ?? '—', num: true },
+              { label: t('kpiBudget'), key: 'budgetAmount', render: row => wan(row.budgetAmount) ?? '—', num: true },
+              { label: t('kpiPrSubmitted'), key: 'prSubmittedAmount', render: row => wan(row.prSubmittedAmount) ?? '—', num: true },
+              { label: t('kpiPaid'), key: 'paidAmount', render: row => wan(row.paidAmount) ?? '—', num: true },
               {
-                label: t('kpiExecRate'), num: true,
+                label: t('kpiExecRate'), key: 'execRate', sortValue: row => execRateOf(row.prSubmittedAmount, row.prEstimatedAmount, row.budgetAmount), num: true,
                 render: row => {
                   const rate = execRateOf(row.prSubmittedAmount, row.prEstimatedAmount, row.budgetAmount)
                   if (rate === null) return '—'
@@ -960,9 +1135,9 @@ window.__ModuleLoader__.load({
               h('div', { className: 'sf-stack' },
                 h('div', null, h('div', { className: 'sf-row-between' }, h('span', { className: 'sf-kpi-value' }, yuan(cashTotals.actualIncome) ?? '—'), h('span', { className: 'sf-note' }, `${t('planCol')} ${yuan(cashTotals.plannedIncome) ?? '—'} · ${t('achieve')} ${ratio(cashTotals.plannedIncome ? cashTotals.actualIncome / cashTotals.plannedIncome : null, 1) ?? '—'}`)), h(Progress, { value: cashTotals.plannedIncome ? cashTotals.actualIncome / cashTotals.plannedIncome : null, tone: 'green' })),
                 h('div', null, h('div', { className: 'sf-row-between' }, h('span', { className: 'sf-kpi-value' }, yuan(cashTotals.actualExpense) ?? '—'), h('span', { className: 'sf-note' }, `${t('planCol')} ${yuan(cashTotals.plannedExpense) ?? '—'} · ${t('achieve')} ${ratio(cashTotals.plannedExpense ? cashTotals.actualExpense / cashTotals.plannedExpense : null, 1) ?? '—'}`)), h(Progress, { value: cashTotals.plannedExpense ? cashTotals.actualExpense / cashTotals.plannedExpense : null, tone: 'amber' })))),
-            h(Card, { title: t('alertSummary'), actions: [h(LinkButton, { key: 'more', onClick: () => onDrill('alerts') }, t('drill'))] }, h(Table, {
+            h(Card, { title: t('alertSummary'), actions: [h(LinkButton, { key: 'more', onClick: () => onDrill('alerts') }, t('drill'))] }, h(Table, { tableId: 'finance-OverviewView-2',
               columns: [
-                { label: t('severity'), render: row => h(SeverityBadge, { severity: row.severity, t }) },
+                { label: t('severity'), key: 'severity', sortValue: row => ({ INFO: 0, WARN: 1, CRITICAL: 2 }[row.severity] ?? 0), render: row => h(SeverityBadge, { severity: row.severity, t }) },
                 { label: t('alertTitleCol'), key: 'title' },
                 { label: t('org'), key: 'orgName' },
               ],
@@ -1050,7 +1225,7 @@ window.__ModuleLoader__.load({
         h(Select, { value: filters.expenseType, onChange: value => { setPage(1); setFilters(f => ({ ...f, expenseType: value })) }, options: EXPENSE_TYPES, placeholder: t('expenseType') }),
         h(SearchSelect, { value: filters.departmentId, onChange: value => { setPage(1); setFilters(f => ({ ...f, departmentId: value })) }, options: (departments || []).map(d => [d.id, d.name]), placeholder: t('department') }),
         h(Select, { value: filters.month, onChange: value => { setPage(1); setFilters(f => ({ ...f, month: value })) }, options: Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1} 月`]), placeholder: t('monthCol') }),
-        view === 'matrix' || view === 'lines' ? h(SearchSelect, { value: filters.versionId, onChange: value => { setPage(1); setFilters(f => ({ ...f, versionId: value })) }, options: (versions?.list || []).map(v => [v.id, `${v.name}${v.isPrimary ? '（主）' : ''}${v.lineCount != null ? ` · ${v.lineCount} 行` : ''}${v.budgetTotal != null ? ` · ${wan(v.budgetTotal)}` : ''}`]), placeholder: t('version') }) : null,
+        view === 'matrix' || view === 'lines' ? h(SearchSelect, { value: filters.versionId, onChange: value => { setPage(1); setFilters(f => ({ ...f, versionId: value })) }, options: (versions?.list || []).map(version => [version.id, budgetVersionLabel(version)]), placeholder: t('version') }) : null,
         view === 'matrix' || view === 'lines' ? h('label', { className: 'sf-row', style: { gap: 6, fontSize: 12, color: 'var(--sf-ink2)' } },
           h('input', { type: 'checkbox', checked: filters.unassigned, onChange: event => { setPage(1); setFilters(f => ({ ...f, unassigned: event.target.checked })) } }), t('unassigned')) : null,
         activeCount > 0 ? h(LinkButton, { onClick: () => { setPage(1); setFilters({ expenseType: '', departmentId: '', versionId: '', month: '', unassigned: false }) } }, `${t('clearFilters')} (${activeCount})`) : null)
@@ -1116,13 +1291,13 @@ window.__ModuleLoader__.load({
       }
       const data = [...groups.values()]
       const columns = [
-        { label: t('org'), stickyLeft: true },
-        ...Array.from({ length: 12 }, (_, index) => ({ label: `${index + 1}`, render: row => renderCell(row.months[index + 1], index + 1), num: true })),
-        { label: t('annualTotal'), render: row => wan(row.total.budget) ?? '—', num: true },
-        { label: t('kpiPrSubmitted'), render: row => wan(row.total.pr) ?? '—', num: true },
-        { label: t('kpiPaid'), render: row => wan(row.total.paid) ?? '—', num: true },
+        { label: t('org'), key: 'label', stickyLeft: true },
+        ...Array.from({ length: 12 }, (_, index) => ({ label: `${index + 1}`, key: 'month-' + (index + 1), sortValue: row => row.months[index + 1]?.pr ?? null, render: row => renderCell(row.months[index + 1], index + 1), num: true })),
+        { label: t('annualTotal'), key: 'total.budget', sortValue: row => row.total.budget, render: row => wan(row.total.budget) ?? '—', num: true },
+        { label: t('kpiPrSubmitted'), key: 'total.pr', sortValue: row => row.total.pr, render: row => wan(row.total.pr) ?? '—', num: true },
+        { label: t('kpiPaid'), key: 'total.paid', sortValue: row => row.total.paid, render: row => wan(row.total.paid) ?? '—', num: true },
         {
-          label: t('kpiExecRate'), num: true,
+          label: t('kpiExecRate'), key: 'execRate', sortValue: row => execRateOf(row.total.pr, row.total.prEstimated, row.total.budget), num: true,
           render: row => {
             const rate = execRateOf(row.total.pr, row.total.prEstimated, row.total.budget)
             if (rate === null) return '—'
@@ -1140,7 +1315,7 @@ window.__ModuleLoader__.load({
           onClick: event => { event.preventDefault(); onCell({ month }) },
         }, wan(cell.pr))
       }
-      return h(Card, { title: t('budgetSummaryTitle'), unit: t('unitNote') }, h(Table, { columns, rows: data, minColumns: 1080, empty: t('empty') }))
+      return h(Card, { title: t('budgetSummaryTitle'), unit: t('unitNote') }, h(Table, { tableId: 'finance-MatrixView-1', columns, rows: data, minColumns: 1080, empty: t('empty') }))
     }
 
     // ---- 月度视图 ----
@@ -1170,14 +1345,14 @@ window.__ModuleLoader__.load({
           h(KpiCard, { icon: 'plan', label: t('kpiPrSubmitted'), value: wan(totals.pr) }),
           h(KpiCard, { icon: 'clock', label: t('kpiPrEstimated'), value: wan(totals.prEstimated) }),
           h(KpiCard, { icon: 'goal', label: t('kpiPaid'), value: wan(totals.paid), hint: delta ? `${t('momVs')} ${delta}` : null, hintTone: delta?.startsWith('+') ? 'up' : 'down' })),
-        h(Card, { title: `${month} ${t('monthCol')} · ${t('orgSummaryFull')}`, unit: t('unitNote') }, h(Table, {
+        h(Card, { title: `${month} ${t('monthCol')} · ${t('orgSummaryFull')}`, unit: t('unitNote') }, h(Table, { tableId: 'finance-MonthView-1',
           columns: [
-            { label: t('org'), render: row => row.orgName ?? t('unassigned'), stickyLeft: true },
-            { label: t('expenseType'), render: row => EXPENSE_LABELS[row.expenseType] ?? row.expenseType ?? '—' },
-            { label: t('kpiBudget'), render: row => wan(row.budgetAmount) ?? '—', num: true },
-            { label: t('kpiPrSubmitted'), render: row => wan(row.prSubmittedAmount) ?? '—', num: true },
-            { label: t('kpiPaid'), render: row => wan(row.paidAmount) ?? '—', num: true },
-            { label: t('available'), render: row => { const value = (finite(row.budgetAmount) ?? 0) - (finite(row.prSubmittedAmount) ?? 0) - (finite(row.paidAmount) ?? 0); return h('span', { className: value < 0 ? 'sf-neg' : '' }, wan(value) ?? '—') }, num: true },
+            { label: t('org'), key: 'orgName', render: row => row.orgName ?? t('unassigned'), stickyLeft: true },
+            { label: t('expenseType'), key: 'expenseType', render: row => EXPENSE_LABELS[row.expenseType] ?? row.expenseType ?? '—' },
+            { label: t('kpiBudget'), key: 'budgetAmount', render: row => wan(row.budgetAmount) ?? '—', num: true },
+            { label: t('kpiPrSubmitted'), key: 'prSubmittedAmount', render: row => wan(row.prSubmittedAmount) ?? '—', num: true },
+            { label: t('kpiPaid'), key: 'paidAmount', render: row => wan(row.paidAmount) ?? '—', num: true },
+            { label: t('available'), key: 'available', sortValue: row => (finite(row.budgetAmount) ?? 0) - (finite(row.prSubmittedAmount) ?? 0) - (finite(row.paidAmount) ?? 0), render: row => { const value = (finite(row.budgetAmount) ?? 0) - (finite(row.prSubmittedAmount) ?? 0) - (finite(row.paidAmount) ?? 0); return h('span', { className: value < 0 ? 'sf-neg' : '' }, wan(value) ?? '—') }, num: true },
           ],
           rows, empty: t('empty'),
         })))
@@ -1188,16 +1363,16 @@ window.__ModuleLoader__.load({
     function LinesView({ budget, page, onPage, t, onDetail }) {
       const lines = budget?.lines
       return h(Card, { title: t('budgetLinesTitle'), unit: t('unitNote') },
-        h(Table, {
+        h(Table, { tableId: 'finance-LinesView-1',
           columns: [
-            { label: t('org'), render: row => row.orgName ?? h(Badge, { tone: 'amber' }, t('unassigned')), stickyLeft: true },
+            { label: t('org'), key: 'orgName', render: row => row.orgName ?? h(Badge, { tone: 'amber' }, t('unassigned')), stickyLeft: true },
             { label: t('department'), key: 'departmentName' },
             { label: t('costItem'), key: 'costItemName' },
-            { label: t('expenseType'), render: row => EXPENSE_LABELS[row.expenseType] ?? row.expenseType ?? '—' },
-            { label: t('monthCol'), render: row => mm(row.month), num: true },
-            { label: t('kpiBudget'), render: row => wan(row.budgetAmount) ?? '—', num: true },
-            { label: t('kpiPrSubmitted'), render: row => wan(row.prSubmittedAmount) ?? '—', num: true },
-            { label: t('kpiPaid'), render: row => wan(row.paidAmount) ?? '—', num: true },
+            { label: t('expenseType'), key: 'expenseType', render: row => EXPENSE_LABELS[row.expenseType] ?? row.expenseType ?? '—' },
+            { label: t('monthCol'), key: 'month', sortValue: row => row.month, render: row => mm(row.month), num: true },
+            { label: t('kpiBudget'), key: 'budgetAmount', render: row => wan(row.budgetAmount) ?? '—', num: true },
+            { label: t('kpiPrSubmitted'), key: 'prSubmittedAmount', render: row => wan(row.prSubmittedAmount) ?? '—', num: true },
+            { label: t('kpiPaid'), key: 'paidAmount', render: row => wan(row.paidAmount) ?? '—', num: true },
           ],
           rows: lines?.list || [], empty: t('empty'), onRowClick: onDetail, rowKey: 'id',
         }),
@@ -1218,16 +1393,16 @@ window.__ModuleLoader__.load({
 
     function LedgerView({ pr, page, onPage, t }) {
       const rows = pr?.data?.list || pr?.list || []
-      return h(Card, { title: t('viewLedger'), unit: t('unitNote') }, h(Table, {
+      return h(Card, { title: t('viewLedger'), unit: t('unitNote') }, h(Table, { tableId: 'finance-LedgerView-1',
         columns: [
           { label: t('org'), key: 'orgName', stickyLeft: true },
           { label: 'PR', key: 'prCode' },
-          { label: t('recordType'), render: row => row.recordType === 'SUBMITTED' ? t('prSubmittedL') : t('prEstimatedL') },
+          { label: t('recordType'), key: 'recordType', render: row => row.recordType === 'SUBMITTED' ? t('prSubmittedL') : t('prEstimatedL') },
           { label: t('description'), key: 'description' },
           { label: t('department'), key: 'departmentName' },
-          { label: t('monthCol'), render: row => mm(row.month), num: true },
-          { label: t('amount'), render: row => wan(row.budgetAmount) ?? '—', num: true },
-          { label: t('statusCol'), render: row => row.status ? h(Pill, { tone: /完成|已批|通过/.test(row.status) ? 'green' : /审批|待|处理/.test(row.status) ? 'blue' : 'muted' }, row.status) : '—' },
+          { label: t('monthCol'), key: 'month', sortValue: row => row.month, render: row => mm(row.month), num: true },
+          { label: t('amount'), key: 'budgetAmount', render: row => wan(row.budgetAmount) ?? '—', num: true },
+          { label: t('statusCol'), key: 'status', render: row => row.status ? h(Pill, { tone: /完成|已批|通过/.test(row.status) ? 'green' : /审批|待|处理/.test(row.status) ? 'blue' : 'muted' }, row.status) : '—' },
         ],
         rows, empty: t('empty'),
       }), h(Pager, { page, total: pr?.data?.total ?? pr?.total, limit: PAGE_SIZE, onPage }))
@@ -1276,12 +1451,12 @@ window.__ModuleLoader__.load({
         .slice(0, 10)
       return h('div', { className: 'sf-stack' },
         h(Card, { title: t('varianceTitle'), unit: t('unitNote') }, h(Waterfall, { steps })),
-        h(Card, { title: t('varianceTop10'), unit: t('unitNote') }, h(Table, {
+        h(Card, { title: t('varianceTop10'), unit: t('unitNote') }, h(Table, { tableId: 'finance-VarianceView-1',
           columns: [
             { label: t('org'), key: 'org', stickyLeft: true },
-            { label: t('kpiBudget'), render: row => wan(row.budget) ?? '—', num: true },
-            { label: t('kpiPaid'), render: row => wan(row.paid) ?? '—', num: true },
-            { label: t('varianceRate'), render: row => h(Badge, { tone: row.rate > 0.2 ? 'rose' : row.rate < -0.3 ? 'amber' : 'muted' }, `${Math.round(row.rate * 100)}%`) },
+            { label: t('kpiBudget'), key: 'budget', render: row => wan(row.budget) ?? '—', num: true },
+            { label: t('kpiPaid'), key: 'paid', render: row => wan(row.paid) ?? '—', num: true },
+            { label: t('varianceRate'), key: 'rate', render: row => h(Badge, { tone: row.rate > 0.2 ? 'rose' : row.rate < -0.3 ? 'amber' : 'muted' }, `${Math.round(row.rate * 100)}%`) },
           ],
           rows: top, empty: t('empty'),
         })))
@@ -1307,15 +1482,15 @@ window.__ModuleLoader__.load({
           h(PillTabs, { tabs: ADJ_STATUSES, value: status, onChange: value => { setStatus(value); onPage(1) }, t }),
           h(PrimaryButton, { busy, onClick: () => onDialog({ kind: 'adjCreate' }) }, h(Glyph, { name: 'plus', size: 12 }), t('adjCreate'))),
         h(Card, { title: t('viewAdjustments'), unit: t('unitNote') },
-          h(Table, {
+          h(Table, { tableId: 'finance-AdjustmentsView-1',
             columns: [
-              { label: t('adjustmentOf'), render: row => `${row.code ?? ''}` },
-              { label: t('adjType'), render: row => t(ADJ_TYPES.find(([id]) => id === row.type)?.[1] ?? row.type) },
-              { label: t('amount'), render: row => wan(row.totalAmount) ?? '—', num: true },
-              { label: t('statusCol'), render: row => h(Pill, { tone: toneOf(row.status) }, labelOf(row.status)) },
-              { label: t('lastSeen'), render: row => shortDate(row.submittedAt) ?? '—', num: true },
+              { label: t('adjustmentOf'), key: 'code', render: row => `${row.code ?? ''}` },
+              { label: t('adjType'), key: 'type', render: row => t(ADJ_TYPES.find(([id]) => id === row.type)?.[1] ?? row.type) },
+              { label: t('amount'), key: 'totalAmount', render: row => wan(row.totalAmount) ?? '—', num: true },
+              { label: t('statusCol'), key: 'status', render: row => h(Pill, { tone: toneOf(row.status) }, labelOf(row.status)) },
+              { label: t('lastSeen'), key: 'submittedAt', render: row => shortDate(row.submittedAt) ?? '—', num: true },
               {
-                label: t('actions'),
+                label: t('actions'), key: 'actions', sortable: false,
                 render: row => h('div', { className: 'sf-row', style: { flexWrap: 'nowrap', justifyContent: 'flex-end' } },
                   h(LinkButton, { onClick: () => onDialog({ kind: 'adjDetail', id: row.id }) }, t('actDetail')),
                   row.status === 'DRAFT' ? h(LinkButton, { onClick: () => act(`/budget-adjustments/${row.id}/submit`, {}) }, t('actSubmit')) : null,
@@ -1380,7 +1555,7 @@ window.__ModuleLoader__.load({
               h('div', { className: 'sf-filters' },
                 h(PillTabs, { tabs: [['IN', 'lineIn'], ['OUT', 'lineOut']], value: row.side, onChange: value => updateRow(index, { side: value }), t }),
                 h(FormRow, { label: t('adjAmount') }, h(Field, { type: 'number', min: '0.01', step: '0.01', value: row.amount, onChange: value => updateRow(index, { amount: value }) })),
-              h(FormRow, { label: t('adjLineBudget') }, h(Select, { value: row.budgetLineId || (row.side === 'IN' ? '__new__' : ''), onChange: value => updateRow(index, { budgetLineId: value === '__new__' ? '' : value }), options: [...(row.side === 'IN' ? [['__new__', '新建预算行']] : []), ...lines.map(line => [line.id, lineLabel(line)])], placeholder: row.side === 'OUT' ? t('required') : t('adjLineBudget') })),
+              h(FormRow, { label: t('adjLineBudget') }, h(SearchSelect, { value: row.budgetLineId || (row.side === 'IN' ? '__new__' : ''), onChange: value => updateRow(index, { budgetLineId: value === '__new__' ? '' : value }), options: [...(row.side === 'IN' ? [['__new__', '新建预算行']] : []), ...lines.map(line => [line.id, lineLabel(line)])], placeholder: row.side === 'OUT' ? t('required') : t('adjLineBudget') })),
               row.side === 'IN' && !row.budgetLineId ? h(FormRow, { label: t('adjTargetOrg') }, h(SearchSelect, { value: row.targetOrgId, onChange: value => updateRow(index, { targetOrgId: value }), options: (orgs || []).map(org => [org.id, org.name]), placeholder: t('org') })) : null,
               row.side === 'IN' && !row.budgetLineId ? h(FormRow, { label: t('adjTargetDept') }, h(SearchSelect, { value: row.targetDepartmentId, onChange: value => updateRow(index, { targetDepartmentId: value }), options: (departments || []).map(department => [department.id, department.name]), placeholder: t('department') })) : null,
               row.side === 'IN' && !row.budgetLineId ? h(FormRow, { label: t('adjTargetMonth') }, h(Select, { value: row.targetMonth, onChange: value => updateRow(index, { targetMonth: value }), options: [...Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1} 月`]), ['0', '全年']], placeholder: t('adjTargetMonth') })) : null,
@@ -1400,11 +1575,11 @@ window.__ModuleLoader__.load({
       return h(Dialog, { title: `${t('adjustmentOf')} ${detail?.code ?? ''}`, onClose },
         h('div', { className: 'sf-stack' },
           detail ? h('div', { className: 'sf-row' }, h(Pill, { tone: ADJ_STATUS_TONES[detail.status] ?? 'muted' }, t(ADJ_STATUS_KEYS[detail.status] ?? detail.status)), h('span', { className: 'sf-note' }, `${t('adjType')}：${t(ADJ_TYPES.find(([tid]) => tid === detail.type)?.[1] ?? detail.type)}`)) : null,
-          h(Table, {
+          h(Table, { tableId: 'finance-AdjustDetailDialog-1',
             columns: [
-              { label: t('inOut'), render: row => h(Badge, { tone: row.side === 'IN' ? 'green' : 'rose' }, row.side === 'IN' ? t('lineIn') : t('lineOut')) },
-              { label: t('amount'), render: row => wan(row.amount) ?? '—', num: true },
-              { label: t('adjLineBudget'), render: row => (row.budgetLine ? lineLabel(row.budgetLine) : row.budgetLineId ?? '—') },
+              { label: t('inOut'), key: 'side', render: row => h(Badge, { tone: row.side === 'IN' ? 'green' : 'rose' }, row.side === 'IN' ? t('lineIn') : t('lineOut')) },
+              { label: t('amount'), key: 'amount', render: row => wan(row.amount) ?? '—', num: true },
+              { label: t('adjLineBudget'), key: 'budgetLine', sortValue: row => row.budgetLine ? lineLabel(row.budgetLine) : row.budgetLineName ?? row.budgetLineId, render: row => (row.budgetLine ? lineLabel(row.budgetLine) : row.budgetLineId ?? '—') },
               { label: t('note'), key: 'note' },
             ],
             rows, empty: t('empty'),
@@ -1438,14 +1613,14 @@ window.__ModuleLoader__.load({
       const recentList = recent?.list || []
       return h('div', { className: 'sf-stack' },
         h(Card, { title: `${t('allocPool')}（${entries.length}）`, unit: t('unitNote') },
-          h(Table, {
+          h(Table, { tableId: 'finance-AllocationsView-1',
             columns: [
-              { label: t('dataset'), render: row => row.title ?? row.sourceId, stickyLeft: true },
-              { label: t('amount'), render: row => wan(row.amount) ?? '—', num: true },
-              { label: t('monthCol'), render: row => mm(row.month), num: true },
-              { label: t('suggestion'), render: row => { const top = row.suggestions?.[0]; return top ? `${lineLabel(top)}（${Math.round((top.score ?? 0) * 100)}）` : '—' } },
+              { label: t('dataset'), key: 'title', sortValue: row => row.title ?? row.sourceId, render: row => row.title ?? row.sourceId, stickyLeft: true },
+              { label: t('amount'), key: 'amount', render: row => wan(row.amount) ?? '—', num: true },
+              { label: t('monthCol'), key: 'month', sortValue: row => row.month, render: row => mm(row.month), num: true },
+              { label: t('suggestion'), key: 'suggestion', sortValue: row => row.suggestions?.[0]?.score ?? null, render: row => { const top = row.suggestions?.[0]; return top ? `${lineLabel(top)}（${Math.round((top.score ?? 0) * 100)}）` : '—' } },
               {
-                label: t('actions'),
+                label: t('actions'), key: 'actions', sortable: false,
                 render: row => h('div', { className: 'sf-row', style: { justifyContent: 'flex-end', flexWrap: 'nowrap' } },
                   row.suggestions?.[0] ? h(LinkButton, { onClick: () => act('/allocations', { sourceType: row.sourceType, sourceId: row.sourceId, budgetLineId: row.suggestions[0].budgetLineId ?? row.suggestions[0].id, amount: row.amount }) }, t('allocOneClick')) : null,
                   h(LinkButton, { onClick: () => onDialog({ kind: 'allocPick', entry: row }) }, t('allocPick'))),
@@ -1454,12 +1629,12 @@ window.__ModuleLoader__.load({
             rows: entries, empty: t('empty'),
           })),
         h(Card, { title: t('allocRecent'), unit: t('unitNote') },
-          h(Table, {
+          h(Table, { tableId: 'finance-AllocationsView-2',
             columns: [
               { label: t('dataset'), key: 'sourceType' },
-              { label: t('adjLineBudget'), render: row => row.budgetLineName ?? row.budgetLineId ?? '—' },
-              { label: t('amount'), render: row => wan(row.amount) ?? '—', num: true },
-              { label: t('actions'), render: row => h(LinkButton, { onClick: () => act(`/allocations/${row.id}/remove`, {}) }, t('allocRemove')) },
+              { label: t('adjLineBudget'), key: 'budgetLine', sortValue: row => row.budgetLine ? lineLabel(row.budgetLine) : row.budgetLineName ?? row.budgetLineId, render: row => row.budgetLineName ?? row.budgetLineId ?? '—' },
+              { label: t('amount'), key: 'amount', render: row => wan(row.amount) ?? '—', num: true },
+              { label: t('actions'), key: 'actions', sortable: false, render: row => h(LinkButton, { onClick: () => act(`/allocations/${row.id}/remove`, {}) }, t('allocRemove')) },
             ],
             rows: recentList, empty: t('empty'),
           }),
@@ -1489,17 +1664,17 @@ window.__ModuleLoader__.load({
         return () => { cancelled = true }
       }, [year, revision, reloadTick])
       return h('div', { className: 'sf-stack' },
-        h(Card, { title: t('viewVersions'), actions: [h(LinkButton, { key: 'diff', onClick: () => onDialog({ kind: 'versionDiff' }) }, t('verDiff'))] }, h(Table, {
+        h(Card, { title: t('viewVersions'), actions: [h(LinkButton, { key: 'diff', onClick: () => onDialog({ kind: 'versionDiff' }) }, t('verDiff'))] }, h(Table, { tableId: 'finance-VersionsView-1',
           columns: [
             { label: t('verName'), render: row => h('span', null, row.name, ' ', row.isPrimary ? h(Badge, { key: 'p', tone: 'blue' }, t('primaryTag')) : null), stickyLeft: true },
             { label: t('verType'), key: 'type' },
-            { label: t('verStatus'), render: row => h(Pill, { tone: VERSION_STATUS_TONES[row.status] ?? 'muted' }, t(VERSION_STATUS_KEYS[row.status] ?? row.status)) },
+            { label: t('verStatus'), key: 'status', render: row => h(Pill, { tone: VERSION_STATUS_TONES[row.status] ?? 'muted' }, t(VERSION_STATUS_KEYS[row.status] ?? row.status)) },
             { label: t('verLines'), key: 'lineCount', num: true },
-            { label: t('kpiBudget'), render: row => wan(row.budgetTotal) ?? '—', num: true },
-            { label: t('kpiPrSubmitted'), render: row => wan(row.prSubmittedTotal) ?? '—', num: true },
-            { label: t('kpiPaid'), render: row => wan(row.paidTotal) ?? '—', num: true },
+            { label: t('kpiBudget'), key: 'budgetTotal', render: row => wan(row.budgetTotal) ?? '—', num: true },
+            { label: t('kpiPrSubmitted'), key: 'prSubmittedTotal', render: row => wan(row.prSubmittedTotal) ?? '—', num: true },
+            { label: t('kpiPaid'), key: 'paidTotal', render: row => wan(row.paidTotal) ?? '—', num: true },
             {
-              label: t('verActions'),
+              label: t('verActions'), key: 'actions', sortable: false,
               render: row => h('div', { className: 'sf-row', style: { flexWrap: 'nowrap', justifyContent: 'flex-end' } },
                 row.status === 'DRAFT' ? h(LinkButton, { onClick: () => act(`/budget-versions/${row.id}/action`, { action: 'confirm' }) }, t('verConfirm')) : null,
                 row.status === 'CONFIRMED' ? h(LinkButton, { onClick: () => act(`/budget-versions/${row.id}/action`, { action: 'activate' }) }, t('verActivate')) : null,
@@ -1520,12 +1695,12 @@ window.__ModuleLoader__.load({
         api('/carryover-rules').then(value => { if (!cancelled) setList(value.data?.list ?? []) }).catch(() => {})
         return () => { cancelled = true }
       }, [revision, reloadTick])
-      return h(Card, { title: t('carryoverRules'), actions: [h(LinkButton, { key: 'add', onClick: () => onDialog({ kind: 'carryover' }) }, h(Glyph, { name: 'plus', size: 12 }), t('ruleAdd'))] }, h(Table, {
+      return h(Card, { title: t('carryoverRules'), actions: [h(LinkButton, { key: 'add', onClick: () => onDialog({ kind: 'carryover' }) }, h(Glyph, { name: 'plus', size: 12 }), t('ruleAdd'))] }, h(Table, { tableId: 'finance-CarryoverCard-1',
         columns: [
-          { label: t('expenseType'), render: row => row.expenseType ? EXPENSE_LABELS[row.expenseType] ?? row.expenseType : t('all') },
-          { label: t('carryoverMode'), render: row => row.mode === 'FULL' ? t('modeFull') : row.mode === 'PERCENT' ? `${t('modePercent')} ${row.percent ?? 100}%` : `${t('modeExpire')} ${t('expireMonth')} ${row.expireMonth ?? '—'}` },
-          { label: t('statusCol'), render: row => h(Pill, { tone: row.enabled ? 'green' : 'muted' }, row.enabled ? t('ruleEnabled') : t('ruleDisabled')) },
-          { label: t('actions'), render: row => h('div', { className: 'sf-row', style: { justifyContent: 'flex-end', flexWrap: 'nowrap' } },
+          { label: t('expenseType'), key: 'expenseType', render: row => row.expenseType ? EXPENSE_LABELS[row.expenseType] ?? row.expenseType : t('all') },
+          { label: t('carryoverMode'), key: 'mode', render: row => row.mode === 'FULL' ? t('modeFull') : row.mode === 'PERCENT' ? `${t('modePercent')} ${row.percent ?? 100}%` : `${t('modeExpire')} ${t('expireMonth')} ${row.expireMonth ?? '—'}` },
+          { label: t('statusCol'), key: 'enabled', render: row => h(Pill, { tone: row.enabled ? 'green' : 'muted' }, row.enabled ? t('ruleEnabled') : t('ruleDisabled')) },
+          { label: t('actions'), key: 'actions', sortable: false, render: row => h('div', { className: 'sf-row', style: { justifyContent: 'flex-end', flexWrap: 'nowrap' } },
             h(LinkButton, { onClick: () => act('/carryover-rules', { action: 'toggle', id: row.id }) }, t('ruleToggle')),
             h(LinkButton, { onClick: () => act('/carryover-rules', { action: 'remove', id: row.id }) }, t('ruleRemove'))) },
         ],
@@ -1574,13 +1749,13 @@ window.__ModuleLoader__.load({
       return h(Dialog, { title: t('verDiff'), width: 'lg', onClose },
         h('div', { className: 'sf-stack' },
           h('div', { className: 'sf-filters' },
-            h(FormRow, { label: t('diffBase') }, h(Select, { value: baseId, onChange: setBaseId, options: list.map(v => [v.id, v.name]) })),
-            h(FormRow, { label: t('diffTarget') }, h(Select, { value: targetId, onChange: setTargetId, options: list.map(v => [v.id, v.name]) }))),
-          h(Table, {
+            h(FormRow, { label: t('diffBase') }, h(SearchSelect, { value: baseId, onChange: setBaseId, options: list.map(version => [version.id, budgetVersionLabel(version)]), placeholder: t('diffBase') })),
+            h(FormRow, { label: t('diffTarget') }, h(SearchSelect, { value: targetId, onChange: setTargetId, options: list.map(version => [version.id, budgetVersionLabel(version)]), placeholder: t('diffTarget') }))),
+          h(Table, { tableId: 'finance-VersionDiffDialog-1',
             columns: [
-              { label: t('org'), render: row => row.orgName ?? '—', stickyLeft: true },
-              { label: t('expenseType'), render: row => EXPENSE_LABELS[row.expenseType] ?? row.expenseType ?? '—' },
-              { label: t('diffAmount'), render: row => { const value = finite(row.diffAmount); return h('span', { className: value < 0 ? 'sf-neg' : 'sf-pos' }, wan(value) ?? '—') }, num: true },
+              { label: t('org'), key: 'orgName', render: row => row.orgName ?? '—', stickyLeft: true },
+              { label: t('expenseType'), key: 'expenseType', render: row => EXPENSE_LABELS[row.expenseType] ?? row.expenseType ?? '—' },
+              { label: t('diffAmount'), key: 'diffAmount', render: row => { const value = finite(row.diffAmount); return h('span', { className: value < 0 ? 'sf-neg' : 'sf-pos' }, wan(value) ?? '—') }, num: true },
             ],
             rows, empty: t('empty'),
           })))
@@ -1682,12 +1857,12 @@ window.__ModuleLoader__.load({
           h(KpiCard, { icon: 'data', label: t('kpiExecRate'), value: ratio(exec, 1) ?? '—', hint: `${t('kpiBudget')} ${wan(m.budgetAmount) ?? '—'}`, onClick: () => onDrill('budget') }),
           h(KpiCard, { icon: 'plan', label: t('kpiPayRate'), value: payRate ?? '—', hint: `${t('kpiPrSubmitted')} ${wan(m.prSubmittedAmount) ?? '—'}`, onClick: () => onDrill('budget', { view: 'ledger' }) }),
           h(KpiCard, { icon: 'goal', label: t('kpiNetInflow'), value: wan(netTotal), hint: `↑${wan(totals.actualIncome) ?? '—'} / ↓${wan(totals.actualExpense) ?? '—'}`, hintTone: netTotal >= 0 ? 'up' : 'down', negative: netTotal < 0, onClick: () => onDrill('cash') })),
-        h(Card, { title: t('opTheme') }, h(Table, {
+        h(Card, { title: t('opTheme') }, h(Table, { tableId: 'finance-OperationsView-1',
           columns: [
             { label: t('theme'), key: '0' },
             { label: t('metric'), key: '1' },
             { label: t('dataSource'), key: '2' },
-            { label: t('readiness'), render: row => row[3] ? h(Pill, { tone: 'green' }, t('ready')) : h(Pill, { tone: 'muted' }, t('pending')) },
+            { label: t('readiness'), key: '3', render: row => row[3] ? h(Pill, { tone: 'green' }, t('ready')) : h(Pill, { tone: 'muted' }, t('pending')) },
           ],
           rows: OP_TOPICS, empty: t('empty'),
         })),
@@ -1835,12 +2010,15 @@ window.__ModuleLoader__.load({
         if (!groups.has(key)) groups.set(key, {})
         groups.get(key)[row.month] = row
       }
-      return h(Table, {
+      return h(Table, { tableId: 'finance-CashMatrix-1',
         minColumns: 1080,
         columns: [
-          { label: t('org'), stickyLeft: true },
+          { label: t('org'), key: 'org', stickyLeft: true },
           ...Array.from({ length: 12 }, (_, index) => ({
             label: `${index + 1}`,
+            key: 'month-' + (index + 1),
+            sortLabel: (index + 1) + '月余额',
+            sortValue: row => finite(row[index + 1]?.projectedBalance) ?? finite(row[index + 1]?.actualBalance),
             num: true,
             render: row => {
               const cell = row[index + 1]
@@ -1863,19 +2041,19 @@ window.__ModuleLoader__.load({
 
     function PlansTab({ rows, total, page, onPage, t, busy, act, onDialog }) {
       return h(Card, { title: t('cashPlans'), unit: t('unitNote') },
-        h(Table, {
+        h(Table, { tableId: 'finance-PlansTab-1',
           columns: [
             { label: t('org'), key: 'orgName', stickyLeft: true },
-            { label: t('planType'), render: row => t(PLAN_LABELS[row.planType] ?? row.planType) },
+            { label: t('planType'), key: 'planType', render: row => t(PLAN_LABELS[row.planType] ?? row.planType) },
             { label: t('description'), key: 'description' },
-            { label: t('planMonth'), render: row => mm(row.planMonth ?? row.month), num: true },
-            { label: t('planned'), render: row => wan(row.plannedAmount) ?? '—', num: true },
-            { label: t('actual'), render: row => { const over = finite(row.actualAmount) !== null && finite(row.plannedAmount) !== null && row.actualAmount > row.plannedAmount; return h('span', { className: over ? 'sf-neg' : '' }, wan(row.actualAmount) ?? '—') }, num: true },
-            { label: t('remaining'), render: row => wan(row.remainingAmount) ?? '—', num: true },
-            { label: t('scheduleDate'), render: row => shortDate(row.scheduleDate) ?? '—', num: true },
-            { label: t('priority'), render: row => row.priority ? h(Pill, { tone: row.priority === 'HIGH' ? 'rose' : row.priority === 'MEDIUM' ? 'amber' : 'muted' }, t(PRIORITIES.find(([id]) => id === row.priority)?.[1] ?? row.priority)) : '—' },
+            { label: t('planMonth'), key: 'planMonth', sortValue: row => row.planMonth ?? row.month, render: row => mm(row.planMonth ?? row.month), num: true },
+            { label: t('planned'), key: 'plannedAmount', render: row => wan(row.plannedAmount) ?? '—', num: true },
+            { label: t('actual'), key: 'actualAmount', render: row => { const over = finite(row.actualAmount) !== null && finite(row.plannedAmount) !== null && row.actualAmount > row.plannedAmount; return h('span', { className: over ? 'sf-neg' : '' }, wan(row.actualAmount) ?? '—') }, num: true },
+            { label: t('remaining'), key: 'remainingAmount', render: row => wan(row.remainingAmount) ?? '—', num: true },
+            { label: t('scheduleDate'), key: 'scheduleDate', render: row => shortDate(row.scheduleDate) ?? '—', num: true },
+            { label: t('priority'), key: 'priority', render: row => row.priority ? h(Pill, { tone: row.priority === 'HIGH' ? 'rose' : row.priority === 'MEDIUM' ? 'amber' : 'muted' }, t(PRIORITIES.find(([id]) => id === row.priority)?.[1] ?? row.priority)) : '—' },
             {
-              label: t('actions'),
+              label: t('actions'), key: 'actions', sortable: false,
               render: row => h('div', { className: 'sf-row', style: { flexWrap: 'nowrap', justifyContent: 'flex-end' } },
                 h(LinkButton, { onClick: () => onDialog({ kind: 'planDetail', plan: row }) }, t('actDetail')),
                 h(LinkButton, { onClick: () => onDialog({ kind: 'schedule', plan: row }) }, t('schedule')),
@@ -1962,14 +2140,14 @@ window.__ModuleLoader__.load({
       return h('div', { className: 'sf-stack' },
         h(PillTabs, { tabs: ADJ_STATUSES, value: status, onChange: value => { setStatus(value); setPage(1) }, t }),
         h(Card, { title: t('cashAdjustments'), unit: t('unitNote') },
-          h(Table, {
+          h(Table, { tableId: 'finance-PlanAdjustmentsTab-1',
             columns: [
               { label: t('adjustmentOf'), key: 'code' },
-              { label: t('amount'), render: row => h('span', null, `${wan(row.oldAmount) ?? '—'} → ${wan(row.newAmount) ?? '—'} `, h('span', { className: 'sf-pos' }, `（${deltaOf(row)}）`)), num: true },
-              { label: t('statusCol'), render: row => h(Pill, { tone: ADJ_STATUS_TONES[row.status] ?? 'muted' }, t(ADJ_STATUS_KEYS[row.status] ?? row.status)) },
-              { label: t('lastSeen'), render: row => shortDate(row.submittedAt) ?? '—', num: true },
+              { label: t('amount'), key: 'amount', sortValue: row => row.newAmount - row.oldAmount, render: row => h('span', null, `${wan(row.oldAmount) ?? '—'} → ${wan(row.newAmount) ?? '—'} `, h('span', { className: 'sf-pos' }, `（${deltaOf(row)}）`)), num: true },
+              { label: t('statusCol'), key: 'status', render: row => h(Pill, { tone: ADJ_STATUS_TONES[row.status] ?? 'muted' }, t(ADJ_STATUS_KEYS[row.status] ?? row.status)) },
+              { label: t('lastSeen'), key: 'submittedAt', render: row => shortDate(row.submittedAt) ?? '—', num: true },
               {
-                label: t('actions'),
+                label: t('actions'), key: 'actions', sortable: false,
                 render: row => h('div', { className: 'sf-row', style: { flexWrap: 'nowrap', justifyContent: 'flex-end' } },
                   h(LinkButton, { onClick: () => onDialog({ kind: 'planAdjDetail', id: row.id }) }, t('actDetail')),
                   row.status === 'SUBMITTED' ? h(LinkButton, { onClick: () => act(`/plan-adjustments/${row.id}/approve`, {}) }, t('actApprove')) : null,
@@ -1990,23 +2168,23 @@ window.__ModuleLoader__.load({
     function RevenueTab({ revenues, page, onPage, t, onBackfill }) {
       const rows = revenues?.data?.list || revenues?.list || []
       return h(Card, { title: t('revenueVs'), unit: t('unitNote') },
-        h(Table, {
+        h(Table, { tableId: 'finance-RevenueTab-1',
           columns: [
             { label: t('org'), key: 'orgName', stickyLeft: true },
             { label: t('itemName'), key: 'itemName' },
             { label: t('payer'), key: 'payerName' },
-            { label: t('monthCol'), render: row => mm(row.month), num: true },
-            { label: t('planned'), render: row => wan(row.plannedAmount) ?? '—', num: true },
-            { label: t('actual'), render: row => wan(row.actualAmount) ?? '—', num: true },
+            { label: t('monthCol'), key: 'month', sortValue: row => row.month, render: row => mm(row.month), num: true },
+            { label: t('planned'), key: 'plannedAmount', render: row => wan(row.plannedAmount) ?? '—', num: true },
+            { label: t('actual'), key: 'actualAmount', render: row => wan(row.actualAmount) ?? '—', num: true },
             {
-              label: t('variance'), num: true,
+              label: t('variance'), key: 'varianceAmount', num: true,
               render: row => {
                 const value = finite(row.varianceAmount)
                 if (value === null) return '—'
                 return h('span', { className: value < 0 ? 'sf-neg' : 'sf-pos' }, wan(value))
               },
             },
-            { label: t('actions'), render: row => h(LinkButton, { onClick: () => onBackfill(row) }, t('backfill')) },
+            { label: t('actions'), key: 'actions', sortable: false, render: row => h(LinkButton, { onClick: () => onBackfill(row) }, t('backfill')) },
           ],
           rows, empty: t('empty'),
         }),
@@ -2118,14 +2296,14 @@ window.__ModuleLoader__.load({
         h('div', { className: 'sf-filters' },
           h(Select, { value: filters.severity, onChange: value => { setPage(1); setFilters(f => ({ ...f, severity: value })) }, options: [['CRITICAL', t('sevCritical')], ['WARN', t('sevWarn')], ['INFO', t('sevInfo')]], placeholder: t('severity') }),
           h(Select, { value: filters.status, onChange: value => { setPage(1); setFilters(f => ({ ...f, status: value })) }, options: ALERT_STATUS_OPTIONS.map(([id, key]) => [id, t(key)]), placeholder: t('stAll') })),
-        h(Card, { title: t('alertsTitle') }, h(Table, {
+        h(Card, { title: t('alertsTitle') }, h(Table, { tableId: 'finance-AlertsView-1',
           columns: [
-            { label: t('severity'), render: row => h(SeverityBadge, { severity: row.severity, t }) },
-            { label: t('alertType'), render: row => alertTypeLabel(row.alertType, t) },
+            { label: t('severity'), key: 'severity', sortValue: row => ({ INFO: 0, WARN: 1, CRITICAL: 2 }[row.severity] ?? 0), render: row => h(SeverityBadge, { severity: row.severity, t }) },
+            { label: t('alertType'), key: 'alertType', render: row => alertTypeLabel(row.alertType, t) },
             { label: t('alertTitleCol'), key: 'title', stickyLeft: false },
-            { label: t('detail'), render: row => h('span', { style: { whiteSpace: 'normal', wordBreak: 'break-all', display: 'block', maxWidth: 420, textAlign: 'left' } }, row.detail ?? '—') },
+            { label: t('detail'), key: 'detail', render: row => h('span', { style: { whiteSpace: 'normal', wordBreak: 'break-all', display: 'block', maxWidth: 420, textAlign: 'left' } }, row.detail ?? '—') },
             { label: t('org'), key: 'orgName' },
-            { label: t('lastSeen'), render: row => shortDate(row.lastSeenAt) ?? '—', num: true },
+            { label: t('lastSeen'), key: 'lastSeenAt', render: row => shortDate(row.lastSeenAt) ?? '—', num: true },
           ],
           rows: alertRows, empty: t('empty'),
           onRowClick: row => setDetail(row), rowKey: 'id',
@@ -2140,24 +2318,34 @@ window.__ModuleLoader__.load({
       )
     }
 
-    // 片段 5/7 视图：数据中心（数据源配置控制台 + 同步批次 + 数据集规模 + 质量清单 + 导入批次）
+    // 片段 5/7 视图：数据中心（配置、手动同步、指标、同步批次、质量清单与导入批次）
 
     function DataCenterView({ ctx, t }) {
       const { revision } = ctx
       const [configs, setConfigs] = useState(null)
       const [runs, setRuns] = useState(null)
+      const [metrics, setMetrics] = useState(null)
       const [quality, setQuality] = useState(null)
       const [batches, setBatches] = useState(null)
       const [busy, setBusy] = useState(false)
       const [notice, setNotice] = useState(null)
       const [loadState, setLoadState] = useState('loading')
+      const [configDialog, setConfigDialog] = useState(null)
+      const [syncForm, setSyncForm] = useState({ scope: 'HEADQUARTERS', bizSystem: 'OA', docType: 'PURCHASE', tableMappingKey: 'OA/PURCHASE' })
+      const [syncResult, setSyncResult] = useState(null)
 
       const load = () => {
         setLoadState('loading')
-        Promise.allSettled([api('/data-source-configs'), api('/data-source-runs?limit=20'), api('/quality')]).then(results => {
-          const [configsResult, runsResult, qualityResult] = results
+        Promise.allSettled([
+          api('/data-source-configs?limit=50'),
+          api('/data-source-runs?limit=20'),
+          api('/data-source-metrics?days=7'),
+          api('/quality'),
+        ]).then(results => {
+          const [configsResult, runsResult, metricsResult, qualityResult] = results
           setConfigs(configsResult.status === 'fulfilled' ? (configsResult.value.data ?? { list: [] }) : null)
           setRuns(runsResult.status === 'fulfilled' ? (runsResult.value.data ?? { list: [] }) : null)
+          setMetrics(metricsResult.status === 'fulfilled' ? (metricsResult.value.data ?? []) : null)
           setQuality(qualityResult.status === 'fulfilled' ? qualityResult.value : null)
           const failed = results.filter(result => result.status === 'rejected').length
           setLoadState(failed === results.length ? 'error' : failed ? 'partial' : 'ready')
@@ -2165,11 +2353,41 @@ window.__ModuleLoader__.load({
       }
       useEffect(() => { load() }, [revision]) // eslint-disable-line react-hooks/exhaustive-deps
 
+      const saveConfig = async form => {
+        setBusy(true); setNotice(null)
+        try {
+          await post('/data-source-configs', form)
+          setNotice(t('saved'))
+          setConfigDialog(null)
+          load()
+          return true
+        } catch (error) {
+          setNotice(`${t('opFailed')}: ${error.message}`)
+          return false
+        } finally { setBusy(false) }
+      }
+
       const toggle = async config => {
         setBusy(true); setNotice(null)
         try {
           await post(`/data-source-configs/${config.id}/active`, { active: !config.active })
           setNotice(t('saved'))
+          load()
+        } catch (error) { setNotice(`${t('opFailed')}: ${error.message}`) } finally { setBusy(false) }
+      }
+
+      const sync = async () => {
+        if (!syncForm.bizSystem.trim()) return
+        setBusy(true); setNotice(null); setSyncResult(null)
+        try {
+          const response = await post('/data-source-sync', {
+            scope: syncForm.scope,
+            bizSystem: syncForm.bizSystem.trim(),
+            docType: syncForm.docType.trim() || undefined,
+            tableMappingKey: syncForm.tableMappingKey.trim() || undefined,
+          })
+          setSyncResult(response.data)
+          setNotice(t('syncDone'))
           load()
         } catch (error) { setNotice(`${t('opFailed')}: ${error.message}`) } finally { setBusy(false) }
       }
@@ -2187,6 +2405,11 @@ window.__ModuleLoader__.load({
           h('div', { className: 'sf-fatal', role: 'alert' }, h(Glyph, { name: 'warning' }), h('strong', null, t('dataCenterFailed')), h('p', { className: 'sf-note' }, t('loadPartial')), h(GhostButton, { onClick: load }, t('dataCenterRetry'))))
       }
 
+      const scopeOptions = [['HEADQUARTERS', t('scopeHq')], ['HEZHONG', t('scopeHezhong')]]
+      const systemOptions = [['OA', 'OA'], ['NC', 'NC'], ['ERP', 'ERP']]
+      const docOptions = [['PURCHASE', t('docPurchase')], ['REIMBURSEMENT', t('docReimbursement')], ['INCOME', t('docIncome')]]
+      const mappingOptions = [['OA/PURCHASE', 'OA / 采购'], ['NC/PURCHASE', 'NC / 采购'], ['ERP/PURCHASE', 'ERP / 采购']]
+
       return h('div', { className: 'sf-view' },
         notice ? h(Notice, null, notice) : null,
         loadState === 'loading' ? h('div', { className: 'sf-loading', role: 'status' }, h(Glyph, { name: 'loading' }), t('dataCenterLoading')) : null,
@@ -2195,35 +2418,66 @@ window.__ModuleLoader__.load({
           h('article', { className: 'sf-dc-stat' }, h('span', null, t('qualityIssues')), h('strong', null, formatNumber(issueTotal) ?? '0'), h('small', null, `${t('qualityCritical')} ${formatNumber(criticalTotal) ?? '0'} · ${t('qualityWarn')} ${formatNumber(warnTotal) ?? '0'}`)),
           h('article', { className: 'sf-dc-stat' }, h('span', null, t('dsRuns')), h('strong', null, formatNumber(runList.length) ?? '0'), h('small', null, `${t('latestSync')} ${shortDate(runList[0]?.runAt ?? runList[0]?.startedAt) ?? '—'}`)),
           h('article', { className: 'sf-dc-stat' }, h('span', null, t('batchesTitle')), h('strong', null, formatNumber(batchList.length) ?? '0'), h('small', null, `${t('successRows')} ${formatNumber(batchList.reduce((sum, row) => sum + (finite(row.successRows) ?? 0), 0)) ?? '0'}`))),
-        h(Card, { title: t('dsConfigs') }, h(React.Fragment, null, h(Table, {
+        h(Card, { title: t('dsManualSync'), actions: h('span', { className: 'sf-card-unit' }, t('dsRouteHint')) },
+          h('div', { className: 'sf-stack' },
+            h('div', { className: 'sf-inline-form' },
+              h(FormRow, { label: t('dsScope') }, h(Select, { value: syncForm.scope, onChange: value => setSyncForm(current => ({ ...current, scope: value })), options: scopeOptions })),
+              h(FormRow, { label: t('bizSystem') }, h(SearchSelect, { value: syncForm.bizSystem, onChange: value => setSyncForm(current => ({ ...current, bizSystem: value })), options: systemOptions, allowCustom: true, placeholder: t('bizSystem') })),
+              h(FormRow, { label: t('docType') }, h(SearchSelect, { value: syncForm.docType, onChange: value => setSyncForm(current => ({ ...current, docType: value })), options: docOptions, allowCustom: true, placeholder: t('docType') })),
+              h(FormRow, { label: t('tableMapping') }, h(SearchSelect, { value: syncForm.tableMappingKey, onChange: value => setSyncForm(current => ({ ...current, tableMappingKey: value })), options: mappingOptions, allowCustom: true, placeholder: t('tableMapping') })),
+            ),
+            h('div', { className: 'sf-row-between' }, h('span', { className: 'sf-note' }, t('dsSyncHint')), h(PrimaryButton, { busy, disabled: !syncForm.bizSystem.trim(), onClick: sync }, t('syncNow'))),
+            syncResult ? h('div', { className: 'sf-note', role: 'status' }, `${t('syncFetched')} ${syncResult.fetched ?? 0} · ${t('dsTransport')} ${syncResult.transport ?? '—'} · ${t('batchStatus')} ${syncResult.stage ?? '—'}${syncResult.batchId ? ` · ${syncResult.batchId}` : ''}`) : null,
+          )),
+        h(Card, { title: t('dsConfigs'), actions: h(PrimaryButton, { busy, onClick: () => setConfigDialog({}) }, h(Glyph, { name: 'plus', size: 12 }), t('dsAdd')) }, h(React.Fragment, null,
+          h(Table, { tableId: 'finance-DataCenterView-configs', minColumns: '900px',
+            columns: [
+              { label: t('dsScope'), key: 'scope', render: row => row.scope === 'HEADQUARTERS' ? t('scopeHq') : t('scopeHezhong') },
+              { label: t('dsKind'), key: 'kind', render: row => row.kind === 'DSS' ? t('kindDss') : t('kindFeishu') },
+              { label: t('dataset'), key: 'displayName' },
+              { label: t('dsEndpoint'), key: 'endpoint', render: row => row.endpoint ? `${row.endpoint}${row.secretRef ? ` · ${row.secretRef}` : ''}` : row.secretRef ? `凭证引用 ${row.secretRef}` : '—' },
+              { label: t('updatedAt'), key: 'updatedAt', render: row => shortDate(row.updatedAt) ?? '—' },
+              { label: t('statusCol'), key: 'active', render: row => h(Pill, { tone: row.active ? 'green' : 'muted' }, row.active ? t('dsEnabled') : t('dsDisable') ) },
+              { label: t('actions'), key: 'actions', sortable: false, render: row => h('div', { className: 'sf-row' }, h(LinkButton, { disabled: busy, onClick: () => setConfigDialog(row) }, t('edit')), h(LinkButton, { disabled: busy, onClick: () => toggle(row) }, row.active ? t('dsDisable') : t('dsEnable'))) },
+            ],
+            rows: configs?.list || [], empty: configs ? t('noSourceConfig') : t('empty'), rowKey: 'id',
+          }), configs?.list?.length ? null : h('p', { className: 'sf-note' }, t('noSourceConfigHint')))),
+        h(Card, { title: `${t('dsMetrics')} · ${t('last7Days')}` }, h(Table, { tableId: 'finance-DataCenterView-metrics',
           columns: [
-            { label: t('dsScope'), render: row => row.scope === 'HEADQUARTERS' ? t('scopeHq') : t('scopeHezhong') },
-            { label: t('dsKind'), render: row => row.kind === 'DSS' ? t('kindDss') : t('kindFeishu') },
-            { label: t('dataset'), key: 'displayName' },
-            { label: t('dsEndpoint'), render: row => row.endpoint ?? '—' },
-            { label: t('statusCol'), render: row => h(Pill, { tone: row.active ? 'green' : 'muted' }, row.active ? t('dsEnabled') : t('dsDisable')) },
-            { label: t('actions'), render: row => h(LinkButton, { onClick: () => toggle(row) }, row.active ? t('dsDisable') : t('dsEnable')) },
-          ],
-          rows: configs?.list || [], empty: configs ? t('noSourceConfig') : t('empty'), rowKey: 'id',
-        }), configs?.list?.length ? null : h('p', { className: 'sf-note' }, t('noSourceConfigHint')))),
+            { label: t('dsScope'), key: 'scope', render: row => row.scope === 'HEADQUARTERS' ? t('scopeHq') : t('scopeHezhong') },
+            { label: t('dsKind'), key: 'transport', render: row => row.transport === 'DSS' ? t('kindDss') : t('kindFeishu') },
+            { label: t('successRate'), key: 'successRate', num: true, render: row => `${row.successRate ?? 0}%` },
+            { label: t('fallbackRate'), key: 'fallbackRate', num: true, render: row => `${row.fallbackRate ?? 0}%` },
+            { label: t('emptyRate'), key: 'emptyResultRate', num: true, render: row => `${row.emptyResultRate ?? 0}%` },
+            { label: t('avgDuration'), key: 'avgDurationMs', num: true, render: row => `${row.avgDurationMs ?? 0} ms` },
+            { label: t('latestSync'), key: 'lastSuccessAt', render: row => shortDate(row.lastSuccessAt) ?? '—' },
+          ], rows: metrics || [], empty: metrics ? t('empty') : t('loading'),
+        })),
         h('div', { className: 'sf-two-col' },
-          h(Card, { title: t('dsRuns') }, h('div', { className: 'sf-timeline' },
-            runList.length ? runList.map((run, index) => h('div', { key: run.id ?? index, className: 'sf-timeline-row' },
-              h('span', { className: `sf-timeline-dot is-${runTone(run)}` }),
-              h('div', { className: 'sf-timeline-main' },
-                h('span', null, `${run.bizSystem ?? '—'} · ${run.scope ?? ''}`),
-                h('small', null, `${shortDate(run.runAt ?? run.startedAt) ?? ''}${run.fallbackReason ? ` · ${t('dsFallback')}: ${run.fallbackReason}` : ''}`)),
-              h(Pill, { tone: runTone(run) }, run.status ?? '—'))) : h(EmptyState, null, t('empty')))),
-          h(Card, { title: t('qualityTitle') }, h(Table, {
+          h(Card, { title: t('dsRuns') }, h(Table, { tableId: 'finance-DataCenterView-runs', minColumns: '1200px',
+            columns: [
+              { label: t('startedAt'), key: 'startedAt', render: row => shortDate(row.startedAt) ?? '—' },
+              { label: t('dsScope'), key: 'scope', render: row => row.scope === 'HEADQUARTERS' ? t('scopeHq') : t('scopeHezhong') },
+              { label: t('bizSystem'), key: 'bizSystem' },
+              { label: t('docType'), key: 'docType', render: row => row.docType ?? '—' },
+              { label: t('dsTransport'), key: 'transportUsed' },
+              { label: t('dsFallback'), key: 'fallbackReason', render: row => row.fallbackReason ? h(Badge, { tone: 'amber' }, row.fallbackReason) : '—' },
+              { label: t('batchStatus'), key: 'status', render: row => h(Pill, { tone: runTone(row) }, row.status ?? '—') },
+              { label: t('processingStage'), key: 'stage' },
+              { label: t('batchId'), key: 'batchId', render: row => row.batchId ?? '—' },
+              { label: t('dataSummary'), key: 'stats', render: row => runStats(row.stats) },
+              { label: t('errorSummary'), key: 'errorSummary', render: row => row.errorSummary ? h('span', { className: 'sf-text-danger' }, row.errorSummary) : '—' },
+            ], rows: runList, empty: t('empty'), rowKey: 'id',
+          })),
+          h(Card, { title: t('qualityTitle') }, h(Table, { tableId: 'finance-DataCenterView-quality',
             columns: [
               { label: t('dataset'), key: 'dataset' },
               { label: t('issue'), key: 'label' },
               { label: t('count'), key: 'count', num: true },
-              { label: t('severity'), render: row => h(SeverityBadge, { severity: row.severity === 'CRITICAL' ? 'CRITICAL' : row.severity === 'WARN' ? 'WARN' : 'INFO', t }) },
-            ],
-            rows: issues, empty: t('empty'),
+              { label: t('severity'), key: 'severity', sortValue: row => ({ INFO: 0, WARN: 1, CRITICAL: 2 }[row.severity] ?? 0), render: row => h(SeverityBadge, { severity: row.severity === 'CRITICAL' ? 'CRITICAL' : row.severity === 'WARN' ? 'WARN' : 'INFO', t }) },
+            ], rows: issues, empty: t('empty'),
           }))),
-        h(Card, { title: t('batchesTitle') }, h(Table, {
+        h(Card, { title: t('batchesTitle') }, h(Table, { tableId: 'finance-DataCenterView-batches',
           columns: [
             { label: t('bizType'), key: 'bizType' },
             { label: t('sourceFile'), key: 'sourceFile' },
@@ -2231,10 +2485,53 @@ window.__ModuleLoader__.load({
             { label: t('successRows'), key: 'successRows', num: true },
             { label: t('failedRows'), key: 'failedRows', num: true },
             { label: t('batchStatus'), key: 'status' },
-            { label: t('startedAt'), render: row => shortDate(row.startedAt) ?? '—', num: true },
-          ],
-          rows: batchList, empty: t('empty'),
-        })))
+            { label: t('startedAt'), key: 'startedAt', render: row => shortDate(row.startedAt) ?? '—', num: true },
+          ], rows: batchList, empty: t('empty'),
+        })),
+        configDialog ? h(DataSourceConfigDialog, { config: configDialog.id ? configDialog : null, busy, t, onClose: () => setConfigDialog(null), onSave: saveConfig }) : null,
+      )
+    }
+
+    function runStats(stats) {
+      if (!stats) return '—'
+      const labels = { fetched: '采集', inserted: '新增', updated: '更新', duplicated: '重复', rejected: '待核对' }
+      const values = Object.entries(stats).filter(([key, value]) => labels[key] && typeof value === 'number').map(([key, value]) => `${labels[key]} ${value}`)
+      return values.length ? values.join(' / ') : '—'
+    }
+
+    function DataSourceConfigDialog({ config, busy, t, onClose, onSave }) {
+      const [formError, setFormError] = useState('')
+      const [form, setForm] = useState({
+        scope: config?.scope || 'HEADQUARTERS', kind: config?.kind || 'DSS', displayName: config?.displayName || '',
+        endpoint: config?.endpoint || '', secretRef: config?.secretRef || '',
+        tableMappingsText: config?.tableMappings ? JSON.stringify(config.tableMappings, null, 2) : '', active: config?.active ?? true,
+      })
+      const submit = () => {
+        if (!form.displayName.trim()) { setFormError(t('required')); return }
+        let tableMappings
+        if (form.tableMappingsText.trim()) {
+          try { tableMappings = JSON.parse(form.tableMappingsText) } catch { setFormError(t('invalidJson')); return }
+        }
+        setFormError('')
+        onSave({ scope: form.scope, kind: form.kind, displayName: form.displayName.trim(), endpoint: form.endpoint.trim() || undefined, secretRef: form.secretRef.trim() || undefined, tableMappings, active: form.active })
+      }
+      return h(Dialog, { title: config ? t('dsEdit') : t('dsAdd'), onClose, footer: [
+        h(GhostButton, { key: 'cancel', onClick: onClose }, t('cancel')),
+        h(PrimaryButton, { key: 'save', busy, disabled: !form.displayName.trim(), onClick: submit }, t('save')),
+      ] },
+        h('fieldset', { className: 'sf-stack sf-fieldset', disabled: busy },
+          h('div', { className: 'sf-inline-form' },
+            h(FormRow, { label: t('dsScope') }, h(Select, { value: form.scope, onChange: value => setForm(current => ({ ...current, scope: value })), options: [['HEADQUARTERS', t('scopeHq')], ['HEZHONG', t('scopeHezhong')]], disabled: Boolean(config) })),
+            h(FormRow, { label: t('dsKind') }, h(Select, { value: form.kind, onChange: value => setForm(current => ({ ...current, kind: value })), options: [['DSS', t('kindDss')], ['FEISHU', t('kindFeishu')]], disabled: Boolean(config) })),
+          ),
+          h(FormRow, { label: t('dataset') }, h(Field, { value: form.displayName, onChange: value => setForm(current => ({ ...current, displayName: value })), placeholder: t('dsNamePlaceholder'), maxLength: 100 })),
+          h(FormRow, { label: t('dsEndpoint') }, h(Field, { value: form.endpoint, onChange: value => setForm(current => ({ ...current, endpoint: value })), placeholder: t('dsEndpointPlaceholder'), maxLength: 500 })),
+          h(FormRow, { label: t('secretRef') }, h(Field, { value: form.secretRef, onChange: value => setForm(current => ({ ...current, secretRef: value })), placeholder: t('secretRefHint'), maxLength: 100 })),
+          h(FormRow, { label: t('tableMappings') }, h(Textarea, { value: form.tableMappingsText, onChange: value => setForm(current => ({ ...current, tableMappingsText: value })), rows: 5, placeholder: '{"OA/PURCHASE":"tblXXX"}' })),
+          formError ? h('p', { className: 'sf-note sf-neg', role: 'alert' }, formError) : null,
+          h('div', { className: 'sf-row-between' }, h('span', null, t('dsEnabled')), h(Switch, { checked: form.active, onChange: value => setForm(current => ({ ...current, active: value })), label: t('dsEnabled') })),
+          h('p', { className: 'sf-note' }, t('secretRefHint')),
+        ))
     }
 
     // 片段 5/7 视图：录入（填报控制台：任务管理/我的填报 + 通讯录 + 归属记录 + 成员角色 + 录入面板 4 类型）
@@ -2247,6 +2544,7 @@ window.__ModuleLoader__.load({
       const [tasks, setTasks] = useState(null)
       const [assignments, setAssignments] = useState(null)
       const [contacts, setContacts] = useState(null)
+      const [employmentContacts, setEmploymentContacts] = useState(null)
       const [employments, setEmployments] = useState(null)
       const [members, setMembers] = useState(null)
       const [quality, setQuality] = useState(null)
@@ -2256,12 +2554,13 @@ window.__ModuleLoader__.load({
       const [notice, setNotice] = useState(null)
       const [dialog, setDialog] = useState(null)
       const [reloadTick, setReloadTick] = useState(0)
+      const retryLists = () => setReloadTick(value => value + 1)
 
       const act = async (path, payload, doneMessage) => {
         setBusy(true); setNotice(null)
         try {
-          await post(path, payload)
-          setNotice(doneMessage ?? t('submitted'))
+          const result = await post(path, payload)
+          setNotice(typeof doneMessage === 'function' ? doneMessage(result?.data ?? result) : doneMessage ?? t('submitted'))
           setReloadTick(value => value + 1)
           return true
         } catch (error) { setNotice(`${t('opFailed')}: ${error.message}`); return false } finally { setBusy(false) }
@@ -2270,14 +2569,33 @@ window.__ModuleLoader__.load({
       useEffect(() => { setNotice(null) }, [revision])
       useEffect(() => {
         let cancelled = false
-        api('/filing-tasks').then(value => { if (!cancelled) setTasks(value.data ?? { list: [] }) }).catch(() => {})
-        api('/filing-assignments').then(value => { if (!cancelled) setAssignments(value.data ?? { list: [] }) }).catch(() => {})
-        api(`/contacts?${onlyUnmapped ? 'onlyUnmapped=1&' : ''}${keyword ? `keyword=${encodeURIComponent(keyword)}` : ''}`).then(value => { if (!cancelled) setContacts(value.data ?? { list: [] }) }).catch(() => {})
-        api('/employment-records?limit=20').then(value => { if (!cancelled) setEmployments(value.data ?? { list: [] }) }).catch(() => {})
-        api('/members').then(value => { if (!cancelled) setMembers(value.data ?? { list: [] }) }).catch(() => { if (!cancelled) setMembers({ list: [], forbidden: true }) })
+        setTasks(null); setAssignments(null); setMembers(null)
+        api('/filing-tasks').then(value => { if (!cancelled) setTasks(value.data ?? { list: [] }) }).catch(() => { if (!cancelled) setTasks({ list: [], error: true }) })
+        api('/filing-assignments').then(value => { if (!cancelled) setAssignments(value.data ?? { list: [] }) }).catch(() => { if (!cancelled) setAssignments({ list: [], error: true }) })
+        setEmployments(null)
+        api('/employment-records?limit=50').then(value => { if (!cancelled) setEmployments(value.data ?? { list: [] }) }).catch(() => { if (!cancelled) setEmployments({ list: [], error: true }) })
+        api('/members').then(value => { if (!cancelled) setMembers(value.data ?? { list: [] }) }).catch(error => { if (!cancelled) setMembers(error?.status === 403 ? { list: [], forbidden: true } : { list: [], error: true }) })
         api('/quality').then(value => { if (!cancelled) setQuality(value) }).catch(() => {})
         return () => { cancelled = true }
+      }, [revision, reloadTick])
+      useEffect(() => {
+        let cancelled = false
+        setContacts(null)
+        api(`/contacts?limit=100&${onlyUnmapped ? 'onlyUnmapped=1&' : ''}${keyword.trim() ? `keyword=${encodeURIComponent(keyword.trim())}` : ''}`)
+          .then(value => { if (!cancelled) setContacts(value.data ?? { list: [] }) })
+          .catch(() => { if (!cancelled) setContacts({ list: [], error: true }) })
+        return () => { cancelled = true }
       }, [revision, reloadTick, keyword, onlyUnmapped])
+      const employmentOpen = dialog?.kind === 'employment'
+      useEffect(() => {
+        if (!employmentOpen) return
+        let cancelled = false
+        setEmploymentContacts(null)
+        api('/contacts?limit=100')
+          .then(value => { if (!cancelled) setEmploymentContacts(value.data ?? { list: [] }) })
+          .catch(() => { if (!cancelled) setEmploymentContacts({ list: [], error: true }) })
+        return () => { cancelled = true }
+      }, [employmentOpen, revision, reloadTick])
 
       const unassignedCount = (quality?.quality?.issues || []).find(issue => /unassigned|未分配/i.test(issue.label ?? issue.dataset ?? ''))?.count ?? 0
 
@@ -2291,51 +2609,59 @@ window.__ModuleLoader__.load({
           h(Glyph, { name: unassignedCount > 0 ? 'warning' : 'check', size: 14 }),
           unassignedCount > 0 ? t('preCheckBad').replace('{n}', String(unassignedCount)) : t('preCheckOk')) : null,
 
-        section === 'filing' ? h(FilingSection, { tasks, busy, t, act, onDialog: setDialog }) : null,
-        section === 'my' ? h(MyFilingSection, { assignments, busy, t, act, onDialog: setDialog, onReopen: assignment => { setDialog({ kind: 'reason', title: t('reopenFiling'), required: true, run: reason => act(`/filing-assignments/${assignment.id}/reopen`, { reason }) }) } }) : null,
+        section === 'filing' ? h(FilingSection, { tasks, busy, t, act, onDialog: setDialog, onRetry: retryLists }) : null,
+        section === 'my' ? h(MyFilingSection, { assignments, busy, t, act, onDialog: setDialog, onRetry: retryLists, onReopen: assignment => { setDialog({ kind: 'reason', title: t('reopenFiling'), required: true, run: reason => act(`/filing-assignments/${assignment.id}/reopen`, { reason }) }) } }) : null,
         section === 'org' ? h('div', { className: 'sf-stack' },
-          h(DirectoryCard, { contacts, keyword, setKeyword, onlyUnmapped, setOnlyUnmapped, busy, t, act, onDialog: setDialog }),
-          h(EmploymentCard, { employments, busy, t, act, onDialog: setDialog }),
-          h(MembersCard, { members, busy, t, act, onDialog: setDialog })) : null,
+          h(DirectoryCard, { contacts, keyword, setKeyword, onlyUnmapped, setOnlyUnmapped, busy, t, act, onDialog: setDialog, onRetry: () => setReloadTick(value => value + 1) }),
+          h(EmploymentCard, { employments, busy, t, onDialog: setDialog, onRetry: () => setReloadTick(value => value + 1) }),
+          h(MembersCard, { members, busy, t, act, onDialog: setDialog, onRetry: retryLists })) : null,
 
         // 录入面板常开内嵌（对齐前端 FinanceEntryPanel）
         h(EntryPanel, { year, orgs, departments, t, act }),
 
-        dialog?.kind === 'createTask' ? h(CreateTaskDialog, { year, departments, busy, t, onClose: () => setDialog(null), act }) : null,
+        dialog?.kind === 'createTask' ? h(CreateTaskDialog, { year, departments, members, busy, t, onClose: () => setDialog(null), act }) : null,
         dialog?.kind === 'assignment' ? h(AssignmentDialog, { assignment: dialog.assignment, busy, t, onClose: () => setDialog(null), act }) : null,
         dialog?.kind === 'reason' ? h(ReasonDialog, { title: dialog.title, required: dialog.required, t, onClose: () => setDialog(null), onSubmit: reason => { setDialog(null); return dialog.run(reason) } }) : null,
         dialog?.kind === 'mapUser' ? h(MapUserDialog, { contact: dialog.contact, t, onClose: () => setDialog(null), act }) : null,
-        dialog?.kind === 'employment' ? h(EmploymentDialog, { contacts: contacts?.list ?? [], departments, t, onClose: () => setDialog(null), act }) : null,
+        employmentOpen ? h(EmploymentDialog, { contacts: employmentContacts?.list ?? [], contactsLoading: !employmentContacts, contactsError: employmentContacts?.error, departments, busy, t, onRetry: () => setReloadTick(value => value + 1), onClose: () => setDialog(null), act }) : null,
       )
     }
 
     // ---- 任务管理（财务） ----
 
-    function FilingSection({ tasks, busy, t, act, onDialog }) {
+    function ListLoadError({ label, onRetry }) {
+      return h('div', { className: 'sf-stack', role: 'alert' },
+        h('p', { className: 'sf-neg' }, `${label}加载失败，请重试。`),
+        h(LinkButton, { onClick: onRetry }, '重试加载'))
+    }
+
+    function FilingSection({ tasks, busy, t, act, onDialog, onRetry }) {
       const rows = tasks?.list || []
       return h(Card, { title: t('filingTasks'), actions: [h(PrimaryButton, { key: 'add', busy, onClick: () => onDialog({ kind: 'createTask' }) }, h(Glyph, { name: 'plus', size: 12 }), t('createTask'))] }, h(Table, {
         columns: [
           { label: t('taskTitle'), key: 'title', stickyLeft: true },
-          { label: t('taskType'), render: row => row.type === 'BUDGET' ? t('typeBudget') : t('typePlan') },
+          { label: t('taskType'), key: 'type', sortValue: row => row.type === 'BUDGET' ? t('typeBudget') : t('typePlan'), render: row => row.type === 'BUDGET' ? t('typeBudget') : t('typePlan') },
           { label: t('taskYear'), key: 'year', num: true },
-          { label: t('dueCol'), render: row => h('span', { className: isOverdue(row) ? 'sf-neg' : '' }, `${shortDate(row.dueAt) ?? '—'}${isOverdue(row) ? ` · ${t('overdue')}` : ''}`), num: true },
-          { label: t('statusCol'), render: row => h(Pill, { tone: row.status === 'CLOSED' ? 'muted' : 'green' }, row.status === 'CLOSED' ? t('taskClosed') : t('stPending')) },
+          { label: t('dueCol'), key: 'dueAt', sortValue: row => row.dueAt ?? row.task?.dueAt ?? null, render: row => h('span', { className: isOverdue(row) ? 'sf-neg' : '' }, `${shortDate(row.dueAt) ?? '—'}${isOverdue(row) ? ` · ${t('overdue')}` : ''}`), num: true },
+          { label: t('statusCol'), key: 'status', render: row => h(Pill, { tone: row.status === 'CLOSED' ? 'muted' : 'green' }, row.status === 'CLOSED' ? t('taskClosed') : t('stPending')) },
           {
-            label: t('actions'),
+            label: t('actions'), key: 'actions', sortable: false,
             render: row => h('div', { className: 'sf-row', style: { flexWrap: 'nowrap', justifyContent: 'flex-end' } },
               row.status !== 'CLOSED' ? h(LinkButton, { onClick: () => act(`/filing-tasks/${row.id}/close`, {}) }, t('closeTask')) : null),
           },
         ],
-        rows, empty: t('empty'), rowKey: 'id',
+        rows: tasks?.error ? [] : rows,
+        empty: !tasks ? t('loading') : tasks.error ? h(ListLoadError, { label: '填报任务', onRetry }) : t('empty'),
+        rowKey: 'id', tableId: 'finance-filing-tasks',
       }))
     }
 
     const isOverdue = task => task.status !== 'CLOSED' && task.dueAt && new Date(task.dueAt) < new Date()
 
-    function CreateTaskDialog({ year, departments, busy, t, onClose, act }) {
+    function CreateTaskDialog({ year, departments, members, busy, t, onClose, act }) {
       const [title, setTitle] = useState('')
       const [type, setType] = useState('PAYMENT_PLAN')
-      const [month, setMonth] = useState(String(new Date().getMonth() + 1))
+      const [month, setMonth] = useState(String(Math.min(12, new Date().getMonth() + 2)))
       const [versionId, setVersionId] = useState('')
       const [versions, setVersions] = useState(null)
       const [selectedDepartmentIds, setSelectedDepartmentIds] = useState((departments || []).map(department => department.id))
@@ -2346,21 +2672,38 @@ window.__ModuleLoader__.load({
       const [allowModify, setAllowModify] = useState(true)
       const [freezeCurrentMonth, setFreezeCurrentMonth] = useState(true)
       const [startAsDraft, setStartAsDraft] = useState(false)
+      const [departmentSelectionReady, setDepartmentSelectionReady] = useState(Boolean(departments?.length))
+      const [versionError, setVersionError] = useState(false)
+      const [versionRetry, setVersionRetry] = useState(0)
+      const personOptions = [...new Set((members?.list || []).filter(member => member.enabled !== false).map(member => member.name?.trim()).filter(Boolean))]
+        .sort((left, right) => left.localeCompare(right, 'zh-CN')).map(name => [name, name])
+      const validDepartmentIds = selectedDepartmentIds.filter(id => (departments || []).some(department => department.id === id))
+      useEffect(() => {
+        if (!departmentSelectionReady && departments?.length) {
+          setSelectedDepartmentIds(departments.map(department => department.id))
+          setDepartmentSelectionReady(true)
+        }
+      }, [departmentSelectionReady, departments])
       useEffect(() => {
         let cancelled = false
+        setVersions(null)
+        setVersionError(false)
+        setVersionId('')
         api(`/budget-versions?year=${year}`).then(value => {
           if (!cancelled) setVersions((value.data?.list || []).filter(version => version.status !== 'LOCKED'))
-        }).catch(() => { if (!cancelled) setVersions([]) })
+        }).catch(() => { if (!cancelled) { setVersions([]); setVersionError(true) } })
         return () => { cancelled = true }
-      }, [year])
+      }, [year, versionRetry])
       const months = Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1}月`])
-      const canSubmit = title.trim() && dueAt && selectedDepartmentIds.length && (type !== 'BUDGET' || versionId) && (type !== 'PAYMENT_PLAN' || month)
+      const canSubmit = !busy && title.trim() && dueAt && Number.isFinite(new Date(dueAt).getTime()) && validDepartmentIds.length &&
+        (type !== 'BUDGET' || (!versionError && versions?.some(version => version.id === versionId))) &&
+        (type !== 'PAYMENT_PLAN' || (Number(month) >= 1 && Number(month) <= 12))
       const submit = async () => {
         if (!canSubmit) return
         const created = await act('/filing-tasks', {
           title: title.trim(), type, year: Number(year), dueAt: new Date(dueAt).toISOString(),
           ...(type === 'PAYMENT_PLAN' ? { month: Number(month) } : { versionId }),
-          departments: selectedDepartmentIds.map(departmentId => ({ departmentId })),
+          departments: validDepartmentIds.map(departmentId => ({ departmentId })),
           ...(instructions.trim() ? { instructions: instructions.trim() } : {}),
           ...(ownerName.trim() ? { ownerName: ownerName.trim() } : {}),
           ...(reviewerName.trim() ? { reviewerName: reviewerName.trim() } : {}),
@@ -2372,30 +2715,32 @@ window.__ModuleLoader__.load({
         h(GhostButton, { key: 'cancel', onClick: onClose }, t('cancel')),
         h(PrimaryButton, { key: 'ok', disabled: !canSubmit, busy, onClick: submit }, t(startAsDraft ? 'taskStartDraft' : 'taskPublish')),
       ] },
-        h('div', { className: 'sf-stack' },
+        h('fieldset', { className: 'sf-stack sf-fieldset', disabled: busy, 'aria-busy': busy },
           h(FormRow, { label: t('taskTitle') }, h(Field, { value: title, onChange: setTitle, maxLength: 150 })),
           h(FormRow, { label: t('taskType') }, h(Select, { value: type, onChange: setType, options: [['PAYMENT_PLAN', t('typePlan')], ['BUDGET', t('typeBudget')]] })),
           type === 'PAYMENT_PLAN'
             ? h(FormRow, { label: t('taskMonth') }, h(Select, { value: month, onChange: setMonth, options: months, placeholder: t('taskMonth') }))
-            : h(FormRow, { label: t('version') }, h(SearchSelect, { value: versionId, onChange: setVersionId, options: (versions || []).map(version => [version.id, version.name]), placeholder: t('version'), disabled: !versions?.length })),
-          type === 'BUDGET' && versions && !versions.length ? h('p', { className: 'sf-note' }, `${t('empty')} · ${t('version')}`) : null,
+            : h(FormRow, { label: t('version') }, h(SearchSelect, { value: versionId, onChange: setVersionId, options: (versions || []).map(version => [version.id, budgetVersionLabel(version)]), placeholder: t('version'), disabled: busy || !versions?.length })),
+          type === 'BUDGET' && versionError ? h('div', { className: 'sf-row', role: 'alert' }, '预算版本加载失败', h(LinkButton, { onClick: () => setVersionRetry(value => value + 1) }, '重新加载版本')) : null,
+          type === 'BUDGET' && !versionError && versions && !versions.length ? h('p', { className: 'sf-note' }, `${t('empty')} · ${t('version')}`) : null,
           h('div', { className: 'sf-inline-form' },
-            h('div', { className: 'sf-row-between' }, h('strong', null, `${t('taskDepartments')}（${selectedDepartmentIds.length}/${departments?.length || 0}）`),
+            h('div', { className: 'sf-row-between' }, h('strong', null, `${t('taskDepartments')}（${validDepartmentIds.length}/${departments?.length || 0}）`),
               h('div', { className: 'sf-row' },
                 h(LinkButton, { onClick: () => setSelectedDepartmentIds((departments || []).map(department => department.id)) }, t('selectAll')),
                 h(LinkButton, { onClick: () => setSelectedDepartmentIds([]) }, t('clearFilters')))),
             h(MultiSearchSelect, {
-              value: selectedDepartmentIds,
+              value: validDepartmentIds,
               onChange: setSelectedDepartmentIds,
               options: (departments || []).map(department => [department.id, department.name]),
               placeholder: t('department'),
-              disabled: !departments?.length,
+              disabled: busy || !departments?.length,
             }),
             !departments?.length ? h('p', { className: 'sf-note' }, `${t('empty')} · ${t('department')}`) : null),
           h(FormRow, { label: t('taskDue') }, h(Field, { type: 'datetime-local', value: dueAt, onChange: setDueAt })),
           h(FormRow, { label: t('taskInstructions') }, h(Field, { value: instructions, onChange: setInstructions, maxLength: 500 })),
-          h(FormRow, { label: t('taskOwner') }, h(Field, { value: ownerName, onChange: setOwnerName, maxLength: 100 })),
-          h(FormRow, { label: t('taskReviewer') }, h(Field, { value: reviewerName, onChange: setReviewerName, maxLength: 100 })),
+          h(FormRow, { label: t('taskOwner') }, h(SearchSelect, { value: ownerName, onChange: setOwnerName, options: personOptions, allowCustom: true, placeholder: t('taskOwner'), maxLength: 100, disabled: busy })),
+          h(FormRow, { label: t('taskReviewer') }, h(SearchSelect, { value: reviewerName, onChange: setReviewerName, options: personOptions, allowCustom: true, placeholder: t('taskReviewer'), maxLength: 100, disabled: busy })),
+          members?.forbidden || members?.error ? h('p', { className: 'sf-note' }, '人员列表暂时无法加载，可在选择器中输入并确认自定义姓名。') : null,
           h('div', { className: 'sf-task-options' },
             h('label', null, h('input', { type: 'checkbox', checked: allowModify, onChange: event => setAllowModify(event.target.checked) }), t('taskAllowModify')),
             h('label', null, h('input', { type: 'checkbox', checked: freezeCurrentMonth, onChange: event => setFreezeCurrentMonth(event.target.checked) }), t('taskFreezeMonth')),
@@ -2404,60 +2749,118 @@ window.__ModuleLoader__.load({
 
     // ---- 我的填报（部门） ----
 
-    function MyFilingSection({ assignments, busy, t, act, onDialog, onReopen }) {
+    function MyFilingSection({ assignments, busy, t, act, onDialog, onRetry, onReopen }) {
       const rows = assignments?.list || []
       return h(Card, { title: t('myFiling') }, h(Table, {
         columns: [
-          { label: t('taskTitle'), render: row => row.task?.title ?? row.taskTitle ?? '—', stickyLeft: true },
+          { label: t('taskTitle'), key: 'title', sortValue: row => row.task?.title ?? row.taskTitle ?? '', render: row => row.task?.title ?? row.taskTitle ?? '—', stickyLeft: true },
           { label: t('departmentCol'), key: 'departmentName' },
-          { label: t('statusCol'), render: row => h(Pill, { tone: row.status === 'LOCKED' ? 'green' : row.status === 'SUBMITTED' ? 'amber' : 'muted' }, row.status === 'LOCKED' ? t('commitFiling') : row.status === 'SUBMITTED' ? t('stSubmitted') : t('stDraft')) },
-          { label: t('dueCol'), render: row => h('span', { className: isOverdue(row) ? 'sf-neg' : '' }, shortDate(row.dueAt ?? row.task?.dueAt) ?? '—'), num: true },
+          { label: t('statusCol'), key: 'status', render: row => h(Pill, { tone: row.status === 'LOCKED' ? 'green' : row.status === 'SUBMITTED' ? 'amber' : 'muted' }, row.status === 'LOCKED' ? t('commitFiling') : row.status === 'SUBMITTED' ? t('stSubmitted') : t('stDraft')) },
+          { label: t('dueCol'), key: 'dueAt', sortValue: row => row.dueAt ?? row.task?.dueAt ?? null, render: row => h('span', { className: isOverdue(row) ? 'sf-neg' : '' }, shortDate(row.dueAt ?? row.task?.dueAt) ?? '—'), num: true },
           {
-            label: t('actions'),
+            label: t('actions'), key: 'actions', sortable: false,
             render: row => h('div', { className: 'sf-row', style: { flexWrap: 'nowrap', justifyContent: 'flex-end' } },
               h(LinkButton, { onClick: () => onDialog({ kind: 'assignment', assignment: row }) }, t('rowsEditor')),
               row.status === 'LOCKED' ? h(LinkButton, { onClick: () => onReopen(row) }, t('reopenFiling')) : null),
           },
         ],
-        rows, empty: t('empty'), rowKey: 'id',
+        rows: assignments?.error ? [] : rows,
+        empty: !assignments ? t('loading') : assignments.error ? h(ListLoadError, { label: '我的填报', onRetry }) : t('empty'),
+        rowKey: 'id', tableId: 'finance-filing-assignments',
       }))
     }
 
     /** 部门行编辑器：月份/说明/金额多行 + 暂存/提交；复核定稿在弹窗内完成，重开走外层 ReasonDialog */
     function AssignmentDialog({ assignment, busy, t, onClose, act }) {
-      const [rows, setRows] = useState((assignment.rows ?? []).map(row => ({ ...row })))
-      const months = Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1}月`])
-      const updateRow = (index, patch) => setRows(current => current.map((row, i) => (i === index ? { ...row, ...patch } : row)))
-      const payloadRows = () => rows
-        .filter(row => finite(row.plannedAmount) !== null && Number(row.plannedAmount) > 0)
-        .map(row => ({ ...(row.month ? { month: Number(row.month) } : {}), plannedAmount: Number(row.plannedAmount), ...(row.description ? { description: row.description } : {}) }))
-      return h(Dialog, { title: `${t('assignmentTitle')} · ${assignment.departmentName ?? ''}`, width: 'lg', onClose, footer: [
-        h(GhostButton, { key: 'save', busy, onClick: () => { act(`/filing-assignments/${assignment.id}/rows`, { rows: payloadRows() }, t('saved')); onClose() } }, t('saveDraft')),
-        assignment.status === 'DRAFT' ? h(PrimaryButton, { key: 'submit', busy, onClick: () => { act(`/filing-assignments/${assignment.id}/submit`, {}); onClose() } }, t('submitFiling')) : null,
-        assignment.status === 'SUBMITTED' ? h(PrimaryButton, { key: 'commit', busy, onClick: () => { act(`/filing-assignments/${assignment.id}/commit`, {}); onClose() } }, t('commitFiling')) : null,
-        h(GhostButton, { key: 'cancel', onClick: onClose }, t('close')),
+      const task = assignment.task
+      const editable = task?.status === 'OPEN' && (!task.dueAt || new Date(task.dueAt).getTime() >= Date.now()) &&
+        (['PENDING', 'DRAFT', 'REJECTED'].includes(assignment.status) || (assignment.status === 'SUBMITTED' && task.allowModify === true))
+      const emptyRow = () => ({ costItemId: '', month: String(task?.month ?? ''), description: '', plannedAmount: '' })
+      const [rows, setRows] = useState(() => assignment.rows?.length ? assignment.rows.map(row => ({ ...row })) : [emptyRow()])
+      const [costItems, setCostItems] = useState(null)
+      const [costError, setCostError] = useState(false)
+      const [reload, setReload] = useState(0)
+      const [saving, setSaving] = useState(false)
+      const [error, setError] = useState('')
+      useEffect(() => {
+        let cancelled = false
+        setCostError(false)
+        api('/cost-items').then(value => {
+          if (!cancelled) setCostItems((value.data?.list || []).filter(item => item.active))
+        }).catch(() => { if (!cancelled) setCostError(true) })
+        return () => { cancelled = true }
+      }, [reload])
+      const months = Array.from({ length: 12 }, (_, index) => [String(index + 1), (index + 1) + '月'])
+      const updateRow = (index, patch) => setRows(current => current.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)))
+      const persist = async thenSubmit => {
+        if (!editable || saving || busy) return
+        const filled = rows.filter(row => String(row.plannedAmount ?? '').trim())
+        if (filled.some(row => !Number.isFinite(Number(row.plannedAmount)) || Number(row.plannedAmount) <= 0)) {
+          setError('请填写大于 0 的金额'); return
+        }
+        if (thenSubmit && (!filled.length || filled.some(row => !row.costItemId || !row.month))) {
+          setError('请至少填写一行，并补全费用类别、月份和金额'); return
+        }
+        setSaving(true); setError('')
+        try {
+          const saved = await act('/filing-assignments/' + assignment.id + '/rows', {
+            rows: filled.map(row => ({
+              ...(row.costItemId ? { costItemId: row.costItemId } : {}),
+              ...(row.month ? { month: Number(row.month) } : {}),
+              plannedAmount: Number(row.plannedAmount),
+              ...(row.description ? { description: row.description } : {}),
+            })),
+          }, t('saved'))
+          if (!saved) { setError('保存失败，填写内容已保留，请重试'); return }
+          if (thenSubmit && !await act('/filing-assignments/' + assignment.id + '/submit', {})) {
+            setError('内容已暂存，提交失败，请重试'); return
+          }
+          onClose()
+        } catch {
+          setError('操作失败，填写内容已保留，请重试')
+        } finally { setSaving(false) }
+      }
+      return h(Dialog, { title: t('assignmentTitle') + ' · ' + (assignment.departmentName ?? ''), width: 'lg', onClose, footer: [
+        editable ? h(GhostButton, { key: 'save', disabled: busy || saving, onClick: () => persist(false) }, t('saveDraft')) : null,
+        editable ? h(PrimaryButton, { key: 'submit', busy: busy || saving, onClick: () => persist(true) }, t('submitFiling')) : null,
+        assignment.status === 'SUBMITTED' ? h(PrimaryButton, {
+          key: 'commit', busy: busy || saving,
+          onClick: async () => { if (await act('/filing-assignments/' + assignment.id + '/commit', {})) onClose() },
+        }, t('commitFiling')) : null,
+        h(GhostButton, { key: 'cancel', disabled: saving, onClick: onClose }, t('close')),
       ] },
         h('div', { className: 'sf-stack' },
+          !editable ? h('p', { className: 'sf-note' }, '当前填报只读；仅开放且未过期的活动可填写，已提交记录须在允许修改的窗口内重提。') : null,
+          costError ? h('div', { role: 'alert' }, '费用类别加载失败', h(LinkButton, { onClick: () => setReload(value => value + 1) }, '重试')) : null,
+          costItems && !costItems.length && !costError ? h('p', { className: 'sf-note' }, '暂无可用费用类别，请联系财务维护。') : null,
+          error ? h('p', { role: 'alert', className: 'sf-neg' }, error) : null,
           h('div', { className: 'sf-row-between' },
             h('strong', null, t('rowsEditor')),
-            h(LinkButton, { onClick: () => setRows(current => [...current, { month: '', description: '', plannedAmount: '' }]) }, h(Glyph, { name: 'plus', size: 12 }), t('addRow'))),
-          ...rows.map((row, index) => h('div', { key: index, className: 'sf-inline-form' },
+            editable ? h(LinkButton, { disabled: busy || saving, onClick: () => setRows(current => [...current, emptyRow()]) }, h(Glyph, { name: 'plus', size: 12 }), t('addRow')) : null),
+          ...rows.map((row, index) => h('div', { key: row.id ?? index, className: 'sf-inline-form' },
             h('div', { className: 'sf-filters' },
-              h(FormRow, { label: t('monthCol') }, h(Select, { value: String(row.month ?? ''), onChange: value => updateRow(index, { month: value }), options: months, placeholder: t('monthCol') })),
-              h(FormRow, { label: t('description') }, h(Field, { value: row.description ?? '', onChange: value => updateRow(index, { description: value }), maxLength: 500 })),
-              h(FormRow, { label: t('planned') }, h(Field, { type: 'number', min: '0.01', step: '0.01', value: row.plannedAmount ?? '', onChange: value => updateRow(index, { plannedAmount: value }) })),
-              h(LinkButton, { onClick: () => setRows(current => current.filter((_, i) => i !== index)) }, h(Glyph, { name: 'trash', size: 13 }))))),
+              h(FormRow, { label: '费用类别' }, h(SearchSelect, {
+                value: row.costItemId ?? '', onChange: value => updateRow(index, { costItemId: value }),
+                options: (costItems || []).map(item => [item.id, item.name]),
+                placeholder: costItems ? '费用类别' : '费用类别（加载中）', disabled: !editable || busy || saving || !costItems || costError,
+              })),
+              h(FormRow, { label: t('monthCol') }, h(Select, { value: String(row.month ?? ''), onChange: value => updateRow(index, { month: value }), options: months, placeholder: t('monthCol'), disabled: !editable || busy || saving })),
+              h(FormRow, { label: t('description') }, h(Field, { value: row.description ?? '', onChange: value => updateRow(index, { description: value }), maxLength: 500, disabled: !editable || busy || saving })),
+              h(FormRow, { label: t('planned') }, h(Field, { type: 'number', min: '0.01', step: '0.01', value: row.plannedAmount ?? '', onChange: value => updateRow(index, { plannedAmount: value }), disabled: !editable || busy || saving })),
+              editable ? h(LinkButton, { disabled: busy || saving, onClick: () => setRows(current => current.filter((_, rowIndex) => rowIndex !== index)) }, h(Glyph, { name: 'trash', size: 13 })) : null))),
           h('p', { className: 'sf-note' }, t('entryHint'))))
     }
 
     // ---- 通讯录 / 归属 / 成员 ----
 
-    function DirectoryCard({ contacts, keyword, setKeyword, onlyUnmapped, setOnlyUnmapped, busy, t, act, onDialog }) {
+    function DirectoryCard({ contacts, keyword, setKeyword, onlyUnmapped, setOnlyUnmapped, busy, t, act, onDialog, onRetry }) {
       const rows = contacts?.list || []
       return h(Card, {
         title: t('directory'),
         actions: [
-          h(LinkButton, { key: 'sync', onClick: () => post('/contacts-sync', { idempotencyKey: `dir-sync-${Date.now()}` }).catch(() => {}) }, t('dirSync')),
+          h(LinkButton, { key: 'sync', disabled: busy, onClick: () => act('/contacts-sync', {}, result => result?.skipped
+            ? `同步跳过：${result.reason ?? '应用未配置'}`
+            : result ? `同步完成：人员 ${result.users}，部门 ${result.departments}，部门匹配 ${result.departmentMatched}，用户匹配 ${result.userMatched}` : t('submitted')) }, t('dirSync')),
           h('label', { key: 'unmapped', className: 'sf-row', style: { gap: 6, fontSize: 12, color: 'var(--sf-ink2)' } },
             h('input', { type: 'checkbox', checked: onlyUnmapped, onChange: event => setOnlyUnmapped(event.target.checked) }), t('unmappedOnly')),
         ],
@@ -2469,19 +2872,23 @@ window.__ModuleLoader__.load({
               { label: t('memberUser'), key: 'name', stickyLeft: true },
               { label: 'mobile', key: 'mobile' },
               { label: 'email', key: 'email' },
-              { label: t('systemUserId'), render: row => row.systemUserId ? h(Badge, { tone: 'green' }, '✓') : h(Badge, { tone: 'amber' }, t('unmappedOnly')) },
-              { label: t('actions'), render: row => h(LinkButton, { onClick: () => onDialog({ kind: 'mapUser', contact: row }) }, t('mapUser')) },
+              { label: '同步时间', key: 'syncedAt', render: row => shortDate(row.syncedAt) ?? '—' },
+              { label: t('systemUserId'), key: 'systemUserId', sortValue: row => Boolean(row.systemUserId), render: row => row.systemUserId ? h(Badge, { tone: 'green' }, '✓') : h(Badge, { tone: 'amber' }, t('unmappedOnly')) },
+              { label: t('actions'), key: 'actions', sortable: false, render: row => h(LinkButton, { onClick: () => onDialog({ kind: 'mapUser', contact: row }) }, t('mapUser')) },
             ],
-            rows, empty: t('empty'), rowKey: 'id',
+            rows: contacts?.error ? [] : rows,
+            empty: !contacts ? t('loading') : contacts.error
+              ? h('div', { role: 'alert' }, '读取通讯录暂时不可用。', h(LinkButton, { onClick: onRetry }, '重试加载'))
+              : keyword || onlyUnmapped ? '没有匹配的通讯录人员' : '暂无通讯录人员',
+            rowKey: 'id', tableId: 'finance-contacts',
           })))
     }
 
     function MapUserDialog({ contact, t, onClose, act }) {
       const [userId, setUserId] = useState(contact.systemUserId ?? '')
-      const submit = () => {
+      const submit = async () => {
         if (!userId.trim()) return
-        act(`/contacts/${contact.id}/map-user`, { userId: userId.trim() })
-        onClose()
+        if (await act(`/contacts/${contact.id}/map-user`, { userId: userId.trim() })) onClose()
       }
       return h(Dialog, { title: `${t('mapUser')} · ${contact.name ?? ''}`, width: 'sm', onClose, footer: [
         h(GhostButton, { key: 'cancel', onClick: onClose }, t('cancel')),
@@ -2490,57 +2897,98 @@ window.__ModuleLoader__.load({
         h(FormRow, { label: t('systemUserId') }, h(Field, { value: userId, onChange: setUserId })))
     }
 
-    function EmploymentCard({ employments, busy, t, act, onDialog }) {
-      const rows = employments?.list || []
-      return h(Card, { title: t('employmentRecords'), actions: [h(LinkButton, { key: 'add', onClick: () => onDialog({ kind: 'employment' }) }, h(Glyph, { name: 'plus', size: 12 }), t('empCreate'))] }, h(Table, {
-        columns: [
-          { label: t('empUser'), key: 'systemUserId', stickyLeft: true },
-          { label: t('empDept'), key: 'departmentName' },
-          { label: t('empStart'), render: row => shortDate(row.startDate) ?? '—', num: true },
-          { label: t('lastSeen'), render: row => shortDate(row.endDate) ?? '—', num: true },
-          { label: t('sourceFile'), key: 'sourceRef' },
-        ],
-        rows, empty: t('empty'), rowKey: 'id',
-      }))
+    function employmentSourceLabel(row) {
+      if (row.sourceRef === 'manual') return '人工补录'
+      if (row.sourceRef?.startsWith('feishu-contact')) return '通讯录同步'
+      return row.sourceRef || '—'
     }
 
-    function EmploymentDialog({ contacts, departments, t, onClose, act }) {
+    function employmentDateLabel(value) {
+      if (!value) return '—'
+      const date = new Date(value)
+      if (!Number.isFinite(date.getTime())) return '—'
+      const pad = number => String(number).padStart(2, '0')
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+    }
+
+    function EmploymentCard({ employments, busy, t, onDialog, onRetry }) {
+      const rows = [...(employments?.list || [])].sort((left, right) => new Date(right.startDate).getTime() - new Date(left.startDate).getTime())
+      return h(Card, { title: t('employmentRecords'), actions: [h(LinkButton, { key: 'add', disabled: busy, onClick: () => onDialog({ kind: 'employment' }) }, h(Glyph, { name: 'plus', size: 12 }), t('empCreate'))] },
+      employments?.error ? h('div', { role: 'alert', className: 'sf-stack' },
+        h('p', { className: 'sf-neg' }, '读取归属记录暂时不可用，请稍后重试。'),
+        h(LinkButton, { onClick: onRetry }, '重试加载')) : null,
+      h(Table, {
+        columns: [
+          { label: t('empUser'), key: 'systemUserId', stickyLeft: true },
+          { label: t('empDept'), key: 'departmentName', sortValue: row => row.departmentName ?? row.departmentId, render: row => row.departmentName ?? row.departmentId },
+          { label: t('empStart'), key: 'startDate', sortValue: row => new Date(row.startDate).getTime(), render: row => employmentDateLabel(row.startDate), num: true },
+          { label: '结束日期', key: 'endDate', sortValue: row => row.endDate ? new Date(row.endDate).getTime() : Infinity, render: row => row.endDate ? employmentDateLabel(row.endDate) : '至今', num: true },
+          { label: '来源', key: 'sourceRef', sortValue: employmentSourceLabel, render: employmentSourceLabel },
+        ],
+        rows, empty: employments?.error ? null : !employments ? t('loading') : '暂无归属记录', rowKey: 'id', tableId: 'finance-employments',
+      }),
+      employments?.total > rows.length ? h('p', { className: 'sf-note' }, `仅展示前 ${rows.length} 条记录，排序仅作用于已加载记录。`) : null)
+    }
+
+    function EmploymentDialog({ contacts, contactsLoading, contactsError, departments, busy, t, onClose, onRetry, act }) {
       const [systemUserId, setSystemUserId] = useState('')
       const [departmentId, setDepartmentId] = useState('')
       const [startDate, setStartDate] = useState('')
-      const submit = () => {
-        if (!systemUserId.trim() || !departmentId || !startDate) return
-        act('/employment-records', { systemUserId: systemUserId.trim(), departmentId, startDate: new Date(`${startDate}T00:00:00`).toISOString() })
-        onClose()
+      const [saving, setSaving] = useState(false)
+      const [error, setError] = useState('')
+      const submitting = useRef(false)
+      const locked = busy || saving
+      const userOptions = [...new Map(contacts.filter(contact => contact.systemUserId).map(contact => [contact.systemUserId, contact.name || contact.systemUserId])).entries()]
+      const canSubmit = !contactsLoading && !contactsError && Boolean(startDate) && userOptions.some(([id]) => id === systemUserId) && (departments || []).some(department => department.id === departmentId)
+      const submit = async () => {
+        if (!canSubmit || locked || submitting.current) return
+        const start = new Date(`${startDate}T00:00:00`)
+        if (!Number.isFinite(start.getTime())) return
+        submitting.current = true
+        setSaving(true)
+        setError('')
+        try {
+          if (await act('/employment-records', { systemUserId, departmentId, startDate: start.toISOString(), sourceRef: 'manual' }, '归属已登记（部门变化时旧记录自动闭合）')) onClose()
+          else setError('登记失败，请检查字段或稍后重试。已保留输入。')
+        } catch { setError('登记失败，请检查字段或稍后重试。已保留输入。') }
+        finally { submitting.current = false; setSaving(false) }
       }
-      return h(Dialog, { title: t('empCreate'), onClose, footer: [
-        h(GhostButton, { key: 'cancel', onClick: onClose }, t('cancel')),
-        h(PrimaryButton, { key: 'ok', disabled: !systemUserId.trim() || !departmentId || !startDate, onClick: submit }, t('submit')),
+      return h(Dialog, { title: t('empCreate'), onClose: () => { if (!locked) onClose() }, footer: [
+        h(GhostButton, { key: 'cancel', disabled: locked, onClick: onClose }, t('cancel')),
+        h(PrimaryButton, { key: 'ok', busy: locked, disabled: !canSubmit || locked, onClick: submit }, t('submit')),
       ] },
-        h('div', { className: 'sf-stack' },
-          h(FormRow, { label: t('empUser') }, h(SearchSelect, { value: systemUserId, onChange: setSystemUserId, options: contacts.filter(contact => contact.systemUserId).map(contact => [contact.systemUserId, contact.name || contact.systemUserId]), placeholder: t('empUser') })),
-          h(FormRow, { label: t('empDept') }, h(SearchSelect, { value: departmentId, onChange: setDepartmentId, options: (departments || []).map(department => [department.id, department.name]), placeholder: t('empDept') })),
-          h(FormRow, { label: t('empStart') }, h(Field, { type: 'date', value: startDate, onChange: setStartDate }))))
+        error ? h('p', { role: 'alert', className: 'sf-neg' }, error) : null,
+        contactsError ? h('div', { role: 'alert' }, h('p', { className: 'sf-neg' }, '读取人员目录暂时不可用，请稍后重试。'), h(LinkButton, { onClick: onRetry }, '重试加载')) : null,
+        !contactsLoading && !contactsError && !userOptions.length ? h('p', { className: 'sf-note' }, '暂无已绑定人员，请先同步或绑定通讯录。') : null,
+        !(departments || []).length ? h('p', { className: 'sf-note' }, '暂无可用部门，请先同步组织目录。') : null,
+        h('fieldset', { className: 'sf-stack sf-fieldset sf-employment-form', disabled: locked },
+          h(FormRow, { label: t('empUser') }, h(SearchSelect, { value: systemUserId, disabled: locked || contactsLoading || contactsError, onChange: value => { setSystemUserId(value); setDepartmentId(''); setStartDate('') }, options: userOptions, placeholder: contactsLoading ? '人员加载中…' : t('empUser'), 'aria-label': '选择人员' })),
+          h(FormRow, { label: t('empDept') }, h(SearchSelect, { value: departmentId, disabled: locked, onChange: setDepartmentId, options: (departments || []).map(department => [department.id, department.name]), placeholder: t('empDept'), title: (departments || []).find(department => department.id === departmentId)?.name, 'aria-label': '归属部门' })),
+          h(FormRow, { label: t('empStart') }, h(Field, { type: 'date', disabled: locked, value: startDate, onChange: setStartDate, 'aria-label': '起始日期' }))))
     }
 
-    function MembersCard({ members, busy, t, act, onDialog }) {
+    function MembersCard({ members, busy, t, act, onDialog, onRetry }) {
       const rows = members?.list || []
-      return h(Card, { title: t('membersTitle') }, h(Table, {
+      return h(Card, { title: t('membersTitle') }, members?.forbidden ? h('div', { className: 'sf-note', role: 'status' }, '当前账号没有成员权限，请联系财务负责人。') : members?.error ? h(ListLoadError, { label: '成员列表', onRetry }) : null,
+      h(Table, {
         columns: [
-          { label: t('memberUser'), render: row => row.name ?? row.userId, stickyLeft: true },
-          { label: t('memberDept'), render: row => row.departmentName ?? '—' },
+          { label: t('memberUser'), key: 'name', sortValue: row => row.name ?? row.userId, render: row => row.name ?? row.userId, stickyLeft: true },
+          { label: t('memberDept'), key: 'departmentName', render: row => row.departmentName ?? '—' },
           {
-            label: t('role'),
+            label: t('role'), key: 'role',
+            sortValue: row => t(`roleName${row.role}`),
             render: row => h(Select, {
               value: row.role,
+              disabled: busy,
               onChange: value => act('/members', { userId: row.userId, role: value, name: row.name ?? undefined, enabled: row.enabled }),
               options: FINANCE_ROLES.map(role => [role, t(`roleName${role}`)]),
             }),
           },
-          { label: t('enabledCol'), render: row => h(Pill, { tone: row.enabled ? 'green' : 'muted' }, row.enabled ? '✓' : '—') },
-          { label: t('actions'), render: row => h(LinkButton, { onClick: () => act(`/members/${row.id}/remove`, {}) }, t('removeMember')) },
+          { label: t('enabledCol'), key: 'enabled', render: row => h(Pill, { tone: row.enabled ? 'green' : 'muted' }, row.enabled ? '✓' : '—') },
+          { label: t('actions'), key: 'actions', sortable: false, render: row => h(LinkButton, { disabled: busy, onClick: () => act(`/members/${row.id}/remove`, {}) }, t('removeMember')) },
         ],
-        rows, empty: members?.forbidden ? t('unknown') : t('empty'), rowKey: 'id', tableId: 'finance-members',
+        rows: members?.error || members?.forbidden ? [] : rows,
+        empty: members?.error || members?.forbidden ? null : !members ? t('loading') : t('empty'), rowKey: 'id', tableId: 'finance-members',
       }))
     }
 
@@ -2555,7 +3003,7 @@ window.__ModuleLoader__.load({
       const [historyError, setHistoryError] = useState(false)
       const orgOptions = (orgs || []).map(org => [org.id, org.name])
       const departmentOptions = (departments || []).map(department => [department.id, department.name])
-      const years = yearOptions()
+      const years = yearOptions(year)
       const months = Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1}月`])
 
       useEffect(() => {
@@ -2587,13 +3035,12 @@ window.__ModuleLoader__.load({
 
       const submit = async event => {
         event.preventDefault()
-        const form = new FormData(event.currentTarget)
+        if (busy) return
+        const formElement = event.currentTarget
+        const form = new FormData(formElement)
         const num = key => Number(form.get(key))
         const text = key => { const value = String(form.get(key) || '').trim(); return value || undefined }
-        const textChoice = key => {
-          const choice = text(`${key}Choice`)
-          return choice === '__custom__' ? text(`${key}Custom`) : choice
-        }
+        const textChoice = key => text(key + 'Choice')
         setBusy(true); setNotice(null)
         try {
           let path, payload
@@ -2616,7 +3063,7 @@ window.__ModuleLoader__.load({
             payload = { orgId: text('orgId'), year: num('year'), expenseType: text('expenseType'), budgetAmount: num('budgetAmount') }
             if (text('month')) payload.month = num('month')
             if (text('departmentId')) payload.departmentId = text('departmentId')
-            if (text('costItemName')) payload.costItemName = text('costItemName')
+            if (textChoice('costItemName')) payload.costItemName = textChoice('costItemName')
             if (text('note')) payload.note = text('note')
           } else {
             path = `/payment-plans/${text('planId')}/actuals`
@@ -2625,7 +3072,7 @@ window.__ModuleLoader__.load({
           }
           await post(path, payload)
           setNotice(t('submitted'))
-          event.currentTarget.reset()
+          formElement.reset()
         } catch (error) { setNotice(`${t('opFailed')}: ${error.message}`) } finally { setBusy(false) }
       }
 
@@ -2644,7 +3091,7 @@ window.__ModuleLoader__.load({
               historyLoaded && !history.paymentPlans.length ? h('p', { key: 'plan-empty', className: 'sf-note' }, `${t('empty')} · ${t('entryPaymentPlan')}`) : null,
             ],
             kind === 'payment' ? [
-              h(FormRow, { key: 'pt', label: t('planType') }, h(Select, { name: 'planType', required: true, options: PLAN_TYPES })),
+              h(FormRow, { key: 'pt', label: t('planType') }, h(Select, { name: 'planType', required: true, options: PLAN_TYPES.map(([id, label]) => [id, t(label)]) })),
               h(FormRow, { key: 'pd', label: t('description') }, h(Field, { name: 'description', required: true, maxLength: 500 })),
               h(FormRow, { key: 'pm', label: `${t('planMonth')} *` }, h(Select, { name: 'planMonth', required: true, options: months, placeholder: t('planMonth') })),
               h(FormRow, { key: 'py', label: t('payee') }, h(CustomizableTextSelect, { name: 'payeeName', options: history.payees, placeholder: t('payee') })),
@@ -2657,7 +3104,7 @@ window.__ModuleLoader__.load({
               h(FormRow, { key: 'rt', label: t('incomeType') }, h(CustomizableTextSelect, { name: 'incomeTypeName', options: history.incomeTypes, placeholder: t('incomeType') })),
               h(FormRow, { key: 'ra', label: `${t('planned')}（${t('unitYuan')}）` }, h(Field, { name: 'plannedAmount', type: 'number', min: 0.01, step: '0.01', required: true })),
             ] : kind === 'budget' ? [
-              h(FormRow, { key: 'be', label: t('expenseType') }, h(Select, { name: 'expenseType', required: true, options: EXPENSE_TYPES })),
+              h(FormRow, { key: 'be', label: t('expenseType') }, h(Select, { name: 'expenseType', required: true, options: EXPENSE_TYPES.map(([id, label]) => [id, t(label)]) })),
               h(FormRow, { key: 'bm', label: t('month') }, h(Select, { name: 'month', options: months, placeholder: t('month') })),
               h(FormRow, { key: 'bd', label: t('department') }, h(SearchSelect, { name: 'departmentId', options: departmentOptions, placeholder: t('department') })),
               h(FormRow, { key: 'bc', label: t('costItem') }, h(CustomizableTextSelect, { name: 'costItemName', options: history.costItems, placeholder: t('costItem') })),
@@ -2672,8 +3119,6 @@ window.__ModuleLoader__.load({
               notice ? h(Notice, null, notice) : null)))))
     }
 
-    // 通讯录同步走专用路由（宿主端无 /contacts-sync 时静默失败不影响其它能力）
-
     // 片段 5/7 视图：深度分析入口（预制指令投递当前会话，Agent 调 mcp__finance__* 完成分析）
 
     function sendErrorReason(error) {
@@ -2687,7 +3132,7 @@ window.__ModuleLoader__.load({
         const conversation = globalThis.__sensteed_finance_conversation?.() ?? null
         if (conversation?.send) {
           void conversation.send(prompt)
-            .then(() => setNotice(t('sent')))
+            .then(() => { globalThis.__sensteed_finance_close?.(); setNotice(t('sent')) })
             .catch(error => {
               globalThis.console?.warn?.('[dofe.sensteed-finance] conversation send failed', error)
               copyFallback(prompt, setNotice, t, sendErrorReason(error))
@@ -2846,8 +3291,8 @@ window.__ModuleLoader__.load({
               h('h1', { id: 'sf-title' }, t(SECTION_META[tab]?.[0] ?? 'title')),
               h('p', { className: 'sf-desc' }, operator ? `${t('operatorAs')} ${operator} · ${t(SECTION_META[tab]?.[1] ?? 'subtitle')}` : t(SECTION_META[tab]?.[1] ?? 'subtitle'))),
             h('div', { className: 'sf-header-side' },
-              h('label', { className: 'sf-filter' }, h('span', null, t('year')), h(Select, { value: year, onChange: value => { setYear(value); setDrillParams(null) }, options: yearOptions() })),
-              h('label', { className: 'sf-filter' }, h('span', null, t('org')), h(SearchSelect, { value: orgId, onChange: value => { setOrgId(value); setDrillParams(null) }, options: orgs.map(org => [org.id, org.name]), placeholder: t('allOrgs') })),
+              h('label', { className: 'sf-filter' }, h('span', null, t('year')), h(Select, { value: year, onChange: value => { setYear(value); setDrillParams(null) }, options: yearOptions(year) })),
+              h('label', { className: 'sf-filter' }, h('span', null, t('org')), h(SearchSelect, { value: orgId, onChange: value => { setOrgId(value); setDrillParams(null) }, options: orgs.filter(org => org.type !== 'GROUP').map(org => [org.id, org.name]), placeholder: t('allOrgs') })),
               h('div', { className: 'sf-header-buttons' },
                 h(Tooltip, { label: t('refresh') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('refresh'), onClick: refresh }, h(IconRefreshOutlineRegular, { size: 16 }))),
                 h(Tooltip, { label: t('close') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('close'), onClick: closeOverlay }, h(IconCloseOutlineRegular, { size: 16 })))))),
@@ -2892,7 +3337,8 @@ window.__ModuleLoader__.load({
             await conversation.send(prompt)
           })
         } })
-        return () => { delete globalThis.__sensteed_finance_conversation }
+        globalThis.__sensteed_finance_close = closeOverlay
+        return () => { delete globalThis.__sensteed_finance_conversation; delete globalThis.__sensteed_finance_close }
       }, 'dofe-sensteed-finance: scoped conversation')
       const t = ctx.locale.bind(NS)
       ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({ name: 'sidebar.footer.action', id: 'dofe-sensteed-finance', order: 56, inject: () => ({ t }) }, Button))
@@ -2909,16 +3355,51 @@ window.__ModuleLoader__.load({
       const [allowed, setAllowed] = useState(null)
       useEffect(() => {
         let cancelled = false
-        void fetch(`${BASE}/access`, {
-          credentials: 'same-origin',
-          redirect: 'error',
-          headers: { Accept: 'application/json' },
-          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-        })
-          .then(response => response.json().catch(() => null).then(body => ({ response, body })))
-          .then(({ response, body }) => { if (!cancelled) setAllowed(response.ok && body?.allowed === true) })
-          .catch(() => { if (!cancelled) setAllowed(false) })
-        return () => { cancelled = true }
+        let checking = false
+        let timer
+        const controller = new AbortController()
+        const check = async () => {
+          if (cancelled || checking) return
+          checking = true
+          clearTimeout(timer)
+          let nextCheckMs = 5000
+          try {
+            const response = await fetch(`${BASE}/access`, {
+              credentials: 'same-origin', redirect: 'error',
+              headers: { Accept: 'application/json' },
+              signal: AbortSignal.any([controller.signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]),
+            })
+            if (cancelled) return
+            if (response.status === 401 || response.status === 403) {
+              setAllowed(false)
+            } else {
+              if (!response.ok) throw new Error('finance_access_unavailable')
+              const body = await response.json()
+              if (body?.ok !== true || typeof body.allowed !== 'boolean') throw new Error('finance_access_unavailable')
+              if (cancelled) return
+              setAllowed(body.allowed)
+              if (body.allowed) nextCheckMs = 60000
+            }
+          } catch { /* An outage does not revoke a previously confirmed permission. */ }
+          finally {
+            checking = false
+            if (!cancelled) timer = setTimeout(() => { void check() }, nextCheckMs)
+          }
+        }
+        const refresh = () => { void check() }
+        const onVisible = () => { if (document.visibilityState === 'visible') refresh() }
+        refresh()
+        window.addEventListener('focus', refresh)
+        window.addEventListener('online', refresh)
+        document.addEventListener('visibilitychange', onVisible)
+        return () => {
+          cancelled = true
+          clearTimeout(timer)
+          controller.abort()
+          window.removeEventListener('focus', refresh)
+          window.removeEventListener('online', refresh)
+          document.removeEventListener('visibilitychange', onVisible)
+        }
       }, [])
       return allowed
     }

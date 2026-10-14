@@ -11,7 +11,7 @@ function sendToAgent(prompt, setNotice, t) {
     const conversation = globalThis.__sensteed_finance_conversation?.() ?? null
     if (conversation?.send) {
       void conversation.send(prompt)
-        .then(() => setNotice(t('sent')))
+        .then(() => { globalThis.__sensteed_finance_close?.(); setNotice(t('sent')) })
         .catch(error => {
           globalThis.console?.warn?.('[dofe.sensteed-finance] conversation send failed', error)
           copyFallback(prompt, setNotice, t, sendErrorReason(error))

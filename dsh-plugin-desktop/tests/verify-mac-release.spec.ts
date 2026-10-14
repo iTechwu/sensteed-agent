@@ -84,6 +84,17 @@ describe('macOS release artifact verification', () => {
     expect(harness.removeMountPoint).toHaveBeenCalledWith('/private/tmp/sensteed-agent-dmg-test')
   })
 
+  it('checks bundled resources inside the mounted application after the signature checks', () => {
+    const order: string[] = []
+    const harness = options({
+      verifyEntitlements: () => { order.push('entitlements') },
+      verifyRuntime: appPath => { order.push(`runtime:${appPath}`) },
+    })
+    verifyMacRelease(harness.value)
+    expect(order).toEqual(['entitlements', `runtime:${join('/private/tmp/sensteed-agent-dmg-test', `${productName}.app`)}`])
+    expect(harness.calls.some(call => call.command === 'spctl')).toBe(true)
+  })
+
   it('rejects absent or ambiguous release images before mounting', () => {
     for (const dmgs of [[], ['/one.dmg', '/two.dmg']]) {
       const harness = options({ listDmgs: () => dmgs })

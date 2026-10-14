@@ -111,13 +111,17 @@ export class DofeAuthService {
     if (this.operation !== undefined) return this.getStatus()
     this.cancelled = false
     this.abort = new AbortController()
-    this.snapshot = { status: 'pending' }
+    // Silent renewal must not temporarily revoke the session used by business
+    // routes. Only an explicit grant rejection invalidates a prior binding.
+    const renewing = !interactive && this.snapshot.status === 'bound'
+    if (!renewing) this.snapshot = { status: 'pending' }
     this.operation = this.openAuthorization(interactive).catch(error => {
       if (!this.cancelled) {
         // The generic dialog copy hides the underlying failure; keep the cause
         // chain in the diagnostic log so network vs provisioning is decidable.
         this.logger?.error(`dsh-plugin-desktop: dofe 登录流程失败: ${formatDesktopErrorDetails(error)}`)
         const invalid = error instanceof DofeAuthTokenError && error.code === 'invalid_grant'
+        if (renewing && !invalid) return
         this.fail(
           invalid ? '登录授权已失效，请重新登录' : loginNetworkError(error),
           invalid ? 'invalid_grant' : undefined,

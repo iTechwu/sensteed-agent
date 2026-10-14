@@ -356,9 +356,10 @@ describe('packaged desktop runtime verification', () => {
       () => {},
       () => {},
       () => calls.push('size'),
+      () => { calls.push('runtime'); return [] as string[] },
     )
 
-    expect(calls).toEqual(['static', 'aa', 'report', 'size', 'native'])
+    expect(calls).toEqual(['static', 'aa', 'runtime', 'report', 'size', 'native'])
   })
 
   it('hydrates omitted macOS native packages before verifying the package', async () => {
@@ -379,9 +380,10 @@ describe('packaged desktop runtime verification', () => {
       () => calls.push('closure'),
       () => {},
       () => calls.push('size'),
+      () => { calls.push('runtime'); return [] as string[] },
     )
 
-    expect(calls).toEqual(['hydrate', 'static', 'aa', 'closure', 'report', 'size', 'native'])
+    expect(calls).toEqual(['hydrate', 'static', 'aa', 'closure', 'runtime', 'report', 'size', 'native'])
   })
 
   it.skipIf(process.platform === 'win32')('rejects a 0644 packaged uv before signing', () => {

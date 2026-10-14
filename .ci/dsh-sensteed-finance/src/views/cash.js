@@ -129,12 +129,15 @@ function CashMatrix({ rows, t }) {
     if (!groups.has(key)) groups.set(key, {})
     groups.get(key)[row.month] = row
   }
-  return h(Table, {
+  return h(Table, { tableId: 'finance-CashMatrix-1',
     minColumns: 1080,
     columns: [
-      { label: t('org'), stickyLeft: true },
+      { label: t('org'), key: 'org', stickyLeft: true },
       ...Array.from({ length: 12 }, (_, index) => ({
         label: `${index + 1}`,
+        key: 'month-' + (index + 1),
+        sortLabel: (index + 1) + '月余额',
+        sortValue: row => finite(row[index + 1]?.projectedBalance) ?? finite(row[index + 1]?.actualBalance),
         num: true,
         render: row => {
           const cell = row[index + 1]
@@ -157,19 +160,19 @@ function CashMatrix({ rows, t }) {
 
 function PlansTab({ rows, total, page, onPage, t, busy, act, onDialog }) {
   return h(Card, { title: t('cashPlans'), unit: t('unitNote') },
-    h(Table, {
+    h(Table, { tableId: 'finance-PlansTab-1',
       columns: [
         { label: t('org'), key: 'orgName', stickyLeft: true },
-        { label: t('planType'), render: row => t(PLAN_LABELS[row.planType] ?? row.planType) },
+        { label: t('planType'), key: 'planType', render: row => t(PLAN_LABELS[row.planType] ?? row.planType) },
         { label: t('description'), key: 'description' },
-        { label: t('planMonth'), render: row => mm(row.planMonth ?? row.month), num: true },
-        { label: t('planned'), render: row => wan(row.plannedAmount) ?? '—', num: true },
-        { label: t('actual'), render: row => { const over = finite(row.actualAmount) !== null && finite(row.plannedAmount) !== null && row.actualAmount > row.plannedAmount; return h('span', { className: over ? 'sf-neg' : '' }, wan(row.actualAmount) ?? '—') }, num: true },
-        { label: t('remaining'), render: row => wan(row.remainingAmount) ?? '—', num: true },
-        { label: t('scheduleDate'), render: row => shortDate(row.scheduleDate) ?? '—', num: true },
-        { label: t('priority'), render: row => row.priority ? h(Pill, { tone: row.priority === 'HIGH' ? 'rose' : row.priority === 'MEDIUM' ? 'amber' : 'muted' }, t(PRIORITIES.find(([id]) => id === row.priority)?.[1] ?? row.priority)) : '—' },
+        { label: t('planMonth'), key: 'planMonth', sortValue: row => row.planMonth ?? row.month, render: row => mm(row.planMonth ?? row.month), num: true },
+        { label: t('planned'), key: 'plannedAmount', render: row => wan(row.plannedAmount) ?? '—', num: true },
+        { label: t('actual'), key: 'actualAmount', render: row => { const over = finite(row.actualAmount) !== null && finite(row.plannedAmount) !== null && row.actualAmount > row.plannedAmount; return h('span', { className: over ? 'sf-neg' : '' }, wan(row.actualAmount) ?? '—') }, num: true },
+        { label: t('remaining'), key: 'remainingAmount', render: row => wan(row.remainingAmount) ?? '—', num: true },
+        { label: t('scheduleDate'), key: 'scheduleDate', render: row => shortDate(row.scheduleDate) ?? '—', num: true },
+        { label: t('priority'), key: 'priority', render: row => row.priority ? h(Pill, { tone: row.priority === 'HIGH' ? 'rose' : row.priority === 'MEDIUM' ? 'amber' : 'muted' }, t(PRIORITIES.find(([id]) => id === row.priority)?.[1] ?? row.priority)) : '—' },
         {
-          label: t('actions'),
+          label: t('actions'), key: 'actions', sortable: false,
           render: row => h('div', { className: 'sf-row', style: { flexWrap: 'nowrap', justifyContent: 'flex-end' } },
             h(LinkButton, { onClick: () => onDialog({ kind: 'planDetail', plan: row }) }, t('actDetail')),
             h(LinkButton, { onClick: () => onDialog({ kind: 'schedule', plan: row }) }, t('schedule')),
@@ -256,14 +259,14 @@ function PlanAdjustmentsTab({ t, revision, reloadTick, busy, act, onDialog }) {
   return h('div', { className: 'sf-stack' },
     h(PillTabs, { tabs: ADJ_STATUSES, value: status, onChange: value => { setStatus(value); setPage(1) }, t }),
     h(Card, { title: t('cashAdjustments'), unit: t('unitNote') },
-      h(Table, {
+      h(Table, { tableId: 'finance-PlanAdjustmentsTab-1',
         columns: [
           { label: t('adjustmentOf'), key: 'code' },
-          { label: t('amount'), render: row => h('span', null, `${wan(row.oldAmount) ?? '—'} → ${wan(row.newAmount) ?? '—'} `, h('span', { className: 'sf-pos' }, `（${deltaOf(row)}）`)), num: true },
-          { label: t('statusCol'), render: row => h(Pill, { tone: ADJ_STATUS_TONES[row.status] ?? 'muted' }, t(ADJ_STATUS_KEYS[row.status] ?? row.status)) },
-          { label: t('lastSeen'), render: row => shortDate(row.submittedAt) ?? '—', num: true },
+          { label: t('amount'), key: 'amount', sortValue: row => row.newAmount - row.oldAmount, render: row => h('span', null, `${wan(row.oldAmount) ?? '—'} → ${wan(row.newAmount) ?? '—'} `, h('span', { className: 'sf-pos' }, `（${deltaOf(row)}）`)), num: true },
+          { label: t('statusCol'), key: 'status', render: row => h(Pill, { tone: ADJ_STATUS_TONES[row.status] ?? 'muted' }, t(ADJ_STATUS_KEYS[row.status] ?? row.status)) },
+          { label: t('lastSeen'), key: 'submittedAt', render: row => shortDate(row.submittedAt) ?? '—', num: true },
           {
-            label: t('actions'),
+            label: t('actions'), key: 'actions', sortable: false,
             render: row => h('div', { className: 'sf-row', style: { flexWrap: 'nowrap', justifyContent: 'flex-end' } },
               h(LinkButton, { onClick: () => onDialog({ kind: 'planAdjDetail', id: row.id }) }, t('actDetail')),
               row.status === 'SUBMITTED' ? h(LinkButton, { onClick: () => act(`/plan-adjustments/${row.id}/approve`, {}) }, t('actApprove')) : null,
@@ -284,23 +287,23 @@ function PlanAdjustmentsTab({ t, revision, reloadTick, busy, act, onDialog }) {
 function RevenueTab({ revenues, page, onPage, t, onBackfill }) {
   const rows = revenues?.data?.list || revenues?.list || []
   return h(Card, { title: t('revenueVs'), unit: t('unitNote') },
-    h(Table, {
+    h(Table, { tableId: 'finance-RevenueTab-1',
       columns: [
         { label: t('org'), key: 'orgName', stickyLeft: true },
         { label: t('itemName'), key: 'itemName' },
         { label: t('payer'), key: 'payerName' },
-        { label: t('monthCol'), render: row => mm(row.month), num: true },
-        { label: t('planned'), render: row => wan(row.plannedAmount) ?? '—', num: true },
-        { label: t('actual'), render: row => wan(row.actualAmount) ?? '—', num: true },
+        { label: t('monthCol'), key: 'month', sortValue: row => row.month, render: row => mm(row.month), num: true },
+        { label: t('planned'), key: 'plannedAmount', render: row => wan(row.plannedAmount) ?? '—', num: true },
+        { label: t('actual'), key: 'actualAmount', render: row => wan(row.actualAmount) ?? '—', num: true },
         {
-          label: t('variance'), num: true,
+          label: t('variance'), key: 'varianceAmount', num: true,
           render: row => {
             const value = finite(row.varianceAmount)
             if (value === null) return '—'
             return h('span', { className: value < 0 ? 'sf-neg' : 'sf-pos' }, wan(value))
           },
         },
-        { label: t('actions'), render: row => h(LinkButton, { onClick: () => onBackfill(row) }, t('backfill')) },
+        { label: t('actions'), key: 'actions', sortable: false, render: row => h(LinkButton, { onClick: () => onBackfill(row) }, t('backfill')) },
       ],
       rows, empty: t('empty'),
     }),

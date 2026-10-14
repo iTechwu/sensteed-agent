@@ -10,6 +10,38 @@ vi.mock('../src/generated-product-identity.ts', async importOriginal => ({
 }))
 afterEach(() => vi.unstubAllGlobals())
 
+it.each([
+  [{ status: 'error', error: 'network unavailable' }, false],
+  [{ status: 'error', code: 'invalid_grant' }, true],
+  [{ status: 'idle' }, true],
+  [{ status: 'cancelled' }, true],
+])('only prompts for login after definitive session revocation: %j', async (status, revoked) => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+  vi.useFakeTimers()
+  let current = { status: 'bound' } as Record<string, unknown>
+  vi.stubGlobal('fetch', vi.fn(async (path: string) => Response.json(path.endsWith('/status') ? current : { models: [] })))
+  const snapshot = { value: { setupComplete: true, validationVersion: 5, authMode: 'feishu', identity: { ssoSub: 'user', name: 'User' } } }
+  const settingsScope = { getSnapshot: () => snapshot, subscribe: () => () => {} }
+  const credentials = { describe: async () => ({ ok: true, value: { MODELS_API_KEY: { configured: true } } }) }
+  const container = document.createElement('div')
+  document.body.append(container)
+  const root = createRoot(container)
+  try {
+    await act(async () => root.render(createElement(DofeAccessGate, { credentials, settingsScope, settingsApi: {}, t: (key: string) => key } as never)))
+    expect(container.querySelector('[role="dialog"]')).toBeNull()
+    current = status
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000) })
+    expect(container.querySelector('[role="dialog"]') !== null).toBe(revoked)
+    current = { status: 'bound' }
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000) })
+    expect(container.querySelector('[role="dialog"]')).toBeNull()
+  } finally {
+    await act(async () => root.unmount())
+    container.remove()
+    vi.useRealTimers()
+  }
+})
+
 it('clears the rendered SSO identity in the same revocation write', async () => {
   const writes: Array<Array<{ op: string; path: string[]; value?: unknown }>> = []
   const calls: string[] = []

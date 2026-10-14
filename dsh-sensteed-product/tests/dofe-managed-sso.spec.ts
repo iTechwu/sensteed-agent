@@ -73,13 +73,13 @@ describe('Sensteed startup authorization', () => {
       .mockResolvedValueOnce(json({ code: 0, data: { allowed: true } })))
     await apply(h.ctx as never)
     expect(h.getSettings().setupComplete).toBe(true)
-    expect(h.getSettings().enabledPlugins).toEqual(['media'])
-    expect(h.ctx.plugin).toHaveBeenCalledTimes(2)
+    expect(h.getSettings().enabledPlugins).toEqual(['openmontage', 'media', 'opencli', 'connect-im'])
+    expect(h.ctx.plugin).toHaveBeenCalledTimes(3)
     expect(h.ctx.plugin).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({
       serverName: 'finance', url: 'https://ai.hozonauto.com/mcp/finance',
       headers: { Authorization: 'Bearer model-key', 'X-Sensteed-SSO-Authorization': 'Bearer access-new' },
     }))
-    expect(h.tray.enabled()).toBe(false)
+    expect(h.tray.enabled()).toBe(true)
     const section = h.ctx.systemPrompt.section.mock.calls.find(([s]) => s.name === 'dofe:managed-access')![0]
     expect(section.text({})).toContain('财务管理')
     const getGate = h.ctx.provide.mock.calls.find(([name]) => name === 'dofeAccess')![1]
@@ -102,7 +102,7 @@ describe('Sensteed startup authorization', () => {
       .mockResolvedValueOnce(json({ sub: 'user-1', name: 'User' }))
       .mockResolvedValueOnce(json({ code: 0, data: { allowed: false } })))
     await apply(h.ctx as never)
-    expect(h.ctx.plugin).toHaveBeenCalledTimes(1)
+    expect(h.ctx.plugin).toHaveBeenCalledTimes(2)
     expect(h.ctx.plugin).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ serverName: 'finance' }))
     const section = h.ctx.systemPrompt.section.mock.calls.find(([s]) => s.name === 'dofe:managed-access')![0]
     expect(section.text({})).not.toContain('财务')
@@ -183,7 +183,7 @@ it.each([true, false])('preserves setup completion (%s) while refreshing profile
     await vi.advanceTimersByTimeAsync(15 * 60_000)
     expect(h.getSettings().setupComplete).toBe(complete)
     expect(h.getSettings().modelId).toBe('model-a')
-    expect(h.getSettings().enabledPlugins).toEqual(['media', 'openmontage'])
+    expect(h.getSettings().enabledPlugins).toEqual(['openmontage', 'media', 'opencli', 'connect-im'])
     expect(h.getSettings().identity).toMatchObject({ name: 'Name 1', avatar: null, groups: ['department-1'], groupNames: { 'department-1': 'Department 1' } })
     expect(h.ctx.desktopRuntime.openExternal).not.toHaveBeenCalled()
   } finally { await h.dispose() }

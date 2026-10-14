@@ -28,6 +28,8 @@ import { initializeDeveloperLogging, diagnosticRunId } from './developer-logging
 import { installHostDeveloperLogging } from './host-developer-logging.ts'
 import { installAgentErrorLogging } from './agent-error-logging.ts'
 import { LogFileSink } from './log-files.ts'
+import * as desktopOffice from './desktop-office.ts'
+import { resolveDesktopOfficeConfig, type DesktopPrimaryRuntime } from './desktop-office.ts'
 
 function desktopProfileMarketSnapshot(market: DesktopMarketProvider): DesktopMarketSnapshot {
   return Object.freeze({
@@ -57,6 +59,8 @@ export interface DesktopHostOptions {
    */
   desktopProxyOverlay: Readonly<Record<string, string>>
   desktopPnpmBootstrap: DesktopPnpmBootstrap
+  /** Bundled interpreter payload of this CPU; a packaged Host fails without it, a development Host skips Office until `prepare:runtime` ran. */
+  primaryRuntime?: DesktopPrimaryRuntime
   logDirectory: string
   diagnosticRunId?: string
 }
@@ -172,6 +176,14 @@ export async function bootDesktopHost(options: DesktopHostOptions, runtime: Desk
         // Registered before the plugin tree mounts, so no agent can fail unrecorded.
         installAgentErrorLogging(hostCtx)
         installHostDeveloperLogging(hostCtx)
+        // Office skills and the workspace dependency tool need the bundled payload; a packaged Host without it fails here.
+        const office = resolveDesktopOfficeConfig(options.primaryRuntime, homeDir)
+        if (office === undefined) {
+          hostCtx.logger.warn(`${BIN_NAME}: Office skills are unavailable; run yarn prepare:runtime to prepare the primary runtime`)
+        } else {
+          await hostCtx.plugin(desktopOffice, office)
+          hostCtx.logger.info(`${BIN_NAME}: Office skills mounted from ${office.source}`)
+        }
         await hostCtx.plugin(DesktopProfileService, {
           current: {
             name: activeProfileName,
