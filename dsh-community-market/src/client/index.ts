@@ -8,7 +8,6 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { MarketLocaleKey } from './locales.js'
-import { MarketLauncher } from './MarketLauncher.js'
 import { MarketOverlay } from './MarketOverlay.js'
 import { MarketSettingsTab } from './MarketSettingsTab.js'
 import { createMarketViewStore } from './market-view-store.js'
@@ -37,14 +36,6 @@ export function apply(ctx: ClientContext): void {
     locale: NS,
     inject: () => ({ readLocale }),
   }, MarketSettingsTab))
-  ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
-    name: 'sidebar.footer.action',
-    id: 'community-market',
-    order: 10,
-    label: () => ctx.locale.bind(NS)('tab'),
-    locale: NS,
-    store: marketView,
-  }, MarketLauncher))
   ctx.slots.inject('shell.overlay', () => ctx.slots.register({
     name: 'shell.overlay',
     id: 'community-market',
