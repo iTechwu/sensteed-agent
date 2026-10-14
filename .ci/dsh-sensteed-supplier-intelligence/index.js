@@ -47,10 +47,13 @@ export const capabilities = Object.freeze([
 
 export function apply(ctx, overrides = {}) {
   const disposers = []
+  // Match the desktop product's built-in supplier entitlement policy.
+  const entitlementAllowsSupplier = gate => gate?.entitlements?.plugins?.includes('supplier-intelligence')
+    || gate?.entitlements?.plugins?.includes('tools')
   const canUseSupplier = scope => {
     const gate = typeof ctx.dofeAccess === 'function' ? ctx.dofeAccess() : undefined
     if (gate && (!gate.ready || !gate.enabledPlugins?.includes('supplier-intelligence')
-      || !gate.entitlements?.plugins?.includes('supplier-intelligence'))) return false
+      || !entitlementAllowsSupplier(gate))) return false
     return (ctx.tools?.schemas?.(scope) || []).some(tool => MCP_TOOL_PREFIXES.some(prefix => String(tool.name || '').startsWith(prefix)))
   }
   if (ctx.systemPrompt?.section) {
@@ -129,21 +132,27 @@ export function apply(ctx, overrides = {}) {
         const path = new URL(req.url, origin).pathname
         if (req.method === 'GET' && path === ROUTE_PREFIX + '/access') {
           const gate = typeof ctx.dofeAccess === 'function' ? ctx.dofeAccess() : undefined
-          const available = gate?.ready === true && gate.enabledPlugins?.includes('supplier-intelligence')
-            && gate.entitlements?.plugins?.includes('supplier-intelligence')
-            && (ctx.tools.schemas?.() || []).some(tool => MCP_TOOL_PREFIXES.some(prefix => String(tool.name || '').startsWith(prefix)))
+          const hasTools = (ctx.tools.schemas?.() || []).some(tool => MCP_TOOL_PREFIXES.some(prefix => String(tool.name || '').startsWith(prefix)))
+          let reason
+          if (gate?.ready !== true) reason = 'login_required'
+          else if (!gate.enabledPlugins?.includes('supplier-intelligence')) reason = 'plugin_disabled'
+          else if (!entitlementAllowsSupplier(gate)) reason = 'entitlement_required'
+          else if (!hasTools) reason = 'supply_chain_unavailable'
           const apiKey = await resolveApiKey(ctx)
           const auth = ctx.dofeAuth ?? ctx.get?.('dofeAuth')
           const session = auth?.getDatasourceSession?.()
           if (apiKey) refreshCredentialScope(apiKey, `${session?.tenantId || ''}\0${session?.operator || ''}`)
-          return respond(200, { ok: true, allowed: Boolean(available && apiKey), scopeId: credentialScopeId })
+          if (!apiKey && reason === undefined) reason = 'credential_unavailable'
+          return respond(200, { ok: true, allowed: reason === undefined, reason, scopeId: credentialScopeId })
         }
         if (req.method !== 'POST' || path !== ROUTE_PREFIX + '/call') return respond(404, { ok: false, error: 'not_found' })
         const gate = typeof ctx.dofeAccess === 'function' ? ctx.dofeAccess() : undefined
-        if (gate?.ready !== true || !gate.enabledPlugins?.includes('supplier-intelligence')
-          || !gate.entitlements?.plugins?.includes('supplier-intelligence')) return respond(403, { ok: false, error: 'plugin_unavailable' })
+        if (gate?.ready !== true) return respond(403, { ok: false, error: 'login_required' })
+        if (!gate.enabledPlugins?.includes('supplier-intelligence')) return respond(403, { ok: false, error: 'plugin_disabled' })
+        if (!entitlementAllowsSupplier(gate)) return respond(403, { ok: false, error: 'entitlement_required' })
         const schemas = ctx.tools.schemas?.() || []
         const available = schemas.map(tool => String(tool.name || ''))
+        if (!available.some(name => MCP_TOOL_PREFIXES.some(prefix => name.startsWith(prefix)))) return respond(503, { ok: false, error: 'supply_chain_unavailable' })
         let body
         try { body = await readJsonBody(req, MAX_BODY_BYTES) } catch { return respond(400, { ok: false, error: 'invalid_request' }) }
         if (!body || typeof body.action !== 'string' || !body.args || typeof body.args !== 'object' || Array.isArray(body.args)) return respond(400, { ok: false, error: 'invalid_request' })

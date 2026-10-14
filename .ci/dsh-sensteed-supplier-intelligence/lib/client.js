@@ -95,14 +95,16 @@ window.__ModuleLoader__.load({
       const [revision, setRevision] = useState(0)
       const [error, setError] = useState('')
       const [access, setAccess] = useState(null)
+      const [accessReason, setAccessReason] = useState('')
       const [scopeReady, setScopeReady] = useState(false)
       const [unread, setUnread] = useState(0)
       const retryAccess = () => {
         setAccess(null)
+        setAccessReason('')
         fetch(`${BASE}/access`, { credentials: 'same-origin', redirect: 'error' })
           .then(response => response.json())
-          .then(body => { adoptScope(body?.scopeId); setScopeReady(Boolean(body?.scopeId)); setAccess(body?.allowed === true) })
-          .catch(() => setAccess(false))
+          .then(body => { adoptScope(body?.scopeId); setScopeReady(Boolean(body?.scopeId)); setAccessReason(body?.reason || 'unavailable'); setAccess(body?.allowed === true) })
+          .catch(() => { setAccessReason('connection_unavailable'); setAccess(false) })
       }
       useEffect(() => {
         const refreshEvent = () => refresh()
@@ -123,7 +125,7 @@ window.__ModuleLoader__.load({
       useEffect(() => { retryAccess() }, [])
       const refresh = () => { setError(''); setRevision(value => value + 1) }
       if (access === null) return h('main', { className: 'sr-page', role: 'status' }, '正在连接供应链工作台…')
-      if (!access) return h('main', { className: 'sr-page' }, h('h1', null, '供应商风险'), h('p', null, '当前插件、凭据或供应链 MCP 暂不可用。'), h('button', { type: 'button', className: 'sr-button sr-secondary', onClick: retryAccess }, '重新连接'))
+      if (!access) return h('main', { className: 'sr-page' }, h('h1', null, '供应商风险'), h('p', null, accessMessage(accessReason)), h('button', { type: 'button', className: 'sr-button sr-secondary', onClick: retryAccess }, '重新连接'))
       return h('main', { className: 'sr-page' },
         h('header', { className: 'sr-header' },
           h('div', null, h('p', { className: 'sr-eyebrow' }, 'SUPPLIER INTELLIGENCE'), h('h1', null, '供应商风险'), h('p', { className: 'sr-subtitle' }, '已归集事实、待核验线索与业务判断分开展示。')),
@@ -140,6 +142,17 @@ window.__ModuleLoader__.load({
           tab === 'media' ? h(Evidence, { kind: 'media', revision, setError, onSelect: row => { setEvidence(row.evidenceId, 'media', row.eventId); setSelected(row.supplierId); setTab('business') } }) : null,
           tab === 'business' ? h(Business, { revision, setError, onScopeReady: scopeReady }) : null,
           tab === 'weekly' ? h(Weekly, { revision, setError, onUnread: setUnread, onScopeReady: scopeReady }) : null))
+    }
+
+    function accessMessage(reason) {
+      return {
+        login_required: '请先完成 Sensteed 登录，再连接供应商风险工作台。',
+        plugin_disabled: '供应商风险插件已关闭，请在插件设置中启用后重试。',
+        entitlement_required: '当前账号未获得供应链数据权限，请联系管理员开通。',
+        credential_unavailable: '本机 Models 凭据不可用，请重新登录后重试。',
+        supply_chain_unavailable: '供应链 MCP 当前未连接，请稍后重试。',
+        connection_unavailable: '本地工作台连接失败，请重新连接。',
+      }[reason] || '当前插件、凭据或供应链 MCP 暂不可用。'
     }
 
     function setSelected(value) { selectedSupplier = value }
