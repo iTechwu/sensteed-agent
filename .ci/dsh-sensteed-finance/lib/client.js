@@ -3355,16 +3355,51 @@ window.__ModuleLoader__.load({
       const [allowed, setAllowed] = useState(null)
       useEffect(() => {
         let cancelled = false
-        void fetch(`${BASE}/access`, {
-          credentials: 'same-origin',
-          redirect: 'error',
-          headers: { Accept: 'application/json' },
-          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-        })
-          .then(response => response.json().catch(() => null).then(body => ({ response, body })))
-          .then(({ response, body }) => { if (!cancelled) setAllowed(response.ok && body?.allowed === true) })
-          .catch(() => { if (!cancelled) setAllowed(false) })
-        return () => { cancelled = true }
+        let checking = false
+        let timer
+        const controller = new AbortController()
+        const check = async () => {
+          if (cancelled || checking) return
+          checking = true
+          clearTimeout(timer)
+          let nextCheckMs = 5000
+          try {
+            const response = await fetch(`${BASE}/access`, {
+              credentials: 'same-origin', redirect: 'error',
+              headers: { Accept: 'application/json' },
+              signal: AbortSignal.any([controller.signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]),
+            })
+            if (cancelled) return
+            if (response.status === 401 || response.status === 403) {
+              setAllowed(false)
+            } else {
+              if (!response.ok) throw new Error('finance_access_unavailable')
+              const body = await response.json()
+              if (body?.ok !== true || typeof body.allowed !== 'boolean') throw new Error('finance_access_unavailable')
+              if (cancelled) return
+              setAllowed(body.allowed)
+              if (body.allowed) nextCheckMs = 60000
+            }
+          } catch { /* An outage does not revoke a previously confirmed permission. */ }
+          finally {
+            checking = false
+            if (!cancelled) timer = setTimeout(() => { void check() }, nextCheckMs)
+          }
+        }
+        const refresh = () => { void check() }
+        const onVisible = () => { if (document.visibilityState === 'visible') refresh() }
+        refresh()
+        window.addEventListener('focus', refresh)
+        window.addEventListener('online', refresh)
+        document.addEventListener('visibilitychange', onVisible)
+        return () => {
+          cancelled = true
+          clearTimeout(timer)
+          controller.abort()
+          window.removeEventListener('focus', refresh)
+          window.removeEventListener('online', refresh)
+          document.removeEventListener('visibilitychange', onVisible)
+        }
       }, [])
       return allowed
     }

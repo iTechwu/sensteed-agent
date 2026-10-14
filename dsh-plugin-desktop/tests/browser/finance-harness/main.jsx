@@ -16,7 +16,7 @@ const sessions = {
   list: { getSnapshot: () => ({ ids: ['session-1'] }) },
   retainInfo: () => ({ getSnapshot: () => ({ retainedBy: { mainView: 1 } }) }),
   using: async (_id, _options, run) => run({ ready: Promise.resolve() }),
-  scope: () => ({ conversation: { send: async prompt => window.analysisPrompts.push(prompt) } }),
+  scope: () => ({ get: name => name === 'conversation' ? { send: async prompt => window.analysisPrompts.push(prompt) } : undefined }),
 }
 plugin.apply({
   effect: setup => setup(),

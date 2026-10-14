@@ -44,12 +44,13 @@ export function apply(ctx, overrides = {}) {
         headers: { Accept: 'application/json', Authorization: `Bearer ${config.token}` },
       })
       const payload = await response.json().catch(() => null)
-      const allowed = response.ok && payload?.data?.allowed === true
-      accessCache = { key: cacheKey, allowed, expiresAt: Date.now() + 5000 }
+      const allowed = response.status === 401 || response.status === 403 ? false
+        : response.ok && typeof payload?.data?.allowed === 'boolean' ? payload.data.allowed : undefined
+      accessCache = { key: cacheKey, allowed, expiresAt: Date.now() + (allowed === undefined ? 1000 : 5000) }
       return allowed
     } catch {
-      accessCache = { key: cacheKey, allowed: false, expiresAt: Date.now() + 1000 }
-      return false
+      accessCache = { key: cacheKey, allowed: undefined, expiresAt: Date.now() + 1000 }
+      return undefined
     }
   }
 
@@ -85,7 +86,9 @@ export function apply(ctx, overrides = {}) {
           if (!config.tenantId) {
             return { ok: false, error: '请先使用飞书登录，再打开财务管理。' }
           }
-          if (!(await resolveWorkspaceAccess(config))) {
+          const allowed = await resolveWorkspaceAccess(config)
+          if (allowed === undefined) return { ok: false, error: '财务权限服务暂不可用，请稍后重试。' }
+          if (!allowed) {
             return { ok: false, error: '当前账号没有财务团队权限，无法使用财务管理。' }
           }
           const orgs = await financeApiCall(fetchImpl, config, 'finance_get_orgs', {}, now(), ctx.logger)
@@ -146,6 +149,7 @@ export function apply(ctx, overrides = {}) {
       const pathname = safePathname(req.url)
       const sub = pathname.slice(ROUTE_PREFIX.length) || '/'
       const allowed = await resolveWorkspaceAccess(config)
+      if (allowed === undefined) return sendJson(res, 503, { ok: false, error: '财务权限服务暂不可用，请稍后重试。' })
       if (sub === '/access') return sendJson(res, 200, { ok: true, allowed })
       if (!allowed) {
         ctx.logger?.info?.(`sensteed finance: ${req.method} ${sub} rejected — finance workspace access denied`)

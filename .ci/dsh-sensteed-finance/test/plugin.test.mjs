@@ -736,6 +736,17 @@ test('checks workspace access before proxying finance data', async () => {
   assert.match(calls[0], /permissions\/workspace-access/u)
 })
 
+test('reports permission service outages separately from a denied workspace', async () => {
+  const { routes } = await loadHost({ fetch: async () => mcpJson({ allowed: false }, 503) })
+  const route = routes.get(BASE)
+  const access = await invokeRoute(route, 'GET', BASE + '/access')
+  assert.equal(access.status, 503)
+  assert.equal(access.body.ok, false)
+  assert.equal(access.body.allowed, undefined)
+  const data = await invokeRoute(route, 'GET', BASE + '/overview')
+  assert.equal(data.status, 503)
+})
+
 test('accepts the public Datasource REST success envelope with code 200', async () => {
   const { routes } = await loadHost({ fetch: async () => jsonResponse({
     code: 200,
