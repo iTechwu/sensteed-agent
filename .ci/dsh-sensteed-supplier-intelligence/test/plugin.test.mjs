@@ -35,8 +35,8 @@ test('loads the skill as system guidance and registers a read-only bootstrap', a
     'mcp__supply-chain__supply_chain_qcc_company_search',
   ])
   assert.equal(sections[0].name, 'sensteed:supplier-intelligence-skill')
-  assert.match(sections[0].text, /供应商全量归集与舆情分析/u)
-  assert.match(sections[0].text, /QCC_MCP_UNAVAILABLE/u)
+  assert.match(sections[0].text({}), /供应商全量归集与舆情分析/u)
+  assert.match(sections[0].text({}), /QCC_MCP_UNAVAILABLE/u)
   const bootstrap = tools.get('sensteed_supplier_intelligence_bootstrap')
   assert.ok(bootstrap)
   assert.equal(bootstrap.isConcurrencySafe(), true)
@@ -60,4 +60,94 @@ test('skill preserves cache, verification, idempotency, and evidence boundaries'
     '不能写成企业事实',
   ]) assert.match(skill, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'u'))
   assert.doesNotMatch(skill, /Bearer\s+[A-Za-z0-9]/u)
+})
+
+test('supplier guidance and bootstrap follow the live product gate and tool connection', async () => {
+  const { apply } = await import('../index.js')
+  const listeners = new Map()
+  const tools = new Map()
+  let enabled = false
+  let connected = true
+  let section
+  const dispose = apply({
+    dofeAccess: () => ({ ready: true, enabledPlugins: enabled ? ['supplier-intelligence'] : [], entitlements: { plugins: enabled ? ['supplier-intelligence'] : [] } }),
+    on(name, callback) { listeners.set(name, callback); return () => listeners.delete(name) },
+    tools: {
+      schemas: scope => connected && scope !== 'restricted' ? [{ name: 'mcp__supply-chain__supply_chain_suppliers_list' }] : [],
+      register(tool) { tools.set(tool.name, tool); return () => tools.delete(tool.name) },
+    },
+    systemPrompt: { section(value) { section = value; return () => {} } },
+  })
+  assert.equal(tools.size, 0)
+  assert.equal(section.text({}), '')
+  enabled = true
+  listeners.get('dofe/access-changed')()
+  assert.equal(tools.size, 1)
+  assert.match(section.text({}), /供应商/u)
+  assert.equal(section.text({ scope: 'restricted' }), '')
+  connected = false
+  listeners.get('tools/change')()
+  assert.equal(tools.size, 0)
+  enabled = false
+  assert.equal(section.text({}), '')
+  dispose()
+  assert.equal(listeners.size, 0)
+})
+
+test('workbench host adapter uses only the fixed gateway and hides the stored key', async () => {
+  const { apply } = await import('../index.js')
+  let route
+  let request
+  const dispose = apply({
+    webServer: { port: 43123, register(value) { route = value; return () => {} } },
+    dofeAccess: () => ({ ready: true, enabledPlugins: ['supplier-intelligence'], entitlements: { plugins: ['supplier-intelligence'] } }),
+    tools: { schemas: () => [
+      'supply_chain_workbench_overview_get', 'supply_chain_weekly_report_retry',
+    ].map(name => ({ name: `mcp__supply-chain__${name}` })) },
+    credentials: { async resolve(name) { assert.equal(name, 'MODELS_API_KEY'); return { value: 'fixture-only-secret' } } },
+  }, { fetch: async (url, options) => {
+    request = { url, options }
+    return new Response(JSON.stringify({ jsonrpc: '2.0', id: 'fixture', result: { structuredContent: { counts: { suppliers: 3 }, dataSource: 'database' } } }), { status: 200, headers: { 'content-type': 'application/json' } })
+  } })
+  const call = async ({ body = '{}', pathname = '/api/desktop/sensteed/supplier-risk/call' } = {}) => {
+    const chunks = [Buffer.from(body)]
+    const req = {
+      method: 'POST', url: pathname, socket: { remoteAddress: '127.0.0.1' },
+      headers: { origin: 'http://127.0.0.1:43123', 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' },
+      async *[Symbol.asyncIterator]() { yield* chunks },
+    }
+    let status
+    let payload
+    const res = { writeHead(code) { status = code }, end(value) { payload = value } }
+    await route.handler(req, res)
+    return { status, payload: JSON.parse(payload || 'null') }
+  }
+  const read = await call({ body: JSON.stringify({ action: 'supply_chain_workbench_overview_get', args: {} }) })
+  assert.equal(read.status, 200)
+  assert.equal(read.payload.data.counts.suppliers, 3)
+  assert.equal(read.payload.data.dataSource, 'database')
+  assert.equal(request.url, 'https://ai.hozonauto.com/mcp/tools/supply-chain')
+  assert.equal(request.options.headers.Authorization, 'Bearer fixture-only-secret')
+  assert.doesNotMatch(JSON.stringify(read.payload), /fixture-only-secret/u)
+
+  const forged = await call({ body: JSON.stringify({ action: 'supply_chain_workbench_overview_get', args: { tenantId: 'forged' } }) })
+  assert.equal(forged.status, 400)
+  assert.equal(forged.payload.error, 'invalid_arguments')
+  const unlisted = await call({ body: JSON.stringify({ action: 'supply_chain_qcc_company_search', args: { query: 'example' } }) })
+  assert.equal(unlisted.status, 404)
+  const unconfirmed = await call({ body: JSON.stringify({ action: 'supply_chain_weekly_report_retry', args: { reportId: 'r1' } }) })
+  assert.equal(unconfirmed.status, 400)
+  assert.equal(unconfirmed.payload.error, 'confirmation_required')
+  dispose()
+})
+
+test('client bundle registers a keyed main panel and a native sidebar panel row', async () => {
+  const manifest = JSON.parse(await readFile(new URL('package.json', root), 'utf8'))
+  assert.equal(manifest.exports['./client'], './lib/client.js')
+  const bundle = await readFile(new URL('lib/client.js', root), 'utf8')
+  assert.match(bundle, /key: PANEL_ID/u)
+  assert.match(bundle, /name: 'sidebar\.panellist'/u)
+  assert.doesNotMatch(bundle, /shell\.overlay|aria-modal/u)
+  assert.match(bundle, /supply_chain_weekly_report_plan_save/u)
+  assert.match(bundle, /supply_chain_business_analysis_save/u)
 })
