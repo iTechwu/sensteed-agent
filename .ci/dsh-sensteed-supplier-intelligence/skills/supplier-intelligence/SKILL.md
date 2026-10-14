@@ -5,6 +5,16 @@ description: 归集供应商企查查与社交媒体数据，复核全量覆盖�
 
 # 供应商全量归集与舆情分析
 
+## 工作台与业务判断
+
+Sensteed 默认插件提供“供应商风险”主内容区：风险总览、供应商台账、工商与司法证据、媒体舆情、业务影响和每周风险报告。工作台读取 `supply_chain_workbench_overview_get`、`supply_chain_workbench_suppliers_list`、`supply_chain_workbench_evidence_list`、`supply_chain_business_context_get` 与 `supply_chain_weekly_reports_list` 等已持久化视图；这些读取不会发起外部采集。
+
+- 面向用户解释风险时，分开引用已确认事实、待核验线索、团队录入的业务背景和 Agent 推断。媒体候选不等于企业事实。
+- 业务影响判断通过 `supply_chain_business_analysis_save` 持久化，必须关联当前业务背景版本和证据版本；版本冲突或证据变化时先重新读取再分析，不覆盖旧结论。
+- 周报只呈现服务端已保存快照。不要声称页面读取会刷新工商/媒体数据，也不要将预算记录描述为已执行采集。
+- 新供应商导入只回报新增、重复数以及经服务端脱敏的行号和稳定错误码；绝不在 Agent 摘要中复述整份 CSV 或原始导入异常。
+- 用户要求扩大监控或启动外部采集时，先说明目标供应商、来源和额度影响，等待明确确认；已提交任务用原 `runId` 轮询，不重复提交。
+
 通过 `mcp__supply-chain__*` 工具工作。开始时调用 `sensteed_supplier_intelligence_bootstrap` 和 `supply_chain_capabilities_get`，确认当前工具目录；不要把客户端、Cookie、API Key、租户或用户标识作为工具参数。
 
 ## 企业主体检索

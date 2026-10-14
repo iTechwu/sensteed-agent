@@ -1,8 +1,10 @@
 # dsh-sensteed-supplier-intelligence
 
-Sensteed Agent 的供应商全量数据归集与舆情分析插件。插件注册 tools.dofe.ai 供应链 MCP、只读能力预检工具，并把 `skills/supplier-intelligence/SKILL.md` 注入 Agent 指导。
+Sensteed Agent 的供应商全量数据归集与舆情分析插件。默认安装后在原生侧栏增加“供应商风险”入口，在主内容区提供风险总览、供应商台账、工商与司法、媒体核验、业务影响和风险周报六个页面；不会替换或覆盖会话侧栏。
 
-默认流程先读取供应商、企查查缓存、关系与情报报告；只有发现数据缺口时，才使用受控 MCP 工具触发企查查或社媒采集。所有外部调用继续由 tools.dofe.ai 服务端执行缓存、预算、入库和幂等保护，插件不保存供应商平台凭据。
+页面读取 Tools 供应链域持久化的数据，读取本身不会触发外部采集。新增供应商、批量导入、事件核验、业务判断和周报设置均通过显式确认及现有幂等命令提交；候选线索、已确认事实和人工判断保持分开。Agent 分析仍在原会话中运行。
+
+Host 只从 Sensteed credential store 解析 `MODELS_API_KEY`，仅请求固定公共 MCP `https://ai.hozonauto.com/mcp/tools/supply-chain`。页面通过受同源校验的本机 Host 路由访问，不接收 URL、tenant、operator 或 credential 参数。
 
 ```bash
 npm test

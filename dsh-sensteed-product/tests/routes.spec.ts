@@ -72,6 +72,7 @@ describe('dofe-product-routes', () => {
       '/api/desktop/auth/feishu/cancel',
       '/api/desktop/auth/feishu/complete',
       '/api/desktop/auth/feishu/logout',
+      '/api/desktop/auth/feishu/refresh',
       '/api/desktop/auth/feishu/session',
       '/api/desktop/auth/feishu/status',
       '/api/desktop/dofe/models',

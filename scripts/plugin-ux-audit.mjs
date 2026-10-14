@@ -324,7 +324,9 @@ if (!dofeAccessSource.includes('aria-busy={interactionBusy}')) {
   failures.push('dsh-plugin-desktop: native access form does not expose its combined busy state')
 }
 if (!dofeAccessSource.includes('const ACCESS_REQUEST_TIMEOUT_MS = 25000')
-  || (dofeAccessSource.match(/signal:\s*AbortSignal\.timeout\(ACCESS_REQUEST_TIMEOUT_MS\)/gu) || []).length !== (dofeAccessSource.match(/\bfetch\(/gu) || []).length) {
+  || !dofeAccessSource.includes('const ACCESS_REFRESH_TIMEOUT_MS = 60_000')
+  || (dofeAccessSource.match(/signal:\s*AbortSignal\.timeout\(ACCESS_REFRESH_TIMEOUT_MS\)/gu) || []).length !== 1
+  || (dofeAccessSource.match(/signal:\s*AbortSignal\.timeout\(ACCESS_(?:REQUEST|REFRESH)_TIMEOUT_MS\)/gu) || []).length !== (dofeAccessSource.match(/\bfetch\(/gu) || []).length) {
   failures.push('dsh-plugin-desktop: native access API calls have no bounded timeout policy')
 }
 if (!desktopSettingsApiSource.includes('const DESKTOP_REQUEST_TIMEOUT_MS = 30000')

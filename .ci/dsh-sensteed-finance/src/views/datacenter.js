@@ -2,6 +2,7 @@
 
 function DataCenterView({ ctx, t }) {
   const { revision } = ctx
+  const canManage = ctx.financeWriter && ctx.permissions.includes('finance.source.review')
   const [configs, setConfigs] = useState(null)
   const [runs, setRuns] = useState(null)
   const [metrics, setMetrics] = useState(null)
@@ -98,7 +99,7 @@ function DataCenterView({ ctx, t }) {
       h('article', { className: 'sf-dc-stat' }, h('span', null, t('qualityIssues')), h('strong', null, formatNumber(issueTotal) ?? '0'), h('small', null, `${t('qualityCritical')} ${formatNumber(criticalTotal) ?? '0'} · ${t('qualityWarn')} ${formatNumber(warnTotal) ?? '0'}`)),
       h('article', { className: 'sf-dc-stat' }, h('span', null, t('dsRuns')), h('strong', null, formatNumber(runList.length) ?? '0'), h('small', null, `${t('latestSync')} ${shortDate(runList[0]?.runAt ?? runList[0]?.startedAt) ?? '—'}`)),
       h('article', { className: 'sf-dc-stat' }, h('span', null, t('batchesTitle')), h('strong', null, formatNumber(batchList.length) ?? '0'), h('small', null, `${t('successRows')} ${formatNumber(batchList.reduce((sum, row) => sum + (finite(row.successRows) ?? 0), 0)) ?? '0'}`))),
-    h(Card, { title: t('dsManualSync'), actions: h('span', { className: 'sf-card-unit' }, t('dsRouteHint')) },
+    canManage ? h(Card, { title: t('dsManualSync'), actions: h('span', { className: 'sf-card-unit' }, t('dsRouteHint')) },
       h('div', { className: 'sf-stack' },
         h('div', { className: 'sf-inline-form' },
           h(FormRow, { label: t('dsScope') }, h(Select, { value: syncForm.scope, onChange: value => setSyncForm(current => ({ ...current, scope: value })), options: scopeOptions })),
@@ -108,8 +109,8 @@ function DataCenterView({ ctx, t }) {
         ),
         h('div', { className: 'sf-row-between' }, h('span', { className: 'sf-note' }, t('dsSyncHint')), h(PrimaryButton, { busy, disabled: !syncForm.bizSystem.trim(), onClick: sync }, t('syncNow'))),
         syncResult ? h('div', { className: 'sf-note', role: 'status' }, `${t('syncFetched')} ${syncResult.fetched ?? 0} · ${t('dsTransport')} ${syncResult.transport ?? '—'} · ${t('batchStatus')} ${syncResult.stage ?? '—'}${syncResult.batchId ? ` · ${syncResult.batchId}` : ''}`) : null,
-      )),
-    h(Card, { title: t('dsConfigs'), actions: h(PrimaryButton, { busy, onClick: () => setConfigDialog({}) }, h(Glyph, { name: 'plus', size: 12 }), t('dsAdd')) }, h(React.Fragment, null,
+      )) : null,
+    h(Card, { title: t('dsConfigs'), actions: canManage ? h(PrimaryButton, { busy, onClick: () => setConfigDialog({}) }, h(Glyph, { name: 'plus', size: 12 }), t('dsAdd')) : null }, h(React.Fragment, null,
       h(Table, { tableId: 'finance-DataCenterView-configs', minColumns: '900px',
         columns: [
           { label: t('dsScope'), key: 'scope', render: row => row.scope === 'HEADQUARTERS' ? t('scopeHq') : t('scopeHezhong') },
@@ -118,7 +119,7 @@ function DataCenterView({ ctx, t }) {
           { label: t('dsEndpoint'), key: 'endpoint', render: row => row.endpoint ? `${row.endpoint}${row.secretRef ? ` · ${row.secretRef}` : ''}` : row.secretRef ? `凭证引用 ${row.secretRef}` : '—' },
           { label: t('updatedAt'), key: 'updatedAt', render: row => shortDate(row.updatedAt) ?? '—' },
           { label: t('statusCol'), key: 'active', render: row => h(Pill, { tone: row.active ? 'green' : 'muted' }, row.active ? t('dsEnabled') : t('dsDisable') ) },
-          { label: t('actions'), key: 'actions', sortable: false, render: row => h('div', { className: 'sf-row' }, h(LinkButton, { disabled: busy, onClick: () => setConfigDialog(row) }, t('edit')), h(LinkButton, { disabled: busy, onClick: () => toggle(row) }, row.active ? t('dsDisable') : t('dsEnable'))) },
+          { label: t('actions'), key: 'actions', sortable: false, render: row => canManage ? h('div', { className: 'sf-row' }, h(LinkButton, { disabled: busy, onClick: () => setConfigDialog(row) }, t('edit')), h(LinkButton, { disabled: busy, onClick: () => toggle(row) }, row.active ? t('dsDisable') : t('dsEnable'))) : null },
         ],
         rows: configs?.list || [], empty: configs ? t('noSourceConfig') : t('empty'), rowKey: 'id',
       }), configs?.list?.length ? null : h('p', { className: 'sf-note' }, t('noSourceConfigHint')))),

@@ -7,6 +7,7 @@ const token = 'https://user.hozonauto.com/api/oauth/token'
 describe('native SSO transport', () => {
   it.each([
     'https://ai.hozonauto.com/api/internal/auth/context',
+    'https://ds.hozonauto.com/api/finance/permissions/workspace-access',
     ...['openai', 'anthropic', 'openai_response'].map(protocol => `https://ai.hozonauto.com/api/v1/models?protocol=${protocol}`),
   ])('uses the same live route for model setup: %s', async url => {
     const refreshSystemProxy = vi.fn(async () => {})

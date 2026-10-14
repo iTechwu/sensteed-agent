@@ -4,6 +4,7 @@
 // 身份来自宿主当前飞书会话，租户及操作者由 datasource 服务端再次校验。
 
 import { randomUUID } from 'node:crypto'
+import { PUBLIC_FINANCE_ROUTES, PUBLIC_QUERY_KEYS } from './public-routes.js'
 
 const ROUTE_PREFIX = '/api/desktop/sensteed/finance'
 // 财务页面是直连服务型插件：Datasource REST API 负责 SSO、租户和操作者校验。
@@ -11,11 +12,17 @@ const ROUTE_PREFIX = '/api/desktop/sensteed/finance'
 const DEFAULT_DATASOURCE_API_BASE_URL = 'https://ds.hozonauto.com/api'
 const FINANCE_WORKSPACE_ACCESS_PATH = '/finance/permissions/workspace-access'
 const REQUEST_TIMEOUT_MS = 30000
-const MAX_BODY_BYTES = 32 * 1024
+const MAX_BODY_BYTES = 256 * 1024
 
 export const inject = ['webServer', 'credentials', 'tools', 'systemPrompt', 'dofeAuth', 'dofeAccess']
 export const capabilities = Object.freeze([
-  { id: 'finance-management', kind: 'business', name: '财务经营分析', description: '预算、台账、资金、预警、成本 BOM 和数据治理看板。' },
+  {
+    "id": "finance-management",
+    "kind": "business",
+    "group": "business",
+    "name": "财务经营分析",
+    "description": "分析预算、台账、资金、经营预警与成本 BOM，查看数据治理看板。"
+  }
 ])
 
 /** Resolve the live Feishu session on every call; never trust a browser-supplied identity. */
@@ -123,7 +130,7 @@ export function apply(ctx, overrides = {}) {
     if (!loopback) return false
     const site = req.headers['sec-fetch-site']
     if (site !== undefined && site !== 'same-origin' && site !== 'none') return false
-    if (req.method !== 'POST') {
+    if (req.method === 'GET') {
       // GET：同源导航/fetch 通常不带 Origin，仅在携带时校验（网页 CSRF 必带且必为跨站）
       return req.headers.origin === undefined || req.headers.origin === rendererOrigin
     }
@@ -150,17 +157,19 @@ export function apply(ctx, overrides = {}) {
       const sub = pathname.slice(ROUTE_PREFIX.length) || '/'
       const allowed = await resolveWorkspaceAccess(config)
       if (allowed === undefined) return sendJson(res, 503, { ok: false, error: '财务权限服务暂不可用，请稍后重试。' })
-      if (sub === '/access' && new URL(req.url, rendererOrigin).searchParams.get('permission') === 'cost.engineering.read') {
+      const permission = new URL(req.url, rendererOrigin).searchParams.get('permission')
+      if (sub === '/access' && permission) {
         if (!allowed) return sendJson(res, 200, { ok: true, allowed: false })
         const result = await financeApiCall(fetchImpl, config, 'finance_get_permissions', {}, now(), ctx.logger)
-        if (!result.ok || !Array.isArray(result.data?.permissions)) return sendJson(res, 503, { ok: false, error: '成本 BOM 权限服务暂不可用，请稍后重试。' })
-        return sendJson(res, 200, { ok: true, allowed: result.data.permissions.includes('cost.engineering.read') })
+        if (!result.ok || !Array.isArray(result.data?.permissions)) return sendJson(res, 503, { ok: false, error: '财务功能权限服务暂不可用，请稍后重试。' })
+        return sendJson(res, 200, { ok: true, allowed: result.data.permissions.includes(permission) })
       }
       if (sub === '/access') return sendJson(res, 200, { ok: true, allowed })
       if (!allowed) {
         ctx.logger?.info?.(`sensteed finance: ${req.method} ${sub} rejected — finance workspace access denied`)
         return sendJson(res, 403, { ok: false, error: '当前账号没有财务团队权限，无法使用财务管理。' })
       }
+      if (sub.startsWith('/rest/')) return dispatchPublicContract(fetchImpl, config, sub.slice(5), req, res, ctx.logger)
       if (req.method === 'GET') return dispatchGet(fetchImpl, config, sub, req.url, res, ctx.logger)
       if (req.method === 'POST') return dispatchPost(fetchImpl, config, sub, req, res, ctx.logger)
       res.writeHead(405, { Allow: 'GET, POST', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' })
@@ -186,7 +195,7 @@ export function apply(ctx, overrides = {}) {
 const QUERY_KEYS = [
   'year', 'month', 'page', 'limit', 'severity', 'status', 'orgId', 'expenseType', 'recordType', 'planType',
   'versionId', 'departmentId', 'unassigned', 'operator', 'keyword', 'onlyUnmapped', 'systemUserId', 'days',
-  'baseVersionId', 'targetVersionId', 'planId', 'type', 'scope', 'kind', 'bizSystem', 'transport',
+  'project', 'sortBy', 'sortDirection', 'alertType', 'baseVersionId', 'targetVersionId', 'planId', 'type', 'scope', 'kind', 'bizSystem', 'transport',
 ]
 
 async function dispatchGet(fetchImpl, config, sub, url, res, logger) {
@@ -226,20 +235,13 @@ async function dispatchGet(fetchImpl, config, sub, url, res, logger) {
       if (config.tenantId) calls.push(['finance_get_departments', { tenantId: config.tenantId }])
       break
     case '/brief': {
-      const baseline = await financeApiCall(fetchImpl, config, 'finance_analysis_brief', { ...tenant(), year: query.year }, new Date(), logger)
-      if (!baseline.ok) return sendJson(res, 502, baseline)
-      if (query.orgId) {
-        for (const [key, name] of [['overview', 'finance_get_overview'], ['budget', 'finance_get_budget_summary'], ['cash', 'finance_get_cash_summary']]) {
-          const scoped = await financeApiCall(fetchImpl, config, name, { ...tenant(), year: query.year, orgId: query.orgId }, new Date(), logger)
-          if (!scoped.ok) return sendJson(res, 502, scoped)
-          baseline.data[key] = scoped.data
-        }
-      }
+      const baseline = await financeApiCall(fetchImpl, config, 'finance_analysis_brief', { ...tenant(), year: query.year, orgId: query.orgId }, new Date(), logger)
+      if (!baseline.ok) return sendJson(res, baseline.status || 502, baseline)
       return sendJson(res, 200, { ok: true, data: baseline.data })
     }
     case '/budget':
       calls = [
-        ['finance_get_budget_summary', { ...tenant(), year: query.year, orgId: query.orgId }],
+        ['finance_get_budget_summary', { ...tenant(), year: query.year, orgId: query.orgId, versionId: query.versionId, departmentId: query.departmentId, unassigned: query.unassigned === '1' ? true : undefined }],
         ['finance_get_budget_lines', {
           ...tenant(), year: query.year, orgId: query.orgId, versionId: query.versionId,
           departmentId: query.departmentId, unassigned: query.unassigned === '1' ? true : undefined,
@@ -264,7 +266,7 @@ async function dispatchGet(fetchImpl, config, sub, url, res, logger) {
       calls = [['finance_get_cash_summary', { ...tenant(), year: query.year, orgId: query.orgId }]]
       break
     case '/alerts':
-      calls = [['finance_get_alerts', { ...(config.tenantId ? { tenantId: config.tenantId } : {}), year: query.year, severity: query.severity, status: query.status, page: query.page, limit: query.limit }]]
+      calls = [['finance_get_alerts', { ...(config.tenantId ? { tenantId: config.tenantId } : {}), year: query.year, orgId: query.orgId, month: query.month, alertType: query.alertType, severity: query.severity, status: query.status, page: query.page, limit: query.limit }]]
       break
     case '/quality':
       calls = [['finance_get_data_quality', {}], ['finance_get_import_batches', { page: query.page, limit: query.limit }]]
@@ -273,7 +275,7 @@ async function dispatchGet(fetchImpl, config, sub, url, res, logger) {
       calls = [['finance_get_departments', tenant()]]
       break
     case '/alerts-summary':
-      calls = [['finance_get_alert_summary', { ...tenant(), year: query.year }]]
+      calls = [['finance_get_alert_summary', { ...tenant(), year: query.year, orgId: query.orgId }]]
       break
     case '/alert-rules':
       calls = [['finance_get_alert_rules', tenant()]]
@@ -360,7 +362,7 @@ async function runGet(calls, res, logger, config, fetchImpl, context = false) {
     }
   }
   if (!okAll) payload.error = results.find(result => !result.ok).error
-  return sendJson(res, results.some(result => result.ok) ? 200 : 502, payload)
+  return sendJson(res, results.some(result => result.ok) ? 200 : results[0]?.status || 502, payload)
 }
 
 function streamKey(toolName) {
@@ -440,7 +442,7 @@ async function dispatchPost(fetchImpl, config, sub, req, res, logger) {
     idempotencyKey: body.json.idempotencyKey || randomUUID(),
   }
   const result = await financeApiCall(fetchImpl, config, match.tool, args, new Date(), logger)
-  return sendJson(res, result.ok ? 200 : 502, result)
+  return sendJson(res, result.ok ? 200 : result.status || 502, result)
 }
 
 // ---------------------------------------------------------------------------
@@ -454,32 +456,25 @@ async function financeApiCall(fetchImpl, config, toolName, args, observedAt, log
   try {
     if (toolName === 'finance_analysis_brief') {
       const year = args.year === undefined ? undefined : Number(args.year)
+      const scope = { year, orgId: args.orgId }
       const calls = [
-        ['finance_get_overview', { year }],
-        ['finance_get_budget_summary', { year }],
-        ['finance_get_cash_summary', { year }],
-        ['finance_get_alert_summary', { year }],
-        ['finance_get_alerts', { year, status: 'OPEN', limit: 10 }],
-        ['finance_get_data_quality', {}],
-        ['finance_get_import_batches', { page: 1, limit: 5 }],
+        ['overview', 'finance_get_overview', scope],
+        ['budget', 'finance_get_budget_summary', scope],
+        ['cash', 'finance_get_cash_summary', scope],
+        ['alertsSummary', 'finance_get_alert_summary', scope],
+        ['openAlerts', 'finance_get_alerts', { ...scope, status: 'OPEN', limit: 10 }],
+        ['dataQuality', 'finance_get_data_quality', {}],
+        ['recentImportBatches', 'finance_get_import_batches', { page: 1, limit: 5 }],
       ]
-      const results = await Promise.all(calls.map(([name, callArgs]) => financeApiCall(fetchImpl, config, name, callArgs, observedAt, logger)))
-      const failed = results.find(result => !result.ok)
-      if (failed) return failed
-      return {
-        ok: true,
-        data: {
-          year,
-          overview: results[0].data,
-          budget: results[1].data,
-          cash: results[2].data,
-          alertsSummary: results[3].data,
-          openAlerts: results[4].data?.list || [],
-          dataQuality: results[5].data,
-          recentImportBatches: results[6].data?.list || [],
-        },
-        meta: { asOf: observedAt.toISOString() },
-      }
+      const results = await Promise.all(calls.map(([, name, callArgs]) => financeApiCall(fetchImpl, config, name, callArgs, observedAt, logger)))
+      if (!results[0].ok) return results[0]
+      const data = { year, errors: {} }
+      calls.forEach(([key], index) => {
+        const result = results[index]
+        if (!result.ok) { data.errors[key] = result.error; return }
+        data[key] = key === 'openAlerts' || key === 'recentImportBatches' ? result.data?.list || [] : result.data
+      })
+      return { ok: true, data, meta: { asOf: observedAt.toISOString() } }
     }
 
     if (toolName === 'finance_budget_availability_query') {
@@ -517,7 +512,7 @@ async function financeApiCall(fetchImpl, config, toolName, args, observedAt, log
     })
     if (response.status === 401 || response.status === 403) {
       logger?.info?.(`sensteed finance: ${toolName} upstream ${response.status} — datasource rejected the live session`)
-      return { ok: false, error: response.status === 401
+      return { ok: false, status: response.status, error: response.status === 401
         ? '飞书登录已失效，请重新登录后重试。'
         : '当前账号没有此项财务操作权限，请联系财务负责人确认授权。' }
     }
@@ -582,7 +577,8 @@ function resolveDatasourceApiBaseUrl() {
 function buildBudgetAvailability(data = {}) {
   const lines = (data.list || []).map(line => {
     const budget = Number(line.budgetAmount ?? 0)
-    const occupied = Number(line.prSubmittedAmount ?? 0) + Number(line.paidAmount ?? 0) + Number(line.allocatedAmount ?? 0)
+    const available = line.availableAmount == null ? null : Number(line.availableAmount)
+    const occupied = available === null ? null : budget - available
     return {
       budgetLineId: line.id,
       orgName: line.orgName,
@@ -591,17 +587,17 @@ function buildBudgetAvailability(data = {}) {
       month: line.month,
       budget,
       occupied,
-      available: budget - occupied,
+      available,
     }
   })
   const sorted = [...lines].sort((a, b) => a.available - b.available)
   return {
     total: {
       budget: lines.reduce((sum, line) => sum + line.budget, 0),
-      occupied: lines.reduce((sum, line) => sum + line.occupied, 0),
-      available: lines.reduce((sum, line) => sum + line.available, 0),
+      occupied: lines.every(line => line.occupied !== null) ? lines.reduce((sum, line) => sum + line.occupied, 0) : null,
+      available: lines.every(line => line.available !== null) ? lines.reduce((sum, line) => sum + line.available, 0) : null,
     },
-    tightestLines: sorted.filter(line => line.available < 0).slice(0, 10),
+    tightestLines: sorted.filter(line => line.available !== null && line.available < 0).slice(0, 10),
     sample: sorted.slice(0, 20),
     lineCount: lines.length,
   }
@@ -758,10 +754,41 @@ const FINANCE_GUIDANCE = `你是资深的财务分析师（CFO 视角），可�
 
 【版本与规则纪律（v0.4）】① 预算版本：finance_get_budget_versions 查看主版本与草稿；版本推进链路=审定（confirm）→生效（activate，切主版本）→锁定（lock），用 finance_budget_version_action；对比两版本用 finance_get_budget_version_diff；结转口径用 finance_get_carryover_rules。引用预算数字须说明所属版本与是否主版本。② 预警规则集：finance_get_alert_rules 查看版本与阈值；确认生效用 finance_confirm_alert_rules（仅财务负责人，须复述阈值）。③ 保存视图：finance_save_view / finance_get_saved_views 可沉淀分析口径。
 
-【预算调整与填报】调整审批流与填报是写通道，必须按用户明确指令操作：① 查可用预算用 finance_budget_availability_query（口径=预算-已打PR-已付款），批预算前必查并引用具体 budgetLineId；② 预算新增/调拨/追减用 finance_budget_adjustment_create 建草稿（调拨须调入=调出且调出行带 budgetLineId），复述要素确认后 finance_budget_adjustment_submit 提交；审批（finance_budget_adjustment_review）与过账（finance_budget_adjustment_post）由财务本人执行，Agent 不代批——仅在用户明确指示本人审批时调用；进度用 finance_budget_adjustment_status_query。③ 付款计划调增用 finance_payment_plan_increase_request（创建即提交），审批/过账纪律同上。④ 分配：finance_allocation_pool_query 查待认领池，finance_allocation_confirm 挂账，finance_allocation_remove 撤销。⑤ 填报：finance_filing_task_list/_task_create 管理任务，finance_filing_assignments_query 查部门填报，finance_filing_rows_upsert 代暂存，finance_filing_assignment_action 提交/定稿/重开（重开必须带原因入审计）。
+【预算调整与填报】调整审批流与填报是写通道，必须按用户明确指令操作：① 查可用预算用 finance_budget_availability_query（采用服务端 availableAmount，月度累计采用 availableCumulative；不得在客户端再扣减分配或重算），批预算前必查并引用具体 budgetLineId；② 预算新增/调拨/追减用 finance_budget_adjustment_create 建草稿（调拨须调入=调出且调出行带 budgetLineId），复述要素确认后 finance_budget_adjustment_submit 提交；审批（finance_budget_adjustment_review）与过账（finance_budget_adjustment_post）由财务本人执行，Agent 不代批——仅在用户明确指示本人审批时调用；进度用 finance_budget_adjustment_status_query。③ 付款计划调增用 finance_payment_plan_increase_request（创建即提交），审批/过账纪律同上。④ 分配：finance_allocation_pool_query 查待认领池，finance_allocation_confirm 挂账，finance_allocation_remove 撤销。⑤ 填报：finance_filing_task_list/_task_create 管理任务，finance_filing_assignments_query 查部门填报，finance_filing_rows_upsert 代暂存，finance_filing_assignment_action 提交/定稿/重开（重开必须带原因入审计）。
 
 【幂等与身份】所有写工具必须提供独立业务 idempotencyKey，同一操作重试复用该键。操作者使用 bootstrap 返回的 operator；服务端按飞书 token 校验实际用户与租户。
 
 【录入与回填】用户明确要求录入或回填时才可调用写入工具（finance_create_payment_plan / finance_create_revenue_plan / finance_create_budget_line / finance_patch_payment_plan_actuals / finance_patch_revenue_plan_actuals / finance_patch_payment_plan_schedule）；付款计划排款月份必填；调用前必须复述关键金额、期间与主体并等待确认；写入后建议调用 finance_run_alert_engine 刷新警情。
 
 【输出口吻】财务口吻、结论先行、金额精确到元并按万/亿辅助表述；先给结论摘要，再给明细与依据；区分"事实（数据口径）"与"判断（预测/归因）"；最后给出下一步行动清单。数据不可用时说明原因，绝不编造数字。`
+
+async function dispatchPublicContract(fetchImpl, config, path, req, res, logger) {
+  const matched = PUBLIC_FINANCE_ROUTES.some(([method, template]) => method === req.method
+    && new RegExp('^' + template.replace(/:[A-Za-z]+/g, '[A-Za-z0-9_-]+') + '$').test(path))
+  if (!matched) return sendJson(res, 404, { ok: false, error: '未开放的财务接口' })
+  const query = Object.fromEntries([...new URL(req.url, 'http://localhost').searchParams].filter(([key]) => PUBLIC_QUERY_KEYS.has(key)))
+  let body
+  if (req.method !== 'GET') {
+    const parsed = await readJsonBody(req)
+    if (parsed.error) return sendJson(res, 400, { ok: false, error: parsed.error })
+    body = stripControlFields(parsed.json)
+    delete body.recipientId
+    delete body.actorId
+  }
+  try {
+    const response = await timedFetch(fetchImpl, buildFinanceUrl(path, req.method === 'GET' ? query : undefined), {
+      method: req.method,
+      headers: { accept: 'application/json', 'content-type': 'application/json', 'x-api-version': '1', authorization: `Bearer ${config.token}` },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    })
+    const payload = await response.json().catch(() => null)
+    if (!response.ok) return sendJson(res, response.status, { ok: false, error: payload?.msg || (response.status === 403 ? '当前账号没有此项财务操作权限' : `upstream_http_${response.status}`) })
+    if (!payload || payload.data === undefined || (payload.code !== undefined && !isSuccessfulDatasourceCode(payload.code))) {
+      return sendJson(res, 502, { ok: false, error: payload?.msg || '财务操作失败' })
+    }
+    return sendJson(res, 200, { ok: true, data: payload.data })
+  } catch {
+    logger?.info?.(`sensteed finance: ${req.method} ${path} unavailable`)
+    return sendJson(res, 503, { ok: false, error: '财务服务暂不可用，请稍后重试' })
+  }
+}

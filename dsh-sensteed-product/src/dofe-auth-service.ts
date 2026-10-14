@@ -15,6 +15,7 @@ import {
 export const DOFE_AUTH_GRANT_KEY = credentialKey('dsh-plugin-desktop', 'sensteed-auth')
 const MODELS_API_KEY_REF = credentialRef('MODELS_API_KEY')
 const MODELS_PROVISION_URL = 'https://ai.hozonauto.com/api/auth/desktop/provision-key'
+export const FINANCE_WORKSPACE_ACCESS_URL = 'https://ds.hozonauto.com/api/finance/permissions/workspace-access'
 const SESSION_TIMEOUT_MS = 5 * 60_000
 
 interface TokenResponse { access_token?: unknown; refresh_token?: unknown; error?: unknown }
@@ -68,6 +69,7 @@ function loginNetworkError(error: unknown): string {
 }
 
 export class DofeAuthService {
+  private bindingRevision = 0
   private snapshot: DofeAuthSnapshot = { status: 'idle' }
   private accessToken: string | undefined
   private server: ReturnType<typeof createServer> | undefined
@@ -105,6 +107,14 @@ export class DofeAuthService {
     await this.start(false)
     await this.operation
     return this.getStatus()
+  }
+
+  /** Report a failed explicit refresh without revoking a still-usable session. */
+  async refreshPermissions(): Promise<DofeAuthSnapshot> {
+    const revision = this.bindingRevision
+    const snapshot = await this.restore()
+    return snapshot.status === 'bound' && revision === this.bindingRevision
+      ? { status: 'error', error: '权限刷新失败，请稍后重试。' } : snapshot
   }
 
   async start(interactive = true): Promise<DofeAuthSnapshot> {
@@ -323,12 +333,18 @@ export class DofeAuthService {
     // an unavailable profile leaves it unchanged in the persisted identity.
     const profile = await this.readProfile(discovery, accessToken, ssoSub)
     const avatar = profile ? asString(profile.picture) ?? null : asString(value.user?.avatar)
+    // Models does not issue finance grants. Datasource owns this permission,
+    // including administrator access. Fail closed on a missing/unavailable check.
+    const financeAccess = await this.readFinanceAccess(accessToken)
+    this.abort.signal.throwIfAborted()
+    const resolvedPlugins = plugins.filter(plugin => plugin !== 'finance')
+    if (financeAccess === 'allowed') resolvedPlugins.push('finance')
     const snapshot: DofeAuthSnapshot = {
       status: 'bound',
       profileSynced: profile !== undefined,
       user: { ssoSub, name: asString(profile?.name) ?? asString(value.user?.name) ?? ssoSub, ...(avatar === undefined ? {} : { avatar }) },
       tenant: { tenantId, ssoTeamId, tenantSlug },
-      entitlements: { plugins, defaultModel: asString(value.entitlements?.defaultModel) ?? '', allowedProtocols },
+      entitlements: { plugins: resolvedPlugins, financeAccess, defaultModel: asString(value.entitlements?.defaultModel) ?? '', allowedProtocols },
       groups: Array.isArray(value.groups) ? value.groups.filter((group): group is string => typeof group === 'string') : [],
       groupNames: typeof value.groupNames === 'object' && value.groupNames !== null && !Array.isArray(value.groupNames)
         ? Object.fromEntries(Object.entries(value.groupNames).filter((entry): entry is [string, string] => typeof entry[1] === 'string')) : {},
@@ -337,9 +353,23 @@ export class DofeAuthService {
     this.abort.signal.throwIfAborted()
     this.accessToken = accessToken
     this.snapshot = snapshot
+    this.bindingRevision += 1
     for (const listener of this.bindingListeners) {
       try { listener(this.getStatus()) } catch { /* Observers must not change authentication results. */ }
     }
+  }
+
+  private async readFinanceAccess(accessToken: string): Promise<'allowed' | 'denied' | 'unavailable'> {
+    try {
+      const response = await this.fetcher(FINANCE_WORKSPACE_ACCESS_URL, {
+        method: 'GET', redirect: 'error', signal: this.signal(10_000),
+        headers: { authorization: `Bearer ${accessToken}`, accept: 'application/json', 'x-company-code': 'sensteed' },
+      })
+      if (response.status === 401 || response.status === 403) return 'denied'
+      const payload = await response.json() as { data?: { allowed?: unknown } }
+      if (!response.ok || typeof payload?.data?.allowed !== 'boolean') return 'unavailable'
+      return payload.data.allowed ? 'allowed' : 'denied'
+    } catch { return 'unavailable' }
   }
 
   private async readProfile(discovery: OidcDiscovery, accessToken: string, subject: string): Promise<{ name?: unknown; picture?: unknown } | undefined> {

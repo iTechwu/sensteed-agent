@@ -93,17 +93,26 @@ export const DOFE_PLUGIN_CATALOG = [
 
 export type DofePluginId = typeof DOFE_PLUGIN_CATALOG[number]['id']
 
+/** Group by user task; access requirements remain separate from navigation. */
+export const DOFE_CAPABILITY_GROUPS = ['research', 'creation', 'collaboration', 'business'] as const
 export const DOFE_CAPABILITY_CATALOG = [
-  { id: 'opencli-research', plugin: 'opencli', kind: 'basic', name: '互联网检索与资料整理', description: '受控读取公开网页，提炼来源与研究结论。' },
-  { id: 'media-image-generation', plugin: 'media', kind: 'basic', name: '图片生成', description: '根据文字描述生成单张图片，并可继续迭代画面。' },
-  { id: 'media-video-generation', plugin: 'media', kind: 'basic', name: '短视频生成', description: '生成 5–10 秒单镜头视频，适合快速验证创意。' },
-  { id: 'openmontage-video-planning', plugin: 'openmontage', kind: 'basic', name: '多镜头视频编排', description: '从脚本到分镜，组织复杂视频的镜头与素材。' },
-  { id: 'openmontage-asset-finishing', plugin: 'openmontage', kind: 'basic', name: '素材复刻与后期', description: '完成素材复刻、字幕、配音和成片提交。' },
-  { id: 'connect-im', plugin: 'connect-im', kind: 'basic', name: '企业消息与协作连接', description: '连接微信、飞书、企微、钉钉、QQ 与 Matrix 等企业消息渠道。' },
-  { id: 'tools-market-research', plugin: 'tools', kind: 'business', name: '商业调研与热点分析', description: '围绕行业、竞品和热点事件形成结构化调研。' },
-  { id: 'knowledge-memory', plugin: 'knowledge', kind: 'business', name: '企业知识与 Memory', description: '检索企业知识，管理记忆，并维护知识图谱关系。' },
-  { id: 'finance-management', plugin: 'finance', kind: 'business', name: '财务经营分析', description: '预算、台账、资金、预警和数据治理看板。' },
-  { id: 'supplier-intelligence', plugin: 'supplier-intelligence', kind: 'business', name: '供应商情报与风险', description: '采集供应商情报，分析舆情并跟踪风险变化。' },
+  { id: 'opencli-research', plugin: 'opencli', kind: 'basic', group: 'research', name: '互联网检索与网页阅读', description: '搜索公开信息、阅读网页、提取来源，整理可追溯的研究结论。' },
+  { id: 'tools-market-research', plugin: 'tools', kind: 'business', group: 'research', name: '行业与竞品调研', description: '发现行业和竞品信息，结合网页证据生成结构化调研。' },
+  { id: 'tools-hotspot-discovery', plugin: 'tools', kind: 'business', group: 'research', name: '热点发现与事件跟踪', description: '发现热点话题、读取事件详情，跟踪热点任务与进展。' },
+  { id: 'tools-talent-discovery', plugin: 'tools', kind: 'business', group: 'research', name: '人才发现', description: '按招聘需求发现人才，整理候选人信息与匹配线索。' },
+  { id: 'tools-lead-discovery', plugin: 'tools', kind: 'business', group: 'research', name: '客户线索发现与监测', description: '发现潜在客户，持续监测线索变化并读取跟进结果。' },
+  { id: 'tools-custom-car-monitoring', plugin: 'tools', kind: 'business', group: 'research', name: '汽车行业专项监测', description: '跟踪汽车行业的指定对象与话题，汇总监测信息。' },
+  { id: 'media-image-generation', plugin: 'media', kind: 'basic', group: 'creation', name: '图片生成', description: '根据文字生成图片，继续调整画面与风格。' },
+  { id: 'media-video-generation', plugin: 'media', kind: 'basic', group: 'creation', name: '短视频生成', description: '生成 5–10 秒单镜头视频，快速验证创意。' },
+  { id: 'openmontage-video-planning', plugin: 'openmontage', kind: 'basic', group: 'creation', name: '多镜头视频编排', description: '从脚本到分镜组织镜头、素材与视频制作任务。' },
+  { id: 'openmontage-asset-finishing', plugin: 'openmontage', kind: 'basic', group: 'creation', name: '素材复刻与后期', description: '复刻参考素材，完成字幕、配音与成片提交。' },
+  { id: 'tools-viral-video', plugin: 'tools', kind: 'business', group: 'creation', name: '热门视频分析', description: '发现并分析热门视频，提炼选题与创作参考。' },
+  { id: 'tools-social-operation', plugin: 'tools', kind: 'business', group: 'collaboration', name: '小红书与抖音运营', description: '读取账号与内容信息，执行工具支持的运营任务；写入操作需确认。' },
+  { id: 'tools-tos-upload', plugin: 'tools', kind: 'business', group: 'collaboration', name: '文件上传与素材链接', description: '上传本地文件，获取可供后续工具使用的素材链接。' },
+  { id: 'connect-im', plugin: 'connect-im', kind: 'basic', group: 'collaboration', name: '企业消息与协作连接', description: '连接飞书、钉钉、企微、微信、QQ 与 Matrix 等消息渠道。' },
+  { id: 'knowledge-memory', plugin: 'knowledge', kind: 'business', group: 'business', name: '企业知识与记忆', description: '检索知识库，管理长期记忆，维护知识图谱关系。' },
+  { id: 'finance-management', plugin: 'finance', kind: 'business', group: 'business', name: '财务经营分析', description: '分析预算、台账、资金、经营预警与成本 BOM，查看数据治理看板。' },
+  { id: 'supplier-intelligence', plugin: 'supplier-intelligence', kind: 'business', group: 'business', name: '供应商情报与风险', description: '查询企业与供应商信息，采集舆情，分析关系与风险变化。' },
 ] as const
 
 export type DofeCapabilityId = typeof DOFE_CAPABILITY_CATALOG[number]['id']
@@ -120,7 +129,8 @@ export function dofeCapabilitiesForBrand(variant: DofeBrandVariant): typeof DOFE
 
 export function dofePluginCanEnable(pluginId: string, variant: DofeBrandVariant, entitledPlugins?: readonly string[]): boolean {
   const plugin = dofePluginsForBrand(variant).find(candidate => candidate.id === pluginId)
-  return plugin !== undefined && (variant !== 'sensteed' || plugin.access === 'basic' || entitledPlugins?.includes(pluginId) === true)
+  return plugin !== undefined && (variant !== 'sensteed' || plugin.access === 'basic' || entitledPlugins?.includes(pluginId) === true
+    || pluginId === 'supplier-intelligence' && entitledPlugins?.includes('tools') === true)
 }
 
 export function normalizeDofeEnabledPluginIds(ids: readonly string[] | undefined, variant: DofeBrandVariant, entitledPlugins?: readonly string[]): DofePluginId[] {

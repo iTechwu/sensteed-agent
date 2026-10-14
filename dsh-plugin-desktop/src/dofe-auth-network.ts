@@ -4,6 +4,7 @@ const AUTH_ENDPOINTS = new Map([
   ['https://user.hozonauto.com/api/oauth/token', 'POST'],
   ['https://user.hozonauto.com/api/oauth/userinfo', 'GET'],
   ['https://ai.hozonauto.com/api/auth/desktop/provision-key', 'POST'],
+  ['https://ds.hozonauto.com/api/finance/permissions/workspace-access', 'GET'],
   ['https://ai.hozonauto.com/api/internal/auth/context', 'GET'],
   ['https://ai.hozonauto.com/api/v1/models?protocol=openai', 'GET'],
   ['https://ai.hozonauto.com/api/v1/models?protocol=anthropic', 'GET'],

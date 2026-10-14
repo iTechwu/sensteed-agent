@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { CredentialRecord } from '@deepseek-ai/dsh-credentials'
-import { DofeAuthService, DOFE_AUTH_GRANT_KEY } from '../src/dofe-auth-service.ts'
+import { DofeAuthService, DOFE_AUTH_GRANT_KEY, FINANCE_WORKSPACE_ACCESS_URL } from '../src/dofe-auth-service.ts'
 
 const discovery = {
   issuer: 'https://user.hozonauto.com/api',
@@ -16,6 +16,10 @@ const provisioned = {
 const userinfo = { sub: 'sub-1', name: 'Alice', picture: 'https://user.hozonauto.com/avatar/sub-1.png' }
 function response(value: unknown, status = 200): Response {
   return new Response(JSON.stringify(value), { status })
+}
+function withFinance(fetcher: typeof fetch, allowed = false): typeof fetch {
+  return (input, init) => String(input) === FINANCE_WORKSPACE_ACCESS_URL
+    ? Promise.resolve(response({ data: { allowed } })) : fetcher(input, init)
 }
 function credentialStore(refreshToken?: string) {
   let record: CredentialRecord | undefined = refreshToken ? { kind: 'grant', payload: { refreshToken } } : undefined
@@ -39,7 +43,7 @@ describe('DofeAuthService', () => {
       .mockResolvedValueOnce(response(provisioned))
       .mockResolvedValueOnce(response(userinfo))
       .mockImplementationOnce(() => new Promise<Response>(resolve => { finish = resolve }))
-    const service = new DofeAuthService({ openExternal: vi.fn() }, credentialStore('refresh') as never, fetcher)
+    const service = new DofeAuthService({ openExternal: vi.fn() }, credentialStore('refresh') as never, withFinance(fetcher))
     try {
       const bound = await service.restore()
       const session = service.getDatasourceSession()
@@ -68,7 +72,7 @@ describe('DofeAuthService', () => {
       .mockResolvedValueOnce(response(provisioned)).mockResolvedValueOnce(response(userinfo))
       .mockResolvedValueOnce(response(discovery))
       .mockResolvedValueOnce(response({ error: 'invalid_grant' }, 400))
-    const service = new DofeAuthService({ openExternal: vi.fn() }, credentialStore('refresh') as never, fetcher)
+    const service = new DofeAuthService({ openExternal: vi.fn() }, credentialStore('refresh') as never, withFinance(fetcher))
     try {
       await service.restore()
       expect(await service.restore()).toMatchObject({ status: 'error', code: 'invalid_grant' })
@@ -93,7 +97,7 @@ describe('DofeAuthService', () => {
   it('removes the saved grant and model key on logout so restart cannot sign in again', async () => {
     const credentials = credentialStore('refresh-old')
     const fetcher = vi.fn()
-    const service = new DofeAuthService({ openExternal: vi.fn() } as never, credentials as never, fetcher)
+    const service = new DofeAuthService({ openExternal: vi.fn() } as never, credentials as never, withFinance(fetcher))
     expect((await service.logout()).status).toBe('idle')
     expect(credentials.deleteRecord).toHaveBeenCalledWith(DOFE_AUTH_GRANT_KEY)
     expect(credentials.unset).toHaveBeenCalledWith('MODELS_API_KEY')
@@ -109,7 +113,7 @@ describe('DofeAuthService', () => {
       .mockResolvedValueOnce(response({ access_token: 'access-new', refresh_token: 'refresh-new' }))
       .mockResolvedValueOnce(response(provisioned))
       .mockResolvedValueOnce(response(userinfo))
-    const service = new DofeAuthService({ openExternal } as never, credentials as never, fetcher, onBound)
+    const service = new DofeAuthService({ openExternal } as never, credentials as never, withFinance(fetcher), onBound)
     const snapshot = await service.restore()
     expect(snapshot.status).toBe('bound')
     expect(service.getDatasourceSession()).toEqual({ accessToken: 'access-new', tenantId: 'tenant-1', operator: 'sub-1' })
@@ -125,10 +129,10 @@ describe('DofeAuthService', () => {
     const openExternal = vi.fn()
     const fetcher = vi.fn().mockResolvedValueOnce(response(discovery))
       .mockResolvedValueOnce(response({ error: 'invalid_grant' }, 400))
-    const first = new DofeAuthService({ openExternal } as never, credentialStore() as never, fetcher)
+    const first = new DofeAuthService({ openExternal } as never, credentialStore() as never, withFinance(fetcher))
     expect((await first.restore()).status).toBe('idle')
     expect(fetcher).not.toHaveBeenCalled()
-    const expired = new DofeAuthService({ openExternal } as never, credentialStore('expired') as never, fetcher)
+    const expired = new DofeAuthService({ openExternal } as never, credentialStore('expired') as never, withFinance(fetcher))
     expect((await expired.restore()).status).toBe('error')
     expect(openExternal).not.toHaveBeenCalled()
     await first.dispose()
@@ -145,7 +149,7 @@ describe('DofeAuthService', () => {
         return response(provisioned)
       })
       .mockResolvedValueOnce(response(userinfo))
-    const service = new DofeAuthService({ openExternal } as never, credentials as never, fetcher)
+    const service = new DofeAuthService({ openExternal } as never, credentials as never, withFinance(fetcher))
     await service.start()
     await vi.waitFor(() => expect(service.getStatus().status).toBe('bound'))
     expect(openExternal).not.toHaveBeenCalled()
@@ -162,7 +166,7 @@ describe('DofeAuthService', () => {
       .mockResolvedValueOnce(response({ access_token: 'access-new' }))
       .mockResolvedValueOnce(response(withAvatar))
       .mockResolvedValueOnce(response({ ...userinfo, name: 'Updated Alice' }))
-    const service = new DofeAuthService({ openExternal: vi.fn() } as never, credentials as never, fetcher)
+    const service = new DofeAuthService({ openExternal: vi.fn() } as never, credentials as never, withFinance(fetcher))
     await service.start()
     await vi.waitFor(() => expect(service.getStatus().status).toBe('bound'))
     expect(fetcher).toHaveBeenCalledTimes(4)
@@ -186,7 +190,7 @@ describe('DofeAuthService', () => {
     const fetcher = vi.fn().mockResolvedValueOnce(response(discovery))
       .mockResolvedValueOnce(response({ access_token: 'access-new', refresh_token: 'refresh-new' }))
       .mockResolvedValueOnce(response({ error: 'unavailable' }, 503))
-    const service = new DofeAuthService({ openExternal: vi.fn() } as never, credentials as never, fetcher)
+    const service = new DofeAuthService({ openExternal: vi.fn() } as never, credentials as never, withFinance(fetcher))
     await service.start()
     await vi.waitFor(() => expect(service.getStatus().status).toBe('error'))
     expect(await credentials.readRecord()).toEqual({ kind: 'grant', payload: { refreshToken: 'refresh-new' } })
@@ -208,7 +212,7 @@ describe('DofeAuthService', () => {
       callback.searchParams.set('code', 'test-code')
       await fetch(callback)
     })
-    const service = new DofeAuthService({ openExternal } as never, credentials as never, fetcher)
+    const service = new DofeAuthService({ openExternal } as never, credentials as never, withFinance(fetcher))
     await service.start()
     await vi.waitFor(() => expect(service.getStatus().status).toBe('bound'))
     expect(openExternal).toHaveBeenCalledOnce()
@@ -224,7 +228,7 @@ describe('DofeAuthService', () => {
     const fetcher = vi.fn().mockResolvedValueOnce(response(discovery))
       .mockResolvedValueOnce(response({ access_token: 'access-new', refresh_token: 'refresh-new' }))
       .mockImplementationOnce(() => new Promise<Response>(resolve => { finish = resolve }))
-    const service = new DofeAuthService({ openExternal: vi.fn() } as never, credentials as never, fetcher)
+    const service = new DofeAuthService({ openExternal: vi.fn() } as never, credentials as never, withFinance(fetcher))
     await service.start()
     await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(3))
     await service.cancel()
@@ -237,7 +241,7 @@ describe('DofeAuthService', () => {
   it('rejects untrusted discovery endpoints before transmitting a refresh token', async () => {
     const credentials = credentialStore('refresh-old')
     const fetcher = vi.fn().mockResolvedValueOnce(response({ ...discovery, token_endpoint: 'https://other.example/token' }))
-    const service = new DofeAuthService({ openExternal: vi.fn() } as never, credentials as never, fetcher)
+    const service = new DofeAuthService({ openExternal: vi.fn() } as never, credentials as never, withFinance(fetcher))
     await service.start()
     await vi.waitFor(() => expect(service.getStatus().status).toBe('error'))
     expect(fetcher).toHaveBeenCalledOnce()
@@ -263,8 +267,61 @@ it('does not apply profile data belonging to a different SSO subject', async () 
     .mockResolvedValueOnce(response({ access_token: 'access-new' }))
     .mockResolvedValueOnce(response(provisioned))
     .mockResolvedValueOnce(response({ sub: 'another-user', name: 'Other', picture: 'https://example.com/other.png' }))
-  const service = new DofeAuthService({ openExternal: vi.fn() } as never, credentialStore('refresh') as never, fetcher)
+  const service = new DofeAuthService({ openExternal: vi.fn() } as never, credentialStore('refresh') as never, withFinance(fetcher))
   try {
     expect((await service.restore()).user).toEqual({ ssoSub: 'sub-1', name: 'Alice' })
+  } finally { await service.dispose() }
+})
+
+it.each([
+  [true, 'allowed', true], [false, 'denied', false],
+])('resolves administrator finance access from Datasource (%s), independently of Models', async (allowed, state, granted) => {
+  const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith('openid-configuration')) return response(discovery)
+    if (url.endsWith('/token')) return response({ access_token: 'access-new' })
+    if (url.endsWith('/provision-key')) return response(provisioned)
+    if (url.endsWith('/userinfo')) return response(userinfo)
+    expect(url).toBe(FINANCE_WORKSPACE_ACCESS_URL)
+    expect(init?.headers).toMatchObject({ authorization: 'Bearer access-new' })
+    return response({ data: { allowed } })
+  })
+  const service = new DofeAuthService({ openExternal: vi.fn() }, credentialStore('refresh') as never, fetcher as typeof fetch)
+  try {
+    const snapshot = await service.restore()
+    expect(snapshot.status).toBe('bound')
+    expect(snapshot.entitlements?.financeAccess).toBe(state)
+    expect(snapshot.entitlements?.plugins.includes('finance')).toBe(granted)
+    expect(JSON.stringify(snapshot)).not.toContain('access-new')
+  } finally { await service.dispose() }
+})
+
+it('does not trust a Models finance grant when its owning permission service is unavailable', async () => {
+  const fetcher = vi.fn(async (url: string) => {
+    if (url.endsWith('openid-configuration')) return response(discovery)
+    if (url.endsWith('/token')) return response({ access_token: 'access-new' })
+    if (url.endsWith('/provision-key')) return response({ ...provisioned, entitlements: { ...provisioned.entitlements, plugins: ['knowledge', 'finance'] } })
+    if (url.endsWith('/userinfo')) return response(userinfo)
+    throw new Error('unavailable')
+  })
+  const service = new DofeAuthService({ openExternal: vi.fn() }, credentialStore('refresh') as never, fetcher as typeof fetch)
+  try {
+    const snapshot = await service.restore()
+    expect(snapshot.status).toBe('bound')
+    expect(snapshot.entitlements?.financeAccess).toBe('unavailable')
+    expect(snapshot.entitlements?.plugins).not.toContain('finance')
+  } finally { await service.dispose() }
+})
+
+it('reports an explicit refresh failure while preserving the last usable session', async () => {
+  const fetcher = vi.fn().mockResolvedValueOnce(response(discovery))
+    .mockResolvedValueOnce(response({ access_token: 'access-old' }))
+    .mockResolvedValueOnce(response(provisioned)).mockResolvedValueOnce(response(userinfo))
+    .mockRejectedValueOnce(new Error('network unavailable'))
+  const service = new DofeAuthService({ openExternal: vi.fn() }, credentialStore('refresh') as never, withFinance(fetcher))
+  try {
+    await service.restore()
+    expect((await service.refreshPermissions()).status).toBe('error')
+    expect(service.getStatus().status).toBe('bound')
+    expect(service.getDatasourceSession()).toBeDefined()
   } finally { await service.dispose() }
 })
