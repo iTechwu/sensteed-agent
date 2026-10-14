@@ -50,8 +50,11 @@ const rgVersion = execFileSync(packagedRgPath, ['--version'], { encoding: 'utf8'
 assert(/^ripgrep\s/u.test(rgVersion), `received an invalid ripgrep version: ${JSON.stringify(rgVersion.trim())}`)
 if (process.platform === 'win32') {
   const sessionBackend = await import('@deepseek-ai/dsh-session-persistence-jsonl')
+  const resolvedBackend = 'apply' in sessionBackend
+    ? sessionBackend
+    : (sessionBackend as unknown as { default: typeof sessionBackend }).default
   assert(
-    typeof sessionBackend.apply === 'function',
+    typeof resolvedBackend.apply === 'function',
     'could not import the Windows JSONL session backend without fs-ext',
   )
 } else {
@@ -63,7 +66,11 @@ if (process.platform === 'win32') {
 async function smokeSessionMigration(): Promise<void> {
   const { Context } = await import('@deepseek-ai/cordis')
   const { SessionId } = await import('@deepseek-ai/dsh-session')
-  const JsonlSessionPersistence = await import('@deepseek-ai/dsh-session-persistence-jsonl')
+  // 打包运行时的 ESM 互操作可能把模块命名空间包进 default,归一化后再挂载。
+  const persistenceModule = await import('@deepseek-ai/dsh-session-persistence-jsonl')
+  const JsonlSessionPersistence = 'apply' in persistenceModule
+    ? persistenceModule
+    : (persistenceModule as unknown as { default: typeof persistenceModule }).default
   const root = mkdtempSync(join(tmpdir(), 'dsh-packaged-session-migration-'))
   const id = SessionId('packaged-migration')
   const directory = join(root, '_no-cwd', id)
