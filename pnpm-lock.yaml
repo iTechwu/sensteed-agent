@@ -17644,23 +17644,23 @@ importers:
         specifier: ^1.9.1
         version: 1.9.1
       '@opentelemetry/api-logs':
-        specifier: ^0.222.0
+        specifier: 0.222.0
         version: 0.222.0
       '@opentelemetry/core':
-        specifier: 2.9.0
-        version: 2.9.0(@opentelemetry/api@1.9.1)
+        specifier: 2.11.0
+        version: 2.11.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/otlp-exporter-base':
-        specifier: ^0.220.0
-        version: 0.220.0(@opentelemetry/api@1.9.1)
+        specifier: 0.222.0
+        version: 0.222.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/otlp-transformer':
-        specifier: ^0.220.0
-        version: 0.220.0(@opentelemetry/api@1.9.1)
+        specifier: 0.222.0
+        version: 0.222.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/resources':
-        specifier: ^2.9.0
+        specifier: 2.11.0
         version: 2.11.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/sdk-logs':
-        specifier: ^0.220.0
-        version: 0.220.0(@opentelemetry/api@1.9.1)
+        specifier: 0.222.0
+        version: 0.222.0(@opentelemetry/api@1.9.1)
       '@playwright/mcp':
         specifier: 0.0.80
         version: 0.0.80
@@ -17706,6 +17706,9 @@ importers:
       diff:
         specifier: ^9.0.0
         version: 9.0.0
+      dijkstrajs:
+        specifier: 1.0.3
+        version: 1.0.3
       dsh-better-sidebar:
         specifier: 0.15.2
         version: 0.15.2(fb5e7e708ad6759e614b563df10f6ddb)
@@ -17760,6 +17763,9 @@ importers:
       picomatch:
         specifier: ^4.0.3
         version: 4.0.5
+      pngjs:
+        specifier: 5.0.0
+        version: 5.0.0
       pnpm:
         specifier: 11.28.5
         version: 11.28.5
