@@ -16581,6 +16581,9 @@ importers:
       '@deepseek-ai/dsh-api-job-controller':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/api/job-controller
+      '@deepseek-ai/dsh-api-remote-access':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/api/remote-access
       '@deepseek-ai/dsh-api-remotes':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/api/remotes
@@ -16734,6 +16737,9 @@ importers:
       '@deepseek-ai/dsh-client-ui-schedule':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/client/ui-schedule
+      '@deepseek-ai/dsh-client-ui-secret-mask':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/client/ui-secret-mask
       '@deepseek-ai/dsh-client-ui-session':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/client/ui-session
@@ -16992,6 +16998,9 @@ importers:
       '@deepseek-ai/dsh-goal-round-driver':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/goal/goal-round-driver
+      '@deepseek-ai/dsh-harness-dev-context':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/context/harness-dev-context
       '@deepseek-ai/dsh-headless':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/bundle/headless
