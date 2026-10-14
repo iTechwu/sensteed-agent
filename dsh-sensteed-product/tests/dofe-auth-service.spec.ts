@@ -32,6 +32,50 @@ function credentialStore(refreshToken?: string) {
 }
 
 describe('DofeAuthService', () => {
+  it('keeps a bound session usable throughout silent renewal and a temporary outage', async () => {
+    let finish!: (value: Response) => void
+    const fetcher = vi.fn().mockResolvedValueOnce(response(discovery))
+      .mockResolvedValueOnce(response({ access_token: 'access-old', refresh_token: 'refresh-new' }))
+      .mockResolvedValueOnce(response(provisioned))
+      .mockResolvedValueOnce(response(userinfo))
+      .mockImplementationOnce(() => new Promise<Response>(resolve => { finish = resolve }))
+    const service = new DofeAuthService({ openExternal: vi.fn() }, credentialStore('refresh') as never, fetcher)
+    try {
+      const bound = await service.restore()
+      const session = service.getDatasourceSession()
+      const renewal = service.restore()
+      await vi.waitFor(() => expect(finish).toBeTypeOf('function'))
+      const duringRenewal = service.getStatus()
+      const sessionDuringRenewal = service.getDatasourceSession()
+      finish(response({}, 503))
+      const afterRenewal = await renewal
+      expect(duringRenewal).toEqual(bound)
+      expect(sessionDuringRenewal).toEqual(session)
+      expect(afterRenewal).toEqual(bound)
+      expect(service.getDatasourceSession()).toEqual(session)
+      fetcher.mockResolvedValueOnce(response(discovery))
+        .mockResolvedValueOnce(response({ access_token: 'access-renewed' }))
+        .mockResolvedValueOnce(response(provisioned))
+        .mockResolvedValueOnce(response(userinfo))
+      expect((await service.restore()).status).toBe('bound')
+      expect(service.getDatasourceSession()?.accessToken).toBe('access-renewed')
+    } finally { await service.dispose() }
+  })
+
+  it('revokes a previously bound session when renewal reports invalid_grant', async () => {
+    const fetcher = vi.fn().mockResolvedValueOnce(response(discovery))
+      .mockResolvedValueOnce(response({ access_token: 'access-old' }))
+      .mockResolvedValueOnce(response(provisioned)).mockResolvedValueOnce(response(userinfo))
+      .mockResolvedValueOnce(response(discovery))
+      .mockResolvedValueOnce(response({ error: 'invalid_grant' }, 400))
+    const service = new DofeAuthService({ openExternal: vi.fn() }, credentialStore('refresh') as never, fetcher)
+    try {
+      await service.restore()
+      expect(await service.restore()).toMatchObject({ status: 'error', code: 'invalid_grant' })
+      expect(service.getDatasourceSession()).toBeUndefined()
+    } finally { await service.dispose() }
+  })
+
   it.each([
     new Error('fetch failed', { cause: Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:7990'), { code: 'ECONNREFUSED' }) }),
     new Error('net::ERR_PROXY_CONNECTION_FAILED'),

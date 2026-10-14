@@ -576,7 +576,8 @@ export function DofeAccessGate({ credentials, settingsApi, settingsScope, t, onA
         const snapshot = await response.json() as DofeAuthSnapshot
         if (cancelled) return
         if (snapshot.status === 'bound') setSessionDead(false)
-        else if (snapshot.status === 'error' || snapshot.status === 'idle' || snapshot.status === 'cancelled') setSessionDead(true)
+        else if (snapshot.status === 'error' && snapshot.code === 'invalid_grant'
+          || snapshot.status === 'idle' || snapshot.status === 'cancelled') setSessionDead(true)
         // `pending`/`issued` mean a login is in flight; keep the current state.
       } catch { /* A transient failure is not a session revocation. */ }
     }
