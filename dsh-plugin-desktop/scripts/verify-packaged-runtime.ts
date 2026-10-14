@@ -149,6 +149,7 @@ export const ALLOWED_SMART_UNPACK_PACKAGE_PREFIXES = [
   'node_modules/@img/sharp-',
   'node_modules/@koromix/koffi-',
   'node_modules/@openai/codex-',
+  'node_modules/@tencent-qqmail/agently-cli-',
   'node_modules/@trycua/cua-driver-',
   'node_modules/@ubjs/node-',
   'node_modules/@vscode/ripgrep-',
