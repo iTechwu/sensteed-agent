@@ -34725,6 +34725,7 @@ snapshots:
 
   '@dofe/dsh-sensteed-skill-manager@file:../docker-helm.dofe.ai/plugins/dsh-sensteed-skill-manager':
     dependencies:
+      fflate: 0.8.3
       yaml: 2.9.0
 
   '@dofe/dsh-sensteed-supplier-intelligence@file:../docker-helm.dofe.ai/plugins/dsh-sensteed-supplier-intelligence': {}

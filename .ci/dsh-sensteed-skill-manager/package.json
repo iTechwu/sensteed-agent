@@ -1,7 +1,7 @@
 {
   "name": "@dofe/dsh-sensteed-skill-manager",
   "version": "0.1.0",
-  "description": "Manage local Sensteed Agent skills",
+  "description": "Manage local and company-shared Sensteed Agent skills",
   "type": "module",
   "main": "./index.js",
   "exports": { ".": "./index.js", "./client": "./lib/client.js", "./package.json": "./package.json" },
@@ -14,7 +14,7 @@
   },
   "files": ["cordis.patch.yml", "index.js", "lib"],
   "scripts": { "build": "node scripts/build.mjs", "test": "node --test test/*.test.mjs", "check": "npm run build && npm test" },
-  "dependencies": { "yaml": "^2.9.0" },
+  "dependencies": { "fflate": "^0.8.2", "yaml": "^2.9.0" },
   "license": "MIT",
   "private": true
 }

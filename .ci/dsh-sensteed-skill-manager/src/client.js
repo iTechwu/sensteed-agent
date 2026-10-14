@@ -8,6 +8,9 @@ const COPY = {
     create: '让 Agent 创建', install: '安装第三方 Skill', empty: '还没有可用的技能',
     loading: '正在读取技能…', refreshing: '正在刷新技能…', refreshFailed: '技能列表刷新失败。', retry: '重试', repository: 'GitHub 仓库或技能目录链接',
     installAction: '安装', cancel: '取消', installing: '正在安装…', installed: '已安装',
+    publish: '上传到公司', publishing: '正在上传…', publishSuccess: '已发布到公司技能库', publishError: '发布失败，请稍后重试。',
+    shared: '公司共享', sharedEmpty: '公司技能库还没有技能', sharedUnavailable: '暂时无法读取公司技能库', sharedInstall: '安装', sharedInstalled: '已安装', sharedLoading: '正在读取公司技能库…',
+    withdraw: '撤回', withdrawing: '正在撤回…', withdrawSuccess: '已从公司技能库撤回',
     installHint: '可粘贴单技能仓库，或合集仓库中某个技能的 /tree/ 分支目录链接。来源可信后再安装。Skill 会在本机加载。',
     installError: '安装失败，请检查仓库地址和技能结构。', installSuccess: '已安装 {name}', bundled: '内置', local: '本机',
     search: '搜索技能名称或说明', all: '全部', filterBySource: '按来源筛选', noMatches: '没有匹配的技能',
@@ -20,6 +23,9 @@ const COPY = {
     create: 'Create with Agent', install: 'Install third-party skill', empty: 'No skills available yet',
     loading: 'Loading skills…', refreshing: 'Refreshing skills…', refreshFailed: 'Could not refresh the skill list.', retry: 'Retry', repository: 'GitHub repository or skill directory URL',
     installAction: 'Install', cancel: 'Cancel', installing: 'Installing…', installed: 'Installed',
+    publish: 'Share with company', publishing: 'Publishing…', publishSuccess: 'Published to company skills', publishError: 'Could not publish this skill. Try again.',
+    shared: 'Company shared', sharedEmpty: 'No company skills yet', sharedUnavailable: 'Company skills are temporarily unavailable', sharedInstall: 'Install', sharedInstalled: 'Installed', sharedLoading: 'Loading company skills…',
+    withdraw: 'Withdraw', withdrawing: 'Withdrawing…', withdrawSuccess: 'Removed from company skills',
     installHint: 'Paste a single-skill repository or a /tree/ link to one skill in a collection. Install trusted sources only.',
     installError: 'Installation failed. Check the repository URL and skill structure.', installSuccess: 'Installed {name}', bundled: 'Built in', local: 'Local',
     search: 'Search skill names and descriptions', all: 'All', filterBySource: 'Filter by source', noMatches: 'No matching skills',
@@ -44,6 +50,9 @@ async function request(path = '', options = {}) {
 
 function SkillManagerPage({ view, t, createSkill }) {
   const [skills, setSkills] = useState([])
+  const [sharedSkills, setSharedSkills] = useState([])
+  const [sharedError, setSharedError] = useState('')
+  const [sharedLoading, setSharedLoading] = useState(true)
   const [state, setState] = useState('loading')
   const [formOpen, setFormOpen] = useState(false)
   const [repository, setRepository] = useState('')
@@ -63,8 +72,11 @@ function SkillManagerPage({ view, t, createSkill }) {
     try {
       const body = await request()
       setSkills(body.skills || [])
+      setSharedSkills(body.sharedSkills || [])
+      setSharedError(body.sharedError || '')
+      setSharedLoading(false)
       setState('ready')
-    } catch { setState(skills.length > 0 ? 'ready' : 'error'); setRefreshError(t('refreshFailed')) }
+    } catch { setSharedLoading(false); setState(skills.length > 0 ? 'ready' : 'error'); setRefreshError(t('refreshFailed')) }
   }
   useEffect(() => { void refresh() }, [])
   if (view === 'summary') return t('description')
@@ -82,6 +94,36 @@ function SkillManagerPage({ view, t, createSkill }) {
       await refresh()
       setNotice(t('installSuccess', { name: body.skill?.name || '' }))
     } catch (cause) { setError(cause?.message || t('installError')) }
+    finally { setBusy(false) }
+  }
+
+  const publish = async name => {
+    setBusy(true); setError(''); setNotice('')
+    try {
+      await request('/publish', { method: 'POST', body: JSON.stringify({ name }) })
+      await refresh()
+      setNotice(t('publishSuccess'))
+    } catch (cause) { setError(cause?.message || t('publishError')) }
+    finally { setBusy(false) }
+  }
+
+  const installShared = async name => {
+    setBusy(true); setError(''); setNotice('')
+    try {
+      await request(`/shared/${encodeURIComponent(name)}`, { method: 'POST', body: '{}' })
+      await refresh()
+      setNotice(t('installSuccess', { name }))
+    } catch (cause) { setError(cause?.message || t('installError')) }
+    finally { setBusy(false) }
+  }
+
+  const withdraw = async name => {
+    setBusy(true); setError(''); setNotice('')
+    try {
+      await request(`/shared/${encodeURIComponent(name)}`, { method: 'DELETE' })
+      await refresh()
+      setNotice(t('withdrawSuccess'))
+    } catch (cause) { setError(cause?.message || t('publishError')) }
     finally { setBusy(false) }
   }
 
@@ -125,7 +167,24 @@ function SkillManagerPage({ view, t, createSkill }) {
             : visibleSkills.map(skill => h('article', { className: 'sm-row', key: `${skill.provider}:${skill.name}` },
               h('div', { className: 'sm-glyph', 'aria-hidden': true }, '✳'),
               h('div', { className: 'sm-copy' }, h('strong', null, skill.name), h('p', null, skill.description)),
-              h('span', { className: `sm-source${skill.source === 'bundled' ? ' is-bundled' : ''}` }, skill.source === 'bundled' ? t('bundled') : t('local'))))),
+              h('span', { className: `sm-source${skill.source === 'bundled' ? ' is-bundled' : ''}` }, skill.source === 'bundled' ? t('bundled') : t('local')),
+              skill.source !== 'bundled' ? h('button', { type: 'button', className: 'sm-row-action', disabled: busy, onClick: () => void publish(skill.name) }, t('publish')) : null))),
+    h('section', { className: 'sm-shared', 'aria-labelledby': 'sm-shared-title' },
+      h('div', { className: 'sm-section-heading' }, h('h3', { id: 'sm-shared-title' }, t('shared')), h('span', null, String(sharedSkills.length))),
+      sharedLoading ? h('p', { className: 'sm-state', role: 'status' }, t('sharedLoading'))
+        : sharedError ? h('p', { className: 'sm-inline-error', role: 'status' }, t('sharedUnavailable'))
+          : sharedSkills.length === 0 ? h('p', { className: 'sm-state' }, t('sharedEmpty'))
+          : h('div', { className: 'sm-list' }, sharedSkills.map(skill => {
+            const isInstalled = skills.some(local => local.name === skill.name)
+            return h('article', { className: 'sm-row', key: `shared:${skill.name}` },
+              h('div', { className: 'sm-glyph sm-shared-glyph', 'aria-hidden': true }, '✳'),
+              h('div', { className: 'sm-copy' }, h('strong', null, skill.name), h('p', null, skill.description)),
+              h('span', { className: 'sm-version' }, `v${skill.version}`),
+              skill.canManage ? h('button', { type: 'button', className: 'sm-row-action is-danger', disabled: busy, onClick: () => void withdraw(skill.name) }, t('withdraw')) : null,
+              h('button', { type: 'button', className: 'sm-row-action', disabled: busy || isInstalled, onClick: () => void installShared(skill.name) }, isInstalled ? t('sharedInstalled') : t('sharedInstall'))
+            )
+          }))),
+      error ? h('div', { className: 'sm-error', role: 'alert' }, error) : null),
     h('section', { className: 'sm-create' },
       h('div', { className: 'sm-create-copy' }, h('strong', null, t('create')), h('p', null, t('createHint')),
         h('textarea', { className: 'sm-create-input', rows: 2, value: createRequest, placeholder: t('createPlaceholder'), onInput: event => setCreateRequest(event.currentTarget.value), 'aria-label': t('createPlaceholder') })),
@@ -172,7 +231,7 @@ function apply(ctx) {
       .sm-header h2{margin:0;font-size:20px;font-weight:650;line-height:1.3}.sm-header p,.sm-create p{margin:5px 0 0;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:1.5}
       .sm-actions,.sm-form-actions{display:flex;align-items:center;gap:8px}.sm-icon{width:36px;height:36px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-secondary);font-size:21px;cursor:pointer}.sm-icon:hover,.sm-quiet:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
       .sm-primary,.sm-secondary,.sm-quiet{min-height:36px;padding:0 13px;border:1px solid var(--dsw-alias-border-l1);border-radius:6px;font:inherit;font-size:13px;cursor:pointer}.sm-primary{border-color:var(--dsw-alias-button-primary-fill);background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground)}.sm-secondary{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}.sm-quiet{background:transparent;color:var(--dsw-alias-label-secondary)}.sm-primary:disabled,.sm-secondary:disabled,.sm-quiet:disabled{cursor:wait;opacity:.55}
-      .sm-list{display:grid;min-width:0}.sm-row{display:flex;align-items:center;gap:14px;min-height:74px;padding:9px 12px;border-bottom:1px solid var(--dsw-alias-border-l1)}.sm-row:hover{background:var(--dsw-alias-bg-layer-2)}.sm-glyph{display:grid;place-items:center;flex:0 0 48px;width:48px;height:48px;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;color:var(--dsw-alias-brand-primary);font-size:22px}.sm-copy{flex:1;min-width:0}.sm-copy strong{font-size:14px;font-weight:600}.sm-copy p{margin:4px 0 0;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:1.45;overflow-wrap:anywhere}.sm-source{flex:0 0 auto;color:var(--dsw-alias-label-secondary);font-size:12px}.sm-source.is-bundled{color:var(--dsw-alias-state-success-primary)}
+      .sm-list{display:grid;min-width:0}.sm-row{display:flex;align-items:center;gap:14px;min-height:74px;padding:9px 12px;border-bottom:1px solid var(--dsw-alias-border-l1)}.sm-row:hover{background:var(--dsw-alias-bg-layer-2)}.sm-glyph{display:grid;place-items:center;flex:0 0 48px;width:48px;height:48px;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;color:var(--dsw-alias-brand-primary);font-size:22px}.sm-copy{flex:1;min-width:0}.sm-copy strong{font-size:14px;font-weight:600}.sm-copy p{margin:4px 0 0;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:1.45;overflow-wrap:anywhere}.sm-source{flex:0 0 auto;color:var(--dsw-alias-label-secondary);font-size:12px}.sm-source.is-bundled{color:var(--dsw-alias-state-success-primary)}.sm-row-action{flex:0 0 auto;min-height:32px;padding:0 10px;border:1px solid var(--dsw-alias-border-l1);border-radius:6px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;font-size:12px;cursor:pointer}.sm-row-action:hover:not(:disabled){background:var(--dsw-alias-bg-layer-2)}.sm-row-action:disabled{opacity:.5;cursor:default}.sm-row-action.is-danger{color:var(--dsw-alias-state-error-primary)}.sm-shared{padding-top:8px;border-top:1px solid var(--dsw-alias-border-l1)}.sm-section-heading{display:flex;align-items:center;gap:8px}.sm-section-heading h3{margin:0;font-size:15px;font-weight:600}.sm-section-heading span,.sm-version{color:var(--dsw-alias-label-secondary);font-size:12px}.sm-shared-glyph{color:var(--dsw-alias-state-success-primary)}
       .sm-state{padding:28px 12px;color:var(--dsw-alias-label-secondary);font-size:13px}.sm-error,.sm-inline-error{color:var(--dsw-alias-state-error-primary)}.sm-error button,.sm-inline-error button{margin-left:8px}.sm-inline-error{font-size:13px}.sm-notice,.sm-refreshing{margin:0;color:var(--dsw-alias-state-success-primary);font-size:13px}.sm-refreshing{color:var(--dsw-alias-label-secondary)}
       .sm-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}.sm-search{box-sizing:border-box;width:min(100%,360px);height:36px;padding:0 10px;border:1px solid var(--dsw-alias-border-l1);border-radius:6px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;font-size:13px}.sm-search:focus-visible,.sm-create-input:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}.sm-filters{display:flex;gap:4px}.sm-filter{min-height:32px;padding:0 9px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;cursor:pointer}.sm-filter:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}.sm-filter.is-active{border-color:var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
       .sm-install-form{display:grid;gap:10px;padding:16px;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;background:var(--dsw-alias-bg-layer-1)}.sm-install-form label{display:grid;gap:7px;font-size:13px;font-weight:550}.sm-install-form input{box-sizing:border-box;width:100%;height:38px;padding:0 10px;border:1px solid var(--dsw-alias-border-l1);border-radius:6px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit}.sm-install-form input:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}.sm-install-form p{margin:0;color:var(--dsw-alias-label-secondary);font-size:12px}.sm-form-actions{justify-content:flex-end}

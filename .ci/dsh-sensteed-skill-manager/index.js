@@ -1,18 +1,23 @@
 import { execFile } from 'node:child_process'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { lstatSync } from 'node:fs'
-import { access, cp, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm } from 'node:fs/promises'
+import { access, cp, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rename, rm, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
-import { isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { promisify } from 'node:util'
 import { parse as parseYaml } from 'yaml'
+import { unzipSync, zipSync } from 'fflate'
 
 const execFileAsync = promisify(execFile)
 const ROUTE = '/api/desktop/sensteed/skills'
+const SHARED_SKILLS_URL = 'https://knowledge.hozonauto.com/api/plugin/v1/shared-agent-skills'
 const MAX_BODY_BYTES = 16 * 1024
+const MAX_ARCHIVE_BYTES = 10 * 1024 * 1024
+const MAX_UNPACKED_BYTES = 25 * 1024 * 1024
+const MAX_ARCHIVE_FILES = 500
 const SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
-export const inject = ['webServer', 'skills']
+export const inject = ['webServer', 'skills', 'credentials']
 
 export function skillRoot(environment = process.env, home = homedir()) {
   return resolve(environment.DSH_HOME || join(home, '.dsh'), 'skills')
@@ -173,6 +178,159 @@ async function readJsonBody(req) {
   return body
 }
 
+async function readArchiveBody(req) {
+  const chunks = []
+  let size = 0
+  for await (const chunk of req) {
+    size += chunk.length
+    if (size > Math.ceil(MAX_ARCHIVE_BYTES * 1.4) + 1024 * 1024) throw new Error('Skill archive is too large.')
+    chunks.push(chunk)
+  }
+  const body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}')
+  if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('Request body must be an object.')
+  return body
+}
+
+function validateZipArchive(archive) {
+  if (archive.length < 22 || archive.length > MAX_ARCHIVE_BYTES) throw new Error('Skill archive exceeds the 10 MiB limit.')
+  let eocd = -1
+  for (let offset = archive.length - 22; offset >= Math.max(0, archive.length - 65_557); offset -= 1) {
+    if (archive.readUInt32LE(offset) === 0x06054b50) { eocd = offset; break }
+  }
+  if (eocd < 0) throw new Error('Skill archive is invalid.')
+  const count = archive.readUInt16LE(eocd + 10)
+  const directorySize = archive.readUInt32LE(eocd + 12)
+  const directoryOffset = archive.readUInt32LE(eocd + 16)
+  if (!count || count > MAX_ARCHIVE_FILES || directoryOffset + directorySize > eocd) throw new Error('Skill archive directory is invalid.')
+  const names = new Set()
+  let totalSize = 0
+  let offset = directoryOffset
+  for (let index = 0; index < count; index += 1) {
+    if (archive.readUInt32LE(offset) !== 0x02014b50) throw new Error('Skill archive directory is invalid.')
+    const flags = archive.readUInt16LE(offset + 8)
+    const method = archive.readUInt16LE(offset + 10)
+    const compressedSize = archive.readUInt32LE(offset + 20)
+    const uncompressedSize = archive.readUInt32LE(offset + 24)
+    const nameLength = archive.readUInt16LE(offset + 28)
+    const extraLength = archive.readUInt16LE(offset + 30)
+    const commentLength = archive.readUInt16LE(offset + 32)
+    const externalAttributes = archive.readUInt32LE(offset + 38)
+    const name = archive.subarray(offset + 46, offset + 46 + nameLength).toString('utf8')
+    const fileType = (externalAttributes >>> 16) & 0o170000
+    if (
+      !name || name.includes('\\') || name.includes('\0') || name.includes(':') || name.startsWith('/') || /^[A-Za-z]:/u.test(name) ||
+      name.split('/').some(part => part === '..' || part === '.' || part.endsWith('.') || part.endsWith(' ')) || names.has(name) ||
+      flags & 1 || ![0, 8].includes(method) || fileType === 0o120000 ||
+      compressedSize === 0xffffffff || uncompressedSize === 0xffffffff
+    ) throw new Error('Skill archive contains an unsafe or unsupported entry.')
+    names.add(name)
+    totalSize += uncompressedSize
+    if (totalSize > MAX_UNPACKED_BYTES || (compressedSize > 0 && uncompressedSize / compressedSize > 200)) {
+      throw new Error('Skill archive expands beyond the 25 MiB limit.')
+    }
+    offset += 46 + nameLength + extraLength + commentLength
+  }
+  if (offset !== directoryOffset + directorySize || ![...names].some(name => name === 'SKILL.md')) {
+    throw new Error('Skill archive must contain SKILL.md at its root.')
+  }
+  return names
+}
+
+async function packLocalSkill(ctx, name) {
+  if (!SKILL_NAME.test(name || '')) throw new Error('Skill name is invalid.')
+  const listed = (await listSkills(ctx)).find(skill => skill.name === name && skill.source !== 'bundled')
+  if (!listed?.path) throw new Error('Only local skills can be published.')
+  const root = await realpath(skillRoot())
+  const skillFile = await realpath(listed.path)
+  const directory = await realpath(dirname(skillFile))
+  const relativeDirectory = relative(root, directory)
+  if (!relativeDirectory || relativeDirectory.startsWith(`..${sep}`) || isAbsolute(relativeDirectory) || relativeDirectory.includes(sep)) {
+    throw new Error('The selected skill is outside the local skills directory.')
+  }
+  if (basename(skillFile) !== 'SKILL.md') throw new Error('The selected skill has no regular SKILL.md.')
+  const metadata = parseSkillFrontmatter(await readFile(skillFile, 'utf8'))
+  if (metadata.name !== name) throw new Error('Skill folder and SKILL.md names must match.')
+  const files = Object.create(null)
+  let totalSize = 0
+  let count = 0
+  const walk = async (directoryPath, prefix = '') => {
+    for (const entry of await readdir(directoryPath, { withFileTypes: true })) {
+      if (entry.name === '.git' || entry.name === 'node_modules' || entry.name.startsWith('.')) continue
+      const fullPath = join(directoryPath, entry.name)
+      const info = await lstat(fullPath)
+      if (info.isSymbolicLink()) continue
+      if (info.isDirectory()) { await walk(fullPath, `${prefix}${entry.name}/`); continue }
+      if (!info.isFile()) continue
+      count += 1
+      totalSize += info.size
+      if (count > MAX_ARCHIVE_FILES || totalSize > MAX_UNPACKED_BYTES) throw new Error('Skill contains too many or too-large files.')
+      files[`${prefix}${entry.name}`] = new Uint8Array(await readFile(fullPath))
+    }
+  }
+  await walk(directory)
+  const archive = Buffer.from(zipSync(files, { level: 6 }))
+  validateZipArchive(archive)
+  return { metadata, archive, sha256: createHash('sha256').update(archive).digest('hex') }
+}
+
+async function installArchive(root, expectedName, archive, expectedSha256) {
+  if (createHash('sha256').update(archive).digest('hex') !== expectedSha256) throw new Error('Skill archive checksum does not match.')
+  const names = validateZipArchive(archive)
+  const entries = unzipSync(archive)
+  const metadata = parseSkillFrontmatter(Buffer.from(entries['SKILL.md']).toString('utf8'))
+  if (metadata.name !== expectedName) throw new Error('Skill archive name does not match the shared listing.')
+  await mkdir(root, { recursive: true, mode: 0o700 })
+  const rootStat = await lstat(root)
+  if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) throw new Error('The local skill directory is not a regular directory.')
+  const destination = join(root, expectedName)
+  if (await exists(destination)) throw new Error(`The skill "${expectedName}" is already installed.`)
+  const staging = join(root, `.${expectedName}.${randomUUID()}.tmp`)
+  try {
+    for (const name of names) {
+      if (name.endsWith('/')) continue
+      const target = resolve(staging, name)
+      const relativePath = relative(staging, target)
+      if (!relativePath || relativePath === '..' || relativePath.startsWith(`..${sep}`) || isAbsolute(relativePath)) {
+        throw new Error('Skill archive contains an unsafe path.')
+      }
+      await mkdir(dirname(target), { recursive: true, mode: 0o700 })
+      await writeFile(target, entries[name], { mode: 0o600, flag: 'wx' })
+    }
+    await rename(staging, destination)
+    return metadata
+  } finally {
+    await rm(staging, { recursive: true, force: true })
+  }
+}
+
+async function resolveModelsKey(ctx) {
+  const result = await ctx.credentials.resolve('MODELS_API_KEY')
+  const value = typeof result === 'string' ? result : result?.value
+  if (typeof value !== 'string' || !value.trim()) throw new Error('MODELS_API_KEY is unavailable.')
+  return value.trim()
+}
+
+async function callSharedSkills(ctx, path = '', options = {}) {
+  const key = await resolveModelsKey(ctx)
+  const response = await (options.fetch || globalThis.fetch)(`${SHARED_SKILLS_URL}${path}`, {
+    ...options.request,
+    redirect: 'error',
+    signal: AbortSignal.timeout(30_000),
+    headers: { Accept: 'application/json', Authorization: `Bearer ${key}`, ...(options.request?.headers || {}) },
+  })
+  const envelope = await response.json().catch(() => null)
+  if (!response.ok || !envelope?.data) {
+    const message = typeof envelope?.msg === 'string' ? envelope.msg : `Knowledge request failed (${response.status}).`
+    throw new Error(message.slice(0, 300))
+  }
+  return envelope.data
+}
+
+function safeRouteName(path) {
+  const match = /^\/api\/desktop\/sensteed\/skills\/shared\/([a-z0-9]+(?:-[a-z0-9]+)*)$/u.exec(path || '')
+  return match?.[1]
+}
+
 function respond(res, status, value) {
   res.writeHead(status, {
     'Cache-Control': 'no-store',
@@ -214,24 +372,53 @@ export function apply(ctx, overrides = {}) {
     async handler(req, res) {
       if (!isSameOrigin(req, ctx.webServer.port)) return respond(res, 403, { error: 'Local same-origin access is required.' })
       if (req.method === 'GET' && req.url?.split('?', 1)[0] === ROUTE) {
-        try { return respond(res, 200, { skills: await listSkills(ctx) }) }
+        try {
+          const [skills, shared] = await Promise.all([
+            listSkills(ctx),
+            callSharedSkills(ctx, '?page=1&limit=200').catch(error => ({ unavailable: error instanceof Error ? error.message : 'Company skills are unavailable.', list: [] })),
+          ])
+          return respond(res, 200, { skills, sharedSkills: shared.list || [], sharedTotal: shared.total || 0, sharedError: shared.unavailable || null })
+        }
         catch { return respond(res, 503, { error: 'Skills are temporarily unavailable.' }) }
       }
-      if (req.method !== 'POST' || req.url?.split('?', 1)[0] !== `${ROUTE}/install`) {
-        return respond(res, 404, { error: 'Route not found.' })
-      }
+      const requestPath = req.url?.split('?', 1)[0]
+      const sharedName = safeRouteName(requestPath)
       try {
-        const body = await readJsonBody(req)
-        if (typeof body.repository !== 'string') return respond(res, 400, { error: 'A GitHub repository URL is required.' })
-        const skill = await installSkill(body.repository, overrides.installOptions)
-        return respond(res, 201, { skill })
+        if (req.method === 'POST' && requestPath === `${ROUTE}/install`) {
+          const body = await readJsonBody(req)
+          if (typeof body.repository !== 'string') return respond(res, 400, { error: 'A GitHub repository URL is required.' })
+          const skill = await installSkill(body.repository, overrides.installOptions)
+          return respond(res, 201, { skill })
+        }
+        if (req.method === 'POST' && requestPath === `${ROUTE}/publish`) {
+          const body = await readArchiveBody(req)
+          if (typeof body.name !== 'string') return respond(res, 400, { error: 'A local skill name is required.' })
+          const { metadata, archive, sha256 } = await packLocalSkill(ctx, body.name)
+          const result = await callSharedSkills(ctx, '', { fetch: overrides.fetch, request: {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: metadata.name, description: metadata.description, sha256, archiveBase64: archive.toString('base64') }),
+          } })
+          return respond(res, 201, { skill: result.skill })
+        }
+        if (req.method === 'POST' && sharedName && requestPath === `${ROUTE}/shared/${sharedName}`) {
+          const result = await callSharedSkills(ctx, `/${encodeURIComponent(sharedName)}/archive`, { fetch: overrides.fetch })
+          const archive = Buffer.from(result.archiveBase64, 'base64')
+          const skill = await installArchive(skillRoot(), sharedName, archive, result.sha256)
+          return respond(res, 201, { skill })
+        }
+        if (req.method === 'DELETE' && sharedName && requestPath === `${ROUTE}/shared/${sharedName}`) {
+          await callSharedSkills(ctx, `/${encodeURIComponent(sharedName)}`, { fetch: overrides.fetch, request: { method: 'DELETE' } })
+          return respond(res, 200, { deleted: true })
+        }
+        return respond(res, 404, { error: 'Route not found.' })
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Skill installation failed.'
-        return respond(res, 400, { error: message.slice(0, 300) })
+        const status = /MODELS_API_KEY|scope|unauthorized/iu.test(message) ? 403 : 400
+        return respond(res, status, { error: message.slice(0, 300) })
       }
     },
   })
   return () => route?.()
 }
 
-export const __test = { safeGitHubUrl, skillSource, installSkill }
+export const __test = { safeGitHubUrl, skillSource, installSkill, validateZipArchive, installArchive, packLocalSkill, SHARED_SKILLS_URL }

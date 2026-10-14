@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
+import { zipSync } from 'fflate'
 import { __test, listSkills, parseSkillFrontmatter, skillRoot } from '../index.js'
 
 test('resolves the local DSH skills directory and validates skill metadata', () => {
@@ -74,4 +75,29 @@ test('resolves only the selected skill directory without scanning sibling skills
     await symlink(join(root, 'skills', 'one'), join(root, 'linked-skill'))
     await assert.rejects(__test.skillSource(root, 'linked-skill'), /not a skill directory/u)
   } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test('validates shared skill archives and installs their complete directory atomically', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'skill-manager-shared-'))
+  const archive = Buffer.from(zipSync({
+    'SKILL.md': new TextEncoder().encode('---\nname: release-notes\ndescription: Prepare release notes\n---\n'),
+    'scripts/check.mjs': new TextEncoder().encode('export default true'),
+  }))
+  const digest = (await import('node:crypto')).createHash('sha256').update(archive).digest('hex')
+  try {
+    assert.equal(__test.validateZipArchive(archive).has('scripts/check.mjs'), true)
+    const installed = await __test.installArchive(root, 'release-notes', archive, digest)
+    assert.equal(installed.name, 'release-notes')
+    assert.equal(await readFile(join(root, 'release-notes', 'scripts', 'check.mjs'), 'utf8'), 'export default true')
+    await assert.rejects(__test.installArchive(root, 'different-name', archive, digest), /does not match/u)
+    await assert.rejects(__test.installArchive(root, 'release-notes', archive, '0'.repeat(64)), /checksum/u)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test('rejects traversal and symbolic-link entries in shared skill archives', () => {
+  const traversal = Buffer.from(zipSync({
+    'SKILL.md': new TextEncoder().encode('---\nname: unsafe\ndescription: Unsafe\n---\n'),
+    '../escape.txt': new TextEncoder().encode('outside'),
+  }))
+  assert.throws(() => __test.validateZipArchive(traversal), /unsafe/u)
 })
