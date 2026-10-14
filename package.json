@@ -1,6 +1,6 @@
 {
   "name": "sensteed-agent",
-  "version": "0.2.1-alpha.2-beta.202610131829",
+  "version": "0.2.1-alpha.2-beta.202610141405",
   "private": true,
   "description": "Sensteed Agent product workspace",
   "license": "MIT",
@@ -8,7 +8,6 @@
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
   },
-
   "scripts": {
     "release:prepare": "node scripts/prepare-release.mjs",
     "release:verify": "node scripts/release-contract.mjs",
