@@ -1,0 +1,4 @@
+# Sensteed local skill management page under the official Plugins entry.
+- insert:
+    - id: sensteed-skill-manager
+      name: '@dofe/dsh-sensteed-skill-manager'
