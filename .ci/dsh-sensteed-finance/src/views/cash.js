@@ -57,7 +57,7 @@ function CashView({ ctx, t, onDrill }) {
   }, [tab, page, revenuePage, year, orgId, filters.planType, filters.departmentId, filters.month, filters.unassigned, revision, reloadTick])
 
   const filterBar = tab === 'plans' ? h('div', { className: 'sf-filters' },
-    h(Select, { value: filters.planType, onChange: value => { setPage(1); setFilters(f => ({ ...f, planType: value })) }, options: PLAN_TYPES, placeholder: t('planType') }),
+    h(Select, { value: filters.planType, onChange: value => { setPage(1); setFilters(f => ({ ...f, planType: value })) }, options: PLAN_TYPES.map(([id, label]) => [id, t(label)]), placeholder: t('planType') }),
     h(SearchSelect, { value: filters.departmentId, onChange: value => { setPage(1); setFilters(f => ({ ...f, departmentId: value })) }, options: (departments || []).map(d => [d.id, d.name]), placeholder: t('department') }),
     h(Select, { value: filters.month, onChange: value => { setPage(1); setFilters(f => ({ ...f, month: value })) }, options: Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1} 月`]), placeholder: t('monthCol') }),
     h('label', { className: 'sf-row', style: { gap: 6, fontSize: 12, color: 'var(--sf-ink2)' } },
@@ -102,7 +102,7 @@ function PlanAdjustDetailDialog({ id, t, onClose }) {
       flow.length ? h('div', null, h('strong', null, t('flow')), h('div', { className: 'sf-timeline' }, ...flow.map((item, index) =>
         h('div', { key: index, className: 'sf-timeline-row' },
           h('span', { className: 'sf-timeline-dot' }),
-          h('div', { className: 'sf-timeline-main' }, h('span', null, `${item.action ?? item.toStatus ?? ''} · ${item.operatorName ?? item.operator ?? '—'}`), h('small', null, shortDate(item.at ?? item.createdAt) ?? '')),
+          h('div', { className: 'sf-timeline-main' }, h('span', null, `${financeLabel(item.action ?? item.toStatus)} · ${item.operatorName ?? item.operator ?? '—'}`), h('small', null, shortDate(item.at ?? item.createdAt) ?? '')),
           h('span', { className: 'sf-note' }, item.note ?? ''))))) : null))
 }
 
@@ -239,7 +239,7 @@ function PlanDetailDialog({ plan, t, onClose }) {
     [t('planned'), wan(plan.plannedAmount)], [t('actual'), wan(plan.actualAmount)], [t('variance'), wan(plan.varianceAmount)],
     [t('remaining'), wan(plan.remainingAmount)], [t('scheduleDate'), shortDate(plan.scheduleDate)], [t('priority'), plan.priority ? t(PRIORITIES.find(([id]) => id === plan.priority)?.[1] ?? plan.priority) : '—'],
     [t('acceptAcceptance'), plan.acceptsAcceptance ? '✓' : '—'], [t('cashAmount'), wan(plan.plannedCashAmount)], [t('acceptanceAmount'), wan(plan.plannedAcceptanceAmount)],
-    [t('payee'), plan.payeeName], [t('statusCol'), plan.status],
+    [t('payee'), plan.payeeName], [t('statusCol'), financeLabel(plan.status)],
   ]
   return h(Dialog, { title: t('planDetail'), onClose },
     h('dl', { className: 'sf-evidence' }, ...fields.map(([label, value], index) =>

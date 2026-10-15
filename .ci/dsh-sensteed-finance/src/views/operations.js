@@ -41,7 +41,7 @@ function OperationsView({ brief, t, onDrill }) {
   }
   const shareTones = ['a', 'b', 'c', 'd']
   const shareSegments = Object.entries(byType).map(([key, value], index) => ({
-    label: EXPENSE_LABELS[key] ?? key, value, tone: shareTones[index % shareTones.length],
+    label: t(EXPENSE_LABELS[key] ?? key), value, tone: shareTones[index % shareTones.length],
   }))
 
   const netByMonth = new Map()

@@ -18,6 +18,12 @@ import { SettingsRequests } from './settings-requests.tsx'
 import type { DesktopSettingsLocaleKey } from '../../../dsh-plugin-desktop/src/client/desktop-settings-locales.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
+  interface SlotMap {
+    /** Controls rendered above the official plugin cards. */
+    'plugins.overview': { kind: 'list'; scope: 'root' }
+    /** Bundle rows owned by the overview controls and hidden from the card list. */
+    'plugins.bundle.hidden': { kind: 'keyed'; scope: 'root' }
+  }
   interface LocaleNamespaceMap {
     'desktop.settings': DesktopSettingsLocaleKey
     'desktop-next': 'settings' | 'language' | 'safeMode' | 'safeModeDetail' | 'recovery' | 'dismiss'
@@ -25,6 +31,12 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 }
 
 export const inject = ['slots', 'layout', 'locale']
+
+export interface DesktopRemoteControlService {
+  read(): Promise<{ enabled: boolean; available: boolean }>
+  setEnabled(enabled: boolean): Promise<void>
+  open(): Promise<void>
+}
 
 export function apply(ctx: Context): void {
   ctx.effect(installUiDiagnostics, 'AA and Plugins client lifecycle diagnostics')
@@ -43,6 +55,30 @@ export function apply(ctx: Context): void {
     }, 'Native Desktop permissions')
     ctx.effect(installSidebarFooterStyles, 'Shared Desktop sidebar footer layout')
     const adapter = new NextSettingsAdapter(window.desktopNext)
+    const remoteControl: DesktopRemoteControlService = {
+      read: async () => {
+        const state = await window.desktopNext!.state()
+        return { enabled: state.features.remoteControl, available: !state.safeMode && state.phase === 'ready' }
+      },
+      setEnabled: async enabled => {
+        const state = await window.desktopNext!.state()
+        await window.desktopNext!.command({ type: 'features', features: { ...state.features, remoteControl: enabled } })
+      },
+      open: async () => {
+        const trigger = document.querySelector<HTMLButtonElement>(
+          '[data-slot="sidebar.footer.action"] button[aria-label="手机连接"][aria-haspopup="dialog"], ' +
+          '[data-slot="sidebar.footer.action"] button[aria-label="Mobile connection"][aria-haspopup="dialog"], ' +
+          '[data-slot="sidebar.footer.action"] button[aria-label="远程控制"][aria-haspopup="dialog"], ' +
+          '[data-slot="sidebar.footer.action"] button[aria-label="Remote Control"][aria-haspopup="dialog"]',
+        )
+        if (!trigger) throw new Error('remote_control_unavailable')
+        trigger.click()
+      },
+    }
+    ctx.effect(() => {
+      const dispose = ctx.reflect.provide('desktopRemoteControl', remoteControl)
+      return () => { void dispose() }
+    }, 'Desktop remote control settings service')
     const t = ctx.locale.bind('desktop-next')
     // The shared settings shell maps the legacy section ID to our display icon.
     ctx.slots.inject('settings.section', () => ctx.slots.register({

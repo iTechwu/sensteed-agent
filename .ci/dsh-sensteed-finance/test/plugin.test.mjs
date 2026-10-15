@@ -114,6 +114,19 @@ test('matrix and detail tables expose sortable raw values for formatted finance 
   }
 })
 
+test('finance enum codes are translated at every user-facing selector and data-center table', async () => {
+  const files = ['src/head.js', 'src/workflows.js', 'src/views/budget.js', 'src/views/cash.js', 'src/views/datacenter.js']
+  const source = (await Promise.all(files.map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  assert.match(source, /bizSystem:\s*'业务系统'/)
+  assert.match(source, /docType:\s*'单据类型'/)
+  assert.match(source, /options: EXPENSE_TYPES\.map\(\(\[id, label\]\) => \[id, t\(label\)\]\)/)
+  assert.match(source, /options: PLAN_TYPES\.map\(\(\[id, label\]\) => \[id, t\(label\)\]\)/)
+  assert.match(source, /financeLabel\(row\.bizSystem\)/)
+  assert.match(source, /financeLabel\(row\.docType\)/)
+  assert.match(source, /FINANCE_PLAN:\s*'财务计划'/)
+  assert.match(source, /FEISHU_RAW_SNAPSHOT:\s*'飞书原始快照'/)
+})
+
 
 test('filing saves selected cost IDs before submission and preserves rows on failure', async () => {
   const components = await readFile(new URL('src/components.js', root), 'utf8')

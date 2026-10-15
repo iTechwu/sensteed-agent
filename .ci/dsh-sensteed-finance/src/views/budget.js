@@ -77,7 +77,7 @@ function BudgetView({ ctx, t }) {
 
   const activeCount = ['expenseType', 'departmentId', 'versionId', 'month'].filter(key => filters[key]).length + (filters.unassigned ? 1 : 0)
   const filterBar = h('div', { className: 'sf-filters sf-budget-filters' },
-    h(Select, { value: filters.expenseType, onChange: value => { setPage(1); setFilters(f => ({ ...f, expenseType: value })) }, options: EXPENSE_TYPES, placeholder: t('expenseType') }),
+    h(Select, { value: filters.expenseType, onChange: value => { setPage(1); setFilters(f => ({ ...f, expenseType: value })) }, options: EXPENSE_TYPES.map(([id, label]) => [id, t(label)]), placeholder: t('expenseType') }),
     h(SearchSelect, { value: filters.departmentId, onChange: value => { setPage(1); setFilters(f => ({ ...f, departmentId: value })) }, options: (departments || []).map(d => [d.id, d.name]), placeholder: t('department') }),
     h(Select, { value: filters.month, onChange: value => { setPage(1); setFilters(f => ({ ...f, month: value })) }, options: Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1} 月`]), placeholder: t('monthCol') }),
     view === 'matrix' || view === 'lines' ? h(SearchSelect, { value: filters.versionId, onChange: value => { setPage(1); setFilters(f => ({ ...f, versionId: value })) }, options: (versions?.list || []).map(version => [version.id, budgetVersionLabel(version)]), placeholder: t('version') }) : null,
@@ -132,7 +132,7 @@ function MatrixView({ budget, t, onCell }) {
   const groups = new Map()
   for (const row of rows) {
     const key = `${row.orgName ?? t('unassigned')}|${row.expenseType ?? ''}|${row.departmentName ?? ''}`
-    if (!groups.has(key)) groups.set(key, { label: [row.orgName ?? t('unassigned'), EXPENSE_LABELS[row.expenseType] ?? '', row.departmentName].filter(Boolean).join(' / '), months: {}, total: { budget: 0, pr: 0, paid: 0, prEstimated: 0 } })
+    if (!groups.has(key)) groups.set(key, { label: [row.orgName ?? t('unassigned'), row.expenseType ? t(EXPENSE_LABELS[row.expenseType] ?? row.expenseType) : '', row.departmentName].filter(Boolean).join(' / '), months: {}, total: { budget: 0, pr: 0, paid: 0, prEstimated: 0 } })
     const group = groups.get(key)
     const month = row.month ?? 0
     group.months[month] = {
@@ -204,7 +204,7 @@ function MonthView({ budget, t }) {
     h(Card, { title: `${month} ${t('monthCol')} · ${t('orgSummaryFull')}`, unit: t('unitNote') }, h(Table, { tableId: 'finance-MonthView-1',
       columns: [
         { label: t('org'), key: 'orgName', render: row => row.orgName ?? t('unassigned'), stickyLeft: true },
-        { label: t('expenseType'), key: 'expenseType', render: row => EXPENSE_LABELS[row.expenseType] ?? row.expenseType ?? '—' },
+        { label: t('expenseType'), key: 'expenseType', render: row => row.expenseType ? t(EXPENSE_LABELS[row.expenseType] ?? row.expenseType) : '—' },
         { label: t('kpiBudget'), key: 'budgetAmount', render: row => wan(row.budgetAmount) ?? '—', num: true },
         { label: t('kpiPrSubmitted'), key: 'prSubmittedAmount', render: row => wan(row.prSubmittedAmount) ?? '—', num: true },
         { label: t('kpiPaid'), key: 'paidAmount', render: row => wan(row.paidAmount) ?? '—', num: true },
@@ -224,7 +224,7 @@ function LinesView({ budget, page, onPage, t, onDetail }) {
         { label: t('org'), key: 'orgName', render: row => row.orgName ?? h(Badge, { tone: 'amber' }, t('unassigned')), stickyLeft: true },
         { label: t('department'), key: 'departmentName' },
         { label: t('costItem'), key: 'costItemName' },
-        { label: t('expenseType'), key: 'expenseType', render: row => EXPENSE_LABELS[row.expenseType] ?? row.expenseType ?? '—' },
+        { label: t('expenseType'), key: 'expenseType', render: row => row.expenseType ? t(EXPENSE_LABELS[row.expenseType] ?? row.expenseType) : '—' },
         { label: t('monthCol'), key: 'month', sortValue: row => row.month, render: row => mm(row.month), num: true },
         { label: t('kpiBudget'), key: 'budgetAmount', render: row => wan(row.budgetAmount) ?? '—', num: true },
         { label: t('kpiPrSubmitted'), key: 'prSubmittedAmount', render: row => wan(row.prSubmittedAmount) ?? '—', num: true },
@@ -239,7 +239,7 @@ function LineDetailDialog({ line, t, onClose }) {
   const occupied = (finite(line.prSubmittedAmount) ?? 0) + (finite(line.paidAmount) ?? 0) + (finite(line.allocatedAmount) ?? 0)
   return h(Dialog, { title: t('budgetLinesTitle'), onClose },
     h('dl', { className: 'sf-evidence' },
-      ...[['org', line.orgName ?? t('unassigned')], ['department', line.departmentName ?? '—'], ['costItem', line.costItemName ?? '—'], ['month', mm(line.month)], ['expenseType', EXPENSE_LABELS[line.expenseType] ?? '—']].map(([key, value]) =>
+      ...[['org', line.orgName ?? t('unassigned')], ['department', line.departmentName ?? '—'], ['costItem', line.costItemName ?? '—'], ['month', mm(line.month)], ['expenseType', line.expenseType ? t(EXPENSE_LABELS[line.expenseType] ?? line.expenseType) : '—']].map(([key, value]) =>
         h('div', { key, className: 'sf-evidence-item' }, h('small', null, t(key)), h('strong', null, value))),
       ...[[t('kpiBudget'), line.budgetAmount], [t('kpiPrSubmitted'), line.prSubmittedAmount], [t('kpiPrEstimated'), line.prEstimatedAmount], [t('kpiPaid'), line.paidAmount], [t('available'), line.availableAmount]].map(([label, value]) =>
         h('div', { key: label, className: 'sf-evidence-item' }, h('small', null, label), h('strong', null, wan(value) ?? '—')))))
@@ -258,7 +258,7 @@ function LedgerView({ pr, page, onPage, t }) {
       { label: t('department'), key: 'departmentName' },
       { label: t('monthCol'), key: 'month', sortValue: row => row.month, render: row => mm(row.month), num: true },
       { label: t('amount'), key: 'budgetAmount', render: row => wan(row.budgetAmount) ?? '—', num: true },
-      { label: t('statusCol'), key: 'status', render: row => row.status ? h(Pill, { tone: /完成|已批|通过/.test(row.status) ? 'green' : /审批|待|处理/.test(row.status) ? 'blue' : 'muted' }, row.status) : '—' },
+      { label: t('statusCol'), key: 'status', render: row => row.status ? h(Pill, { tone: /完成|已批|通过|已发布|已生效/.test(financeLabel(row.status)) ? 'green' : /审批|待|处理/.test(financeLabel(row.status)) ? 'blue' : 'muted' }, financeLabel(row.status)) : '—' },
     ],
     rows, empty: t('empty'),
   }), h(Pager, { page, total: pr?.data?.total ?? pr?.total, limit: PAGE_SIZE, onPage }))
@@ -400,7 +400,7 @@ function AdjustCreateDialog({ year, orgs, departments, lines, busy, t, onClose, 
   ] },
     h('div', { className: 'sf-stack' },
       h('div', { className: 'sf-filters' },
-        h(FormRow, { label: t('adjType') }, h(Select, { value: type, onChange: setType, options: ADJ_TYPES })),
+        h(FormRow, { label: t('adjType') }, h(Select, { value: type, onChange: setType, options: ADJ_TYPES.map(([id, label]) => [id, t(label)]) })),
         h(FormRow, { label: `${t('year')}` }, h(Field, { value: year, disabled: true }))),
       h(FormRow, { label: t('adjReason'), wide: true }, h(Textarea, { value: reason, onChange: setReason, maxLength: 1000, required: true })),
       h('div', { className: 'sf-stack' },
@@ -443,7 +443,7 @@ function AdjustDetailDialog({ id, t, onClose }) {
       flow.length ? h('div', null, h('strong', null, t('flow')), h('div', { className: 'sf-timeline' }, ...flow.map((item, index) =>
         h('div', { key: index, className: 'sf-timeline-row' },
           h('span', { className: 'sf-timeline-dot' }),
-          h('div', { className: 'sf-timeline-main' }, h('span', null, `${item.action ?? item.toStatus ?? ''} · ${item.operatorName ?? item.operator ?? '—'}`), h('small', null, shortDate(item.at ?? item.createdAt) ?? '')),
+          h('div', { className: 'sf-timeline-main' }, h('span', null, `${financeLabel(item.action ?? item.toStatus)} · ${item.operatorName ?? item.operator ?? '—'}`), h('small', null, shortDate(item.at ?? item.createdAt) ?? '')),
           h('span', { className: 'sf-note' }, item.note ?? ''))))) : null))
 }
 
@@ -553,7 +553,7 @@ function CarryoverCard({ t, revision, reloadTick, act, onDialog }) {
   }, [revision, reloadTick])
   return h(Card, { title: t('carryoverRules'), actions: [h(LinkButton, { key: 'add', onClick: () => onDialog({ kind: 'carryover' }) }, h(Glyph, { name: 'plus', size: 12 }), t('ruleAdd'))] }, h(Table, { tableId: 'finance-CarryoverCard-1',
     columns: [
-      { label: t('expenseType'), key: 'expenseType', render: row => row.expenseType ? EXPENSE_LABELS[row.expenseType] ?? row.expenseType : t('all') },
+      { label: t('expenseType'), key: 'expenseType', render: row => row.expenseType ? t(EXPENSE_LABELS[row.expenseType] ?? row.expenseType) : t('all') },
       { label: t('carryoverMode'), key: 'mode', render: row => row.mode === 'FULL' ? t('modeFull') : row.mode === 'PERCENT' ? `${t('modePercent')} ${row.percent ?? 100}%` : `${t('modeExpire')} ${t('expireMonth')} ${row.expireMonth ?? '—'}` },
       { label: t('statusCol'), key: 'enabled', render: row => h(Pill, { tone: row.enabled ? 'green' : 'muted' }, row.enabled ? t('ruleEnabled') : t('ruleDisabled')) },
       { label: t('actions'), key: 'actions', sortable: false, render: row => h('div', { className: 'sf-row', style: { justifyContent: 'flex-end', flexWrap: 'nowrap' } },
@@ -584,7 +584,7 @@ function CarryoverDialog({ t, onClose, act }) {
   ] },
     h('div', { className: 'sf-stack' },
       h(FormRow, { label: t('carryoverMode') }, h(Select, { value: mode, onChange: setMode, options: [['FULL', 'modeFull'], ['PERCENT', 'modePercent'], ['EXPIRE', 'modeExpire']] })),
-      h(FormRow, { label: t('expenseType') }, h(Select, { value: expenseType, onChange: setExpenseType, options: EXPENSE_TYPES, placeholder: t('all') })),
+      h(FormRow, { label: t('expenseType') }, h(Select, { value: expenseType, onChange: setExpenseType, options: EXPENSE_TYPES.map(([id, label]) => [id, t(label)]), placeholder: t('all') })),
       mode === 'PERCENT' ? h(FormRow, { label: t('percent') }, h(Field, { type: 'number', min: 1, max: 100, value: percent, onChange: setPercent })) : null,
       mode === 'EXPIRE' ? h(FormRow, { label: t('expireMonth') }, h(Field, { type: 'number', min: 1, max: 12, value: expireMonth, onChange: setExpireMonth })) : null))
 }
@@ -610,7 +610,7 @@ function VersionDiffDialog({ versions, year, t, onClose }) {
       h(Table, { tableId: 'finance-VersionDiffDialog-1',
         columns: [
           { label: t('org'), key: 'orgName', render: row => row.orgName ?? '—', stickyLeft: true },
-          { label: t('expenseType'), key: 'expenseType', render: row => EXPENSE_LABELS[row.expenseType] ?? row.expenseType ?? '—' },
+          { label: t('expenseType'), key: 'expenseType', render: row => row.expenseType ? t(EXPENSE_LABELS[row.expenseType] ?? row.expenseType) : '—' },
           { label: t('diffAmount'), key: 'diffAmount', render: row => { const value = finite(row.diffAmount); return h('span', { className: value < 0 ? 'sf-neg' : 'sf-pos' }, wan(value) ?? '—') }, num: true },
         ],
         rows, empty: t('empty'),

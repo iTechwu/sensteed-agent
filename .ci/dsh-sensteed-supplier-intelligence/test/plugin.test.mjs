@@ -151,3 +151,63 @@ test('client bundle registers a keyed main panel and a native sidebar panel row'
   assert.match(bundle, /supply_chain_weekly_report_plan_save/u)
   assert.match(bundle, /supply_chain_business_analysis_save/u)
 })
+
+test('workbench and guidance honor the product Tools entitlement without granting disabled access', async () => {
+  const { apply } = await import('../index.js')
+  let gate = { ready: true, enabledPlugins: ['supplier-intelligence'], entitlements: { plugins: ['tools'] } }
+  let connected = true
+  let credential = { value: 'fixture-only-secret' }
+  let route
+  let section
+  const tools = new Map()
+  let externalCalls = 0
+  const dispose = apply({
+    dofeAccess: () => gate,
+    webServer: { port: 43123, register(value) { route = value; return () => {} } },
+    systemPrompt: { section(value) { section = value; return () => {} } },
+    tools: {
+      schemas: () => connected ? [{ name: 'mcp__tools-supply-chain__supply_chain_workbench_overview_get' }] : [],
+      register(value) { tools.set(value.name, value); return () => tools.delete(value.name) },
+    },
+    credentials: { async resolve() { return credential } },
+  }, { fetch: async () => {
+    externalCalls++
+    return new Response(JSON.stringify({ result: { structuredContent: { counts: { suppliers: 3 } } } }))
+  } })
+  const request = async (method = 'GET') => {
+    let status
+    let payload
+    await route.handler({
+      method, url: `/api/desktop/sensteed/supplier-risk/${method === 'GET' ? 'access' : 'call'}`,
+      socket: { remoteAddress: '127.0.0.1' },
+      headers: { origin: 'http://127.0.0.1:43123', 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' },
+      async *[Symbol.asyncIterator]() { yield Buffer.from(JSON.stringify({ action: 'supply_chain_workbench_overview_get', args: {} })) },
+    }, { writeHead(value) { status = value }, end(value) { payload = JSON.parse(value) } })
+    return { status, ...payload }
+  }
+  assert.equal((await request()).allowed, true)
+  assert.match(section.text({}), /供应商/u)
+  assert.ok(tools.has('sensteed_supplier_intelligence_bootstrap'))
+  assert.equal((await request('POST')).status, 200)
+  assert.equal(externalCalls, 1)
+
+  for (const plugins of [['supplier-intelligence'], ['tools']]) {
+    gate.entitlements.plugins = plugins
+    assert.equal((await request()).allowed, true)
+  }
+  for (const [update, reason] of [
+    [() => { gate.ready = false }, 'login_required'],
+    [() => { gate.ready = true; gate.enabledPlugins = [] }, 'plugin_disabled'],
+    [() => { gate.enabledPlugins = ['supplier-intelligence']; gate.entitlements.plugins = [] }, 'entitlement_required'],
+    [() => { gate.entitlements.plugins = ['tools']; credential = undefined }, 'credential_unavailable'],
+    [() => { credential = { value: 'fixture-only-secret' }; connected = false }, 'supply_chain_unavailable'],
+  ]) {
+    update()
+    const access = await request()
+    assert.equal(access.allowed, false)
+    assert.equal(access.reason, reason)
+    assert.equal((await request('POST')).ok, false)
+  }
+  assert.equal(externalCalls, 1, 'unavailable requests must not reach the gateway')
+  dispose()
+})

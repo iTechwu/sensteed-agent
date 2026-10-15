@@ -6,7 +6,7 @@ const COPY = {
   zh: {
     title: '技能管理', description: '查看和添加 Agent 技能', refresh: '刷新', add: '添加 Skill',
     create: '让 Agent 创建', install: '安装第三方 Skill', empty: '还没有可用的技能',
-    loading: '正在读取技能…', refreshing: '正在刷新技能…', refreshFailed: '技能列表刷新失败。', retry: '重试', repository: 'GitHub 仓库或技能目录链接',
+    loading: '正在读取技能…', refreshing: '正在刷新技能…', refreshFailed: '技能列表刷新失败。', serviceUnavailable: '技能服务暂时不可用，请稍后重试。', retry: '重试', repository: 'GitHub 仓库或技能目录链接',
     installAction: '安装', cancel: '取消', installing: '正在安装…', installed: '已安装',
     publish: '上传到公司', publishing: '正在上传…', publishSuccess: '已发布到公司技能库', publishError: '发布失败，请稍后重试。',
     shared: '公司共享', sharedEmpty: '公司技能库还没有技能', sharedUnavailable: '暂时无法读取公司技能库', sharedInstall: '安装', sharedUpdate: '更新', sharedInstalled: '已安装', sharedLoading: '正在读取公司技能库…',
@@ -21,7 +21,7 @@ const COPY = {
   en: {
     title: 'Skill management', description: 'Browse and add Agent skills', refresh: 'Refresh', add: 'Add skill',
     create: 'Create with Agent', install: 'Install third-party skill', empty: 'No skills available yet',
-    loading: 'Loading skills…', refreshing: 'Refreshing skills…', refreshFailed: 'Could not refresh the skill list.', retry: 'Retry', repository: 'GitHub repository or skill directory URL',
+    loading: 'Loading skills…', refreshing: 'Refreshing skills…', refreshFailed: 'Could not refresh the skill list.', serviceUnavailable: 'The skill service is temporarily unavailable. Try again later.', retry: 'Retry', repository: 'GitHub repository or skill directory URL',
     installAction: 'Install', cancel: 'Cancel', installing: 'Installing…', installed: 'Installed',
     publish: 'Share with company', publishing: 'Publishing…', publishSuccess: 'Published to company skills', publishError: 'Could not publish this skill. Try again.',
     shared: 'Company shared', sharedEmpty: 'No company skills yet', sharedUnavailable: 'Company skills are temporarily unavailable', sharedInstall: 'Install', sharedUpdate: 'Update', sharedInstalled: 'Installed', sharedLoading: 'Loading company skills…',
@@ -44,7 +44,11 @@ async function request(path = '', options = {}) {
     signal: AbortSignal.timeout(120000),
   })
   const body = await response.json().catch(() => null)
-  if (!response.ok) throw new Error(body?.error || `HTTP ${response.status}`)
+  if (!response.ok) {
+    const failure = new Error(body?.error || `HTTP ${response.status}`)
+    failure.statusCode = response.status
+    throw failure
+  }
   return body
 }
 
@@ -76,7 +80,11 @@ function SkillManagerPage({ view, t, createSkill }) {
       setSharedError(body.sharedError || '')
       setSharedLoading(false)
       setState('ready')
-    } catch { setSharedLoading(false); setState(skills.length > 0 ? 'ready' : 'error'); setRefreshError(t('refreshFailed')) }
+    } catch (cause) {
+      setSharedLoading(false)
+      setState(skills.length > 0 ? 'ready' : 'error')
+      setRefreshError(cause?.statusCode >= 500 ? t('serviceUnavailable') : t('refreshFailed'))
+    }
   }
   useEffect(() => { void refresh() }, [])
   if (view === 'summary') return t('description')
@@ -194,7 +202,7 @@ function SkillManagerPage({ view, t, createSkill }) {
         setBusy(true); setError(''); setNotice('')
         try { await createSkill(`${t('prompt')}\n${createRequest.trim()}`); setCreateRequest('') } catch { setError(t('createFailed')) } finally { setBusy(false) }
       } }, busy ? t('creating') : t('create')),
-      error && !formOpen ? h('div', { className: 'sm-error', role: 'alert' }, error) : null))
+      error && !formOpen ? h('div', { className: 'sm-error', role: 'alert' }, error) : null)
 }
 
 function apply(ctx) {
