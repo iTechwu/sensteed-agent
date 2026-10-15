@@ -309,6 +309,10 @@ function Business({ revision, setError, onScopeReady }) {
 }
 
 function textArea(value, onChange) { return h('textarea', { rows: 3, value: value || '', onChange: event => onChange(event.target.value) }) }
+function normalizeSupplierIds(value) {
+  const values = Array.isArray(value) ? value : String(value || '').split(/[,，\n]/u)
+  return [...new Set(values.map(item => String(item).trim()).filter(Boolean))]
+}
 function Field(label, control) { return h('label', { className: 'sr-field' }, h('span', null, label), control) }
 function setRevisionAfterSave() { window.dispatchEvent(new CustomEvent('supplier-risk:refresh')) }
 
@@ -331,16 +335,18 @@ function Weekly({ revision, setError, onUnread, onScopeReady }) {
     api('supply_chain_weekly_report_plan_get'),
     api('supply_chain_weekly_reports_list', { page: 1, pageSize: 20 }),
     reportId ? api('supply_chain_weekly_report_get', { reportId }) : Promise.resolve(null),
+    api('supply_chain_workbench_suppliers_list', { page: 1, pageSize: 500 }),
   ]) : Promise.resolve(null)), [revision, reportId], setError)
   const plan = state.data?.[0]?.plan
   const reports = state.data?.[1]
   const report = state.data?.[2]?.report
-  useEffect(() => { if (plan) setPlanFields(current => current ?? ({ ...plan })) }, [plan])
+  const suppliers = state.data?.[3]?.items || []
+  useEffect(() => { if (plan) setPlanFields(current => current ?? ({ ...plan, supplierIds: normalizeSupplierIds(plan.supplierIds) })) }, [plan])
   useEffect(() => { if (reports) onUnread(reports.unreadCount || 0) }, [reports?.unreadCount])
   const savePlan = async event => {
     event.preventDefault(); setBusy(true); setNotice('')
     try {
-      const supplierIds = String(planFields.supplierIds || []).split(/[,，\n]/u).map(value => value.trim()).filter(Boolean)
+      const supplierIds = normalizeSupplierIds(planFields.supplierIds)
       const saved = await api('supply_chain_weekly_report_plan_save', { expectedVersion: planFields.version, fields: { enabled: planFields.enabled === true, weekday: 0, hour: 9, minute: 0, timezone: 'Asia/Shanghai', supplierIds, collectionBudget: Number(planFields.collectionBudget || 0) }, idempotencyKey: crypto.randomUUID(), confirm: true })
       if (saved?.plan) setPlanFields({ ...saved.plan })
       setNotice('周报计划已保存。')
@@ -354,12 +360,19 @@ function Weekly({ revision, setError, onUnread, onScopeReady }) {
       setReportId(id); window.dispatchEvent(new CustomEvent('supplier-risk:refresh'))
     } catch (error) { setError(errorText(error)) } finally { setBusy(false) }
   }
-  if (!planFields || !reports) return h(Loading, { state })
+  if (!planFields || !reports || !state.data?.[3]) return h(Loading, { state })
   return h(React.Fragment, null,
     h('div', { className: 'sr-weekly-layout' },
       h('section', { className: 'sr-section' }, h('h2', null, '周报计划'), h('p', { className: 'sr-muted' }, '服务端每周一 09:00（Asia/Shanghai）汇总已保存事实，不会启动外部采集或模型调用。'),
         h('form', { className: 'sr-form', onSubmit: savePlan }, h('label', { className: 'sr-toggle' }, h('input', { type: 'checkbox', checked: planFields.enabled === true, onChange: event => setPlanFields({ ...planFields, enabled: event.target.checked }) }), h('span', null, '启用每周风险周报')),
-          Field('供应商范围（每行一个 ID）', h('textarea', { rows: 5, value: Array.isArray(planFields.supplierIds) ? planFields.supplierIds.join('\n') : planFields.supplierIds || '', onChange: event => setPlanFields({ ...planFields, supplierIds: event.target.value }) })),
+          Field('供应商范围', h(React.Fragment, null,
+            h('select', {
+              className: 'sr-multi-select', multiple: true, size: Math.min(Math.max(suppliers.length, 3), 8),
+              value: normalizeSupplierIds(planFields.supplierIds),
+              onChange: event => setPlanFields({ ...planFields, supplierIds: Array.from(event.target.selectedOptions, option => option.value) }),
+              'aria-label': '选择周报供应商',
+            }, suppliers.map(supplier => h('option', { key: supplier.supplierId, value: supplier.supplierId }, supplier.displayName || supplier.supplierId))),
+            h('small', { className: 'sr-field-hint' }, suppliers.length ? `已录入 ${suppliers.length} 家供应商，可按住 Command 或 Ctrl 多选。` : '暂无已录入供应商。'))),
           Field('采集预算记录', h('input', { type: 'number', min: 0, value: planFields.collectionBudget || 0, onChange: event => setPlanFields({ ...planFields, collectionBudget: event.target.value }) })),
           h('p', { className: 'sr-footnote' }, `下次执行：${fmt(plan.nextRunAt)} · 当前运行：${plan.currentRunStatus || '无'}${plan.failureCode ? ` · ${plan.failureCode}` : ''}`),
           h('button', { type: 'submit', className: 'sr-button', disabled: busy }, busy ? '保存中…' : '保存计划'))),
