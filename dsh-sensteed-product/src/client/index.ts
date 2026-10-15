@@ -3,6 +3,9 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
+import type {} from '@deepseek-ai/dsh-api-session-controller/client'
+import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { applyDofeAccess } from './register-dofe-access.ts'
 
 /** Services required by the DoFe access surface. */
@@ -13,6 +16,9 @@ export const inject = [
   'remote.credentials',
   'remote.settings',
   'configForms',
+  'sessions',
+  'workspaces',
+  'uiWorkspace',
 ]
 
 /** Register the DoFe access gate and settings section. @param ctx - browser Cordis context. */

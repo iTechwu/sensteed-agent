@@ -1569,7 +1569,7 @@ function Overlay({ t, embedded = false, onClose = closeOverlay }) {
     );
   return h(
     "div",
-    { className: `yk-overlay${embedded ? " yk-page" : ""}`, role: embedded ? "region" : "dialog", "aria-modal": embedded ? undefined : true, "aria-labelledby": "yk-title" },
+    { className: `yk-overlay${embedded ? " yk-page" : ""}`, ...(embedded ? { role: "region" } : { role: "dialog", "aria-modal": true }), "aria-labelledby": "yk-title" },
     h(
       "main",
       { className: "yk-shell", "aria-labelledby": "yk-title", ref: shellRef, tabIndex: -1 },

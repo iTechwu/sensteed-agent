@@ -1,6 +1,7 @@
 const React = require('react')
-const { createElement: h, useEffect, useState } = React
+const { createElement: h, useEffect, useRef, useState } = React
 const { Tooltip, IconShieldOutlineRegular, IconRefreshOutlineRegular, IconSearchOutlineRegular, IconRightUpOutlineRegular } = require('@deepseek-ai/dsh-client-ui-primitives')
+const REQUEST_TIMEOUT_MS = 30000
 
 const PANEL_ID = 'supplier-risk'
 const BASE = '/api/desktop/sensteed/supplier-risk'
@@ -32,7 +33,7 @@ async function api(action, args = {}, signal) {
     method: 'POST', credentials: 'same-origin', redirect: 'error',
     headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
     body: JSON.stringify({ action, args }),
-    signal: signal || AbortSignal.timeout(30000),
+    signal: AbortSignal.any([AbortSignal.timeout(REQUEST_TIMEOUT_MS), ...(signal ? [signal] : [])]),
   })
   const body = await response.json().catch(() => null)
   if (!response.ok || body?.ok !== true) throw new Error(body?.error || `http_${response.status}`)

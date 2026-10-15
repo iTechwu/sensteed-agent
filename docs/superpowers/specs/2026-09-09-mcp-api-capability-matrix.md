@@ -32,6 +32,8 @@
 | 审计事件与同步 | `/api/desktop/yootun/audit` | audit | ready、offline、cached、auth_required、forbidden、local_error；同步可重试 | 读取与 `retry_sync` 使用同源托管路由；脱机优先展示本地缓存，不把同步失败伪装成空数据 |
 | Sensteed 财务看板 | `/api/desktop/sensteed/finance`；`sensteed_finance_bootstrap`；代理 `mcp__finance__*` 数据面 | dsh-sensteed-finance | ready、partial、empty、unavailable、error | 前缀路由代理 datasource 的无状态 MCP 端点；凭据从 credential store 注入，租户由服务端校验；块间失败独立降级并披露 partial，不把单块失败伪装成空数据 |
 | Sensteed 知识与记忆 | `/api/desktop/sensteed/knowledge`；`knowledge_*`、`memory_*` | dsh-sensteed-knowledge | ready、degraded、empty、error；写入需确认 | 本地路由代理公开知识 MCP 网关；凭据从 credential store 注入，sensteed 租户注入 tenant.all 企业空间模板；读取不写审计，remember/forget/confirm 写入审计且 remember 只创建候选、确认后才 confirmed |
+| Sensteed 技能管理 | `/api/desktop/sensteed/skills`；共享技能网关 `shared-agent-skills` | dsh-sensteed-skill-manager | ready、empty、error | 本地路由管理 `<DSH_HOME>/skills` 技能目录；归档安装受包体（10MB）、解压（25MB）与文件数（500）上限和技能名规范约束，共享技能经凭证访问网关后同样落地本地校验 |
+| Sensteed 供应商风险工作台 | `/api/desktop/sensteed/supplier-risk`；代理 `mcp__supply-chain__*`、`mcp__tools-supply-chain__*` | dsh-sensteed-supplier-intelligence | ready、partial、empty、unavailable、error | 前缀路由按读/写允许清单代理 supply-chain MCP；凭据从 credential store 注入，写操作走确认链路，读取失败独立降级不伪装成空数据 |
 | TOS 媒体上传 | `/_dsh/uploader/pick-file`、`/_dsh/uploader/upload`、`/_dsh/uploader/uploadStart`、`/_dsh/uploader/uploadStatus`、`/_dsh/uploader/media`；`media_upload` | XHS operation、Agent 媒体工具 | uploading、queued、succeeded、failed、cancelled、requires_user_login | 通过原生选取、允许清单和 TOCTOU 复查；授权仅交给 Tools MCP，不回传本地路径、预签名 URL 或对象 key |
 | 文件交付声明 | `present`；`deliverables/presented` Session 事件 | Web Deliverables 文件卡片与默认应用打开 | declared、blocked、opened | 仅接受 Session 工作区可访问的常规文件，单次受 `maxFiles` 限制；记录路径和描述，不复制文件内容，子 Agent 的交付由父 Session 显式声明 |
 

@@ -9,7 +9,7 @@ function Workbench() {
   const retryAccess = () => {
     setAccess(null)
     setAccessReason('')
-    fetch(`${BASE}/access`, { credentials: 'same-origin', redirect: 'error' })
+    fetch(`${BASE}/access`, { credentials: 'same-origin', redirect: 'error', signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
       .then(response => response.json())
       .then(body => { adoptScope(body?.scopeId); setScopeReady(Boolean(body?.scopeId)); setAccessReason(body?.reason || 'unavailable'); setAccess(body?.allowed === true) })
       .catch(() => { setAccessReason('connection_unavailable'); setAccess(false) })
@@ -31,7 +31,15 @@ function Workbench() {
     }
   }, [])
   useEffect(() => { retryAccess() }, [])
-  const refresh = () => { setError(''); setRevision(value => value + 1) }
+  // Synchronous reload lock: bursts of refresh events must not stack revisions.
+  const loadingRef = useRef(false)
+  const refresh = () => {
+    if (loadingRef.current) return
+    loadingRef.current = true
+    setError('')
+    setRevision(value => value + 1)
+    setTimeout(() => { loadingRef.current = false }, 400)
+  }
   if (access === null) return h('main', { className: 'sr-page', role: 'status' }, '正在连接供应链工作台…')
   if (!access) return h('main', { className: 'sr-page' }, h('h1', null, '供应商风险'), h('p', null, accessMessage(accessReason)), h('button', { type: 'button', className: 'sr-button sr-secondary', onClick: retryAccess }, '重新连接'))
   return h('main', { className: 'sr-page' },
@@ -127,10 +135,16 @@ function Suppliers({ revision, setError, onSelect, onImported }) {
   const [busy, setBusy] = useState(false)
   const state = useLoad(() => api('supply_chain_workbench_suppliers_list', { page, pageSize: 20, ...(submitted ? { query: submitted } : {}) }), [page, submitted, revision], setError)
   const data = state.data
+  let lastTrigger = null
+  const closeIntake = () => {
+    setShowAdd(false)
+    requestAnimationFrame(() => lastTrigger?.focus?.())
+  }
   return h(React.Fragment, null,
     h('div', { className: 'sr-toolbar' }, h('form', { onSubmit: event => { event.preventDefault(); setPage(1); setSubmitted(query.trim()) } }, h('label', { className: 'sr-search' }, h(IconSearchOutlineRegular, { size: 16 }), h('input', { value: query, onChange: event => setQuery(event.target.value), placeholder: '搜索供应商名称或统一社会信用代码', 'aria-label': '搜索供应商' })), h('button', { type: 'submit', className: 'sr-button' }, '搜索')),
-      h('div', { className: 'sr-toolbar-actions' }, h('span', { className: 'sr-muted' }, `${data?.total ?? '—'} 家供应商`), h('button', { type: 'button', className: 'sr-button sr-secondary', onClick: () => setShowAdd(!showAdd) }, showAdd ? '收起新增' : '新增 / 导入'))),
-    showAdd ? h(SupplierIntake, { newName, setNewName, importText, setImportText, busy, setBusy, setError, onDone: () => { setPage(1); setSubmitted(''); onImported?.(); window.dispatchEvent(new CustomEvent('supplier-risk:refresh')) } }) : null,
+      h('div', { className: 'sr-toolbar-actions' }, h('span', { className: 'sr-muted' }, `${data?.total ?? '—'} 家供应商`), h('button', { type: 'button', className: 'sr-button sr-secondary', ref: element => { lastTrigger = element }, 'aria-haspopup': 'dialog', 'aria-expanded': showAdd, onClick: () => { showAdd ? closeIntake() : setShowAdd(true) } }, showAdd ? '收起新增' : '新增 / 导入'))),
+    showAdd ? h('div', { role: 'dialog', 'aria-label': '新增或导入供应商', onKeyDown: event => { if (event.key === 'Escape') { event.stopPropagation(); closeIntake() } } },
+      h(SupplierIntake, { newName, setNewName, importText, setImportText, busy, setBusy, setError, onDone: () => { setPage(1); setSubmitted(''); onImported?.(); window.dispatchEvent(new CustomEvent('supplier-risk:refresh')) } })) : null,
     h(Loading, { state }), data ? h(React.Fragment, null,
       h('div', { className: 'sr-table-wrap' }, h('table', { className: 'sr-table' }, h('thead', null, h('tr', null, ...['供应商', '统一社会信用代码', '类别', '主体核验', '监控范围', '来源覆盖', '更新时间', ''].map(label => h('th', { key: label }, label)))), h('tbody', null,
         ...data.items.map(row => h('tr', { key: row.supplierId }, h('td', null, h('strong', null, row.displayName)), h('td', null, row.creditCode || '未关联'), h('td', null, row.category || '未分类'), h('td', null, h(Status, { value: row.verificationStatus })), h('td', null, row.monitoringScope || '未设置'), h('td', null, row.coverage?.status === 'partial' ? '部分来源' : '待接入'), h('td', null, fmt(row.updatedAt)), h('td', null, h('button', { type: 'button', className: 'sr-link', onClick: () => onSelect(row.supplierId) }, '业务影响'))))))),

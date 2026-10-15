@@ -13,6 +13,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { applyAdvancedShell } from './advanced-shell.ts'
+import { applyDesktopAutomation } from './automation.tsx'
 import { applyDesktopBrand } from './brand.tsx'
 import { startRendererBootReporter } from './boot-health.ts'
 import { dismissBootSplashWhenSurfacesReady } from './boot-splash-dismiss.ts'
@@ -174,7 +175,8 @@ export function apply(ctx: ClientContext): void {
   // `layout`, and upstream's `uiWorkspace` injects it. Naming `uiWorkspace` in
   // the module-level inject list would deadlock the two against each other.
   // Not gated on win32 either — the launcher's folder argument works on Linux.
-  ctx.inject(['workspaces', 'uiWorkspace'], (scope: ClientContext) => {
+  ctx.inject(['workspaces', 'uiWorkspace', 'conversation'], (scope: ClientContext) => {
+    applyDesktopAutomation(scope)
     scope.effect(
       () => installDesktopLaunchWorkspaceBridge({
         ready: async () => { await whenWorkspaceListsReady(scope) },

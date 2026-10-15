@@ -32,6 +32,11 @@ function copyFallback(prompt, setNotice, t, reason) {
   try { navigator.clipboard.writeText(prompt).then(() => setNotice(reason ? t('sendFailReason', { reason }) : t('sendFail')), failed) } catch { failed() }
 }
 
+function analysisPrompt(entry, year, orgName) {
+  const context = typeof entry.prompt === 'function' ? entry.prompt(year, orgName) : entry.prompt
+  return `/${entry.skill}\n${context}`
+}
+
 function AnalyzeView({ ctx, t }) {
   const { year, orgId, orgs } = ctx
   const [notice, setNotice] = useState(null)
@@ -41,7 +46,7 @@ function AnalyzeView({ ctx, t }) {
     h('div', { className: 'sf-analysis-grid' }, ...ANALYSIS_ENTRIES.map(entry => h('article', { className: 'sf-card sf-analysis-card', key: entry.id },
       h('div', { className: 'sf-analysis-head' }, h(Glyph, { name: entry.icon, size: 15 }), h('h2', null, t(`analysis_${entry.id}`))),
       h('p', null, t(`analysis_${entry.id}_desc`)),
-      h('div', null, h(PrimaryButton, { onClick: () => sendToAgent(typeof entry.prompt === 'function' ? entry.prompt(year, orgName) : entry.prompt, setNotice, t) }, h(Glyph, { name: 'send', size: 12 }), t('send')))))),
+      h('div', null, h(PrimaryButton, { onClick: () => sendToAgent(analysisPrompt(entry, year, orgName), setNotice, t) }, h(Glyph, { name: 'send', size: 12 }), t('send')))))),
     notice ? h(Notice, null, notice) : null,
     h('p', { className: 'sf-note' }, t('analyzingNote')))
 }

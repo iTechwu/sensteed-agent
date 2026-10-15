@@ -1,6 +1,14 @@
 /** Desktop-owned settings copy. */
 import { desktopSetupWizardCopy } from '../setup-wizard-copy.ts'
 import { BRAND_DISPLAY_NAME } from '../generated-product-identity.ts'
+import type {} from '@deepseek-ai/dsh-client-ui-slots'
+
+declare module '@deepseek-ai/dsh-client-ui-slots' {
+  interface LocaleNamespaceMap {
+    /** Desktop-only settings page copy. */
+    'desktop.settings': DesktopSettingsLocaleKey
+  }
+}
 
 export const zh = {
   loggingTitle: '日志',

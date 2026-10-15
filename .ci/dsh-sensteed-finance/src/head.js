@@ -57,17 +57,17 @@ const LEDGER_LIMIT = 100
 const BUDGET_LINE_LIMIT = 200
 const PAGE_SIZE = 20
 
-// 深度分析入口：预制指令发送到当前会话，由 Agent 调 mcp__finance__* 完成分析
+// 深度分析入口：每个入口显式调用一个默认 skill，并把年度/主体作为新会话上下文。
 const ANALYSIS_ENTRIES = [
-  { id: 'risk', icon: 'warning', prompt: (year, org) => `请对${org || '全部主体'} ${year} 年度财务状况做一次风险预判：先调用 sensteed_finance_bootstrap 获取租户上下文，再用 mcp__finance__finance_analysis_brief 建立口径基线，然后下钻 mcp__finance__finance_get_alerts 与 mcp__finance__finance_get_budget_summary。按预算超支、执行偏慢、资金缺口、数据质量四类逐项给出：影响金额（元）、涉及主体与期间、严重级别、置信度、建议动作。结论先行，财务口吻。` },
-  { id: 'cost', icon: 'layers', prompt: (year, org) => `请分析${org || '全部主体'} ${year} 年成本结构：调用 mcp__finance__finance_analysis_brief 与 mcp__finance__finance_get_budget_summary，按三类费用（项目运营/固定运营/模型专项）与主体维度拆解预算与实际付款占比，识别占比异常漂移与单点集中度风险，给出成本优化建议与下季度成本预判（声明外推方法与假设）。金额单位元，财务口吻。` },
-  { id: 'cash', icon: 'goal', prompt: (year, org) => `请对${org || '全部主体'} ${year} 年资金链做压力评估：调用 mcp__finance__finance_get_cash_summary 与 mcp__finance__finance_get_payment_plans，梳理各月期初/收入/支出/预计余额，识别预计余额为负或骤降的月份，结合付款计划给出未来 1-3 个月的资金缺口预判与头寸安排建议。金额单位元，财务口吻。` },
-  { id: 'budget', icon: 'data', prompt: (year, org) => `请复盘${org || '全部主体'} ${year} 年预算执行：调用 mcp__finance__finance_get_budget_summary 与 mcp__finance__finance_get_budget_lines，计算各主体的执行率（(已打PR+预计PR)/预算）与实际支付率（实际付款/预算），输出执行率排名、偏离原因归类（录入滞后/计划变更/预算虚高），并给出预算调整建议。金额单位元，财务口吻。` },
-  { id: 'revenue', icon: 'sparkle', prompt: (year, org) => `请分析${org || '全部主体'} ${year} 年收入达成与差额：调用 mcp__finance__finance_get_revenue_plans 与 mcp__finance__finance_get_cash_summary，逐项比对计划收入与实际到账，归因未达成项（延期/缩水/未回填），评估对全年资金平衡的影响并给出催收与计划修正建议。金额单位元，财务口吻。` },
-  { id: 'quality', icon: 'database', prompt: `请评估财务数据中心当前的数据质量对分析口径的影响：调用 mcp__finance__finance_get_data_quality、mcp__finance__finance_get_import_batches 与 mcp__finance__finance_get_alerts（severity=DATA_QUALITY 或按警情类型判断）。列出问题清单、涉及数据集与数量级，说明哪些分析结论会因此失真，并给出补数与修复的优先级建议。财务口吻。` },
-  { id: 'forecast', icon: 'clock', prompt: (year, org) => `请对${org || '全部主体'} ${year} 年剩余期间做成本与资金预判：调用 mcp__finance__finance_analysis_brief 后，按近 3 个月实际付款均值与已打 PR 未付款部分，外推未来支出；结合收入计划到账节奏，给出月末资金余额区间预判（声明方法与假设），并标注高置信/低置信结论。金额单位元，财务口吻。` },
-  { id: 'version', icon: 'check', prompt: (year, org) => `请为${org || '全部主体'} ${year} 年预算做一次版本健康检查：调用 mcp__finance__finance_get_budget_versions 查看当前主版本与各草稿/已审定版本，用 finance_budget_version_diff 对比主版本与最新调整稿差异（主体×三类费用），识别：未生效的审定版本、超 30 天未推进的草稿、主版本与实际执行（finance_get_budget_summary）的偏离。给出版本推进建议（审定/生效/作废重排）。财务口吻。` },
-  { id: 'rules', icon: 'database', prompt: `请检查预警规则集状态：调用 mcp__finance__finance_get_alert_rules 查看 activeVersion 与各版本阈值；若规则集从未确认生效（无 activeVersion），提示「以内置默认阈值确认生效」的必要性并列出默认阈值；若已生效，用 finance_get_alert_summary 抽查近 30 天告警量是否与阈值预期一致。财务口吻。` },
+  { id: 'risk', skill: 'finance-monthly-risk', icon: 'warning', prompt: (year, org) => `请对${org || '全部主体'} ${year} 年度财务状况做一次风险预判。` },
+  { id: 'cost', skill: 'finance-cost-structure', icon: 'layers', prompt: (year, org) => `请分析${org || '全部主体'} ${year} 年成本结构。` },
+  { id: 'cash', skill: 'finance-cash-pressure', icon: 'goal', prompt: (year, org) => `请对${org || '全部主体'} ${year} 年资金链做压力评估。` },
+  { id: 'budget', skill: 'finance-budget-review', icon: 'data', prompt: (year, org) => `请复盘${org || '全部主体'} ${year} 年预算执行。` },
+  { id: 'revenue', skill: 'finance-revenue-attainment', icon: 'sparkle', prompt: (year, org) => `请分析${org || '全部主体'} ${year} 年收入达成与差额。` },
+  { id: 'quality', skill: 'finance-data-quality', icon: 'database', prompt: `请评估财务数据中心当前的数据质量对分析口径的影响。` },
+  { id: 'forecast', skill: 'finance-cost-cash-forecast', icon: 'clock', prompt: (year, org) => `请对${org || '全部主体'} ${year} 年剩余期间做成本与资金预判。` },
+  { id: 'version', skill: 'finance-budget-version-health', icon: 'check', prompt: (year, org) => `请为${org || '全部主体'} ${year} 年预算做一次版本健康检查。` },
+  { id: 'rules', skill: 'finance-alert-rules-audit', icon: 'database', prompt: `请检查财务预警规则集状态。` },
 ]
 
 const copy = {
@@ -124,7 +124,7 @@ const copy = {
     analysis_forecast: '成本与资金预判', analysis_forecast_desc: '按近 3 个月外推未来支出与月末资金余额区间，标注置信度。',
     analysis_version: '版本健康检查', analysis_version_desc: '主版本与调整稿差异、未推进草稿与版本推进建议。',
     analysis_rules: '预警规则核查', analysis_rules_desc: '规则集生效状态、默认阈值与近 30 天告警量核对。',
-    analyzeTitle: '深度分析入口', analyzeHint: '以下入口会把预制指令发送到当前会话，由 Agent 调用财务数据中心 MCP（mcp__finance__*）完成深度分析，产出财务口吻的风险与成本预判。', send: '开始分析', sent: '已发送到会话', sendFail: '发送失败，指令已复制到剪贴板', sendFailReason: '发送失败（{reason}），指令已复制到剪贴板', analyzingNote: '分析会读取真实账面数据；录入/回填类操作 Agent 会先与你确认再执行。审批与过账由财务本人执行，Agent 不代批。',
+    analyzeTitle: '深度分析入口', analyzeHint: '每个入口都会创建新会话并调用对应财务分析 skill，由 Agent 调用财务数据中心 MCP（mcp__finance__*）完成分析。', send: '开始分析', sent: '已在新会话开始分析', sendFail: '发送失败，指令已复制到剪贴板', sendFailReason: '发送失败（{reason}），指令已复制到剪贴板', analyzingNote: '分析会读取真实账面数据；录入/回填类操作 Agent 会先与你确认再执行。审批与过账由财务本人执行，Agent 不代批。',
     // 通用动作
     submit: '提交', cancel: '取消', submitted: '已提交', saved: '已保存', deleted: '已删除', confirm: '确认', close: '关闭', actions: '操作', runEngine: '触发预警引擎', running: '执行中', runDone: '已触发：新建 {created} · 更新 {updated} · 关闭 {resolved}', backfill: '回填', backfillActual: '回填实际值', submitConfirm: '确认提交？', opFailed: '操作失败', refreshed: '已刷新', required: '必填', invalidJson: '表映射必须是合法 JSON。',
   },
@@ -170,7 +170,7 @@ const copy = {
     analysis_forecast: 'Cost & cash forecast', analysis_forecast_desc: '3-month-average extrapolation with confidence labels.',
     analysis_version: 'Version health', analysis_version_desc: 'Primary vs adjusted diff, stale drafts, and version progression advice.',
     analysis_rules: 'Alert rules check', analysis_rules_desc: 'Rule set status, default thresholds, and 30-day alert volume check.',
-    analyzeTitle: 'Deep analysis entries', analyzeHint: 'Each entry sends a prepared instruction to the current conversation; the agent calls finance MCP tools (mcp__finance__*) and returns CFO-tone forecasts.', send: 'Analyze', sent: 'Sent to conversation', sendFail: 'Send failed; copied to clipboard', sendFailReason: 'Send failed ({reason}); copied to clipboard', analyzingNote: 'Analysis reads real ledger data; write actions always require your confirmation first. Approvals and posting are done by finance users, never the agent.',
+    analyzeTitle: 'Deep analysis entries', analyzeHint: 'Each entry creates a new session and invokes its finance skill; the agent calls finance MCP tools (mcp__finance__*) for the analysis.', send: 'Analyze', sent: 'Started in a new session', sendFail: 'Send failed; copied to clipboard', sendFailReason: 'Send failed ({reason}); copied to clipboard', analyzingNote: 'Analysis reads real ledger data; write actions always require your confirmation first. Approvals and posting are done by finance users, never the agent.',
     submit: 'Submit', cancel: 'Cancel', submitted: 'Submitted', saved: 'Saved', deleted: 'Deleted', confirm: 'Confirm', close: 'Close', actions: 'Actions', runEngine: 'Run alert engine', running: 'Running...', runDone: 'Done: created {created} · updated {updated} · resolved {resolved}', backfill: 'Backfill', backfillActual: 'Backfill actuals', submitConfirm: 'Confirm submit?', opFailed: 'Operation failed', refreshed: 'Refreshed', required: 'required', invalidJson: 'Table mappings must be valid JSON.',
   },
 }
