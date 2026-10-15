@@ -62,3 +62,32 @@ Var pid
 
   dsh_installer_app_stopped:
 !macroend
+
+; Skip the install-mode wizard page during in-app updates while preserving
+; the existing per-machine or per-user installation scope, so the installer
+; opens directly to the visible extraction progress window.
+!macro customInstallMode
+  !ifndef BUILD_UNINSTALLER
+    ${if} ${isUpdated}
+      ${if} $hasPerMachineInstallation == "1"
+      ${andIf} $hasPerUserInstallation == "0"
+        StrCpy $isForceMachineInstall "1"
+      ${else}
+        StrCpy $isForceCurrentInstall "1"
+      ${endIf}
+    ${endIf}
+  !endif
+!macroend
+
+; When launched visibly by an in-app update (--updated --force-run), relaunch
+; the updated application and close the installer as soon as extraction finishes
+; without stopping on the Finish wizard page.
+!macro customInstall
+  ${if} ${isUpdated}
+  ${andIf} ${isForceRun}
+  ${andIfNot} ${Silent}
+    HideWindow
+    ${StdUtils.ExecShellAsUser} $0 "$launchLink" "open" "--updated"
+    !insertmacro quitSuccess
+  ${endIf}
+!macroend

@@ -1,8 +1,8 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
-import { assertMacRuntimeSignature, runtimeEntitlements, signMacRuntime, UPSTREAM_DESKTOP_SCRIPTS, withMacSigningIdentity, type MacRuntimeSigningIdentity } from '../scripts/sign-runtime.ts'
+import { assertMacRuntimeSignature, runtimeEntitlements, signMacRuntime, TIMESTAMP_ATTEMPTS, UPSTREAM_DESKTOP_SCRIPTS, withMacSigningIdentity, type MacRuntimeSigningIdentity } from '../scripts/sign-runtime.ts'
 
 const roots: string[] = []
 function root(): string {
@@ -30,6 +30,42 @@ it('signs Mach-O files in their final locations and verifies each signature', as
   expect(t.sign).toHaveBeenCalledTimes(1)
 })
 
+// File symlinks in these macOS fixtures require privileges unavailable to ordinary Windows processes.
+it.skipIf(process.platform === 'win32')('signs a shared Python interpreter once and retains both executable aliases', async () => {
+  const path = root()
+  const bin = join(path, 'dependencies/python/bin')
+  mkdirSync(bin, { recursive: true })
+  writeFileSync(join(path, 'runtime.json'), JSON.stringify({ desktopVersion: '1', platform: 'darwin', arch: 'arm64', python: '3.12.14', pythonPackages: {} }))
+  writeFileSync(join(bin, 'python3.12'), machO)
+  for (const name of ['python', 'python3']) symlinkSync('python3.12', join(bin, name))
+  const t = tools()
+  await expect(signMacRuntime(path, 'com.example.app', identity, 'arm64', t)).resolves.toBe(1)
+  expect(t.sign).toHaveBeenCalledExactlyOnceWith(join(bin, 'python3.12'), expect.any(String), identity, undefined)
+  for (const name of ['python', 'python3']) expect(readlinkSync(join(bin, name))).toBe('python3.12')
+})
+
+// The signer must inspect real file symlinks, including dangling and cyclic ones.
+it.skipIf(process.platform === 'win32').each(['unknown', 'absolute', 'escaping', 'dangling', 'chained', 'directory'])('rejects a %s runtime link before signing any file', async (kind) => {
+  const path = root()
+  const bin = join(path, 'dependencies/python/bin')
+  mkdirSync(bin, { recursive: true })
+  writeFileSync(join(path, 'runtime.json'), JSON.stringify({ desktopVersion: '1', platform: 'darwin', arch: 'arm64', python: '3.12.14', pythonPackages: {} }))
+  const canonical = join(bin, 'python3.12')
+  if (kind === 'directory') mkdirSync(canonical)
+  else if (kind !== 'dangling') writeFileSync(canonical, machO)
+  if (kind === 'chained') {
+    rmSync(canonical)
+    symlinkSync('python3', canonical)
+  }
+  const target = kind === 'absolute' ? canonical : kind === 'escaping' ? '../outside' : 'python3.12'
+  symlinkSync(target, join(bin, kind === 'unknown' ? 'unlisted' : 'python3'))
+  const t = tools()
+  const result = signMacRuntime(path, 'com.example.app', identity, 'arm64', t)
+  if (kind === 'dangling') await expect(result).rejects.toMatchObject({ code: 'ENOENT', path: canonical })
+  else await expect(result).rejects.toThrow(kind === 'unknown' ? 'must not contain links' : 'invalid Python alias')
+  expect(t.sign).not.toHaveBeenCalled()
+})
+
 it('awaits other signers before rejecting and permitting output cleanup', async () => {
   const path = root()
   for (const name of ['a.node', 'b.node']) writeFileSync(join(path, name), machO)
@@ -51,6 +87,40 @@ it('awaits other signers before rejecting and permitting output cleanup', async 
   } finally { release() }
   expect(await result).toBeInstanceOf(AggregateError)
   expect(t.verify).toHaveBeenCalledWith(join(path, 'b.node'), identity)
+})
+
+it('asks the timestamp service again when a signature comes back without its timestamp', async () => {
+  const path = root()
+  for (const name of ['a.node', 'b.node']) writeFileSync(join(path, name), machO)
+  const t = { ...tools(), pause: vi.fn(async () => {}) }
+  let dropped = false
+  t.sign.mockImplementation(async (file) => {
+    if (file.endsWith('a.node') && !dropped) {
+      dropped = true
+      throw new Error(`Next runtime signing: codesign exited with 1 for ${file}: A timestamp was expected but was not found.`)
+    }
+  })
+  await expect(signMacRuntime(path, 'com.example.app', identity, 'arm64', t)).resolves.toBe(2)
+  expect(t.sign).toHaveBeenCalledTimes(3)
+  expect(t.pause).toHaveBeenCalledWith(1)
+  expect(t.verify).toHaveBeenCalledWith(join(path, 'a.node'), identity)
+  expect(t.verify).toHaveBeenCalledWith(join(path, 'b.node'), identity)
+})
+
+it('gives a timestamp three attempts and other codesign failures one', async () => {
+  const path = root()
+  writeFileSync(join(path, 'a.node'), machO)
+  const timestamps = { ...tools(), pause: vi.fn(async () => {}) }
+  timestamps.sign.mockRejectedValue(new Error('The timestamp service is not available.'))
+  await expect(signMacRuntime(path, 'com.example.app', identity, 'arm64', timestamps)).rejects.toThrow('native signing failed')
+  expect(timestamps.sign).toHaveBeenCalledTimes(TIMESTAMP_ATTEMPTS)
+  expect(timestamps.pause).toHaveBeenCalledTimes(TIMESTAMP_ATTEMPTS - 1)
+  expect(timestamps.verify).not.toHaveBeenCalled()
+  const other = { ...tools(), pause: vi.fn(async () => {}) }
+  other.sign.mockRejectedValue(new Error('sign failure'))
+  await expect(signMacRuntime(path, 'com.example.app', identity, 'arm64', other)).rejects.toThrow('native signing failed')
+  expect(other.sign).toHaveBeenCalledTimes(1)
+  expect(other.pause).not.toHaveBeenCalled()
 })
 
 it.each(['arm64', 'x64'] as const)('gives only the standalone Node %s entitlements and signs Python without any', async (arch) => {

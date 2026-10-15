@@ -1,6 +1,6 @@
 {
   "name": "dsh-desktop-next",
-  "version": "2.0.17-next",
+  "version": "2.0.18-next",
   "private": true,
   "description": "Experimental upstream-inspired DSH Desktop with Profiles, recovery, remote control and Community Market",
   "license": "MIT",
@@ -50,6 +50,7 @@
     "@deepseek-ai/dsh-agent-tool-presentation": "0.2.1-alpha.3",
     "@deepseek-ai/dsh-anonymous-user-id": "0.2.1-alpha.3",
     "@deepseek-ai/dsh-api-gateway": "0.2.1-alpha.3",
+    "@deepseek-ai/dsh-api-remote-access": "0.2.1-alpha.3",
     "@deepseek-ai/dsh-api-remotes": "0.2.1-alpha.3",
     "@deepseek-ai/dsh-api-session-controller": "0.2.1-alpha.3",
     "@deepseek-ai/dsh-api-settings-controller": "0.2.1-alpha.3",
@@ -79,6 +80,7 @@
     "@deepseek-ai/dsh-client-ui-plugin-manager": "0.2.1-alpha.3",
     "@deepseek-ai/dsh-client-ui-primitives": "0.2.1-alpha.3",
     "@deepseek-ai/dsh-client-ui-renderer": "0.2.1-alpha.3",
+    "@deepseek-ai/dsh-client-ui-secret-mask": "0.2.1-alpha.3",
     "@deepseek-ai/dsh-client-ui-session": "0.2.1-alpha.3",
     "@deepseek-ai/dsh-client-ui-settings": "0.2.1-alpha.3",
     "@deepseek-ai/dsh-client-ui-sidebar": "0.2.1-alpha.3",
@@ -119,6 +121,7 @@
     "@deepseek-ai/dsh-fs-local": "0.2.1-alpha.3",
     "@deepseek-ai/dsh-goal": "0.2.1-alpha.3",
     "@deepseek-ai/dsh-goal-round-driver": "0.2.1-alpha.3",
+    "@deepseek-ai/dsh-harness-dev-context": "0.2.1-alpha.3",
     "@deepseek-ai/dsh-home-paths": "0.2.1-alpha.3",
     "@deepseek-ai/dsh-hook-protocol": "0.2.1-alpha.3",
     "@deepseek-ai/dsh-host-directory-picker": "0.2.1-alpha.3",
@@ -206,9 +209,9 @@
     "@deepseek-ai/dsh-workflow": "0.2.1-alpha.3",
     "@deepseek-ai/dsh-working-directory": "0.2.1-alpha.3",
     "@deepseek-ai/dsh-workspace": "0.2.1-alpha.3",
-    "@deepseek-ai/schemastery": "^3.18.5-alpha.1",
+    "@deepseek-ai/schemastery": "^3.18.5-alpha.2",
     "dsh-community-market": "0.1.0-dev.0",
-    "dshmarket": "1.66.20",
+    "dshmarket": "1.66.22",
     "mdast-util-from-markdown": "^2.0.3",
     "mdast-util-gfm": "^3.1.0",
     "mdast-util-to-string": "^4.0.0",
@@ -309,7 +312,7 @@
     "appId": "ai.deepseek.dsh.desktop.next",
     "productName": "DSH NEXT",
     "asar": true,
-    "npmRebuild": false,
+    "beforeBuild": "./scripts/before-build.ts",
     "beforePack": "./scripts/prepare-pack.ts",
     "afterPack": "./scripts/verify-packaged.ts",
     "afterAllArtifactBuild": "./scripts/verify-fuses.ts",
@@ -327,21 +330,19 @@
       "nsis": "1.2.1"
     },
     "files": [
-      "assets/**",
-      "build/app-icon.ico",
-      "build/app-icon.png",
-      "build/app-icon-mac.png",
-      "cordis.patch.yml",
-      "host.cordis.patch.yml",
-      "lib/**",
-      "package.json",
-      "scripts/node-bin/**",
-      "!**/*.{js,cjs,mjs,ts,cts,mts,css}.map",
-      "!**/*.d.{ts,cts,mts}",
-      "!**/*.tsbuildinfo",
-      "!**/.yarn-state.yml",
-      "!node_modules/node-pty/build/**",
-      "!node_modules/fs-ext/build/**"
+      {
+        "from": ".desktop-build/payload",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": ".desktop-build/payload/node_modules",
+        "to": "node_modules",
+        "filter": [
+          "**/*"
+        ]
+      }
     ],
     "mac": {
       "artifactName": "DSH-NEXT-${version}-${arch}.${ext}",
@@ -371,6 +372,10 @@
         {
           "from": ".desktop-build/runtime",
           "to": "runtime"
+        },
+        {
+          "from": ".desktop-build/payload/package.json",
+          "to": "app/package.json"
         }
       ],
       "mergeASARs": false,
@@ -379,7 +384,7 @@
         "\\.(?:pak|dat|wasm)$",
         "/Contents/Resources/runtime/(?:arm64|x64)/primary-runtime(?:/|$)"
       ],
-      "x64ArchFiles": "{**/node_modules/{@deepseek-ai/node-addon-system-darwin-*/**,node-pty/prebuilds/darwin-*/**,fs-ext/prebuilds/darwin-*/**,node-addon-require-builtin-darwin-*/**,@vscode/ripgrep-darwin-*/**,@img/sharp-darwin-*/**,@img/sharp-libvips-darwin-*/**,@koromix/koffi-darwin-*/**,@dataiku/uv-darwin-*/**,@deepseek-ai/libreoffice-kit-darwin-*/**,sherpa-onnx-darwin-*/**,@trycua/cua-driver-darwin-*/**,@ubjs/node-darwin-*/**},Contents/Resources/runtime/**}"
+      "x64ArchFiles": "{**/node_modules/{@deepseek-ai/node-addon-system-darwin-*/**,node-pty/prebuilds/darwin-*/**,fs-ext/prebuilds/darwin-*/**,node-addon-require-builtin-darwin-*/**,@vscode/ripgrep-darwin-*/**,@img/sharp-darwin-*/**,@img/sharp-libvips-darwin-*/**,@koromix/koffi-darwin-*/**,@dataiku/uv-darwin-*/**,@deepseek-ai/libreoffice-kit-darwin-*/**,sherpa-onnx-darwin-*/**,@trycua/cua-driver-darwin-*/**,@ubjs/node-darwin-*/**,@reflink/reflink-darwin-*/**},Contents/Resources/runtime/**,Contents/Resources/runtime/**/.*/**}"
     },
     "win": {
       "compression": "normal",
@@ -434,10 +439,12 @@
       "**/node_modules/@trycua/cua-driver-*/**/*",
       "**/node_modules/sherpa-onnx-*/**/*",
       "**/node_modules/@agents-anywhere/dsh-bridge-next/lib/bundled-connector/**/*",
+      "**/node_modules/@deepseek-ai/dsh-agent-preset/**/*",
+      "**/node_modules/@deepseek-ai/dsh-skill-badge/**/*",
       "**/node_modules/pnpm/**/*",
-      "scripts/node-bin/**/*",
-      "assets/**/*",
-      "build/**/*"
+      ".desktop-build/payload/scripts/node-bin/**/*",
+      ".desktop-build/payload/assets/**/*",
+      ".desktop-build/payload/build/**/*"
     ]
   }
 }

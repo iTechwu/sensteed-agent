@@ -15845,6 +15845,9 @@ importers:
       '@deepseek-ai/dsh-api-gateway':
         specifier: 0.2.1-alpha.3
         version: link:../deepseek-harness/packages/api/gateway
+      '@deepseek-ai/dsh-api-remote-access':
+        specifier: 0.2.1-alpha.3
+        version: link:../deepseek-harness/packages/api/remote-access
       '@deepseek-ai/dsh-api-remotes':
         specifier: 0.2.1-alpha.3
         version: link:../deepseek-harness/packages/api/remotes
@@ -15932,6 +15935,9 @@ importers:
       '@deepseek-ai/dsh-client-ui-renderer':
         specifier: 0.2.1-alpha.3
         version: link:../deepseek-harness/packages/client/ui-renderer
+      '@deepseek-ai/dsh-client-ui-secret-mask':
+        specifier: 0.2.1-alpha.3
+        version: link:../deepseek-harness/packages/client/ui-secret-mask
       '@deepseek-ai/dsh-client-ui-session':
         specifier: 0.2.1-alpha.3
         version: link:../deepseek-harness/packages/client/ui-session
@@ -16052,6 +16058,9 @@ importers:
       '@deepseek-ai/dsh-goal-round-driver':
         specifier: 0.2.1-alpha.3
         version: link:../deepseek-harness/packages/goal/goal-round-driver
+      '@deepseek-ai/dsh-harness-dev-context':
+        specifier: 0.2.1-alpha.3
+        version: link:../deepseek-harness/packages/context/harness-dev-context
       '@deepseek-ai/dsh-home-paths':
         specifier: 0.2.1-alpha.3
         version: link:../deepseek-harness/packages/util/home-paths
@@ -16317,14 +16326,14 @@ importers:
         specifier: 0.1.5
         version: 0.1.5
       '@deepseek-ai/schemastery':
-        specifier: ^3.18.5-alpha.1
+        specifier: ^3.18.5-alpha.2
         version: link:../deepseek-harness/vendor/schemastery
       dsh-community-market:
         specifier: 0.1.0-dev.0
         version: link:../dsh-community-market
       dshmarket:
-        specifier: 1.66.20
-        version: 1.66.20(@deepseek-ai/cordis@deepseek-harness+vendor+cordis)(@deepseek-ai/dsh-settings@deepseek-harness+packages+settings+settings)(@deepseek-ai/schemastery@deepseek-harness+vendor+schemastery)
+        specifier: 1.66.22
+        version: 1.66.22(@deepseek-ai/cordis@deepseek-harness+vendor+cordis)(@deepseek-ai/dsh-settings@deepseek-harness+packages+settings+settings)(@deepseek-ai/schemastery@deepseek-harness+vendor+schemastery)
       mdast-util-from-markdown:
         specifier: ^2.0.3
         version: 2.0.3(supports-color@9.4.0)
@@ -25524,8 +25533,8 @@ packages:
       '@deepseek-ai/schemastery':
         optional: true
 
-  dshmarket@1.66.20:
-    resolution: {integrity: sha512-qmWbLSXqey8tW6OPXMcbsdC/7kHZTVD5ZBd7taMGGZjN2EtmKZvFvBEscyYcAkayWkL/kJrF5Zk2+SC1djCWXg==}
+  dshmarket@1.66.22:
+    resolution: {integrity: sha512-q+fEuZlL3xB9ubgCfunWfhdw84kIOxOlThVMCd4rwoy6sr7uMFDuD/XC0iPH2/Dq36kWI9KRU69HQYN92+Xjrg==}
     peerDependencies:
       '@deepseek-ai/cordis': ^4.0.1
       '@deepseek-ai/dsh-settings': ^0.1.0-rc.7 || ^0.1.1-rc.2 || ^0.1.2-alpha.2 || ^0.2.0-rc.1
@@ -39054,7 +39063,7 @@ snapshots:
       '@deepseek-ai/dsh-settings': link:deepseek-harness/packages/settings/settings
       '@deepseek-ai/schemastery': link:deepseek-harness/vendor/schemastery
 
-  dshmarket@1.66.20(@deepseek-ai/cordis@deepseek-harness+vendor+cordis)(@deepseek-ai/dsh-settings@deepseek-harness+packages+settings+settings)(@deepseek-ai/schemastery@deepseek-harness+vendor+schemastery):
+  dshmarket@1.66.22(@deepseek-ai/cordis@deepseek-harness+vendor+cordis)(@deepseek-ai/dsh-settings@deepseek-harness+packages+settings+settings)(@deepseek-ai/schemastery@deepseek-harness+vendor+schemastery):
     dependencies:
       '@deepseek-ai/cordis': link:deepseek-harness/vendor/cordis
       js-yaml: 4.3.2

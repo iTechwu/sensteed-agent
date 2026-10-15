@@ -164,7 +164,8 @@
     "dist:linux": "node scripts/package-linux.ts",
     "prepack": "corepack pnpm run check",
     "prepare:electron-native": "node scripts/prepare-fs-ext.ts",
-    "prepare:runtime": "node scripts/prepare-runtime.ts"
+    "prepare:runtime": "node scripts/prepare-runtime.ts",
+    "icons:export": "node ../scripts/export-app-icons.mjs --channel stable"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "1.4.0",

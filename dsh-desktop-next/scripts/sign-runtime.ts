@@ -1,9 +1,10 @@
 /** Sign the bundled interpreter payloads before electron-builder signs the enclosing application; ported from upstream Desktop. */
 import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { createHash, randomBytes } from 'node:crypto'
-import { chmodSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, lstatSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { primaryRuntimePythonAliases, readPrimaryRuntime } from '@deepseek-ai/dsh-tool-workspace-dependencies'
 import { isMachO } from './primary-runtime.ts'
 
 /** The pinned upstream checkout owns the entitlement files the payload executables receive. */
@@ -34,38 +35,75 @@ export function runtimeEntitlements(path: string, arch: 'arm64' | 'x64'): string
   return join(UPSTREAM_DESKTOP_SCRIPTS, arch === 'x64' ? 'node-x64-entitlements.plist' : 'jit-entitlements.plist')
 }
 
-function listFiles(root: string, directory = ''): string[] {
+async function listFiles(root: string): Promise<string[]> {
+  let hasManifest = false
+  try { hasManifest = lstatSync(join(root, 'runtime.json')).isFile() } catch { /* fixtures without runtime.json */ }
+  const aliases = hasManifest ? await primaryRuntimePythonAliases(root, await readPrimaryRuntime(root)) : new Map<string, string>()
   const files: string[] = []
-  for (const entry of readdirSync(join(root, directory), { withFileTypes: true })) {
-    const path = directory === '' ? entry.name : `${directory}/${entry.name}`
-    if (entry.isSymbolicLink()) throw new Error(`Next runtime signing: the payload must not contain links: ${path}`)
-    if (entry.isDirectory()) files.push(...listFiles(root, path))
-    else if (entry.isFile()) files.push(path)
+  const visit = (directory: string): void => {
+    for (const entry of readdirSync(join(root, directory), { withFileTypes: true })) {
+      const path = directory === '' ? entry.name : `${directory}/${entry.name}`
+      if (entry.isSymbolicLink()) {
+        if (aliases.has(path)) continue
+        throw new Error(`Next runtime signing: the payload must not contain links: ${path}`)
+      }
+      if (entry.isDirectory()) visit(path)
+      else if (entry.isFile()) files.push(path)
+    }
   }
+  visit('')
   return files
 }
 
+/** Attempts for one signature whose secure timestamp request fails; every signature asks Apple's timestamp service. */
+export const TIMESTAMP_ATTEMPTS = 3
+
+/**
+ * Whether codesign reported a secure timestamp it could not obtain rather than a signature it could not make.
+ * @param error - Failure of one signature.
+ * @returns True for the timestamp service's failures; a payload path naming a timestamp only retries a failure.
+ */
+export function isTimestampFailure(error: unknown): boolean {
+  return error instanceof Error && /timestamp/iu.test(error.message)
+}
+
+/** Wait before asking the timestamp service again. */
+const timestampBackoff = (attempt: number): Promise<void> => new Promise(resolve => setTimeout(resolve, 2_000 * attempt))
+
 /**
  * Sign and verify every Mach-O file of one payload in place, awaiting all signers on failure.
- * @param root - Self-contained payload without symlinks.
+ * @param root - Self-contained payload without symlinks other than validated Python aliases.
  * @param appId - Release application identifier.
  * @param identity - Required signing identity.
  * @param arch - Payload CPU, independent of the signing host.
- * @param tools - Injectable signer and verifier.
+ * @param tools - Injectable signer and verifier, and the wait between timestamp attempts.
  * @returns Number of signed native files.
  */
 export async function signMacRuntime(
   root: string, appId: string, identity: MacRuntimeSigningIdentity, arch: 'arm64' | 'x64',
-  tools: { readonly sign: SignRuntimeCode; readonly verify: VerifyRuntimeCode } = { sign: signMacOSRuntimeCode, verify: verifyMacOSRuntimeCode },
+  tools: { readonly sign: SignRuntimeCode; readonly verify: VerifyRuntimeCode; readonly pause?: (attempt: number) => Promise<void> }
+    = { sign: signMacOSRuntimeCode, verify: verifyMacOSRuntimeCode },
 ): Promise<number> {
-  const files = listFiles(root).filter(path => isMachO(join(root, path)))
+  const files = (await listFiles(root)).filter(path => isMachO(join(root, path)))
+  const pause = tools.pause ?? timestampBackoff
   let next = 0
   const workers = Array.from({ length: Math.min(4, files.length) }, async () => {
     for (;;) {
       const path = files[next++]
       if (path === undefined) return
       const file = join(root, path)
-      await tools.sign(file, `${appId}.runtime.${createHash('sha256').update(path).digest('hex')}`, identity, runtimeEntitlements(path, arch))
+      const identifier = `${appId}.runtime.${createHash('sha256').update(path).digest('hex')}`
+      const entitlements = runtimeEntitlements(path, arch)
+      // The secure timestamp comes from Apple's service on every signature; a request it drops is made again.
+      for (let attempt = 1; ; attempt++) {
+        try {
+          await tools.sign(file, identifier, identity, entitlements)
+          break
+        } catch (error) {
+          if (attempt >= TIMESTAMP_ATTEMPTS || !isTimestampFailure(error)) throw error
+          await pause(attempt)
+        }
+      }
       tools.verify(file, identity)
     }
   })

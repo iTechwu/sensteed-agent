@@ -44,6 +44,7 @@
     "brand:docs": "node scripts/generate-brand-docs.mjs",
     "brand:version": "node scripts/bump-version.mjs",
     "brand:check": "node scripts/verify-brand-docs.mjs && node scripts/verify-bilingual-docs.mjs && node scripts/verify-brand-isolation.mjs",
-    "brand:isolation": "node scripts/verify-brand-isolation.mjs"
+    "brand:isolation": "node scripts/verify-brand-isolation.mjs",
+    "icons:check": "node --test scripts/export-app-icons.test.mjs && node scripts/export-app-icons.mjs --check"
   }
 }

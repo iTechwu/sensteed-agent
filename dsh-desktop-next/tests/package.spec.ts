@@ -16,9 +16,9 @@ it('declares every official optional bundle as a discoverable, version-aligned i
 
 it('archives the application like upstream Desktop while keeping fuses and native inventory aligned with Beta', () => {
   const next = read('../package.json'); const beta = read('../../dsh-plugin-desktop/package.json')
-  // Sensteed 的 stable 把 electron-builder 配置放在独立文件里，fuse 面与 x64 原生清单从这里读取。
+  // Sensteed 的 stable 把 electron-builder 配置放在独立文件里，fuse 面与原生清单从这里读取。
   const betaBuilder = read('../../dsh-plugin-desktop/electron-builder.json')
-  expect(next.version).toBe('2.0.17-next')
+  expect(next.version).toBe('2.0.18-next')
   expect(next.build.appId).toBe('ai.deepseek.dsh.desktop.next')
   expect(next.build.asar).toBe(true)
   for (const platform of ['mac', 'win', 'linux']) expect(next.build[platform].asar, platform).toBeUndefined()
@@ -28,22 +28,32 @@ it('archives the application like upstream Desktop while keeping fuses and nativ
   // Electron's own fs and dlopen read the archive; child processes, shells and nativeImage need these physically.
   expect(next.build.asarUnpack).toEqual(expect.arrayContaining(['**/*.{node,dylib,dll,so,exe}', '**/*.so.*', '**/spawn-helper',
     '**/@vscode/ripgrep-*/bin/rg', '**/@dataiku/uv-*/bin/uv', '**/node_modules/@deepseek-ai/libreoffice-kit-*/**/*', '**/node_modules/pnpm/**/*',
-    '**/node_modules/@agents-anywhere/dsh-bridge-next/lib/bundled-connector/**/*', 'scripts/node-bin/**/*', 'assets/**/*', 'build/**/*']))
-  // The Desktop file policy is applied by these globs; the afterPack audit rejects anything they miss.
-  expect(next.build.files).toEqual(expect.arrayContaining(['!**/*.{js,cjs,mjs,ts,cts,mts,css}.map', '!**/*.d.{ts,cts,mts}', '!**/*.tsbuildinfo']))
-  // Platform omissions join the single file set in beforePack; a platform-level files list would include everything else.
+    '**/node_modules/@agents-anywhere/dsh-bridge-next/lib/bundled-connector/**/*', '**/node_modules/@deepseek-ai/dsh-agent-preset/**/*',
+    '**/node_modules/@deepseek-ai/dsh-skill-badge/**/*']))
+  // The prepared tree is archived verbatim, as upstream archives its prepared dsh tree: one file set for the
+  // shell files and one for the dependency tree, because electron-builder leaves out a file set's root node_modules.
+  expect(next.build.files).toEqual([{ from: '.desktop-build/payload', filter: ['**/*'] },
+    { from: '.desktop-build/payload/node_modules', to: 'node_modules', filter: ['**/*'] }])
   for (const platform of ['mac', 'win', 'linux']) expect(next.build[platform].files, platform).toBeUndefined()
+  // electron-builder collects node_modules itself unless beforeBuild declines, and npmRebuild: false would skip that hook.
+  expect(next.build.beforeBuild).toBe('./scripts/before-build.ts')
+  expect(next.build.npmRebuild).toBeUndefined()
+  // beforePack only adds the Office closure of the prepared payload to the unpack patterns.
   expect(next.build.beforePack).toBe('./scripts/prepare-pack.ts')
+  // Unpack patterns are matched below the application directory, so payload-root patterns name the prepared directory.
+  expect(next.build.asarUnpack).toEqual(expect.arrayContaining(['.desktop-build/payload/scripts/node-bin/**/*', '.desktop-build/payload/assets/**/*', '.desktop-build/payload/build/**/*']))
+  expect(next.build.asarUnpack.every((pattern: string) => pattern.startsWith('**/') || pattern.startsWith('.desktop-build/payload/'))).toBe(true)
   expect(next.build.afterPack).toBe('./scripts/verify-packaged.ts')
   expect(next.build.afterAllArtifactBuild).toBe('./scripts/verify-fuses.ts')
   expect(next.build.electronFuses).toEqual(betaBuilder.electronFuses)
-  // The interpreter payloads of both CPUs are identical across the two CPU builds, so the universal merge keeps them as they are.
   // Sensteed 的 stable 原生清单额外携带 claude-agent-sdk/codex/lightningcss 三个自有条目，两侧 glob 不逐字相等，
-  // 只断言 Next 侧包含 stable 的公共清单主体并追加 runtime 载荷。
+  // 只断言 Next 侧保留公共清单主体并追加 runtime 载荷（含 universal 合并的 dot 目录规则）。
   expect(next.build.mac.x64ArchFiles).toContain('**/node_modules/{')
-  expect(next.build.mac.x64ArchFiles.endsWith(',Contents/Resources/runtime/**}')).toBe(true)
+  expect(next.build.mac.x64ArchFiles.endsWith(',Contents/Resources/runtime/**,Contents/Resources/runtime/**/.*/**}')).toBe(true)
   // Both CPU payloads ride beside the archive as extra resources; electron-builder must not re-sign the pre-signed payloads.
-  for (const platform of ['mac', 'win']) expect(next.build[platform].extraResources, platform).toEqual([{ from: '.desktop-build/runtime', to: 'runtime' }])
+  // macOS also carries the manifest copy the updaters shipped in 2.0.14-next through 2.0.17-next read beside the archive.
+  expect(next.build.mac.extraResources).toEqual([{ from: '.desktop-build/runtime', to: 'runtime' }, { from: '.desktop-build/payload/package.json', to: 'app/package.json' }])
+  expect(next.build.win.extraResources).toEqual([{ from: '.desktop-build/runtime', to: 'runtime' }])
   expect(next.build.extraResources).toBeUndefined()
   expect(next.build.linux.extraResources).toBeUndefined()
   expect(next.build.mac.signIgnore).toContain('/Contents/Resources/runtime/(?:arm64|x64)/primary-runtime(?:/|$)')
@@ -56,6 +66,4 @@ it('archives the application like upstream Desktop while keeping fuses and nativ
   expect(existsSync(new URL('../build/app-icon.icon/icon.json', import.meta.url))).toBe(true)
   expect(next.build.nsis).toMatchObject({ oneClick: false, perMachine: false, allowElevation: true, allowToChangeInstallationDirectory: true })
   expect(next.build.mac.notarize).toBe(true)
-  expect(next.build.files).toContain('lib/**')
-  expect(next.build.files.some((path: string) => path.includes('.desktop-next'))).toBe(false)
 })

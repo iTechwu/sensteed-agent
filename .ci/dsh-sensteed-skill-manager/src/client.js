@@ -1,14 +1,16 @@
 const React = require('react')
-const { createElement: h, useEffect, useRef, useState } = React
-const { Modal, Menu, MenuItemButton, IconDataOutlineRegular, IconSkillOutlineRegular,
+const { createElement: h, useEffect, useRef, useState, useSyncExternalStore } = React
+const { Menu, MenuItemButton, IconDataOutlineRegular, IconSkillOutlineRegular, IconCloseOutlineRegular,
   IconRefreshOutlineRegular, IconPlusOutlineRegular, IconChevronDownOutlineRegular,
   IconDownloadOutlineRegular, IconAgentPresetOutlineRegular } = require('@deepseek-ai/dsh-client-ui-primitives')
 const PANEL_ID = 'sensteed-skill-manager'
 const NS = 'sensteed.skill-manager'
+// 安装对话框的触发元素;关闭后焦点回到它(与 knowledge 插件同一契约)。
+let lastTrigger = null
 const ROUTE = '/api/desktop/sensteed/skills'
 const COPY = {
   zh: {
-    title: '技能管理', description: '安装、创建和管理 Agent 技能', refresh: '刷新', add: '添加技能', chooseAddMethod: '选择添加技能方式',
+    title: '技能', description: '安装、创建和管理 Agent 技能', refresh: '刷新', add: '添加技能', chooseAddMethod: '选择添加技能方式',
     create: '让 Agent 创建', install: '安装第三方技能', empty: '还没有可用的技能', installedTitle: '已安装技能',
     loading: '正在读取技能…', refreshing: '正在刷新技能…', refreshFailed: '技能列表刷新失败。', serviceUnavailable: '技能服务暂时不可用，请稍后重试。', retry: '重试', repository: 'GitHub 仓库或技能目录链接',
     installAction: '安装', cancel: '取消', installing: '正在安装…', installed: '已安装',
@@ -23,7 +25,7 @@ const COPY = {
     installMenuHint: '从 GitHub 仓库或技能目录安装到本机。',
   },
   en: {
-    title: 'Skill management', description: 'Install, create, and manage Agent skills', refresh: 'Refresh', add: 'Add skill', chooseAddMethod: 'Choose how to add a skill',
+    title: 'Skills', description: 'Install, create, and manage Agent skills', refresh: 'Refresh', add: 'Add skill', chooseAddMethod: 'Choose how to add a skill',
     create: 'Create with Agent', install: 'Install third-party skill', empty: 'No skills available yet', installedTitle: 'Installed skills',
     loading: 'Loading skills…', refreshing: 'Refreshing skills…', refreshFailed: 'Could not refresh the skill list.', serviceUnavailable: 'The skill service is temporarily unavailable. Try again later.', retry: 'Retry', repository: 'GitHub repository or skill directory URL',
     installAction: 'Install', cancel: 'Cancel', installing: 'Installing…', installed: 'Installed',
@@ -78,7 +80,7 @@ async function requestLong(path = '', options = {}) {
   return body
 }
 
-function SkillManagerPage({ view, t, createSkill }) {
+function SkillManagerPage({ view, t, createSkill, panelInfo }) {
   const [skills, setSkills] = useState([])
   const [sharedSkills, setSharedSkills] = useState([])
   const [sharedError, setSharedError] = useState('')
@@ -94,10 +96,31 @@ function SkillManagerPage({ view, t, createSkill }) {
   const [refreshError, setRefreshError] = useState('')
   const [notice, setNotice] = useState('')
   const operation = useRef(false)
+  // The main slot stays mounted while the user moves between global panels.
+  // Refresh on activation so the list reflects installs made elsewhere without
+  // issuing a request while the page is hidden.
+  const isActive = panelInfo?.subscribe && panelInfo?.getSnapshot
+    ? useSyncExternalStore(panelInfo.subscribe, () => panelInfo.getSnapshot().activePanelId === PANEL_ID, () => true)
+    : true
+  const restoreTriggerFocus = () => {
+    requestAnimationFrame(() => lastTrigger?.focus())
+  }
   const closeInstall = () => {
     if (operation.current) return
     setFormOpen(false)
+    restoreTriggerFocus()
   }
+  // 自持对话框键盘契约:Escape 关闭,关闭后焦点回到触发按钮。
+  useEffect(() => {
+    if (!formOpen) return undefined
+    const key = event => { if (event.key === 'Escape') closeInstall() }
+    window.addEventListener('keydown', key)
+    return () => window.removeEventListener('keydown', key)
+  }, [formOpen])
+  const repositoryInput = useRef(null)
+  useEffect(() => {
+    if (formOpen) repositoryInput.current?.focus()
+  }, [formOpen])
 
   const refresh = async () => {
     setState(state === 'ready' || skills.length > 0 || sharedSkills.length > 0 ? 'refreshing' : 'loading')
@@ -117,7 +140,7 @@ function SkillManagerPage({ view, t, createSkill }) {
       setRefreshError(cause?.statusCode >= 500 ? t('serviceUnavailable') : t('refreshFailed'))
     }
   }
-  useEffect(() => { void refresh() }, [])
+  useEffect(() => { if (isActive) void refresh() }, [isActive])
   if (view === 'summary') return t('description')
 
   const install = async event => {
@@ -131,13 +154,15 @@ function SkillManagerPage({ view, t, createSkill }) {
       const body = await requestLong('/install', { method: 'POST', body: JSON.stringify({ repository: repository.trim() }) })
       setRepository('')
       setFormOpen(false)
+      restoreTriggerFocus()
       await refresh()
       setNotice(t('installSuccess', { name: body.skill?.name || '' }))
     } catch (cause) { setError(cause?.message || t('installError')) }
     finally { operation.current = false; setBusy(false) }
   }
 
-  const openInstall = () => {
+  const openInstall = event => {
+    lastTrigger = event?.currentTarget ?? document.activeElement
     setAddMenuOpen(false)
     setFormOpen(true)
     setError('')
@@ -257,13 +282,19 @@ function SkillManagerPage({ view, t, createSkill }) {
             )
           }))) : null,
     error && !formOpen ? h('div', { className: 'sm-error', role: 'alert' }, error) : null),
-    formOpen ? h(Modal, { open: true, onClose: closeInstall, title: t('install'), closeLabel: t('close'), description: t('installHint'), className: 'sm-install-dialog' },
-      h('form', { className: 'sm-install-form', onSubmit: install, 'aria-busy': busy },
-        h('label', null, t('repository'), h('input', { type: 'url', required: true, value: repository, disabled: busy, placeholder: 'https://github.com/owner/skills', 'data-modal-autofocus': true, onInput: event => setRepository(event.currentTarget.value) })),
-        error ? h('div', { className: 'sm-error', role: 'alert' }, error) : null,
-        h('div', { className: 'sm-form-actions' },
-          h('button', { type: 'button', className: 'sm-quiet', disabled: busy, onClick: closeInstall }, t('cancel')),
-          h('button', { type: 'submit', className: 'sm-primary', disabled: busy || !repository.trim() }, busy ? t('installing') : t('installAction'))))) : null)
+    formOpen ? h('div', { className: 'sm-overlay', role: 'dialog', 'aria-modal': true, 'aria-labelledby': 'sm-install-title',
+      onClick: event => { if (event.target === event.currentTarget) closeInstall() } },
+      h('div', { className: 'sm-install-dialog', role: 'document' },
+        h('header', { className: 'sm-install-head' },
+          h('h3', { id: 'sm-install-title' }, t('install')),
+          h('button', { type: 'button', className: 'sm-icon', 'aria-label': t('close'), disabled: busy, onClick: closeInstall }, h(IconCloseOutlineRegular, { size: 18 }))),
+        h('p', { className: 'sm-install-hint' }, t('installHint')),
+        h('form', { className: 'sm-install-form', onSubmit: install, 'aria-busy': busy },
+          h('label', null, t('repository'), h('input', { type: 'url', required: true, value: repository, disabled: busy, placeholder: 'https://github.com/owner/skills', ref: repositoryInput, onInput: event => setRepository(event.currentTarget.value) })),
+          error ? h('div', { className: 'sm-error', role: 'alert' }, error) : null,
+          h('div', { className: 'sm-form-actions' },
+            h('button', { type: 'button', className: 'sm-quiet', disabled: busy, onClick: closeInstall }, t('cancel')),
+            h('button', { type: 'submit', className: 'sm-primary', disabled: busy || !repository.trim() }, busy ? t('installing') : t('installAction')))))) : null)
 }
 
 async function createSkillConversation(ctx) {
@@ -289,7 +320,7 @@ function apply(ctx) {
   const t = ctx.locale.bind(NS)
   const createSkill = () => createSkillConversation(ctx)
   ctx.slots.inject('main', () => ctx.slots.register({
-    name: 'main', key: PANEL_ID, locale: NS, inject: () => ({ t, createSkill }),
+    name: 'main', key: PANEL_ID, locale: NS, inject: () => ({ t, createSkill, panelInfo: ctx.layout.panelInfo }),
   }, SkillManagerPage))
   ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
     name: 'sidebar.panellist', id: PANEL_ID, order: 1, label: () => t('title'), locale: NS,
@@ -300,7 +331,7 @@ function apply(ctx) {
     style.textContent = `
       .sm-page{box-sizing:border-box;flex:1;width:100%;height:100%;min-height:0;min-width:0;overflow:auto;padding:calc(32px + var(--dsh-frame-top-clearance,0px)) 48px 48px;container:skill-manager / inline-size;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary)}
       .sm-content{box-sizing:border-box;width:100%;max-width:1040px;min-width:0;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr);gap:28px}
-      .sm-header{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px}.sm-heading-copy{flex:1 1 240px;min-width:0}
+      .sm-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;min-height:72px}.sm-heading-copy{flex:1 1 240px;min-width:0}
       .sm-header h2{margin:0;font-size:22px;font-weight:650;line-height:1.4}.sm-header p{margin:6px 0 0;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:1.5}
       .sm-actions,.sm-form-actions{display:flex;align-items:center;gap:10px;flex:none}
       .sm-page button,.sm-install-dialog button{font:inherit;cursor:pointer}.sm-page button:disabled,.sm-install-dialog button:disabled{opacity:.5;cursor:default}
@@ -323,7 +354,11 @@ function apply(ctx) {
       .sm-page .sm-row-action{min-height:32px;padding:0 10px;border:1px solid var(--dsw-alias-border-l1);border-radius:6px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font-size:12px;white-space:nowrap}.sm-row-action:hover:not(:disabled){background:var(--dsw-alias-bg-layer-2)}.sm-page .is-danger{color:var(--dsw-alias-state-error-primary)}
       .sm-state{display:grid;justify-items:center;gap:16px;margin:0;padding:40px 16px;color:var(--dsw-alias-label-secondary);font-size:13px;text-align:center}.sm-state p{margin:0}
       .sm-error,.sm-inline-error{color:var(--dsw-alias-state-error-primary);font-size:13px;line-height:1.6;overflow-wrap:anywhere}.sm-error button,.sm-inline-error button{margin-left:8px}.sm-notice,.sm-refreshing{margin:0;font-size:13px;color:var(--dsw-alias-state-success-primary)}.sm-refreshing{color:var(--dsw-alias-label-secondary)}
-      .sm-install-dialog{width:min(520px,100%);max-height:100%;overflow:auto}.sm-install-form{display:grid;gap:20px}.sm-install-form label{display:grid;gap:8px;font-size:13px;font-weight:550}.sm-install-form input{width:100%;font-weight:400}.sm-form-actions{justify-content:flex-end;flex-wrap:wrap}
+      .sm-overlay{position:fixed;inset:0;z-index:60;display:grid;place-items:center;padding:24px;background:color-mix(in srgb,var(--dsw-alias-bg-base) 55%,transparent);backdrop-filter:blur(6px)}
+      .sm-install-dialog{box-sizing:border-box;width:min(520px,100%);max-height:100%;overflow:auto;padding:20px 22px;border:1px solid var(--dsw-alias-border-l1);border-radius:12px;background:var(--dsw-alias-bg-layer-1);box-shadow:0 18px 48px rgba(0,0,0,.28)}
+      .sm-install-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 4px}.sm-install-head h3{margin:0;font-size:16px;font-weight:650;color:var(--dsw-alias-label-primary)}
+      .sm-install-hint{margin:0 0 14px;font-size:12px;line-height:1.6;color:var(--dsw-alias-label-secondary)}
+      .sm-install-form{display:grid;gap:20px}.sm-install-form label{display:grid;gap:8px;font-size:13px;font-weight:550}.sm-install-form input{width:100%;font-weight:400}.sm-form-actions{justify-content:flex-end;flex-wrap:wrap}
       @container skill-manager (max-width:680px){.sm-toolbar{align-items:stretch}.sm-search{width:100%}.sm-row{grid-template-columns:40px minmax(0,1fr);gap:8px 12px}.sm-row-meta{grid-column:2;justify-content:flex-start;max-width:none}.sm-glyph{width:40px;height:40px;grid-row:1 / span 2}.sm-heading-copy{flex-basis:100%}.sm-actions{margin-left:auto}}
       @media(max-width:760px){.sm-page{padding-inline:24px}}@media(max-width:420px){.sm-page{padding-inline:16px}.sm-content{gap:24px}.sm-page .sm-filter{padding-inline:8px}}
     `
@@ -332,4 +367,4 @@ function apply(ctx) {
   }, 'sensteed-skill-manager: styles')
 }
 
-module.exports = { apply, inject: ['slots', 'locale', 'sessions', 'uiWorkspace', 'workspaces'], __test: { request, createSkillConversation } }
+module.exports = { apply, inject: ['slots', 'locale', 'sessions', 'uiWorkspace', 'workspaces', 'layout'], __test: { request, createSkillConversation } }

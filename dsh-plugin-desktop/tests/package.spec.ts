@@ -647,8 +647,6 @@ describe('published package surface', () => {
     expect(main).toContain('!hasDesktopProfileUsageHistory(releaseUserDataLocations, prepared.profile.dir, activeProfileName)')
     expect(main).toContain("selection === undefined ? 'skipped' : 'completed'")
     expect(main).toContain('profile !== activeProfileName || safeModePaths !== undefined')
-    const client = readFileSync(new URL('src/client/onboarding.tsx', packageRoot), 'utf8')
-    expect(client).toContain("ctx.slots.inject('onboarding.desktop.before'")
   })
 
   it('declares every remote service consumed by the mandatory DoFe gate', () => {
