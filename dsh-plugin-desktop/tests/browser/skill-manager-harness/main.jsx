@@ -21,6 +21,16 @@ delete window.__ModuleLoader__
 
 let dictionary, Page, pageProps
 window.skillEvents = []
+const panelListeners = new Set()
+let activePanelId = 'sensteed-skill-manager'
+const panelInfo = {
+  getSnapshot: () => ({ activePanelId }),
+  subscribe(listener) { panelListeners.add(listener); return () => panelListeners.delete(listener) },
+}
+window.setSkillPanelActive = active => {
+  activePanelId = active ? 'sensteed-skill-manager' : null
+  panelListeners.forEach(listener => listener())
+}
 const services = {
   workspaces: { list: { getSnapshot: () => ({ items: [{ workspaceId: 'workspace-fixture' }] }) } },
   sessions: {
@@ -46,6 +56,7 @@ const services = {
 }
 const context = {
   get: name => services[name],
+  layout: { panelInfo },
   effect: setup => setup(),
   locale: {
     register(_namespace, values) { dictionary = values.zh; return () => {} },

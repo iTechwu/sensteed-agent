@@ -35,7 +35,7 @@ const skills = Array.from({ length: 140 }, (_, index) => ({
   source: index < 7 ? 'bundled' : 'user-dsh', provider: 'filesystem',
 }))
 const sharedSkills = [{ name: '公司经营分析', description: '每周汇总销售指标与财务数据', version: 3, sha256: 'fixture', canManage: true }]
-let failInstall = true, failRefresh = false, posts = 0
+let failInstall = true, failRefresh = false, posts = 0, reads = 0
 try {
   await page.route('**/api/desktop/sensteed/skills**', async route => {
     if (route.request().method() === 'POST') {
@@ -44,11 +44,18 @@ try {
       await route.fulfill({ status: failInstall ? 422 : 200, contentType: 'application/json', body: JSON.stringify(failInstall ? { error: '技能结构无效，请检查后重试。' } : { skill: { name: 'weekly-report' } }) })
       return
     }
+    reads++
+    await page.evaluate(value => { window.skillPanelReadCount = value }, reads)
     await route.fulfill({ status: failRefresh ? 503 : 200, contentType: 'application/json', body: JSON.stringify(failRefresh ? { error: 'unavailable' } : { skills, sharedSkills }) })
   })
   await page.goto(`http://127.0.0.1:${vite.httpServer.address().port}`)
   await page.locator('.sm-installed .sm-row').first().waitFor()
   assert.equal(await page.locator('.sm-installed .sm-row').count(), 140)
+  assert.equal(reads, 1, 'the initial activation should load the list once')
+  await page.evaluate(() => window.setSkillPanelActive(false))
+  await page.evaluate(() => window.setSkillPanelActive(true))
+  await page.waitForFunction(() => window.skillPanelReadCount === 2)
+  assert.equal(reads, 2, 'returning to the skill panel should refresh the list')
   const bounds = await page.evaluate(() => {
     const box = selector => document.querySelector(selector).getBoundingClientRect().toJSON()
     return { heading: box('.sm-header'), toolbar: box('.sm-toolbar'), list: box('.sm-installed'), title: box('#sm-title') }

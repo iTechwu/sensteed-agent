@@ -1,5 +1,5 @@
 const React = require('react')
-const { createElement: h, useEffect, useRef, useState } = React
+const { createElement: h, useEffect, useRef, useState, useSyncExternalStore } = React
 const { Modal, Menu, MenuItemButton, IconDataOutlineRegular, IconSkillOutlineRegular,
   IconRefreshOutlineRegular, IconPlusOutlineRegular, IconChevronDownOutlineRegular,
   IconDownloadOutlineRegular, IconAgentPresetOutlineRegular } = require('@deepseek-ai/dsh-client-ui-primitives')
@@ -8,7 +8,7 @@ const NS = 'sensteed.skill-manager'
 const ROUTE = '/api/desktop/sensteed/skills'
 const COPY = {
   zh: {
-    title: '技能管理', description: '安装、创建和管理 Agent 技能', refresh: '刷新', add: '添加技能', chooseAddMethod: '选择添加技能方式',
+    title: '技能', description: '安装、创建和管理 Agent 技能', refresh: '刷新', add: '添加技能', chooseAddMethod: '选择添加技能方式',
     create: '让 Agent 创建', install: '安装第三方技能', empty: '还没有可用的技能', installedTitle: '已安装技能',
     loading: '正在读取技能…', refreshing: '正在刷新技能…', refreshFailed: '技能列表刷新失败。', serviceUnavailable: '技能服务暂时不可用，请稍后重试。', retry: '重试', repository: 'GitHub 仓库或技能目录链接',
     installAction: '安装', cancel: '取消', installing: '正在安装…', installed: '已安装',
@@ -23,7 +23,7 @@ const COPY = {
     installMenuHint: '从 GitHub 仓库或技能目录安装到本机。',
   },
   en: {
-    title: 'Skill management', description: 'Install, create, and manage Agent skills', refresh: 'Refresh', add: 'Add skill', chooseAddMethod: 'Choose how to add a skill',
+    title: 'Skills', description: 'Install, create, and manage Agent skills', refresh: 'Refresh', add: 'Add skill', chooseAddMethod: 'Choose how to add a skill',
     create: 'Create with Agent', install: 'Install third-party skill', empty: 'No skills available yet', installedTitle: 'Installed skills',
     loading: 'Loading skills…', refreshing: 'Refreshing skills…', refreshFailed: 'Could not refresh the skill list.', serviceUnavailable: 'The skill service is temporarily unavailable. Try again later.', retry: 'Retry', repository: 'GitHub repository or skill directory URL',
     installAction: 'Install', cancel: 'Cancel', installing: 'Installing…', installed: 'Installed',
@@ -78,7 +78,7 @@ async function requestLong(path = '', options = {}) {
   return body
 }
 
-function SkillManagerPage({ view, t, createSkill }) {
+function SkillManagerPage({ view, t, createSkill, panelInfo }) {
   const [skills, setSkills] = useState([])
   const [sharedSkills, setSharedSkills] = useState([])
   const [sharedError, setSharedError] = useState('')
@@ -94,6 +94,12 @@ function SkillManagerPage({ view, t, createSkill }) {
   const [refreshError, setRefreshError] = useState('')
   const [notice, setNotice] = useState('')
   const operation = useRef(false)
+  // The main slot stays mounted while the user moves between global panels.
+  // Refresh on activation so the list reflects installs made elsewhere without
+  // issuing a request while the page is hidden.
+  const isActive = panelInfo?.subscribe && panelInfo?.getSnapshot
+    ? useSyncExternalStore(panelInfo.subscribe, () => panelInfo.getSnapshot().activePanelId === PANEL_ID, () => true)
+    : true
   const closeInstall = () => {
     if (operation.current) return
     setFormOpen(false)
@@ -117,7 +123,7 @@ function SkillManagerPage({ view, t, createSkill }) {
       setRefreshError(cause?.statusCode >= 500 ? t('serviceUnavailable') : t('refreshFailed'))
     }
   }
-  useEffect(() => { void refresh() }, [])
+  useEffect(() => { if (isActive) void refresh() }, [isActive])
   if (view === 'summary') return t('description')
 
   const install = async event => {
@@ -289,7 +295,7 @@ function apply(ctx) {
   const t = ctx.locale.bind(NS)
   const createSkill = () => createSkillConversation(ctx)
   ctx.slots.inject('main', () => ctx.slots.register({
-    name: 'main', key: PANEL_ID, locale: NS, inject: () => ({ t, createSkill }),
+    name: 'main', key: PANEL_ID, locale: NS, inject: () => ({ t, createSkill, panelInfo: ctx.layout.panelInfo }),
   }, SkillManagerPage))
   ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
     name: 'sidebar.panellist', id: PANEL_ID, order: 1, label: () => t('title'), locale: NS,
@@ -332,4 +338,4 @@ function apply(ctx) {
   }, 'sensteed-skill-manager: styles')
 }
 
-module.exports = { apply, inject: ['slots', 'locale', 'sessions', 'uiWorkspace', 'workspaces'], __test: { request, createSkillConversation } }
+module.exports = { apply, inject: ['slots', 'locale', 'sessions', 'uiWorkspace', 'workspaces', 'layout'], __test: { request, createSkillConversation } }

@@ -16,6 +16,7 @@ export function createPage(skills = [], sharedSkills = [], createSkill = async (
   const react = {
     createElement: (tag, props, ...children) => ({ tag, props: props || {}, children: children.flat(Infinity).filter(child => child != null && child !== false) }),
     useEffect() {},
+    useSyncExternalStore(_subscribe, getSnapshot) { return getSnapshot() },
     useRef(value) { return reference ??= { current: value } },
     useState(initial) {
       const index = cursor++
@@ -39,6 +40,12 @@ export function createPage(skills = [], sharedSkills = [], createSkill = async (
     slots: {
       inject: (_name, callback) => callback(),
       register: (options, value) => { if (options.name === 'main') component = value },
+    },
+    layout: {
+      panelInfo: {
+        getSnapshot: () => ({ activePanelId: 'sensteed-skill-manager' }),
+        subscribe: () => () => {},
+      },
     },
   })
   return {
@@ -162,4 +169,10 @@ test('lets company skills be browsed directly and searches their descriptions', 
   assert.ok(find(page.render(), 'sm-row'))
   find(page.render(), 'sm-search').props.onInput({ currentTarget: { value: 'missing' } })
   assert.equal(find(page.render(), 'sm-row'), undefined)
+})
+
+test('refreshes when the skill panel becomes active again', () => {
+  const page = createPage(fixture)
+  const root = page.render()
+  assert.equal(root.children[0].children[0].children[0].children[0].children[0], '技能')
 })
