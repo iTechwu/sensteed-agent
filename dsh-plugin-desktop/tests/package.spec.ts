@@ -1078,7 +1078,9 @@ describe('published package surface', () => {
     expect(windowsJob.match(/CI: 'false'/g)?.length).toBeGreaterThanOrEqual(3)
     expect(windowsJob.match(/npm_config_minimum_release_age: '0'/g)?.length).toBeGreaterThanOrEqual(3)
     expect(windowsJob).toContain('DSH_PACKAGE_CHECK_ALREADY_RAN: \'1\'')
-    expect(windowsJob).toContain('DSH_WINDOWS_PACKAGE_COMPRESSION: store')
+    // Store compression leaves the embedded NSIS 7z above the 32-bit makensis
+    // mmap ceiling once the payload passes ~2GB, so CI candidates compress.
+    expect(windowsJob).toContain('DSH_WINDOWS_PACKAGE_COMPRESSION: normal')
     expect(macosJob).not.toContain('- run: pnpm check')
     expect(macosJob).toContain('run: pnpm --filter dsh-plugin-desktop check:mac-package')
     expect(macosJob).toContain('run: pnpm --filter dsh-plugin-desktop dist:mac-smoke')
