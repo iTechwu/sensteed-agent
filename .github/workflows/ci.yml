@@ -263,6 +263,7 @@ jobs:
           restore-keys: electron-${{ runner.os }}-${{ runner.arch }}-
       # The following upstream install validates the sibling's own lockfile.
       - run: pnpm install --no-frozen-lockfile --config.minimumReleaseAge=0
+      - run: node scripts/verify-dofe-ui-install.mjs
       - run: pnpm --dir ../deepseek-harness install --no-frozen-lockfile --config.minimumReleaseAge=0
       - name: Build upstream Harness
         env:
@@ -416,6 +417,7 @@ jobs:
           key: pnpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', 'upstream.json') }}
       # The following upstream install validates the sibling's own lockfile.
       - run: pnpm install --no-frozen-lockfile --config.minimumReleaseAge=0
+      - run: node scripts/verify-dofe-ui-install.mjs
       - run: pnpm --dir ../deepseek-harness install --no-frozen-lockfile --config.minimumReleaseAge=0
       - name: Build upstream Harness
         env:
@@ -518,6 +520,7 @@ jobs:
           key: pnpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', 'upstream.json') }}
       # The following upstream install validates the sibling's own lockfile.
       - run: pnpm install --no-frozen-lockfile --config.minimumReleaseAge=0
+      - run: node scripts/verify-dofe-ui-install.mjs
       - run: pnpm --dir ../deepseek-harness install --no-frozen-lockfile --config.minimumReleaseAge=0
       - name: Build upstream Harness
         env:
