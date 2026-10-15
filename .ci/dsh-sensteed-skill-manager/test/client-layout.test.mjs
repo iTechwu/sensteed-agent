@@ -7,7 +7,7 @@ import { runInNewContext } from 'node:vm'
 // session or network. This catches valid-JS nesting mistakes that syntax checks
 // cannot detect (for example, putting the entire page inside its flex header).
 export function createPage(skills = [], sharedSkills = [], createSkill = async () => {}) {
-  const states = [skills, sharedSkills, '', false, 'ready']
+  const states = [skills, sharedSkills, '', false, [], [], '', 'ready']
   let cursor = 0
   let reference
   let component
@@ -66,7 +66,7 @@ const fixture = [{ name: 'release-notes', description: 'Prepare release notes', 
 test('keeps the header, toolbar, installed list and shared section as separate page blocks', () => {
   const page = createPage(fixture)
   const root = page.render()
-  assert.deepEqual(Array.from(find(root, 'sm-content').children, node => node.props.className), ['sm-header', 'sm-toolbar', 'sm-installed', 'sm-shared'])
+  assert.deepEqual(Array.from(find(root, 'sm-content').children, node => node.props.className), ['sm-header', 'sm-toolbar', 'sm-installed', 'sm-shared', 'sm-hub'])
   assert.deepEqual(Array.from(find(root, 'sm-header').children, node => node.props.className), ['sm-heading-copy', 'sm-actions'])
   assert.equal(find(find(root, 'sm-row'), 'sm-row-meta').children.length, 2)
 })

@@ -11,6 +11,9 @@ import { unzipSync, zipSync } from 'fflate'
 const execFileAsync = promisify(execFile)
 const ROUTE = '/api/desktop/sensteed/skills'
 const SHARED_SKILLS_URL = 'https://knowledge.hozonauto.com/api/plugin/v1/shared-agent-skills'
+// 企业技能/插件管理 Hub（skill.dofe.ai）：目录浏览走 /skillhub/v1 契约，
+// 认证复用桌面端 SSO 会话（dofeAuth 注入；Hub 校验同 issuer 的用户 token）。
+const HUB_API_BASE = 'https://ai.hozonauto.com/plugins/api'
 const MAX_BODY_BYTES = 16 * 1024
 const MAX_ARCHIVE_BYTES = 10 * 1024 * 1024
 const MAX_UNPACKED_BYTES = 25 * 1024 * 1024
@@ -18,7 +21,7 @@ const MAX_ARCHIVE_FILES = 500
 const SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const SHARED_INSTALL_MARKER = '.sensteed-shared-skill.json'
 
-export const inject = ['webServer', 'skills', 'credentials']
+export const inject = ['webServer', 'skills', 'credentials', 'dofeAuth']
 
 export function skillRoot(environment = process.env, home = homedir()) {
   return resolve(environment.DSH_HOME || join(home, '.dsh'), 'skills')
@@ -464,6 +467,29 @@ async function callSharedSkills(ctx, path = '', options = {}) {
   return envelope.data
 }
 
+function hubSession(ctx) {
+  const session = ctx.dofeAuth?.getDatasourceSession?.()
+  return typeof session?.accessToken === 'string' && session.accessToken ? session : undefined
+}
+
+async function callHubCatalog(ctx, path, options = {}) {
+  const session = hubSession(ctx)
+  if (!session) throw Object.assign(new Error('请先在桌面端登录企业账号。'), { code: 'HUB_SSO_REQUIRED' })
+  const response = await (options.fetch || globalThis.fetch)(`${HUB_API_BASE}${path}`, {
+    redirect: 'error',
+    signal: AbortSignal.timeout(30_000),
+    headers: { Accept: 'application/json', Authorization: `Bearer ${session.accessToken}` },
+  })
+  const envelope = await response.json().catch(() => null)
+  if (!response.ok || envelope?.code !== 200 || !envelope?.data) {
+    const message = typeof envelope?.msg === 'string' && envelope.msg !== 'ok'
+      ? envelope.msg
+      : `Hub request failed (${response.status}).`
+    throw Object.assign(new Error(message.slice(0, 300)), { code: response.status === 401 ? 'HUB_SSO_REQUIRED' : 'HUB_UNAVAILABLE' })
+  }
+  return envelope.data
+}
+
 function safeRouteName(path) {
   const match = /^\/api\/desktop\/sensteed\/skills\/shared\/([a-z0-9]+(?:-[a-z0-9]+)*)$/u.exec(path || '')
   return match?.[1]
@@ -515,11 +541,23 @@ export function apply(ctx, overrides = {}) {
       if (!isSameOrigin(req, ctx.webServer.port)) return respond(res, 403, { error: 'Local same-origin access is required.' })
       if (req.method === 'GET' && req.url?.split('?', 1)[0] === ROUTE) {
         try {
-          const [skills, shared] = await Promise.all([
+          const [skills, shared, hubSkills, hubPlugins] = await Promise.all([
             listSkills(ctx),
             callSharedSkills(ctx, '?page=1&limit=200').catch(error => ({ unavailable: error instanceof Error ? error.message : 'Company skills are unavailable.', list: [] })),
+            callHubCatalog(ctx, '/skillhub/v1/skills?page=1&limit=100').catch(error => ({ unavailable: error instanceof Error ? error.message : 'Hub is unavailable.', list: [] })),
+            callHubCatalog(ctx, '/skillhub/v1/plugins?page=1&limit=100').catch(error => ({ unavailable: error instanceof Error ? error.message : 'Hub is unavailable.', list: [] })),
           ])
-          return respond(res, 200, { skills, sharedSkills: shared.list || [], sharedTotal: shared.total || 0, sharedError: shared.unavailable || null })
+          return respond(res, 200, {
+            skills,
+            sharedSkills: shared.list || [],
+            sharedTotal: shared.total || 0,
+            sharedError: shared.unavailable || null,
+            hubSkills: hubSkills.list || [],
+            hubSkillsTotal: hubSkills.total || 0,
+            hubPlugins: hubPlugins.list || [],
+            hubPluginsTotal: hubPlugins.total || 0,
+            hubError: hubSkills.unavailable || hubPlugins.unavailable || null,
+          })
         }
         catch { return respond(res, 503, { error: 'Skills are temporarily unavailable.' }) }
       }
@@ -563,4 +601,4 @@ export function apply(ctx, overrides = {}) {
   return () => route?.()
 }
 
-export const __test = { safeGitHubUrl, skillSource, inspectGitSkill, installSkill, validateSkillTree, validateZipArchive, installArchive, packLocalSkill, SHARED_SKILLS_URL }
+export const __test = { safeGitHubUrl, skillSource, inspectGitSkill, installSkill, validateSkillTree, validateZipArchive, installArchive, packLocalSkill, SHARED_SKILLS_URL, HUB_API_BASE, callHubCatalog, hubSession }
