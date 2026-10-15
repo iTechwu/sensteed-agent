@@ -5,6 +5,8 @@ window.__ModuleLoader__.load({
     var exports = module.exports;
     const React = require('react')
     const { createElement: h, useEffect, useState } = React
+    const { IconDataOutlineRegular } = require('@deepseek-ai/dsh-client-ui-primitives')
+    const PANEL_ID = 'sensteed-skill-manager'
     const NS = 'sensteed.skill-manager'
     const ROUTE = '/api/desktop/sensteed/skills'
     const COPY = {
@@ -233,15 +235,17 @@ window.__ModuleLoader__.load({
           await conversation.send(`/skill-creator\n${prompt}`)
         })
       }
-      ctx.slots.inject('plugins.item', () => ctx.slots.register({
-        name: 'plugins.item', id: 'sensteed-skill-manager', order: 30,
-        label: () => t('title'), locale: NS, inject: () => ({ t, createSkill }),
+      ctx.slots.inject('main', () => ctx.slots.register({
+        name: 'main', key: PANEL_ID, locale: NS, inject: () => ({ t, createSkill }),
       }, SkillManagerPage))
+      ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
+        name: 'sidebar.panellist', id: PANEL_ID, order: 1, label: () => t('title'), locale: NS,
+      }, ({ size }) => h(IconDataOutlineRegular, { size })))
       ctx.effect(() => {
         const style = document.createElement('style')
         style.dataset.plugin = '@dofe/dsh-sensteed-skill-manager'
         style.textContent = `
-          .sm-page{display:grid;gap:20px;color:var(--dsw-alias-label-primary);min-width:0}
+          .sm-page{box-sizing:border-box;height:100%;overflow:auto;padding:40px 56px;align-content:start;display:grid;gap:20px;color:var(--dsw-alias-label-primary);min-width:0}
           .sm-header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:8px 0 16px;border-bottom:1px solid var(--dsw-alias-border-l1)}
           .sm-header h2{margin:0;font-size:20px;font-weight:650;line-height:1.3}.sm-header p,.sm-create p{margin:5px 0 0;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:1.5}
           .sm-actions,.sm-form-actions{display:flex;align-items:center;gap:8px}.sm-icon{width:36px;height:36px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-secondary);font-size:21px;cursor:pointer}.sm-icon:hover,.sm-quiet:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
@@ -251,7 +255,7 @@ window.__ModuleLoader__.load({
           .sm-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}.sm-search{box-sizing:border-box;width:min(100%,360px);height:36px;padding:0 10px;border:1px solid var(--dsw-alias-border-l1);border-radius:6px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;font-size:13px}.sm-search:focus-visible,.sm-create-input:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}.sm-filters{display:flex;gap:4px}.sm-filter{min-height:32px;padding:0 9px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;cursor:pointer}.sm-filter:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}.sm-filter.is-active{border-color:var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
           .sm-install-form{display:grid;gap:10px;padding:16px;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;background:var(--dsw-alias-bg-layer-1)}.sm-install-form label{display:grid;gap:7px;font-size:13px;font-weight:550}.sm-install-form input{box-sizing:border-box;width:100%;height:38px;padding:0 10px;border:1px solid var(--dsw-alias-border-l1);border-radius:6px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit}.sm-install-form input:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}.sm-install-form p{margin:0;color:var(--dsw-alias-label-secondary);font-size:12px}.sm-form-actions{justify-content:flex-end}
           .sm-create{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:16px;padding:16px 0;border-top:1px solid var(--dsw-alias-border-l1)}.sm-create-copy{min-width:0}.sm-create strong{font-size:14px}.sm-create p{max-width:620px}.sm-create-input{box-sizing:border-box;width:100%;min-height:58px;margin-top:12px;padding:9px 10px;border:1px solid var(--dsw-alias-border-l1);border-radius:6px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;font-size:13px;line-height:1.45;resize:vertical}.sm-create>.sm-secondary{align-self:end}
-          @media(max-width:620px){.sm-header{align-items:flex-start}.sm-row{gap:10px;padding-inline:4px}.sm-glyph{flex-basis:40px;width:40px;height:40px}.sm-source{font-size:11px}.sm-toolbar{align-items:stretch}.sm-search{width:100%}.sm-create{grid-template-columns:minmax(0,1fr)}.sm-create>.sm-secondary{justify-self:start}}
+          @media(max-width:620px){.sm-page{padding:20px 16px}.sm-header{align-items:flex-start}.sm-row{gap:10px;padding-inline:4px}.sm-glyph{flex-basis:40px;width:40px;height:40px}.sm-source{font-size:11px}.sm-toolbar{align-items:stretch}.sm-search{width:100%}.sm-create{grid-template-columns:minmax(0,1fr)}.sm-create>.sm-secondary{justify-self:start}}
         `
         document.head.appendChild(style)
         return () => style.remove()

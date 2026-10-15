@@ -417,10 +417,14 @@ function apply(ctx) {
     }
   }, 'supplier risk agent bridge')
   ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID, locale: 'dofe.supplier-risk' }, Workbench))
-  ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 20, label: () => t('panel'), locale: 'dofe.supplier-risk' }, PanelIcon))
-  ctx.effect(() => ctx.locale.register('dofe.supplier-risk', { zh: { panel: '供应商风险' }, en: { panel: 'Supplier risk' } }), 'supplier risk locale')
+  ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({ name: 'sidebar.footer.action', id: PANEL_ID, order: 57, locale: 'dofe.supplier-risk', inject: () => ({ t, onOpen: () => ctx.layout.selectPanel(PANEL_ID) }) }, FooterButton))
+  ctx.effect(() => ctx.locale.register('dofe.supplier-risk', { zh: { panel: '供应链管理' }, en: { panel: 'Supply chain' } }), 'supplier risk locale')
 }
 
-function PanelIcon({ size }) { return h(IconShieldOutlineRegular, { size }) }
+function FooterButton({ wide, t, onOpen }) {
+  return h(Tooltip, { label: t('panel'), disabled: wide },
+    h('button', { type: 'button', className: `sr-launcher${wide ? ' sr-wide' : ''}`, 'aria-label': t('panel'), onClick: onOpen },
+      h(IconShieldOutlineRegular, { size: wide ? 14 : 18 }), wide ? h('span', null, t('panel')) : null))
+}
 exports.apply = apply
 exports.inject = ['slots', 'locale', 'sessions', 'uiWorkspace', 'layout']

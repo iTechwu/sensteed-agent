@@ -141,12 +141,12 @@ test('workbench host adapter uses only the fixed gateway and hides the stored ke
   dispose()
 })
 
-test('client bundle registers a keyed main panel and a native sidebar panel row', async () => {
+test('client bundle registers a keyed main panel and a footer launcher', async () => {
   const manifest = JSON.parse(await readFile(new URL('package.json', root), 'utf8'))
   assert.equal(manifest.exports['./client'], './lib/client.js')
   const bundle = await readFile(new URL('lib/client.js', root), 'utf8')
   assert.match(bundle, /key: PANEL_ID/u)
-  assert.match(bundle, /name: 'sidebar\.panellist'/u)
+  assert.match(bundle, /name: 'sidebar\.footer\.action'/u)
   assert.doesNotMatch(bundle, /shell\.overlay|aria-modal/u)
   assert.match(bundle, /supply_chain_weekly_report_plan_save/u)
   assert.match(bundle, /supply_chain_business_analysis_save/u)

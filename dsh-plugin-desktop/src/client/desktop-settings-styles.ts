@@ -11,7 +11,11 @@ body [data-slot="sidebar.panellist"] button[aria-label="Plugin market"],
 body [data-slot="sidebar.panellist"] button[aria-label="手机连接"],
 body [data-slot="sidebar.panellist"] button[aria-label="Phone connection"],
 body [data-slot="sidebar.panellist"] button[aria-label="远程控制"],
-body [data-slot="sidebar.panellist"] button[aria-label="Remote control"] {
+body [data-slot="sidebar.panellist"] button[aria-label="Remote control"],
+body [data-slot="sidebar.footer.action"] button[aria-label="远程控制"],
+body [data-slot="sidebar.footer.action"] button[aria-label="Remote control"],
+body [data-slot="sidebar.footer.action"] button[aria-label="手机连接"],
+body [data-slot="sidebar.footer.action"] button[aria-label="Mobile connection"] {
   display: none !important;
 }
 .sensteedAgentSettings {
