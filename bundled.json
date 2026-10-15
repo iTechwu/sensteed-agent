@@ -67,6 +67,15 @@
       "siblingDir": "../docker-helm.dofe.ai/skills/sensteed-automation",
       "snapshotDir": "dsh-plugin-desktop/bundled/skills/sensteed-automation",
       "resolvedSha": "fa6b39107912dc525642d4e8bdc3954584e73bc4"
+    },
+    {
+      "name": "dsh-sensteed-create-plugin",
+      "repository": "https://github.com/iTechwu/helm.dofe.ai",
+      "ref": null,
+      "source": "sibling",
+      "siblingDir": "../docker-helm.dofe.ai/skills/dsh-sensteed-create-plugin",
+      "snapshotDir": "dsh-plugin-desktop/bundled/skills/dsh-sensteed-create-plugin",
+      "resolvedSha": "30bb06746b3e9a977ac313350d128150c544b8f2"
     }
   ],
   "plugins": [

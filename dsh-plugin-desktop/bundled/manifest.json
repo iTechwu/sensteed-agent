@@ -126,6 +126,13 @@
       "path": "sensteed-automation",
       "repository": "https://github.com/iTechwu/helm.dofe.ai",
       "resolvedSha": "fa6b39107912dc525642d4e8bdc3954584e73bc4"
+    },
+    {
+      "name": "dsh-sensteed-create-plugin",
+      "kind": "dir",
+      "path": "dsh-sensteed-create-plugin",
+      "repository": "https://github.com/iTechwu/helm.dofe.ai",
+      "resolvedSha": "30bb06746b3e9a977ac313350d128150c544b8f2"
     }
   ]
 }

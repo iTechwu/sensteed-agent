@@ -2,14 +2,26 @@
 import { BRAND_VARIANT } from '../generated-product-identity.ts'
 import { SensteedUserSettingsTrigger } from './SensteedUserSettingsTrigger.tsx'
 import type { Context } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { DofeAccessSection, DofeUserSection, DofeModelSection, DofeCapabilitiesSection, installDofeAccessGate, installDofeAccessStyles } from './DofeAccessSection.tsx'
 import { registerDofePluginItems } from './DofePluginItems.tsx'
 import { DOFE_ACCESS_COPY } from './dofe-access.ts'
 import { DOFE_ACCESS_SETTINGS_NAMESPACE, type DofeAccessSettings } from '../dofe-plugins.ts'
+import { CreatePluginMenuItem, startCreatorConversation } from './CreatePluginMenuItem.tsx'
 
 export function applyDofeAccess(ctx: Context): void {
+  const inject = (ctx as Context & { inject?: Context['inject'] }).inject
+  if (BRAND_VARIANT === 'sensteed' && inject !== undefined) inject.call(ctx, ['slots', 'sessions', 'workspaces', 'uiWorkspace'], scope => {
+    scope.slots.inject('plugins.add.actions', () => scope.slots.register({
+      name: 'plugins.add.actions',
+      id: 'create-plugin',
+      priority: -100,
+      locale: 'settings.agentPreset',
+      inject: () => ({ startCreator: async () => { await startCreatorConversation(scope) } }),
+    }, CreatePluginMenuItem))
+  })
   ctx.effect(() => ctx.locale.register('dofe.access', DOFE_ACCESS_COPY), 'desktop: access dictionaries')
   ctx.effect(() => installDofeAccessStyles(), 'desktop: access styles')
   const settingsScope = ctx.configForms.get<DofeAccessSettings>(DOFE_ACCESS_SETTINGS_NAMESPACE)
