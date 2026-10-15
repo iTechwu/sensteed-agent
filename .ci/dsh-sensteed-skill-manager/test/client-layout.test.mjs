@@ -6,7 +6,7 @@ import { runInNewContext } from 'node:vm'
 // Exercise the shipped element tree, including state changes, without a host
 // session or network. This catches valid-JS nesting mistakes that syntax checks
 // cannot detect (for example, putting the entire page inside its flex header).
-export function createPage(skills = [], sharedSkills = []) {
+export function createPage(skills = [], sharedSkills = [], createSkill = async () => {}) {
   const states = [skills, sharedSkills, '', false, 'ready']
   let cursor = 0
   let component
@@ -41,7 +41,8 @@ export function createPage(skills = [], sharedSkills = []) {
   })
   return {
     get css() { return css },
-    render() { cursor = 0; return component({ t: key => dictionary[key], createSkill: async () => {} }) },
+    createSkillConversation: module.exports.__test.createSkillConversation,
+    render() { cursor = 0; return component({ t: key => dictionary[key], createSkill }) },
   }
 }
 
@@ -61,17 +62,76 @@ test('keeps the header, toolbar, installed list and shared section as separate p
   assert.equal(find(find(root, 'sm-row'), 'sm-row-meta').children.length, 2)
 })
 
-test('opens the add menu inside its trigger and places creation and install forms below the header', () => {
-  const page = createPage(fixture)
+test('starts skill creation from the menu instead of showing an inline form', async () => {
+  let started = 0
+  const page = createPage(fixture, [], async () => { started += 1 })
   find(page.render(), 'sm-add-more').props.onClick()
   const menu = find(page.render(), 'sm-add-menu')
   assert.equal(menu.children.length, 2)
-  menu.children[1].props.onClick()
-  let root = page.render()
-  assert.equal(root.children[1].props.className, 'sm-create-form')
-  assert.equal(find(find(root, 'sm-header'), 'sm-create-form'), undefined)
-  find(root, 'sm-add-primary').props.onClick()
-  root = page.render()
-  assert.equal(root.children[1].props.className, 'sm-install-form')
+  await menu.children[1].props.onClick()
+  const root = page.render()
+  assert.equal(started, 1)
   assert.equal(find(root, 'sm-create-form'), undefined)
+  assert.equal(root.children[1].props.className, 'sm-toolbar')
+})
+
+test('opens the conversation before its runtime is ready, then sends the skill invocation', async () => {
+  const { createSkillConversation } = createPage()
+  const events = []
+  let resolveReady
+  const ready = new Promise(resolve => { resolveReady = resolve })
+  let resolveOpened
+  const opened = new Promise(resolve => { resolveOpened = resolve })
+  const services = {
+    sessions: {
+      create: async () => { events.push('create'); return 'new-session' },
+      retain: id => {
+        assert.equal(id, 'new-session')
+        return { ready, release: () => events.push('release') }
+      },
+    },
+    uiWorkspace: { openSession: id => { assert.equal(id, 'new-session'); events.push('open'); resolveOpened() } },
+  }
+  const pending = createSkillConversation({ get: name => services[name] })
+  await opened
+  assert.deepEqual(events, ['create', 'open'])
+  resolveReady({ session: { prompt: async (messages, mode) => {
+    assert.equal(mode, 'queue')
+    assert.equal(messages.length, 1)
+    assert.match(messages[0].text, /^\/skill-creator\n\n/)
+    assert.match(messages[0].text, /请先询问/)
+    events.push('prompt')
+    return { ok: true }
+  } } })
+  assert.equal(await pending, 'new-session')
+  assert.deepEqual(events, ['create', 'open', 'prompt', 'release'])
+})
+
+test('releases the conversation reference when the initial prompt fails', async () => {
+  const { createSkillConversation } = createPage()
+  let released = false
+  const services = {
+    sessions: {
+      create: async () => 'new-session',
+      retain: () => ({
+        ready: Promise.resolve({ session: { prompt: async () => ({ ok: false, error: { message: 'send failed' } }) } }),
+        release: () => { released = true },
+      }),
+    },
+    uiWorkspace: { openSession() {} },
+  }
+  await assert.rejects(createSkillConversation({ get: name => services[name] }), /send failed/)
+  assert.equal(released, true)
+})
+
+test('shows a retryable creation error without leaving an inline form open', async () => {
+  const page = createPage(fixture, [], async () => { throw new Error('unavailable') })
+  find(page.render(), 'sm-add-primary').props.onClick()
+  assert.ok(find(page.render(), 'sm-install-form'))
+  find(page.render(), 'sm-add-more').props.onClick()
+  await find(page.render(), 'sm-add-menu').children[1].props.onClick()
+  const root = page.render()
+  assert.equal(find(root, 'sm-install-form'), undefined)
+  assert.equal(find(root, 'sm-error').children[0], '无法打开 Agent 会话，请重试。')
+  assert.equal(find(root, 'sm-add-more').props.disabled, false)
 })

@@ -21,9 +21,8 @@ window.__ModuleLoader__.load({
         installHint: '可粘贴单技能仓库，或合集仓库中某个技能的 /tree/ 分支目录链接。来源可信后再安装。Skill 会在本机加载。',
         installError: '安装失败，请检查仓库地址和技能结构。', installSuccess: '已安装 {name}', bundled: '内置', local: '本机',
         search: '搜索技能名称或说明', all: '全部', filterBySource: '按来源筛选', noMatches: '没有匹配的技能',
-        createHint: '描述技能要完成的任务，Agent 会使用内置 skill-creator 创建。', createPlaceholder: '例如：读取销售周报，提取关键指标并生成管理层摘要',
-        creating: '正在打开 Agent…', createFailed: '无法打开 Agent 会话，请重试。',
-        prompt: '请根据以下需求创建一个新的 Agent skill：',
+        createHint: '进入会话，由 Agent 引导你创建技能。',
+        createFailed: '无法打开 Agent 会话，请重试。',
       },
       en: {
         title: 'Skill management', description: 'Install, create, and manage Agent skills', refresh: 'Refresh', add: 'Add skill', chooseAddMethod: 'Choose how to add a skill',
@@ -36,9 +35,8 @@ window.__ModuleLoader__.load({
         installHint: 'Paste a single-skill repository or a /tree/ link to one skill in a collection. Install trusted sources only.',
         installError: 'Installation failed. Check the repository URL and skill structure.', installSuccess: 'Installed {name}', bundled: 'Built in', local: 'Local',
         search: 'Search skill names and descriptions', all: 'All', filterBySource: 'Filter by source', noMatches: 'No matching skills',
-        createHint: 'Describe the task for the skill. Agent will use the built-in skill-creator.', createPlaceholder: 'For example: read weekly sales reports and summarize key metrics for leadership',
-        creating: 'Opening Agent…', createFailed: 'Could not open an Agent conversation. Try again.',
-        prompt: 'Create a new Agent skill for this request:',
+        createHint: 'Open a conversation and let Agent guide you through skill creation.',
+        createFailed: 'Could not open an Agent conversation. Try again.',
       },
     }
 
@@ -88,10 +86,8 @@ window.__ModuleLoader__.load({
       const [sharedLoading, setSharedLoading] = useState(true)
       const [state, setState] = useState('loading')
       const [formOpen, setFormOpen] = useState(false)
-      const [createOpen, setCreateOpen] = useState(false)
       const [addMenuOpen, setAddMenuOpen] = useState(false)
       const [repository, setRepository] = useState('')
-      const [createRequest, setCreateRequest] = useState('')
       const [query, setQuery] = useState('')
       const [sourceFilter, setSourceFilter] = useState('all')
       const [busy, setBusy] = useState(false)
@@ -101,10 +97,6 @@ window.__ModuleLoader__.load({
       let lastTrigger = null
       const closeInstall = () => {
         setFormOpen(false)
-        requestAnimationFrame(() => lastTrigger?.focus?.())
-      }
-      const closeCreate = () => {
-        setCreateOpen(false)
         requestAnimationFrame(() => lastTrigger?.focus?.())
       }
 
@@ -147,16 +139,17 @@ window.__ModuleLoader__.load({
 
       const openInstall = () => {
         setAddMenuOpen(false)
-        setCreateOpen(false)
         setFormOpen(true)
         setError('')
       }
 
-      const openCreate = () => {
+      const openCreate = async () => {
+        if (busy) return
         setAddMenuOpen(false)
         setFormOpen(false)
-        setCreateOpen(true)
         setError('')
+        setBusy(true)
+        try { await createSkill() } catch { setError(t('createFailed')) } finally { setBusy(false) }
       }
 
       const publish = async name => {
@@ -221,16 +214,6 @@ window.__ModuleLoader__.load({
           h('div', { className: 'sm-form-actions' },
             h('button', { type: 'button', className: 'sm-quiet', disabled: busy, onClick: closeInstall }, t('cancel')),
             h('button', { type: 'submit', className: 'sm-primary', disabled: busy || !repository.trim() }, busy ? t('installing') : t('install')))) : null,
-        createOpen ? h('section', { className: 'sm-create-form', role: 'dialog', 'aria-label': t('create'), 'aria-labelledby': 'sm-create-title', onKeyDown: event => { if (event.key === 'Escape') { event.stopPropagation(); closeCreate() } } },
-          h('div', { className: 'sm-form-heading' }, h('strong', { id: 'sm-create-title' }, t('create')), h('p', null, t('createHint'))),
-          h('textarea', { className: 'sm-create-input', rows: 4, value: createRequest, placeholder: t('createPlaceholder'), onInput: event => setCreateRequest(event.currentTarget.value), 'aria-label': t('createPlaceholder'), autoFocus: true }),
-          error ? h('div', { className: 'sm-error', role: 'alert' }, error) : null,
-          h('div', { className: 'sm-form-actions' },
-            h('button', { type: 'button', className: 'sm-quiet', disabled: busy, onClick: closeCreate }, t('cancel')),
-            h('button', { type: 'button', className: 'sm-primary', disabled: busy || !createRequest.trim(), onClick: async () => {
-              setBusy(true); setError(''); setNotice('')
-              try { await createSkill(`${t('prompt')}\n${createRequest.trim()}`); setCreateRequest(''); closeCreate() } catch { setError(t('createFailed')) } finally { setBusy(false) }
-            } }, busy ? t('creating') : t('create')))) : null,
         skills.length > 0 ? h('div', { className: 'sm-toolbar' },
           h('input', { type: 'search', className: 'sm-search', value: query, placeholder: t('search'), 'aria-label': t('search'), onInput: event => setQuery(event.currentTarget.value) }),
           h('div', { className: 'sm-filters', role: 'group', 'aria-label': t('filterBySource') },
@@ -272,32 +255,30 @@ window.__ModuleLoader__.load({
                     h('button', { type: 'button', className: 'sm-row-action', disabled: busy || (isInstalled && !canUpdate), onClick: () => void installShared(skill.name) }, canUpdate ? t('sharedUpdate') : isInstalled ? t('sharedInstalled') : t('sharedInstall')))
                 )
               }))),
-        error && !formOpen && !createOpen ? h('div', { className: 'sm-error', role: 'alert' }, error) : null)
+        error && !formOpen ? h('div', { className: 'sm-error', role: 'alert' }, error) : null)
+    }
+
+    async function createSkillConversation(ctx) {
+      const sessions = ctx.get?.('sessions')
+      const navigation = ctx.get?.('uiWorkspace')
+      if (!sessions || !navigation) throw new Error('conversation_unavailable')
+      const id = await sessions.create()
+      navigation.openSession(id)
+      const reference = sessions.retain(id, { source: 'controllerOperation' })
+      try {
+        const binding = await reference.ready
+        const result = await binding.session.prompt([{ type: 'text', text: '/skill-creator\n\n请先询问我需要创建的技能目标、使用场景、输入和期望结果，然后引导我完成技能创建。' }], 'queue')
+        if (!result.ok) throw new Error(result.error.message)
+        return id
+      } finally {
+        reference.release()
+      }
     }
 
     function apply(ctx) {
       ctx.effect(() => ctx.locale.register(NS, { zh: COPY.zh, en: COPY.en }), 'sensteed-skill-manager: dictionaries')
       const t = ctx.locale.bind(NS)
-      const createSkill = async prompt => {
-        const sessions = ctx.get?.('sessions')
-        const navigation = ctx.get?.('uiWorkspace')
-        if (!sessions || !navigation) throw new Error('conversation_unavailable')
-        const id = await sessions.create()
-        navigation.openSession(id)
-        const scoped = sessions.scope(id)
-        if (scoped) {
-          const conversation = scoped.get('conversation')
-          if (!conversation) throw new Error('conversation_service_unavailable')
-          await conversation.send(`/skill-creator\n${prompt}`)
-          return
-        }
-        await sessions.using(id, { source: 'controllerOperation' }, async reference => {
-          await reference.ready
-          const conversation = sessions.scope(id)?.get('conversation')
-          if (!conversation) throw new Error('conversation_service_unavailable')
-          await conversation.send(`/skill-creator\n${prompt}`)
-        })
-      }
+      const createSkill = () => createSkillConversation(ctx)
       ctx.slots.inject('main', () => ctx.slots.register({
         name: 'main', key: PANEL_ID, locale: NS, inject: () => ({ t, createSkill }),
       }, SkillManagerPage))
@@ -312,27 +293,27 @@ window.__ModuleLoader__.load({
           .sm-page> *{box-sizing:border-box;flex:none;width:100%;max-width:960px;min-width:0}
           .sm-header{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:16px;padding-bottom:8px}
           .sm-heading-copy{flex:1 1 240px;min-width:0}.sm-actions{flex:none;white-space:nowrap}
-          .sm-header h2{margin:0;font-size:20px;font-weight:650;line-height:1.3}.sm-header p,.sm-create p{margin:5px 0 0;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:1.5}
+          .sm-header h2{margin:0;font-size:20px;font-weight:650;line-height:1.3}.sm-header p{margin:5px 0 0;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:1.5}
           .sm-actions,.sm-form-actions{display:flex;align-items:center;gap:8px}.sm-icon{width:36px;height:36px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-secondary);font-size:21px;cursor:pointer}.sm-icon:hover,.sm-quiet:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
           .sm-primary,.sm-secondary,.sm-quiet{min-height:36px;padding:0 13px;border:1px solid var(--dsw-alias-border-l1);border-radius:6px;font:inherit;font-size:13px;cursor:pointer}.sm-primary{border-color:var(--dsw-alias-button-primary-fill);background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground)}.sm-secondary{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}.sm-quiet{background:transparent;color:var(--dsw-alias-label-secondary)}.sm-primary:disabled,.sm-secondary:disabled,.sm-quiet:disabled{cursor:wait;opacity:.55}
           .sm-add-group{position:relative;display:flex}.sm-add-primary{display:inline-flex;align-items:center;gap:6px;border-radius:6px 0 0 6px}.sm-add-primary span{font-size:18px;line-height:1}.sm-add-more{width:32px;padding:0;border-left:1px solid color-mix(in srgb,var(--dsw-alias-button-primary-fill) 70%,white);border-radius:0 6px 6px 0;font-size:15px}.sm-add-menu{position:absolute;z-index:5;top:calc(100% + 8px);right:0;width:min(360px,calc(100vw - 32px));padding:6px;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;background:var(--dsw-alias-bg-layer-1);box-shadow:0 12px 28px rgb(0 0 0 / 14%)}.sm-add-menu-item{display:flex;align-items:flex-start;gap:10px;width:100%;padding:10px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-primary);font:inherit;text-align:left;cursor:pointer}.sm-add-menu-item:hover,.sm-add-menu-item:focus-visible{background:var(--dsw-alias-bg-layer-2);outline:0}.sm-add-menu-item strong,.sm-add-menu-item small{display:block}.sm-add-menu-item strong{font-size:13px;font-weight:600}.sm-add-menu-item small{margin-top:4px;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:1.4}.sm-menu-icon{display:grid;place-items:center;flex:0 0 24px;width:24px;height:24px;color:var(--dsw-alias-brand-primary);font-size:17px}
           .sm-list{display:grid;min-width:0}.sm-installed{display:grid;gap:10px}.sm-row{display:flex;align-items:center;gap:14px;min-height:74px;padding:9px 12px;border-bottom:1px solid var(--dsw-alias-border-l1)}.sm-row:hover{background:var(--dsw-alias-bg-layer-2)}.sm-glyph{display:grid;place-items:center;flex:0 0 48px;width:48px;height:48px;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;color:var(--dsw-alias-brand-primary);font-size:22px}.sm-copy{flex:1;min-width:0}.sm-copy strong{font-size:14px;font-weight:600}.sm-copy p{margin:4px 0 0;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:1.45;overflow-wrap:anywhere}.sm-source{flex:0 0 auto;padding:3px 7px;border-radius:999px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);font-size:12px}.sm-source.is-bundled{background:var(--dsw-alias-state-success-secondary);color:var(--dsw-alias-state-success-primary)}.sm-row-action{flex:0 0 auto;min-height:32px;padding:0 10px;border:1px solid var(--dsw-alias-border-l1);border-radius:6px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;font-size:12px;cursor:pointer}.sm-row-action:hover:not(:disabled){background:var(--dsw-alias-bg-layer-2)}.sm-row-action:disabled{opacity:.5;cursor:default}.sm-row-action.is-danger{color:var(--dsw-alias-state-error-primary)}.sm-shared{padding-top:8px;border-top:1px solid var(--dsw-alias-border-l1)}.sm-section-heading{display:flex;align-items:center;gap:8px}.sm-section-heading h3{margin:0;font-size:15px;font-weight:600}.sm-section-heading span,.sm-version{color:var(--dsw-alias-label-secondary);font-size:12px}.sm-shared-glyph{color:var(--dsw-alias-state-success-primary)}
           .sm-state{padding:28px 12px;color:var(--dsw-alias-label-secondary);font-size:13px}.sm-error,.sm-inline-error{color:var(--dsw-alias-state-error-primary)}.sm-error button,.sm-inline-error button{margin-left:8px}.sm-inline-error{font-size:13px}.sm-notice,.sm-refreshing{margin:0;color:var(--dsw-alias-state-success-primary);font-size:13px}.sm-refreshing{color:var(--dsw-alias-label-secondary)}
-          .sm-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}.sm-search{box-sizing:border-box;width:min(100%,360px);height:36px;padding:0 10px;border:1px solid var(--dsw-alias-border-l1);border-radius:6px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;font-size:13px}.sm-search:focus-visible,.sm-create-input:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}.sm-filters{display:flex;gap:4px}.sm-filter{min-height:32px;padding:0 9px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;cursor:pointer}.sm-filter:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}.sm-filter.is-active{border-color:var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
-          .sm-install-form,.sm-create-form{display:grid;gap:12px;padding:18px;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;background:var(--dsw-alias-bg-layer-1)}.sm-form-heading{display:grid;gap:4px}.sm-form-heading strong{font-size:14px}.sm-form-heading p{margin:0;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:1.45}.sm-install-form label{display:grid;gap:7px;font-size:13px;font-weight:550}.sm-install-form input{box-sizing:border-box;width:100%;height:38px;padding:0 10px;border:1px solid var(--dsw-alias-border-l1);border-radius:6px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit}.sm-install-form input:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}.sm-install-form p{margin:0;color:var(--dsw-alias-label-secondary);font-size:12px}.sm-form-actions{justify-content:flex-end}.sm-create-input{box-sizing:border-box;width:100%;min-height:96px;padding:10px;border:1px solid var(--dsw-alias-border-l1);border-radius:6px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;font-size:13px;line-height:1.5;resize:vertical}.sm-create-input:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}
+          .sm-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}.sm-search{box-sizing:border-box;width:min(100%,360px);height:36px;padding:0 10px;border:1px solid var(--dsw-alias-border-l1);border-radius:6px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;font-size:13px}.sm-search:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}.sm-filters{display:flex;gap:4px}.sm-filter{min-height:32px;padding:0 9px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;cursor:pointer}.sm-filter:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}.sm-filter.is-active{border-color:var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
+          .sm-install-form{display:grid;gap:12px;padding:18px;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;background:var(--dsw-alias-bg-layer-1)}.sm-form-heading{display:grid;gap:4px}.sm-form-heading strong{font-size:14px}.sm-form-heading p{margin:0;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:1.45}.sm-install-form label{display:grid;gap:7px;font-size:13px;font-weight:550}.sm-install-form input{box-sizing:border-box;width:100%;height:38px;padding:0 10px;border:1px solid var(--dsw-alias-border-l1);border-radius:6px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit}.sm-install-form input:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}.sm-install-form p{margin:0;color:var(--dsw-alias-label-secondary);font-size:12px}.sm-form-actions{justify-content:flex-end}
           .sm-installed,.sm-shared,.sm-list{min-width:0}.sm-shared{display:grid;gap:10px;padding-top:24px}.sm-section-heading h3,.sm-source,.sm-row-action,.sm-filter,.sm-version{white-space:nowrap}
           .sm-row{display:grid;grid-template-columns:48px minmax(0,1fr) auto;padding:14px 0;gap:16px}.sm-row-meta{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px}.sm-copy strong{display:block;overflow-wrap:anywhere;line-height:1.5}.sm-copy p{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;line-height:1.55}.sm-state{margin:0}.sm-form-actions{flex-wrap:wrap}
           .sm-add-group,.sm-filters{flex-shrink:0}.sm-add-primary,.sm-add-more{white-space:nowrap}.sm-add-menu{max-width:100cqw}.sm-search{min-width:0}.sm-icon{flex:none}.sm-filters{flex-wrap:wrap}
           @container skill-manager (max-width:600px){.sm-row{grid-template-columns:40px minmax(0,1fr);gap:8px 12px}.sm-row-meta{grid-column:2;justify-content:flex-start}.sm-glyph{width:40px;height:40px;grid-row:1 / span 2;align-self:start}.sm-search{width:100%}.sm-toolbar{gap:12px}.sm-heading-copy{flex-basis:100%}.sm-actions{width:100%;justify-content:flex-end}}
           @media(max-width:760px){.sm-page{padding-inline:24px}}
-          @media(max-width:420px){.sm-page{padding-inline:16px}.sm-install-form,.sm-create-form{padding:14px}}
+          @media(max-width:420px){.sm-page{padding-inline:16px}.sm-install-form{padding:14px}}
         `
         document.head.appendChild(style)
         return () => style.remove()
       }, 'sensteed-skill-manager: styles')
     }
 
-    module.exports = { apply, inject: ['slots', 'locale', 'sessions', 'uiWorkspace'], __test: { request } }
+    module.exports = { apply, inject: ['slots', 'locale', 'sessions', 'uiWorkspace'], __test: { request, createSkillConversation } }
 
     return module.exports;
   },
