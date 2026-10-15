@@ -16,7 +16,8 @@ const SECTION_META = {
   engine: ['tabEngine', 'descEngine'], comparisons: ['tabComparisons', 'descComparisons'], review: ['tabReview', 'descReview'], sources: ['tabSources', 'descSources'], facts: ['tabFacts', 'descFacts'], notifications: ['tabNotifications', 'descNotifications'], permissions: ['tabPermissions', 'descPermissions'],
 }
 
-function Dashboard({ t }) {
+function Dashboard({ t, embedded = false, onClose = closeOverlay }) {
+  const active = embedded || opened
   const capabilities = useFinanceCapabilities()
   const financeWriter = ['FINANCE_STAFF', 'FINANCE_OWNER'].includes(capabilities.role)
   const identity = { ...capabilities, financeWriter }
@@ -38,7 +39,7 @@ function Dashboard({ t }) {
   const loadingRef = useRef(false)
 
   useEffect(() => {
-    if (!opened) return undefined
+    if (!active) return undefined
     let cancelled = false
     void api('/context').then(value => { if (!cancelled) setContext(value) }).catch(() => {})
     // 登录身份（sensteed 品牌宿主提供；路由不存在/未登录时静默隐藏）
@@ -47,11 +48,11 @@ function Dashboard({ t }) {
       .then(snapshot => { if (!cancelled && snapshot?.status === 'bound' && snapshot.user?.name) setOperator(snapshot.user.name) })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [opened, revision])
+  }, [active, revision])
 
   // 总览/经营共用 brief；其余视图自取数
   useEffect(() => {
-    if (!opened) return undefined
+    if (!active) return undefined
     if (tab !== 'overview' && tab !== 'operations') return undefined
     let cancelled = false
     loadingRef.current = true
@@ -62,10 +63,10 @@ function Dashboard({ t }) {
       .catch(() => { if (!cancelled) setBriefState('error') })
       .finally(() => { loadingRef.current = false })
     return () => { cancelled = true; loadingRef.current = false }
-  }, [opened, tab, year, orgId, revision])
+  }, [active, tab, year, orgId, revision])
 
   useEffect(() => {
-    if (!opened || tab !== 'overview') return undefined
+    if (!active || tab !== 'overview') return undefined
     let cancelled = false
     setWorkQueue({ state: 'loading' })
     const requests = [
@@ -83,18 +84,18 @@ function Dashboard({ t }) {
       setWorkQueue({ state: failed === results.length ? 'error' : failed ? 'partial' : 'ready', tasks, quality, alerts })
     })
     return () => { cancelled = true }
-  }, [opened, tab, year, orgId, revision])
+  }, [active, tab, year, orgId, revision])
 
   const refresh = () => { if (loadingRef.current) return; setRevision(value => value + 1) }
   useEffect(() => {
-    if (!opened) return undefined
+    if (!active) return undefined
     window.addEventListener('sf:refresh', refresh)
-    const key = event => { if (event.key === 'Escape') closeOverlay() }
+    const key = event => { if (event.key === 'Escape') onClose() }
     window.addEventListener('keydown', key)
     return () => { window.removeEventListener('sf:refresh', refresh); window.removeEventListener('keydown', key) }
-  }, [opened])
+  }, [active])
 
-  useEffect(() => { if (opened) requestAnimationFrame(() => shellRef.current?.focus?.()) }, [opened])
+  useEffect(() => { if (active) requestAnimationFrame(() => shellRef.current?.focus?.()) }, [active])
 
   const orgs = context?.data?.orgs || []
   const departments = context?.data?.departments || []
@@ -126,7 +127,7 @@ function Dashboard({ t }) {
         tab === 'notifications' ? h(NotificationsView, { ctx, t, onDrill }) : null,
         tab === 'permissions' ? h(PermissionsView, { ctx, t }) : null)
 
-  return h('div', { className: 'sf-overlay sf-root', role: 'dialog', 'aria-modal': true, 'aria-labelledby': 'sf-title' },
+  return h('div', { className: `sf-overlay sf-root${embedded ? ' sf-page' : ''}`, role: embedded ? 'region' : 'dialog', 'aria-modal': embedded ? undefined : true, 'aria-labelledby': 'sf-title' },
     h('main', { className: 'sf-shell', 'aria-labelledby': 'sf-title', ref: shellRef, tabIndex: -1 },
       h('div', { className: 'sf-sidebar-brand' },
         h('span', { className: 'sf-sidebar-brand-mark' }, h(Glyph, { name: 'data', size: 18 })),
@@ -141,16 +142,16 @@ function Dashboard({ t }) {
           ['overview', 'operations', 'cash', 'alerts'].includes(tab) ? h('label', { className: 'sf-filter' }, h('span', null, t('org')), h(SearchSelect, { value: orgId, onChange: value => { setOrgId(value); setDrillParams(null) }, options: orgs.filter(org => org.type !== 'GROUP').map(org => [org.id, org.name]), placeholder: t('allOrgs') })) : null,
           h('div', { className: 'sf-header-buttons' },
             h(Tooltip, { label: t('refresh') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('refresh'), onClick: refresh }, h(IconRefreshOutlineRegular, { size: 16 }))),
-            h(Tooltip, { label: t('close') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('close'), onClick: closeOverlay }, h(IconCloseOutlineRegular, { size: 16 })))))),
+            h(Tooltip, { label: t('close') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('close'), onClick: onClose }, h(IconCloseOutlineRegular, { size: 16 })))))),
       h('nav', { className: 'sf-tabs', 'aria-label': t('title') }, ...TABS.filter(([id]) => canOpen(id)).map(([id, key]) =>
         h('button', { type: 'button', key: id, 'aria-current': tab === id ? 'page' : undefined, onClick: () => { setTab(id); setDrillParams(null) } }, t(key)))),
       h('div', { className: `sf-content${briefState === 'loading' && !brief ? ' sf-refreshing' : ''}`, 'aria-busy': briefState === 'loading' && !brief }, body)))
 }
 
-function Button({ wide, t }) {
+function Button({ wide, t, onOpen = openOverlay }) {
   const allowed = useFinanceWorkspaceAccess()
   if (allowed !== true) return null
-  return h(Tooltip, { label: t('open'), disabled: wide }, h('button', { type: 'button', className: `sf-button${wide ? ' sf-wide' : ''}`, 'aria-label': t('open'), onClick: openOverlay }, h(IconGaugeOutlineRegular, { size: wide ? 14 : 18 }), wide ? h('span', null, t('open')) : null))
+  return h(Tooltip, { label: t('open'), disabled: wide }, h('button', { type: 'button', className: `sf-button${wide ? ' sf-wide' : ''}`, 'aria-label': t('open'), onClick: onOpen }, h(IconGaugeOutlineRegular, { size: wide ? 14 : 18 }), wide ? h('span', null, t('open')) : null))
 }
 
 function apply(ctx) {
@@ -187,8 +188,13 @@ function apply(ctx) {
     return () => { delete globalThis.__sensteed_finance_conversation; delete globalThis.__sensteed_finance_close }
   }, 'dofe-sensteed-finance: scoped conversation')
   const t = ctx.locale.bind(NS)
-  ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({ name: 'sidebar.footer.action', id: 'dofe-sensteed-finance', order: 56, inject: () => ({ t }) }, Button))
-  ctx.slots.inject('shell.overlay', () => ctx.slots.register({ name: 'shell.overlay', id: 'dofe-sensteed-finance', order: 56, inject: () => ({ t }) }, Overlay))
+  ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({ name: 'sidebar.footer.action', id: 'dofe-sensteed-finance', order: 56, inject: () => ({ t, onOpen: () => ctx.layout.selectPanel('sensteed-finance') }) }, Button))
+  ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: 'sensteed-finance', inject: () => ({ t, embedded: true, onClose: () => ctx.layout.selectPanel(null) }) }, FinancePage))
+}
+
+function FinancePage(props) {
+  const allowed = useFinanceWorkspaceAccess()
+  return allowed === true ? h(Dashboard, props) : null
 }
 
 function Overlay({ t }) {

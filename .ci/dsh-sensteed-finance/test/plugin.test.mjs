@@ -1043,7 +1043,7 @@ test('MCP registration is owned by the desktop login lifecycle without machine s
 
 test('client source wires sidebar entry, overlay, tabs, and analysis entries', async () => {
   const source = await readClientSource()
-  for (const token of ['sidebar.footer.action', 'shell.overlay', 'sf-overlay', 'ANALYSIS_ENTRIES', '/brief', 'backfillActual', 'runDone', 'analysis_forecast', 'PillTabs', 'BudgetView', 'sf-pilltabs', 'sf-table-fields', 'sf-table-sort-button', 'sf-sidebar-brand', 'CustomizableTextSelect', 'MultiSearchSelect', 'textChoice', '新建预算行', 'targetYear', 'adjTargetMonth']) {
+  for (const token of ['sidebar.footer.action', "name: 'main'", 'sf-overlay', 'ANALYSIS_ENTRIES', '/brief', 'backfillActual', 'runDone', 'analysis_forecast', 'PillTabs', 'BudgetView', 'sf-pilltabs', 'sf-table-fields', 'sf-table-sort-button', 'sf-sidebar-brand', 'CustomizableTextSelect', 'MultiSearchSelect', 'textChoice', '新建预算行', 'targetYear', 'adjTargetMonth']) {
     assert.match(source, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'u'))
   }
   assert.match(source, /if \(await act\('\/budget-adjustments',[\s\S]*?\)\) onClose\(\)/u)
@@ -1309,7 +1309,8 @@ test('clicking the sidebar button renders the dashboard without render-time refe
     slots: { inject(_key, register) { register() }, register(options, component) { registered[options.name] = component; return () => {} } },
     get: () => undefined,
   })
-  assert.equal(registered['shell.overlay'], Overlay, 'shell.overlay must register the Overlay')
+  assert.equal(typeof registered.main, 'function', 'finance must register a native main page')
+  assert.equal(registered['shell.overlay'], undefined, 'finance must leave the shell overlay layer free')
 
   const closed = Overlay({ t: key => key })
   assert.equal(closed, null, 'closed overlay renders nothing')
