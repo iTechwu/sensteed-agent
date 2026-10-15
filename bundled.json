@@ -124,10 +124,9 @@
     {
       "name": "dsh-soup",
       "package": "@lyhue1991/dsh-soup",
-      "source": "github",
+      "source": "sibling",
       "upstream": "https://github.com/lyhue1991/dsh-soup",
       "siblingDir": "../docker-helm.dofe.ai/plugins/dsh-soup",
-      "siblingRepository": "../docker-helm.dofe.ai",
       "snapshotDir": ".ci/dsh-soup"
     }
   ]
