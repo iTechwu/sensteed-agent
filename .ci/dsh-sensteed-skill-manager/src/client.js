@@ -16,6 +16,7 @@ const COPY = {
     installAction: '安装', cancel: '取消', installing: '正在安装…', installed: '已安装',
     publish: '上传到公司', publishing: '正在上传…', publishSuccess: '已发布到公司技能库', publishError: '发布失败，请稍后重试。',
     shared: '公司共享', sharedEmpty: '公司技能库还没有技能', sharedUnavailable: '暂时无法读取公司技能库', sharedInstall: '安装', sharedUpdate: '更新', sharedInstalled: '已安装', sharedLoading: '正在读取公司技能库…',
+    hub: '企业 Hub', hubEmpty: '企业 Hub 目录还没有内容', hubUnavailable: '暂时无法读取企业 Hub（需桌面端登录企业账号）', hubOpen: '在 Hub 查看', hubSkillsTitle: 'Hub 技能', hubPluginsTitle: 'Hub 插件', hubHint: '发布、审核与安装计划在 Hub 工作台完成。',
     withdraw: '撤回', withdrawing: '正在撤回…', withdrawSuccess: '已从公司技能库撤回',
     installHint: '可粘贴单技能仓库，或合集仓库中某个技能的 /tree/ 分支目录链接。来源可信后再安装。Skill 会在本机加载。',
     installError: '安装失败，请检查仓库地址和技能结构。', installSuccess: '已安装 {name}', bundled: '内置', local: '本机',
@@ -31,6 +32,7 @@ const COPY = {
     installAction: 'Install', cancel: 'Cancel', installing: 'Installing…', installed: 'Installed',
     publish: 'Share with company', publishing: 'Publishing…', publishSuccess: 'Published to company skills', publishError: 'Could not publish this skill. Try again.',
     shared: 'Company shared', sharedEmpty: 'No company skills yet', sharedUnavailable: 'Company skills are temporarily unavailable', sharedInstall: 'Install', sharedUpdate: 'Update', sharedInstalled: 'Installed', sharedLoading: 'Loading company skills…',
+    hub: 'Company hub', hubEmpty: 'The company hub catalog is empty', hubUnavailable: 'The company hub is temporarily unavailable (desktop enterprise sign-in required)', hubOpen: 'Open in hub', hubSkillsTitle: 'Hub skills', hubPluginsTitle: 'Hub plugins', hubHint: 'Publishing, review, and install plans happen in the hub workspace.',
     withdraw: 'Withdraw', withdrawing: 'Withdrawing…', withdrawSuccess: 'Removed from company skills',
     installHint: 'Paste a single-skill repository or a /tree/ link to one skill in a collection. Install trusted sources only.',
     installError: 'Installation failed. Check the repository URL and skill structure.', installSuccess: 'Installed {name}', bundled: 'Built in', local: 'Local',
@@ -80,11 +82,25 @@ async function requestLong(path = '', options = {}) {
   return body
 }
 
+const HUB_WEB_BASE = 'https://ai.hozonauto.com/plugins'
+
+function hubRow(item, t) {
+  return h('article', { className: 'sm-row', key: `hub:${item.kind}:${item.name}` },
+    h('div', { className: 'sm-glyph', 'aria-hidden': true }, h(IconSkillOutlineRegular, { size: 24 })),
+    h('div', { className: 'sm-copy' }, h('strong', null, item.displayName || item.name), h('p', { title: item.description }, item.description)),
+    h('div', { className: 'sm-row-meta' },
+      item.version ? h('span', { className: 'sm-version' }, `v${item.version}`) : null,
+      h('button', { type: 'button', className: 'sm-row-action', onClick: () => window.open(`${HUB_WEB_BASE}/${item.kind === 'plugin' ? 'plugins' : 'skills'}`, '_blank', 'noopener') }, t('hubOpen'))))
+}
+
 function SkillManagerPage({ view, t, createSkill, panelInfo }) {
   const [skills, setSkills] = useState([])
   const [sharedSkills, setSharedSkills] = useState([])
   const [sharedError, setSharedError] = useState('')
   const [sharedLoading, setSharedLoading] = useState(true)
+  const [hubSkills, setHubSkills] = useState([])
+  const [hubPlugins, setHubPlugins] = useState([])
+  const [hubError, setHubError] = useState('')
   const [state, setState] = useState('loading')
   const [formOpen, setFormOpen] = useState(false)
   const [addMenuOpen, setAddMenuOpen] = useState(false)
@@ -133,6 +149,9 @@ function SkillManagerPage({ view, t, createSkill, panelInfo }) {
       setSharedSkills(body.sharedSkills || [])
       setSharedError(body.sharedError || '')
       setSharedLoading(false)
+      setHubSkills((body.hubSkills || []).map(item => ({ name: item.slug, displayName: item.displayName, description: item.description, version: item.stableVersion, kind: 'skill' })))
+      setHubPlugins((body.hubPlugins || []).map(item => ({ name: item.npmPackageName || item.pluginId, displayName: item.displayName, description: item.description, version: item.stableVersion, kind: 'plugin' })))
+      setHubError(body.hubError || '')
       setState('ready')
     } catch (cause) {
       setSharedLoading(false)
@@ -214,8 +233,10 @@ function SkillManagerPage({ view, t, createSkill, panelInfo }) {
     finally { operation.current = false; setBusy(false) }
   }
 
-  const matchesQuery = skill => !query.trim() || `${skill.name} ${skill.description || ''}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())
+  const matchesQuery = skill => !query.trim() || `${skill.name} ${skill.displayName || ''} ${skill.description || ''}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())
   const visibleShared = sharedSkills.filter(matchesQuery)
+  const visibleHubSkills = hubSkills.filter(matchesQuery)
+  const visibleHubPlugins = hubPlugins.filter(matchesQuery)
   const visibleSkills = skills.filter(skill => {
     const isBundled = skill.source === 'bundled'
     const matchesSource = sourceFilter === 'all' || (sourceFilter === 'bundled' ? isBundled : !isBundled)
@@ -242,13 +263,13 @@ function SkillManagerPage({ view, t, createSkill, panelInfo }) {
     busy && operation.current === 'create' ? h('p', { className: 'sm-refreshing', role: 'status' }, t('creating')) : null,
     h('div', { className: 'sm-toolbar' },
       h('div', { className: 'sm-filters', role: 'group', 'aria-label': t('filterBySource') },
-        [['all', t('all'), skills.length + sharedSkills.length], ['bundled', t('bundled'), bundledCount], ['local', t('local'), skills.length - bundledCount], ['shared', t('shared'), sharedSkills.length]].map(([id, label, count]) => h('button', {
+        [['all', t('all'), skills.length + sharedSkills.length + hubSkills.length + hubPlugins.length], ['bundled', t('bundled'), bundledCount], ['local', t('local'), skills.length - bundledCount], ['shared', t('shared'), sharedSkills.length], ['hub', t('hub'), hubSkills.length + hubPlugins.length]].map(([id, label, count]) => h('button', {
           type: 'button', key: id, className: `sm-filter${sourceFilter === id ? ' is-active' : ''}`, 'aria-pressed': sourceFilter === id,
           onClick: () => setSourceFilter(id),
         }, label, h('span', { className: 'sm-filter-count' }, String(count))))),
       h('input', { type: 'search', className: 'sm-search', value: query, placeholder: t('search'), 'aria-label': t('search'), onInput: event => setQuery(event.currentTarget.value) })),
     state === 'refreshing' ? h('p', { className: 'sm-refreshing', role: 'status' }, t('refreshing')) : null,
-    sourceFilter !== 'shared' ? h('section', { className: 'sm-installed', 'aria-labelledby': 'sm-installed-title' },
+    sourceFilter !== 'shared' && sourceFilter !== 'hub' ? h('section', { className: 'sm-installed', 'aria-labelledby': 'sm-installed-title' },
       h('div', { className: 'sm-section-heading' }, h('h3', { id: 'sm-installed-title' }, t('installedTitle')), h('span', null, String(visibleSkills.length))),
       h('div', { className: 'sm-list', 'aria-busy': state === 'loading' || state === 'refreshing' },
       state === 'loading' ? h('p', { className: 'sm-state', role: 'status' }, t('loading'))
@@ -281,6 +302,16 @@ function SkillManagerPage({ view, t, createSkill, panelInfo }) {
                 h('button', { type: 'button', className: 'sm-row-action', disabled: busy || (isInstalled && !canUpdate), onClick: () => void installShared(skill.name) }, canUpdate ? t('sharedUpdate') : isInstalled ? t('sharedInstalled') : t('sharedInstall')))
             )
           }))) : null,
+    sourceFilter === 'all' || sourceFilter === 'hub' ? h('section', { className: 'sm-hub', 'aria-labelledby': 'sm-hub-title' },
+      h('div', { className: 'sm-section-heading' }, h('h3', { id: 'sm-hub-title' }, t('hub')), h('span', null, String(visibleHubSkills.length + visibleHubPlugins.length))),
+      h('p', { className: 'sm-hub-hint' }, t('hubHint')),
+      hubError ? h('div', { className: 'sm-inline-error', role: 'status' }, t('hubUnavailable'), h('button', { type: 'button', className: 'sm-quiet', disabled: state === 'loading' || state === 'refreshing', onClick: () => void refresh() }, t('retry')))
+        : (hubSkills.length === 0 && hubPlugins.length === 0) ? h('p', { className: 'sm-state' }, t('hubEmpty'))
+        : h('div', { className: 'sm-list' },
+            visibleHubSkills.length > 0 ? h('h4', { className: 'sm-hub-group' }, t('hubSkillsTitle')) : null,
+            visibleHubSkills.map(item => hubRow(item, t)),
+            visibleHubPlugins.length > 0 ? h('h4', { className: 'sm-hub-group' }, t('hubPluginsTitle')) : null,
+            visibleHubPlugins.map(item => hubRow(item, t)))) : null,
     error && !formOpen ? h('div', { className: 'sm-error', role: 'alert' }, error) : null),
     formOpen ? h('div', { className: 'sm-overlay', role: 'dialog', 'aria-modal': true, 'aria-labelledby': 'sm-install-title',
       onClick: event => { if (event.target === event.currentTarget) closeInstall() } },
@@ -353,6 +384,7 @@ function apply(ctx) {
       .sm-row-meta{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:10px;max-width:260px}.sm-source{padding:3px 8px;border-radius:6px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);font-size:12px;white-space:nowrap}.sm-source.is-bundled{color:var(--dsw-alias-label-primary)}
       .sm-page .sm-row-action{min-height:32px;padding:0 10px;border:1px solid var(--dsw-alias-border-l1);border-radius:6px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font-size:12px;white-space:nowrap}.sm-row-action:hover:not(:disabled){background:var(--dsw-alias-bg-layer-2)}.sm-page .is-danger{color:var(--dsw-alias-state-error-primary)}
       .sm-state{display:grid;justify-items:center;gap:16px;margin:0;padding:40px 16px;color:var(--dsw-alias-label-secondary);font-size:13px;text-align:center}.sm-state p{margin:0}
+      .sm-hub-hint{margin:0 0 12px;font-size:12px;line-height:1.6;color:var(--dsw-alias-label-secondary)}.sm-hub-group{margin:10px 0 0;padding:8px 8px 0;font-size:12px;font-weight:600;color:var(--dsw-alias-label-secondary)}
       .sm-error,.sm-inline-error{color:var(--dsw-alias-state-error-primary);font-size:13px;line-height:1.6;overflow-wrap:anywhere}.sm-error button,.sm-inline-error button{margin-left:8px}.sm-notice,.sm-refreshing{margin:0;font-size:13px;color:var(--dsw-alias-state-success-primary)}.sm-refreshing{color:var(--dsw-alias-label-secondary)}
       .sm-overlay{position:fixed;inset:0;z-index:60;display:grid;place-items:center;padding:24px;background:color-mix(in srgb,var(--dsw-alias-bg-base) 55%,transparent);backdrop-filter:blur(6px)}
       .sm-install-dialog{box-sizing:border-box;width:min(520px,100%);max-height:100%;overflow:auto;padding:20px 22px;border:1px solid var(--dsw-alias-border-l1);border-radius:12px;background:var(--dsw-alias-bg-layer-1);box-shadow:0 18px 48px rgba(0,0,0,.28)}

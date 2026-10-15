@@ -5,11 +5,13 @@ window.__ModuleLoader__.load({
     var exports = module.exports;
     const React = require('react')
     const { createElement: h, useEffect, useRef, useState, useSyncExternalStore } = React
-    const { Modal, Menu, MenuItemButton, IconDataOutlineRegular, IconSkillOutlineRegular,
+    const { Menu, MenuItemButton, IconDataOutlineRegular, IconSkillOutlineRegular, IconCloseOutlineRegular,
       IconRefreshOutlineRegular, IconPlusOutlineRegular, IconChevronDownOutlineRegular,
       IconDownloadOutlineRegular, IconAgentPresetOutlineRegular } = require('@deepseek-ai/dsh-client-ui-primitives')
     const PANEL_ID = 'sensteed-skill-manager'
     const NS = 'sensteed.skill-manager'
+    // 安装对话框的触发元素;关闭后焦点回到它(与 knowledge 插件同一契约)。
+    let lastTrigger = null
     const ROUTE = '/api/desktop/sensteed/skills'
     const COPY = {
       zh: {
@@ -19,6 +21,7 @@ window.__ModuleLoader__.load({
         installAction: '安装', cancel: '取消', installing: '正在安装…', installed: '已安装',
         publish: '上传到公司', publishing: '正在上传…', publishSuccess: '已发布到公司技能库', publishError: '发布失败，请稍后重试。',
         shared: '公司共享', sharedEmpty: '公司技能库还没有技能', sharedUnavailable: '暂时无法读取公司技能库', sharedInstall: '安装', sharedUpdate: '更新', sharedInstalled: '已安装', sharedLoading: '正在读取公司技能库…',
+        hub: '企业 Hub', hubEmpty: '企业 Hub 目录还没有内容', hubUnavailable: '暂时无法读取企业 Hub（需桌面端登录企业账号）', hubOpen: '在 Hub 查看', hubSkillsTitle: 'Hub 技能', hubPluginsTitle: 'Hub 插件', hubHint: '发布、审核与安装计划在 Hub 工作台完成。',
         withdraw: '撤回', withdrawing: '正在撤回…', withdrawSuccess: '已从公司技能库撤回',
         installHint: '可粘贴单技能仓库，或合集仓库中某个技能的 /tree/ 分支目录链接。来源可信后再安装。Skill 会在本机加载。',
         installError: '安装失败，请检查仓库地址和技能结构。', installSuccess: '已安装 {name}', bundled: '内置', local: '本机',
@@ -34,6 +37,7 @@ window.__ModuleLoader__.load({
         installAction: 'Install', cancel: 'Cancel', installing: 'Installing…', installed: 'Installed',
         publish: 'Share with company', publishing: 'Publishing…', publishSuccess: 'Published to company skills', publishError: 'Could not publish this skill. Try again.',
         shared: 'Company shared', sharedEmpty: 'No company skills yet', sharedUnavailable: 'Company skills are temporarily unavailable', sharedInstall: 'Install', sharedUpdate: 'Update', sharedInstalled: 'Installed', sharedLoading: 'Loading company skills…',
+        hub: 'Company hub', hubEmpty: 'The company hub catalog is empty', hubUnavailable: 'The company hub is temporarily unavailable (desktop enterprise sign-in required)', hubOpen: 'Open in hub', hubSkillsTitle: 'Hub skills', hubPluginsTitle: 'Hub plugins', hubHint: 'Publishing, review, and install plans happen in the hub workspace.',
         withdraw: 'Withdraw', withdrawing: 'Withdrawing…', withdrawSuccess: 'Removed from company skills',
         installHint: 'Paste a single-skill repository or a /tree/ link to one skill in a collection. Install trusted sources only.',
         installError: 'Installation failed. Check the repository URL and skill structure.', installSuccess: 'Installed {name}', bundled: 'Built in', local: 'Local',
@@ -83,11 +87,25 @@ window.__ModuleLoader__.load({
       return body
     }
 
+    const HUB_WEB_BASE = 'https://ai.hozonauto.com/plugins'
+
+    function hubRow(item, t) {
+      return h('article', { className: 'sm-row', key: `hub:${item.kind}:${item.name}` },
+        h('div', { className: 'sm-glyph', 'aria-hidden': true }, h(IconSkillOutlineRegular, { size: 24 })),
+        h('div', { className: 'sm-copy' }, h('strong', null, item.displayName || item.name), h('p', { title: item.description }, item.description)),
+        h('div', { className: 'sm-row-meta' },
+          item.version ? h('span', { className: 'sm-version' }, `v${item.version}`) : null,
+          h('button', { type: 'button', className: 'sm-row-action', onClick: () => window.open(`${HUB_WEB_BASE}/${item.kind === 'plugin' ? 'plugins' : 'skills'}`, '_blank', 'noopener') }, t('hubOpen'))))
+    }
+
     function SkillManagerPage({ view, t, createSkill, panelInfo }) {
       const [skills, setSkills] = useState([])
       const [sharedSkills, setSharedSkills] = useState([])
       const [sharedError, setSharedError] = useState('')
       const [sharedLoading, setSharedLoading] = useState(true)
+      const [hubSkills, setHubSkills] = useState([])
+      const [hubPlugins, setHubPlugins] = useState([])
+      const [hubError, setHubError] = useState('')
       const [state, setState] = useState('loading')
       const [formOpen, setFormOpen] = useState(false)
       const [addMenuOpen, setAddMenuOpen] = useState(false)
@@ -105,10 +123,25 @@ window.__ModuleLoader__.load({
       const isActive = panelInfo?.subscribe && panelInfo?.getSnapshot
         ? useSyncExternalStore(panelInfo.subscribe, () => panelInfo.getSnapshot().activePanelId === PANEL_ID, () => true)
         : true
+      const restoreTriggerFocus = () => {
+        requestAnimationFrame(() => lastTrigger?.focus())
+      }
       const closeInstall = () => {
         if (operation.current) return
         setFormOpen(false)
+        restoreTriggerFocus()
       }
+      // 自持对话框键盘契约:Escape 关闭,关闭后焦点回到触发按钮。
+      useEffect(() => {
+        if (!formOpen) return undefined
+        const key = event => { if (event.key === 'Escape') closeInstall() }
+        window.addEventListener('keydown', key)
+        return () => window.removeEventListener('keydown', key)
+      }, [formOpen])
+      const repositoryInput = useRef(null)
+      useEffect(() => {
+        if (formOpen) repositoryInput.current?.focus()
+      }, [formOpen])
 
       const refresh = async () => {
         setState(state === 'ready' || skills.length > 0 || sharedSkills.length > 0 ? 'refreshing' : 'loading')
@@ -121,6 +154,9 @@ window.__ModuleLoader__.load({
           setSharedSkills(body.sharedSkills || [])
           setSharedError(body.sharedError || '')
           setSharedLoading(false)
+          setHubSkills((body.hubSkills || []).map(item => ({ name: item.slug, displayName: item.displayName, description: item.description, version: item.stableVersion, kind: 'skill' })))
+          setHubPlugins((body.hubPlugins || []).map(item => ({ name: item.npmPackageName || item.pluginId, displayName: item.displayName, description: item.description, version: item.stableVersion, kind: 'plugin' })))
+          setHubError(body.hubError || '')
           setState('ready')
         } catch (cause) {
           setSharedLoading(false)
@@ -142,13 +178,15 @@ window.__ModuleLoader__.load({
           const body = await requestLong('/install', { method: 'POST', body: JSON.stringify({ repository: repository.trim() }) })
           setRepository('')
           setFormOpen(false)
+          restoreTriggerFocus()
           await refresh()
           setNotice(t('installSuccess', { name: body.skill?.name || '' }))
         } catch (cause) { setError(cause?.message || t('installError')) }
         finally { operation.current = false; setBusy(false) }
       }
 
-      const openInstall = () => {
+      const openInstall = event => {
+        lastTrigger = event?.currentTarget ?? document.activeElement
         setAddMenuOpen(false)
         setFormOpen(true)
         setError('')
@@ -200,8 +238,10 @@ window.__ModuleLoader__.load({
         finally { operation.current = false; setBusy(false) }
       }
 
-      const matchesQuery = skill => !query.trim() || `${skill.name} ${skill.description || ''}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())
+      const matchesQuery = skill => !query.trim() || `${skill.name} ${skill.displayName || ''} ${skill.description || ''}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())
       const visibleShared = sharedSkills.filter(matchesQuery)
+      const visibleHubSkills = hubSkills.filter(matchesQuery)
+      const visibleHubPlugins = hubPlugins.filter(matchesQuery)
       const visibleSkills = skills.filter(skill => {
         const isBundled = skill.source === 'bundled'
         const matchesSource = sourceFilter === 'all' || (sourceFilter === 'bundled' ? isBundled : !isBundled)
@@ -228,13 +268,13 @@ window.__ModuleLoader__.load({
         busy && operation.current === 'create' ? h('p', { className: 'sm-refreshing', role: 'status' }, t('creating')) : null,
         h('div', { className: 'sm-toolbar' },
           h('div', { className: 'sm-filters', role: 'group', 'aria-label': t('filterBySource') },
-            [['all', t('all'), skills.length + sharedSkills.length], ['bundled', t('bundled'), bundledCount], ['local', t('local'), skills.length - bundledCount], ['shared', t('shared'), sharedSkills.length]].map(([id, label, count]) => h('button', {
+            [['all', t('all'), skills.length + sharedSkills.length + hubSkills.length + hubPlugins.length], ['bundled', t('bundled'), bundledCount], ['local', t('local'), skills.length - bundledCount], ['shared', t('shared'), sharedSkills.length], ['hub', t('hub'), hubSkills.length + hubPlugins.length]].map(([id, label, count]) => h('button', {
               type: 'button', key: id, className: `sm-filter${sourceFilter === id ? ' is-active' : ''}`, 'aria-pressed': sourceFilter === id,
               onClick: () => setSourceFilter(id),
             }, label, h('span', { className: 'sm-filter-count' }, String(count))))),
           h('input', { type: 'search', className: 'sm-search', value: query, placeholder: t('search'), 'aria-label': t('search'), onInput: event => setQuery(event.currentTarget.value) })),
         state === 'refreshing' ? h('p', { className: 'sm-refreshing', role: 'status' }, t('refreshing')) : null,
-        sourceFilter !== 'shared' ? h('section', { className: 'sm-installed', 'aria-labelledby': 'sm-installed-title' },
+        sourceFilter !== 'shared' && sourceFilter !== 'hub' ? h('section', { className: 'sm-installed', 'aria-labelledby': 'sm-installed-title' },
           h('div', { className: 'sm-section-heading' }, h('h3', { id: 'sm-installed-title' }, t('installedTitle')), h('span', null, String(visibleSkills.length))),
           h('div', { className: 'sm-list', 'aria-busy': state === 'loading' || state === 'refreshing' },
           state === 'loading' ? h('p', { className: 'sm-state', role: 'status' }, t('loading'))
@@ -267,14 +307,30 @@ window.__ModuleLoader__.load({
                     h('button', { type: 'button', className: 'sm-row-action', disabled: busy || (isInstalled && !canUpdate), onClick: () => void installShared(skill.name) }, canUpdate ? t('sharedUpdate') : isInstalled ? t('sharedInstalled') : t('sharedInstall')))
                 )
               }))) : null,
+        sourceFilter === 'all' || sourceFilter === 'hub' ? h('section', { className: 'sm-hub', 'aria-labelledby': 'sm-hub-title' },
+          h('div', { className: 'sm-section-heading' }, h('h3', { id: 'sm-hub-title' }, t('hub')), h('span', null, String(visibleHubSkills.length + visibleHubPlugins.length))),
+          h('p', { className: 'sm-hub-hint' }, t('hubHint')),
+          hubError ? h('div', { className: 'sm-inline-error', role: 'status' }, t('hubUnavailable'), h('button', { type: 'button', className: 'sm-quiet', disabled: state === 'loading' || state === 'refreshing', onClick: () => void refresh() }, t('retry')))
+            : (hubSkills.length === 0 && hubPlugins.length === 0) ? h('p', { className: 'sm-state' }, t('hubEmpty'))
+            : h('div', { className: 'sm-list' },
+                visibleHubSkills.length > 0 ? h('h4', { className: 'sm-hub-group' }, t('hubSkillsTitle')) : null,
+                visibleHubSkills.map(item => hubRow(item, t)),
+                visibleHubPlugins.length > 0 ? h('h4', { className: 'sm-hub-group' }, t('hubPluginsTitle')) : null,
+                visibleHubPlugins.map(item => hubRow(item, t)))) : null,
         error && !formOpen ? h('div', { className: 'sm-error', role: 'alert' }, error) : null),
-        formOpen ? h(Modal, { open: true, onClose: closeInstall, title: t('install'), closeLabel: t('close'), description: t('installHint'), className: 'sm-install-dialog' },
-          h('form', { className: 'sm-install-form', onSubmit: install, 'aria-busy': busy },
-            h('label', null, t('repository'), h('input', { type: 'url', required: true, value: repository, disabled: busy, placeholder: 'https://github.com/owner/skills', 'data-modal-autofocus': true, onInput: event => setRepository(event.currentTarget.value) })),
-            error ? h('div', { className: 'sm-error', role: 'alert' }, error) : null,
-            h('div', { className: 'sm-form-actions' },
-              h('button', { type: 'button', className: 'sm-quiet', disabled: busy, onClick: closeInstall }, t('cancel')),
-              h('button', { type: 'submit', className: 'sm-primary', disabled: busy || !repository.trim() }, busy ? t('installing') : t('installAction'))))) : null)
+        formOpen ? h('div', { className: 'sm-overlay', role: 'dialog', 'aria-modal': true, 'aria-labelledby': 'sm-install-title',
+          onClick: event => { if (event.target === event.currentTarget) closeInstall() } },
+          h('div', { className: 'sm-install-dialog', role: 'document' },
+            h('header', { className: 'sm-install-head' },
+              h('h3', { id: 'sm-install-title' }, t('install')),
+              h('button', { type: 'button', className: 'sm-icon', 'aria-label': t('close'), disabled: busy, onClick: closeInstall }, h(IconCloseOutlineRegular, { size: 18 }))),
+            h('p', { className: 'sm-install-hint' }, t('installHint')),
+            h('form', { className: 'sm-install-form', onSubmit: install, 'aria-busy': busy },
+              h('label', null, t('repository'), h('input', { type: 'url', required: true, value: repository, disabled: busy, placeholder: 'https://github.com/owner/skills', ref: repositoryInput, onInput: event => setRepository(event.currentTarget.value) })),
+              error ? h('div', { className: 'sm-error', role: 'alert' }, error) : null,
+              h('div', { className: 'sm-form-actions' },
+                h('button', { type: 'button', className: 'sm-quiet', disabled: busy, onClick: closeInstall }, t('cancel')),
+                h('button', { type: 'submit', className: 'sm-primary', disabled: busy || !repository.trim() }, busy ? t('installing') : t('installAction')))))) : null)
     }
 
     async function createSkillConversation(ctx) {
@@ -311,7 +367,7 @@ window.__ModuleLoader__.load({
         style.textContent = `
           .sm-page{box-sizing:border-box;flex:1;width:100%;height:100%;min-height:0;min-width:0;overflow:auto;padding:calc(32px + var(--dsh-frame-top-clearance,0px)) 48px 48px;container:skill-manager / inline-size;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary)}
           .sm-content{box-sizing:border-box;width:100%;max-width:1040px;min-width:0;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr);gap:28px}
-          .sm-header{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px}.sm-heading-copy{flex:1 1 240px;min-width:0}
+          .sm-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;min-height:72px}.sm-heading-copy{flex:1 1 240px;min-width:0}
           .sm-header h2{margin:0;font-size:22px;font-weight:650;line-height:1.4}.sm-header p{margin:6px 0 0;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:1.5}
           .sm-actions,.sm-form-actions{display:flex;align-items:center;gap:10px;flex:none}
           .sm-page button,.sm-install-dialog button{font:inherit;cursor:pointer}.sm-page button:disabled,.sm-install-dialog button:disabled{opacity:.5;cursor:default}
@@ -333,8 +389,13 @@ window.__ModuleLoader__.load({
           .sm-row-meta{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:10px;max-width:260px}.sm-source{padding:3px 8px;border-radius:6px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);font-size:12px;white-space:nowrap}.sm-source.is-bundled{color:var(--dsw-alias-label-primary)}
           .sm-page .sm-row-action{min-height:32px;padding:0 10px;border:1px solid var(--dsw-alias-border-l1);border-radius:6px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font-size:12px;white-space:nowrap}.sm-row-action:hover:not(:disabled){background:var(--dsw-alias-bg-layer-2)}.sm-page .is-danger{color:var(--dsw-alias-state-error-primary)}
           .sm-state{display:grid;justify-items:center;gap:16px;margin:0;padding:40px 16px;color:var(--dsw-alias-label-secondary);font-size:13px;text-align:center}.sm-state p{margin:0}
+          .sm-hub-hint{margin:0 0 12px;font-size:12px;line-height:1.6;color:var(--dsw-alias-label-secondary)}.sm-hub-group{margin:10px 0 0;padding:8px 8px 0;font-size:12px;font-weight:600;color:var(--dsw-alias-label-secondary)}
           .sm-error,.sm-inline-error{color:var(--dsw-alias-state-error-primary);font-size:13px;line-height:1.6;overflow-wrap:anywhere}.sm-error button,.sm-inline-error button{margin-left:8px}.sm-notice,.sm-refreshing{margin:0;font-size:13px;color:var(--dsw-alias-state-success-primary)}.sm-refreshing{color:var(--dsw-alias-label-secondary)}
-          .sm-install-dialog{width:min(520px,100%);max-height:100%;overflow:auto}.sm-install-form{display:grid;gap:20px}.sm-install-form label{display:grid;gap:8px;font-size:13px;font-weight:550}.sm-install-form input{width:100%;font-weight:400}.sm-form-actions{justify-content:flex-end;flex-wrap:wrap}
+          .sm-overlay{position:fixed;inset:0;z-index:60;display:grid;place-items:center;padding:24px;background:color-mix(in srgb,var(--dsw-alias-bg-base) 55%,transparent);backdrop-filter:blur(6px)}
+          .sm-install-dialog{box-sizing:border-box;width:min(520px,100%);max-height:100%;overflow:auto;padding:20px 22px;border:1px solid var(--dsw-alias-border-l1);border-radius:12px;background:var(--dsw-alias-bg-layer-1);box-shadow:0 18px 48px rgba(0,0,0,.28)}
+          .sm-install-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 4px}.sm-install-head h3{margin:0;font-size:16px;font-weight:650;color:var(--dsw-alias-label-primary)}
+          .sm-install-hint{margin:0 0 14px;font-size:12px;line-height:1.6;color:var(--dsw-alias-label-secondary)}
+          .sm-install-form{display:grid;gap:20px}.sm-install-form label{display:grid;gap:8px;font-size:13px;font-weight:550}.sm-install-form input{width:100%;font-weight:400}.sm-form-actions{justify-content:flex-end;flex-wrap:wrap}
           @container skill-manager (max-width:680px){.sm-toolbar{align-items:stretch}.sm-search{width:100%}.sm-row{grid-template-columns:40px minmax(0,1fr);gap:8px 12px}.sm-row-meta{grid-column:2;justify-content:flex-start;max-width:none}.sm-glyph{width:40px;height:40px;grid-row:1 / span 2}.sm-heading-copy{flex-basis:100%}.sm-actions{margin-left:auto}}
           @media(max-width:760px){.sm-page{padding-inline:24px}}@media(max-width:420px){.sm-page{padding-inline:16px}.sm-content{gap:24px}.sm-page .sm-filter{padding-inline:8px}}
         `
