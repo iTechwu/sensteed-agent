@@ -10,6 +10,7 @@ const preinstalledPlugins = [
   'dsh-sensteed-finance',
   'dsh-sensteed-knowledge',
   'dsh-sensteed-supplier-intelligence',
+  'dsh-sensteed-skill-manager',
   'dsh-sensteed-video-notes',
   'dsh-sensteed-im',
   'dsh-soup',
