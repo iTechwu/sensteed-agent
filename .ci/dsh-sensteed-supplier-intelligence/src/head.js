@@ -1,6 +1,6 @@
 const React = require('react')
 const { createElement: h, useEffect, useState } = React
-const { IconShieldOutlineRegular, IconRefreshOutlineRegular, IconSearchOutlineRegular, IconRightUpOutlineRegular } = require('@deepseek-ai/dsh-client-ui-primitives')
+const { Tooltip, IconShieldOutlineRegular, IconRefreshOutlineRegular, IconSearchOutlineRegular, IconRightUpOutlineRegular } = require('@deepseek-ai/dsh-client-ui-primitives')
 
 const PANEL_ID = 'supplier-risk'
 const BASE = '/api/desktop/sensteed/supplier-risk'

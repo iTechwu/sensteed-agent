@@ -9,6 +9,7 @@ describe('product package skeleton', () => {
     const manifest = JSON.parse(readFileSync(`${root}package.json`, 'utf8')) as {
       name: string
       dsh?: { bundle?: { patch?: string } }
+      dependencies?: Record<string, string>
     }
     expect(manifest.name).toBe(PRODUCT_PACKAGE_NAME)
     expect(manifest.dsh?.bundle?.patch).toBe('./cordis.patch.yml')
