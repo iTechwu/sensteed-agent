@@ -9,7 +9,7 @@ function Workbench() {
   const retryAccess = () => {
     setAccess(null)
     setAccessReason('')
-    fetch(`${BASE}/access`, { credentials: 'same-origin', redirect: 'error' })
+    fetch(`${BASE}/access`, { credentials: 'same-origin', redirect: 'error', signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
       .then(response => response.json())
       .then(body => { adoptScope(body?.scopeId); setScopeReady(Boolean(body?.scopeId)); setAccessReason(body?.reason || 'unavailable'); setAccess(body?.allowed === true) })
       .catch(() => { setAccessReason('connection_unavailable'); setAccess(false) })
@@ -31,7 +31,15 @@ function Workbench() {
     }
   }, [])
   useEffect(() => { retryAccess() }, [])
-  const refresh = () => { setError(''); setRevision(value => value + 1) }
+  // Synchronous reload lock: bursts of refresh events must not stack revisions.
+  const loadingRef = useRef(false)
+  const refresh = () => {
+    if (loadingRef.current) return
+    loadingRef.current = true
+    setError('')
+    setRevision(value => value + 1)
+    setTimeout(() => { loadingRef.current = false }, 400)
+  }
   if (access === null) return h('main', { className: 'sr-page', role: 'status' }, '正在连接供应链工作台…')
   if (!access) return h('main', { className: 'sr-page' }, h('h1', null, '供应商风险'), h('p', null, accessMessage(accessReason)), h('button', { type: 'button', className: 'sr-button sr-secondary', onClick: retryAccess }, '重新连接'))
   return h('main', { className: 'sr-page' },
@@ -127,10 +135,16 @@ function Suppliers({ revision, setError, onSelect, onImported }) {
   const [busy, setBusy] = useState(false)
   const state = useLoad(() => api('supply_chain_workbench_suppliers_list', { page, pageSize: 20, ...(submitted ? { query: submitted } : {}) }), [page, submitted, revision], setError)
   const data = state.data
+  let lastTrigger = null
+  const closeIntake = () => {
+    setShowAdd(false)
+    requestAnimationFrame(() => lastTrigger?.focus?.())
+  }
   return h(React.Fragment, null,
     h('div', { className: 'sr-toolbar' }, h('form', { onSubmit: event => { event.preventDefault(); setPage(1); setSubmitted(query.trim()) } }, h('label', { className: 'sr-search' }, h(IconSearchOutlineRegular, { size: 16 }), h('input', { value: query, onChange: event => setQuery(event.target.value), placeholder: '搜索供应商名称或统一社会信用代码', 'aria-label': '搜索供应商' })), h('button', { type: 'submit', className: 'sr-button' }, '搜索')),
-      h('div', { className: 'sr-toolbar-actions' }, h('span', { className: 'sr-muted' }, `${data?.total ?? '—'} 家供应商`), h('button', { type: 'button', className: 'sr-button sr-secondary', onClick: () => setShowAdd(!showAdd) }, showAdd ? '收起新增' : '新增 / 导入'))),
-    showAdd ? h(SupplierIntake, { newName, setNewName, importText, setImportText, busy, setBusy, setError, onDone: () => { setPage(1); setSubmitted(''); onImported?.(); window.dispatchEvent(new CustomEvent('supplier-risk:refresh')) } }) : null,
+      h('div', { className: 'sr-toolbar-actions' }, h('span', { className: 'sr-muted' }, `${data?.total ?? '—'} 家供应商`), h('button', { type: 'button', className: 'sr-button sr-secondary', ref: element => { lastTrigger = element }, 'aria-haspopup': 'dialog', 'aria-expanded': showAdd, onClick: () => { showAdd ? closeIntake() : setShowAdd(true) } }, showAdd ? '收起新增' : '新增 / 导入'))),
+    showAdd ? h('div', { role: 'dialog', 'aria-label': '新增或导入供应商', onKeyDown: event => { if (event.key === 'Escape') { event.stopPropagation(); closeIntake() } } },
+      h(SupplierIntake, { newName, setNewName, importText, setImportText, busy, setBusy, setError, onDone: () => { setPage(1); setSubmitted(''); onImported?.(); window.dispatchEvent(new CustomEvent('supplier-risk:refresh')) } })) : null,
     h(Loading, { state }), data ? h(React.Fragment, null,
       h('div', { className: 'sr-table-wrap' }, h('table', { className: 'sr-table' }, h('thead', null, h('tr', null, ...['供应商', '统一社会信用代码', '类别', '主体核验', '监控范围', '来源覆盖', '更新时间', ''].map(label => h('th', { key: label }, label)))), h('tbody', null,
         ...data.items.map(row => h('tr', { key: row.supplierId }, h('td', null, h('strong', null, row.displayName)), h('td', null, row.creditCode || '未关联'), h('td', null, row.category || '未分类'), h('td', null, h(Status, { value: row.verificationStatus })), h('td', null, row.monitoringScope || '未设置'), h('td', null, row.coverage?.status === 'partial' ? '部分来源' : '待接入'), h('td', null, fmt(row.updatedAt)), h('td', null, h('button', { type: 'button', className: 'sr-link', onClick: () => onSelect(row.supplierId) }, '业务影响'))))))),
@@ -309,6 +323,10 @@ function Business({ revision, setError, onScopeReady }) {
 }
 
 function textArea(value, onChange) { return h('textarea', { rows: 3, value: value || '', onChange: event => onChange(event.target.value) }) }
+function normalizeSupplierIds(value) {
+  const values = Array.isArray(value) ? value : String(value || '').split(/[,，\n]/u)
+  return [...new Set(values.map(item => String(item).trim()).filter(Boolean))]
+}
 function Field(label, control) { return h('label', { className: 'sr-field' }, h('span', null, label), control) }
 function setRevisionAfterSave() { window.dispatchEvent(new CustomEvent('supplier-risk:refresh')) }
 
@@ -331,16 +349,18 @@ function Weekly({ revision, setError, onUnread, onScopeReady }) {
     api('supply_chain_weekly_report_plan_get'),
     api('supply_chain_weekly_reports_list', { page: 1, pageSize: 20 }),
     reportId ? api('supply_chain_weekly_report_get', { reportId }) : Promise.resolve(null),
+    api('supply_chain_workbench_suppliers_list', { page: 1, pageSize: 500 }),
   ]) : Promise.resolve(null)), [revision, reportId], setError)
   const plan = state.data?.[0]?.plan
   const reports = state.data?.[1]
   const report = state.data?.[2]?.report
-  useEffect(() => { if (plan) setPlanFields(current => current ?? ({ ...plan })) }, [plan])
+  const suppliers = state.data?.[3]?.items || []
+  useEffect(() => { if (plan) setPlanFields(current => current ?? ({ ...plan, supplierIds: normalizeSupplierIds(plan.supplierIds) })) }, [plan])
   useEffect(() => { if (reports) onUnread(reports.unreadCount || 0) }, [reports?.unreadCount])
   const savePlan = async event => {
     event.preventDefault(); setBusy(true); setNotice('')
     try {
-      const supplierIds = String(planFields.supplierIds || []).split(/[,，\n]/u).map(value => value.trim()).filter(Boolean)
+      const supplierIds = normalizeSupplierIds(planFields.supplierIds)
       const saved = await api('supply_chain_weekly_report_plan_save', { expectedVersion: planFields.version, fields: { enabled: planFields.enabled === true, weekday: 0, hour: 9, minute: 0, timezone: 'Asia/Shanghai', supplierIds, collectionBudget: Number(planFields.collectionBudget || 0) }, idempotencyKey: crypto.randomUUID(), confirm: true })
       if (saved?.plan) setPlanFields({ ...saved.plan })
       setNotice('周报计划已保存。')
@@ -354,12 +374,19 @@ function Weekly({ revision, setError, onUnread, onScopeReady }) {
       setReportId(id); window.dispatchEvent(new CustomEvent('supplier-risk:refresh'))
     } catch (error) { setError(errorText(error)) } finally { setBusy(false) }
   }
-  if (!planFields || !reports) return h(Loading, { state })
+  if (!planFields || !reports || !state.data?.[3]) return h(Loading, { state })
   return h(React.Fragment, null,
     h('div', { className: 'sr-weekly-layout' },
       h('section', { className: 'sr-section' }, h('h2', null, '周报计划'), h('p', { className: 'sr-muted' }, '服务端每周一 09:00（Asia/Shanghai）汇总已保存事实，不会启动外部采集或模型调用。'),
         h('form', { className: 'sr-form', onSubmit: savePlan }, h('label', { className: 'sr-toggle' }, h('input', { type: 'checkbox', checked: planFields.enabled === true, onChange: event => setPlanFields({ ...planFields, enabled: event.target.checked }) }), h('span', null, '启用每周风险周报')),
-          Field('供应商范围（每行一个 ID）', h('textarea', { rows: 5, value: Array.isArray(planFields.supplierIds) ? planFields.supplierIds.join('\n') : planFields.supplierIds || '', onChange: event => setPlanFields({ ...planFields, supplierIds: event.target.value }) })),
+          Field('供应商范围', h(React.Fragment, null,
+            h('select', {
+              className: 'sr-multi-select', multiple: true, size: Math.min(Math.max(suppliers.length, 3), 8),
+              value: normalizeSupplierIds(planFields.supplierIds),
+              onChange: event => setPlanFields({ ...planFields, supplierIds: Array.from(event.target.selectedOptions, option => option.value) }),
+              'aria-label': '选择周报供应商',
+            }, suppliers.map(supplier => h('option', { key: supplier.supplierId, value: supplier.supplierId }, supplier.displayName || supplier.supplierId))),
+            h('small', { className: 'sr-field-hint' }, suppliers.length ? `已录入 ${suppliers.length} 家供应商，可按住 Command 或 Ctrl 多选。` : '暂无已录入供应商。'))),
           Field('采集预算记录', h('input', { type: 'number', min: 0, value: planFields.collectionBudget || 0, onChange: event => setPlanFields({ ...planFields, collectionBudget: event.target.value }) })),
           h('p', { className: 'sr-footnote' }, `下次执行：${fmt(plan.nextRunAt)} · 当前运行：${plan.currentRunStatus || '无'}${plan.failureCode ? ` · ${plan.failureCode}` : ''}`),
           h('button', { type: 'submit', className: 'sr-button', disabled: busy }, busy ? '保存中…' : '保存计划'))),
