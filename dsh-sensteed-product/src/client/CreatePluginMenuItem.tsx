@@ -63,4 +63,3 @@ export function CreatePluginMenuItem({ t, onDismiss, startCreator }: CreatePlugi
     </MenuItemButton>
   )
 }
-
