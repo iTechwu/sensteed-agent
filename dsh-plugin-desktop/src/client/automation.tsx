@@ -5,7 +5,6 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { StoredEntry } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
-import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-schedule/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
@@ -46,10 +45,13 @@ export function createAutomationStarter(ctx: Context): AutomationStarter {
         const id = retrySession
         await ctx.sessions.using(id, { source: 'controllerOperation' }, async (reference) => {
           const binding = await reference.ready
-          await binding.ctx.conversation.send(automationPrompt(
+          // Session scopes do not inherit this plugin's injected services.
+          // The retained binding already addresses the intended Session.
+          const result = await binding.session.prompt([{ type: 'text', text: automationPrompt(
             ctx.locale.getSnapshot().active,
             Intl.DateTimeFormat().resolvedOptions().timeZone,
-          ))
+          ) }], 'queue')
+          if (!result.ok) throw new Error(`Automation prompt failed: ${result.error.code}: ${result.error.message}`)
           ctx.uiWorkspace.openSession(id)
         })
         retrySession = undefined

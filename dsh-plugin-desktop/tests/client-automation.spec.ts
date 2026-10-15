@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { createElement, act, type ComponentType } from 'react'
 import { createRoot } from 'react-dom/client'
-import { Context } from '@deepseek-ai/cordis'
+import { Context, Service } from '@deepseek-ai/cordis'
+import { createScope, scopeOf } from '@deepseek-ai/dsh-api-session-controller/src/client/scope.ts'
 import { SlotCore } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { WorkspaceId } from '@deepseek-ai/dsh-api-workspace-controller/client'
@@ -17,14 +18,16 @@ async function fixture() {
   slots.onMutate(key => { ctx.emit('slots/changed', key) })
   ctx.provide('slots', slots as never)
   const create = vi.fn(async () => 'new-automation' as SessionId)
-  const send = vi.fn(async (_text: string) => {})
+  const prompt = vi.fn(async (_content: unknown, _mode: string) => ({ ok: true as const, value: { accepted: true as const } }))
   const release = vi.fn()
   const open = vi.fn()
-  const binding = { ctx: { conversation: { send } } }
+  // Real Session scopes enforce Cordis injection; plain context fakes hide this failure.
+  const scope = createScope(ctx, 'new-automation' as SessionId)
+  const binding = { ctx: scope.ctx, session: { prompt } }
   const using = vi.fn(async (_id: SessionId, _options: unknown, operation: (ref: { ready: Promise<typeof binding> }) => Promise<void>) => {
     try { await operation({ ready: Promise.resolve(binding) }) } finally { release() }
   })
-  ctx.provide('sessions', { create, using, list: { getSnapshot: () => ({ byId: {
+  ctx.provide('sessions', { create, using, scopeOf, binding: () => binding, list: { getSnapshot: () => ({ byId: {
     older: { updatedAt: 10 }, recent: { updatedAt: 20 },
   } }) } } as never)
   ctx.provide('workspaces', { list: { getSnapshot: () => ({ items: [
@@ -33,18 +36,24 @@ async function fixture() {
   ] }) } } as never)
   ctx.provide('uiWorkspace', { openSession: open } as never)
   ctx.provide('locale', { getSnapshot: () => ({ active: 'zh' }) } as never)
-  return { ctx, create, send, release, open, using }
+  class ConversationService extends Service {
+    constructor(owner: Context) { super(owner, 'conversation') }
+    send = vi.fn()
+  }
+  await ctx.plugin(ConversationService).await()
+  return { ctx, scope, create, prompt, release, open, using }
 }
 
 describe('Desktop automation creation', () => {
   it('sends an explicit skill invocation before opening the new Session, inheriting the latest project', async () => {
     const test = await fixture()
+    expect(() => test.scope.ctx.conversation).toThrow('without inject')
     await createAutomationStarter(test.ctx).start()
     expect(test.create).toHaveBeenCalledExactlyOnceWith({ workspaceId: 'recent-project' as WorkspaceId })
-    expect(test.send).toHaveBeenCalledExactlyOnceWith(automationPrompt('zh', Intl.DateTimeFormat().resolvedOptions().timeZone))
-    expect(test.send.mock.calls[0]?.[0]).toMatch(/^\/sensteed-automation /)
+    expect(test.prompt).toHaveBeenCalledExactlyOnceWith([{ type: 'text', text: automationPrompt('zh', Intl.DateTimeFormat().resolvedOptions().timeZone) }], 'queue')
+    expect((test.prompt.mock.calls[0]?.[0] as { text: string }[])[0]?.text).toMatch(/^\/sensteed-automation /)
     expect(test.open).toHaveBeenCalledExactlyOnceWith('new-automation')
-    expect(test.send.mock.invocationCallOrder[0]).toBeLessThan(test.open.mock.invocationCallOrder[0]!)
+    expect(test.prompt.mock.invocationCallOrder[0]).toBeLessThan(test.open.mock.invocationCallOrder[0]!)
     expect(test.release).toHaveBeenCalledOnce()
   })
 
@@ -54,32 +63,32 @@ describe('Desktop automation creation', () => {
     vi.spyOn(test.ctx.locale, 'getSnapshot').mockReturnValue({ active: 'en' } as never)
     await createAutomationStarter(test.ctx).start()
     expect(test.create).toHaveBeenCalledExactlyOnceWith({})
-    expect(test.send.mock.calls[0]?.[0]).toContain('Help me create an automation.')
+    expect((test.prompt.mock.calls[0]?.[0] as { text: string }[])[0]?.text).toContain('Help me create an automation.')
     expect(automationPrompt('en', 'America/New_York')).toContain('America/New_York')
   })
 
   it('shares concurrent clicks and lets a later deliberate action start another conversation', async () => {
     const test = await fixture()
-    let finish!: () => void
-    test.send.mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve }))
+    let finish!: (value: { ok: true; value: { accepted: true } }) => void
+    test.prompt.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
     const starter = createAutomationStarter(test.ctx)
     const first = starter.start()
     expect(starter.start()).toBe(first)
-    await vi.waitFor(() => expect(test.send).toHaveBeenCalledOnce())
-    finish(); await first
+    await vi.waitFor(() => expect(test.prompt).toHaveBeenCalledOnce())
+    finish({ ok: true, value: { accepted: true } }); await first
     await starter.start()
     expect(test.create).toHaveBeenCalledTimes(2)
   })
 
   it('retries a rejected send in the same Session and releases its reference on both outcomes', async () => {
     const test = await fixture()
-    test.send.mockRejectedValueOnce(new Error('admission failed'))
+    test.prompt.mockRejectedValueOnce(new Error('admission failed'))
     const starter = createAutomationStarter(test.ctx)
     await expect(starter.start()).rejects.toThrow('admission failed')
     expect(test.open).not.toHaveBeenCalled()
     await starter.start()
     expect(test.create).toHaveBeenCalledOnce()
-    expect(test.send).toHaveBeenCalledTimes(2)
+    expect(test.prompt).toHaveBeenCalledTimes(2)
     expect(test.release).toHaveBeenCalledTimes(2)
     expect(test.open).toHaveBeenCalledOnce()
   })
@@ -89,10 +98,26 @@ describe('Desktop automation creation', () => {
     test.create.mockRejectedValueOnce(new Error('creation refused'))
     const starter = createAutomationStarter(test.ctx)
     await expect(starter.start()).rejects.toThrow('creation refused')
-    expect(test.send).not.toHaveBeenCalled()
+    expect(test.prompt).not.toHaveBeenCalled()
     expect(test.open).not.toHaveBeenCalled()
     await starter.start()
-    expect(test.send).toHaveBeenCalledOnce()
+    expect(test.prompt).toHaveBeenCalledOnce()
+  })
+
+  it('rejects a refused prompt result and retries the same Session without navigating prematurely', async () => {
+    const test = await fixture()
+    test.prompt.mockResolvedValueOnce({ ok: false, error: {
+      code: 'session/agent-busy', message: 'busy',
+    } } as never)
+    const starter = createAutomationStarter(test.ctx)
+    await expect(starter.start()).rejects.toThrow('session/agent-busy: busy')
+    expect(test.open).not.toHaveBeenCalled()
+    expect(test.release).toHaveBeenCalledOnce()
+    await starter.start()
+    expect(test.create).toHaveBeenCalledOnce()
+    expect(test.prompt).toHaveBeenCalledTimes(2)
+    expect(test.release).toHaveBeenCalledTimes(2)
+    expect(test.open).toHaveBeenCalledOnce()
   })
 
   it('preserves the task page actions, invokes the skill from either creation button, and restores the upstream seat', async () => {
@@ -118,7 +143,7 @@ describe('Desktop automation creation', () => {
     const previous = actEnv.IS_REACT_ACT_ENVIRONMENT; actEnv.IS_REACT_ACT_ENVIRONMENT = true
     try {
       await act(async () => { root.render(createElement(entry.component as ComponentType<Record<string, unknown>>, entry.inject?.())) })
-      test.send.mockRejectedValueOnce(new Error('offline'))
+      test.prompt.mockRejectedValueOnce(new Error('offline'))
       await act(async () => { container.querySelector('button')!.click() })
       expect(container.querySelector('[role="alert"]')?.textContent).toContain('无法开始创建自动化任务')
       await act(async () => { container.querySelector<HTMLButtonElement>('[role="alert"] button')!.click() })
