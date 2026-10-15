@@ -1192,6 +1192,20 @@ const EN = Object.freeze({
   '刷新会话列表': 'Refresh the session list',
   '腾讯 Agent 邮箱需要微信扫码授权。点下面的按钮生成授权链接，在打开的页面里用微信扫码登录并确认。': 'The Tencent Agent mailbox authorizes with a WeChat QR code. Generate an authorization link, then scan it with WeChat on the page that opens and confirm.',
   '请求失败': 'The request failed',
+  '远程控制': 'Remote control',
+  '桌面功能': 'Desktop feature',
+  '管理手机和其他设备连接哪吒 Agent。': 'Manage phone and other device connections to Nezha Agent.',
+  '允许手机或其他设备连接当前桌面上的哪吒 Agent。': 'Allow phones and other devices to connect to Nezha Agent on this Desktop.',
+  '启用远程控制': 'Enable remote control',
+  '已启用': 'Enabled',
+  '未启用': 'Disabled',
+  '打开配对界面': 'Open pairing',
+  '启用后可在配对界面完成设备连接和访问管理。': 'After enabling, finish device pairing and access management in the pairing view.',
+  '当前桌面运行状态不支持远程控制。': 'Remote control is unavailable in the current Desktop state.',
+  '当前桌面版本未提供远程控制服务。': 'This Desktop version does not provide remote control.',
+  '暂时无法读取远程控制状态，请稍后重试。': 'Remote control status is temporarily unavailable. Try again later.',
+  '远程控制状态更新失败，请稍后重试。': 'Could not update remote control. Try again later.',
+  '远程控制界面尚未就绪，请稍后重试。': 'The remote control view is not ready yet. Try again shortly.',
 });
 
 export const en = EN;

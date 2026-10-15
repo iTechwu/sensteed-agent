@@ -675,6 +675,14 @@ var package_default = {
       ],
       platform: "web"
     },
+    capabilities: [
+      {
+        id: "connect-im",
+        kind: "basic",
+        name: "\u4F01\u4E1A\u6D88\u606F\u4E0E\u534F\u4F5C\u8FDE\u63A5",
+        description: "\u8FDE\u63A5\u5FAE\u4FE1\u3001\u98DE\u4E66\u3001\u4F01\u5FAE\u3001\u9489\u9489\u3001QQ \u4E0E Matrix \u7B49\u4F01\u4E1A\u6D88\u606F\u6E20\u9053\u3002"
+      }
+    ],
     compatibility: {
       dsh: "0.2.0-rc.2",
       dshReleases: {
@@ -2353,7 +2361,21 @@ var EN = Object.freeze({
   "\u7531\u6388\u6743\u7ED3\u679C\u81EA\u52A8\u586B\u5165\uFF0C\u65E0\u9700\u624B\u5DE5\u586B\u5199\u3002": "Filled in from the authorization; no need to type it.",
   "\u5237\u65B0\u4F1A\u8BDD\u5217\u8868": "Refresh the session list",
   "\u817E\u8BAF Agent \u90AE\u7BB1\u9700\u8981\u5FAE\u4FE1\u626B\u7801\u6388\u6743\u3002\u70B9\u4E0B\u9762\u7684\u6309\u94AE\u751F\u6210\u6388\u6743\u94FE\u63A5\uFF0C\u5728\u6253\u5F00\u7684\u9875\u9762\u91CC\u7528\u5FAE\u4FE1\u626B\u7801\u767B\u5F55\u5E76\u786E\u8BA4\u3002": "The Tencent Agent mailbox authorizes with a WeChat QR code. Generate an authorization link, then scan it with WeChat on the page that opens and confirm.",
-  "\u8BF7\u6C42\u5931\u8D25": "The request failed"
+  "\u8BF7\u6C42\u5931\u8D25": "The request failed",
+  "\u8FDC\u7A0B\u63A7\u5236": "Remote control",
+  "\u684C\u9762\u529F\u80FD": "Desktop feature",
+  "\u7BA1\u7406\u624B\u673A\u548C\u5176\u4ED6\u8BBE\u5907\u8FDE\u63A5\u54EA\u5412 Agent\u3002": "Manage phone and other device connections to Nezha Agent.",
+  "\u5141\u8BB8\u624B\u673A\u6216\u5176\u4ED6\u8BBE\u5907\u8FDE\u63A5\u5F53\u524D\u684C\u9762\u4E0A\u7684\u54EA\u5412 Agent\u3002": "Allow phones and other devices to connect to Nezha Agent on this Desktop.",
+  "\u542F\u7528\u8FDC\u7A0B\u63A7\u5236": "Enable remote control",
+  "\u5DF2\u542F\u7528": "Enabled",
+  "\u672A\u542F\u7528": "Disabled",
+  "\u6253\u5F00\u914D\u5BF9\u754C\u9762": "Open pairing",
+  "\u542F\u7528\u540E\u53EF\u5728\u914D\u5BF9\u754C\u9762\u5B8C\u6210\u8BBE\u5907\u8FDE\u63A5\u548C\u8BBF\u95EE\u7BA1\u7406\u3002": "After enabling, finish device pairing and access management in the pairing view.",
+  "\u5F53\u524D\u684C\u9762\u8FD0\u884C\u72B6\u6001\u4E0D\u652F\u6301\u8FDC\u7A0B\u63A7\u5236\u3002": "Remote control is unavailable in the current Desktop state.",
+  "\u5F53\u524D\u684C\u9762\u7248\u672C\u672A\u63D0\u4F9B\u8FDC\u7A0B\u63A7\u5236\u670D\u52A1\u3002": "This Desktop version does not provide remote control.",
+  "\u6682\u65F6\u65E0\u6CD5\u8BFB\u53D6\u8FDC\u7A0B\u63A7\u5236\u72B6\u6001\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002": "Remote control status is temporarily unavailable. Try again later.",
+  "\u8FDC\u7A0B\u63A7\u5236\u72B6\u6001\u66F4\u65B0\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002": "Could not update remote control. Try again later.",
+  "\u8FDC\u7A0B\u63A7\u5236\u754C\u9762\u5C1A\u672A\u5C31\u7EEA\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002": "The remote control view is not ready yet. Try again shortly."
 });
 var en = EN;
 var zh = Object.freeze(Object.fromEntries(
@@ -18281,6 +18303,8 @@ var CSS9 = String.raw`
 .dim-logoTelegram svg { width: 21px; height: 21px; }
 .dim-logoOffice { color: white; background: linear-gradient(145deg, #12213f, #3964fe); }
 .dim-logoOffice svg { width: 23px; height: 23px; }
+.dim-logoRemoteControl { color: var(--dim-blue); background: color-mix(in srgb, var(--dim-blue) 11%, white); border: 1px solid color-mix(in srgb, var(--dim-blue) 22%, var(--dsw-alias-border-l2, #dfe1e5)); }
+.dim-remoteControlGlyph { font-size: 18px; line-height: 1; font-weight: 700; }
 .dim-logoMatrix { color: white; background: #0dbd8b; }
 .dim-logoMatrix svg { width: 22px; height: 22px; }
 .dim-logoDiscord { color: white; background: #5865f2; }
@@ -18303,6 +18327,22 @@ var CSS9 = String.raw`
 .dim-panelHeadingTitle { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .dim-panelHeading h2 { margin: 0; color: var(--dsw-alias-label-primary, #1f2329); font-size: 18px; line-height: 24px; font-weight: 650; }
 .dim-panelHeading p { margin: 4px 0 0; color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; line-height: 20px; }
+.dim-remoteControlPanel { min-width: 0; display: grid; gap: 12px; }
+.dim-settingsCard { padding: 20px; border: 1px solid var(--dsw-alias-border-l2, #e5e6eb); border-radius: 14px; background: var(--dsw-alias-bg-layer-1, #fff); box-shadow: 0 1px 2px rgb(31 35 41 / 3%); }
+.dim-settingsCardHeading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.dim-settingsCardHeading h3 { margin: 0; color: var(--dsw-alias-label-primary, #1f2329); font-size: 16px; line-height: 22px; font-weight: 650; }
+.dim-settingsCardHeading p { margin: 5px 0 0; color: var(--dsw-alias-label-secondary, #646a73); font-size: 13px; line-height: 20px; }
+.dim-toggleRow { display: inline-flex; align-items: center; flex: none; gap: 8px; color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; line-height: 20px; white-space: nowrap; cursor: pointer; }
+.dim-toggleRow input { width: 34px; height: 20px; margin: 0; accent-color: var(--dim-blue); cursor: pointer; }
+.dim-toggleRow input:disabled { cursor: not-allowed; opacity: .55; }
+.dim-remoteControlActions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--dsw-alias-border-l1, #eef0f3); }
+.dim-primaryAction { min-height: 34px; display: inline-flex; align-items: center; justify-content: center; padding: 0 13px; border: 1px solid var(--dim-action-primary, #1763db); border-radius: 8px; color: #fff; background: var(--dim-action-primary, #1763db); font: inherit; font-size: 13px; font-weight: 560; cursor: pointer; }
+.dim-primaryAction:hover:not(:disabled) { border-color: #0958d9; background: #0958d9; }
+.dim-primaryAction:focus-visible, .dim-toggleRow input:focus-visible { outline: 2px solid color-mix(in srgb, var(--dim-blue) 70%, white); outline-offset: 2px; }
+.dim-primaryAction:disabled { opacity: .55; cursor: not-allowed; }
+.dim-settingsHint { margin: 12px 0 0; color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; line-height: 19px; }
+.dim-errorText { margin: 12px 0 0; color: var(--dsw-alias-state-error-primary, #d54941); font-size: 12px; line-height: 19px; }
+@media (max-width: 620px) { .dim-settingsCardHeading { flex-direction: column; gap: 12px; } .dim-toggleRow { align-self: flex-start; } }
 .dim-experimentalBadge { padding: 1px 6px; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 5px; color: var(--dsw-alias-label-secondary, #646a73); font-size: 11px; line-height: 17px; }
 .dim-connectSteps { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 20px 0 0; padding: 0; list-style: none; }
 .dim-connectSteps li { display: inline-flex; align-items: center; gap: 7px; color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; line-height: 20px; }
@@ -19862,6 +19902,7 @@ function callWorkspaceDirectoryApi(ctx, method, ...args) {
   }
   return service[method](...args);
 }
+var REMOTE_CONTROL_TAB_ID = "remoteControl";
 var CHANNELS = Object.freeze([
   { id: "weixin", label: "\u5FAE\u4FE1", description: "\u5728\u5FAE\u4FE1\u79C1\u804A\u4E2D\u5411\u54EA\u5412 Agent \u53D1\u8D77\u4EFB\u52A1\u3002" },
   { id: "feishu", label: "\u98DE\u4E66", description: "\u5728\u98DE\u4E66\u79C1\u804A\u548C\u7FA4\u804A\u4E2D\uFF0C\u4E0E\u54EA\u5412 Agent \u534F\u4F5C\u3002" },
@@ -19870,7 +19911,8 @@ var CHANNELS = Object.freeze([
   { id: "qq", label: "QQ", description: "\u5728 QQ \u79C1\u804A\u548C\u7FA4\u804A\u4E2D\u4F7F\u7528\u54EA\u5412 Agent\u3002" },
   { id: "wecomApp", label: "\u4F01\u4E1A\u5FAE\u4FE1\u5E94\u7528", note: "\u5B9E\u9A8C\u529F\u80FD", extended: true, description: "\u901A\u8FC7\u4F01\u4E1A\u81EA\u5EFA\u5E94\u7528\u63A5\u5165\uFF0C\u9002\u5408\u6709\u5E94\u7528\u7BA1\u7406\u6743\u9650\u7684\u56E2\u961F\u3002" },
   { id: "email", label: "\u90AE\u7BB1", note: "\u5B9E\u9A8C\u529F\u80FD", extended: true, description: "\u7528\u90AE\u4EF6\u63D0\u4EA4\u4EFB\u52A1\uFF0C\u5E76\u901A\u8FC7\u56DE\u4FE1\u63A5\u6536\u5904\u7406\u7ED3\u679C\u3002" },
-  { id: "office", label: "AI Office", note: "\u5B9E\u9A8C\u529F\u80FD", extended: true, description: "\u8FDE\u63A5\u529E\u516C\u7CFB\u7EDF\uFF0C\u914D\u7F6E\u4EFB\u52A1\u63A5\u6536\u4E0E\u7ED3\u679C\u56DE\u4F20\u3002" }
+  { id: "office", label: "AI Office", note: "\u5B9E\u9A8C\u529F\u80FD", extended: true, description: "\u8FDE\u63A5\u529E\u516C\u7CFB\u7EDF\uFF0C\u914D\u7F6E\u4EFB\u52A1\u63A5\u6536\u4E0E\u7ED3\u679C\u56DE\u4F20\u3002" },
+  { id: REMOTE_CONTROL_TAB_ID, label: "\u8FDC\u7A0B\u63A7\u5236", note: "\u684C\u9762\u529F\u80FD", extended: true, description: "\u7BA1\u7406\u624B\u673A\u548C\u5176\u4ED6\u8BBE\u5907\u8FDE\u63A5\u54EA\u5412 Agent\u3002" }
 ]);
 function WeixinLogo() {
   return h2(
@@ -19916,6 +19958,13 @@ function OfficeLogo() {
     h2(OfficeLogoGlyph)
   );
 }
+function RemoteControlLogo() {
+  return h2(
+    "span",
+    { className: "dim-logo dim-logoRemoteControl", "aria-hidden": "true" },
+    h2("span", { className: "dim-remoteControlGlyph" }, "\u2194")
+  );
+}
 function ChannelLogo({ channel: channel2 }) {
   if (channel2 === "weixin") return h2(WeixinLogo);
   if (channel2 === "feishu") return h2(FeishuLogo);
@@ -19924,7 +19973,113 @@ function ChannelLogo({ channel: channel2 }) {
   if (channel2 === "wecomApp") return h2(WecomAppLogo);
   if (channel2 === "qq") return h2(QqLogo);
   if (channel2 === "email") return h2(EmailLogo);
+  if (channel2 === REMOTE_CONTROL_TAB_ID) return h2(RemoteControlLogo);
   return h2(OfficeLogo);
+}
+function RemoteControlSettingsTab({ remoteControl }) {
+  const [state, setState] = React36.useState(null);
+  const [busy, setBusy] = React36.useState(false);
+  const [error, setError] = React36.useState("");
+  const mountedRef = React36.useRef(true);
+  const refresh = React36.useCallback(async () => {
+    if (!remoteControl) {
+      setState({ enabled: false, available: false });
+      return;
+    }
+    try {
+      const next = await remoteControl.read();
+      if (!mountedRef.current) return;
+      setState({
+        enabled: next?.enabled === true,
+        available: next?.available !== false
+      });
+      setError("");
+    } catch {
+      if (!mountedRef.current) return;
+      setState({ enabled: false, available: false });
+      setError("\u6682\u65F6\u65E0\u6CD5\u8BFB\u53D6\u8FDC\u7A0B\u63A7\u5236\u72B6\u6001\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002");
+    }
+  }, [remoteControl]);
+  React36.useEffect(() => {
+    mountedRef.current = true;
+    void refresh();
+    return () => {
+      mountedRef.current = false;
+    };
+  }, [refresh]);
+  const changeEnabled = async (enabled) => {
+    if (!remoteControl || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await remoteControl.setEnabled(enabled);
+      await refresh();
+    } catch {
+      setError("\u8FDC\u7A0B\u63A7\u5236\u72B6\u6001\u66F4\u65B0\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const openPairing = async () => {
+    if (!remoteControl || busy || state?.enabled !== true) return;
+    setBusy(true);
+    setError("");
+    try {
+      await remoteControl.open();
+    } catch {
+      setError("\u8FDC\u7A0B\u63A7\u5236\u754C\u9762\u5C1A\u672A\u5C31\u7EEA\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const unavailable = !remoteControl || state?.available === false;
+  return h2(
+    "section",
+    { className: "dim-remoteControlPanel", "data-im-remote-control": true },
+    h2(
+      "div",
+      { className: "dim-settingsCard" },
+      h2(
+        "div",
+        { className: "dim-settingsCardHeading" },
+        h2(
+          "div",
+          null,
+          h2("h3", null, "\u8FDC\u7A0B\u63A7\u5236"),
+          h2("p", null, "\u5141\u8BB8\u624B\u673A\u6216\u5176\u4ED6\u8BBE\u5907\u8FDE\u63A5\u5F53\u524D\u684C\u9762\u4E0A\u7684\u54EA\u5412 Agent\u3002")
+        ),
+        h2(
+          "label",
+          { className: "dim-toggleRow" },
+          h2("input", {
+            type: "checkbox",
+            role: "switch",
+            checked: state?.enabled === true,
+            disabled: unavailable || busy,
+            onChange: (event) => {
+              void changeEnabled(event.target.checked);
+            },
+            "aria-label": "\u542F\u7528\u8FDC\u7A0B\u63A7\u5236"
+          }),
+          h2("span", null, state?.enabled ? "\u5DF2\u542F\u7528" : "\u672A\u542F\u7528")
+        )
+      ),
+      unavailable ? h2("p", { className: "dim-settingsHint", role: "status" }, remoteControl ? "\u5F53\u524D\u684C\u9762\u8FD0\u884C\u72B6\u6001\u4E0D\u652F\u6301\u8FDC\u7A0B\u63A7\u5236\u3002" : "\u5F53\u524D\u684C\u9762\u7248\u672C\u672A\u63D0\u4F9B\u8FDC\u7A0B\u63A7\u5236\u670D\u52A1\u3002") : h2(
+        "div",
+        { className: "dim-remoteControlActions" },
+        h2("button", {
+          type: "button",
+          className: "dim-primaryAction",
+          disabled: state?.enabled !== true || busy,
+          onClick: () => {
+            void openPairing();
+          }
+        }, "\u6253\u5F00\u914D\u5BF9\u754C\u9762"),
+        h2("p", { className: "dim-settingsHint" }, "\u542F\u7528\u540E\u53EF\u5728\u914D\u5BF9\u754C\u9762\u5B8C\u6210\u8BBE\u5907\u8FDE\u63A5\u548C\u8BBF\u95EE\u7BA1\u7406\u3002")
+      ),
+      error ? h2("p", { className: "dim-errorText", role: "alert" }, error) : null
+    )
+  );
 }
 function LoopbackRecoveryNotice({ recovery, onNavigate = replacePageLocation }) {
   return h2(
@@ -19965,6 +20120,7 @@ function IMSettingsTab({
   updateRpcCall,
   deliveryRpcCall,
   globalSettingsRpcCall,
+  remoteControl,
   workspaceDirectoryPicker,
   preferredSectionId,
   browserLocation = globalThis.location,
@@ -20179,7 +20335,7 @@ function IMSettingsTab({
               rpcCall: rpcCalls.deliveryRpcCall,
               accessRpcCall: rpcCalls[`${active.id}RpcCall`],
               onBack: () => setDeliverySettings(null)
-            }) : active.id === "weixin" ? h2(WeixinSettingsTab, { rpcCall: rpcCalls.weixinRpcCall }) : active.id === "feishu" ? h2(FeishuSettingsTab, { rpcCall: rpcCalls.feishuRpcCall }) : active.id === "dingtalk" ? h2(DingtalkSettingsTab, { rpcCall: rpcCalls.dingtalkRpcCall }) : active.id === "wecom" ? h2(WecomSettingsTab, { rpcCall: rpcCalls.wecomRpcCall }) : active.id === "wecomApp" ? h2(WecomAppSettingsTab, { rpcCall: rpcCalls.wecomAppRpcCall }) : active.id === "qq" ? h2(QqSettingsTab, { rpcCall: rpcCalls.qqRpcCall }) : active.id === "email" ? h2(EmailSettingsTab, { rpcCall: rpcCalls.emailRpcCall }) : h2(OfficeSettingsTab, { rpcCall: rpcCalls.officeRpcCall })
+            }) : active.id === "weixin" ? h2(WeixinSettingsTab, { rpcCall: rpcCalls.weixinRpcCall }) : active.id === "feishu" ? h2(FeishuSettingsTab, { rpcCall: rpcCalls.feishuRpcCall }) : active.id === "dingtalk" ? h2(DingtalkSettingsTab, { rpcCall: rpcCalls.dingtalkRpcCall }) : active.id === "wecom" ? h2(WecomSettingsTab, { rpcCall: rpcCalls.wecomRpcCall }) : active.id === "wecomApp" ? h2(WecomAppSettingsTab, { rpcCall: rpcCalls.wecomAppRpcCall }) : active.id === "qq" ? h2(QqSettingsTab, { rpcCall: rpcCalls.qqRpcCall }) : active.id === "email" ? h2(EmailSettingsTab, { rpcCall: rpcCalls.emailRpcCall }) : active.id === "office" ? h2(OfficeSettingsTab, { rpcCall: rpcCalls.officeRpcCall }) : h2(RemoteControlSettingsTab, { remoteControl })
           )
         )
       )
@@ -20236,6 +20392,12 @@ function apply(ctx) {
     listDirectory: (path, signal) => callWorkspaceDirectoryApi(ctx, "listDirectory", path, signal),
     pickDirectory: () => callWorkspaceDirectoryApi(ctx, "pickDirectory")
   });
+  let remoteControl;
+  try {
+    remoteControl = typeof ctx.get === "function" ? ctx.get("desktopRemoteControl", false) : void 0;
+  } catch {
+    remoteControl = void 0;
+  }
   const panelDependencies = {
     dingtalkRpcCall,
     discordRpcCall,
@@ -20254,6 +20416,7 @@ function apply(ctx) {
     updateRpcCall,
     deliveryRpcCall,
     globalSettingsRpcCall,
+    remoteControl,
     workspaceDirectoryPicker
   };
   const subscribeLocale = (listener) => typeof ctx.on === "function" ? ctx.on("locale/change", listener) : () => {

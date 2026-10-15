@@ -275,12 +275,13 @@ test('IM settings renders the retained IM channels plus the AI Office connector'
   assert.doesNotMatch(markup, /dim-logoSlack|dim-logoTelegram|dim-logoDiscord|dim-logoWhatsapp|dim-logoIMessage/);
   assert.doesNotMatch(markup, /dim-logoMatrix/);
   assert.match(markup, /dim-logoOffice/);
+  assert.match(markup, /dim-logoRemoteControl/);
   assert.match(styles, /\.dim-logoFeishu svg \{ width: 28px; height: 28px; \}/);
   // Overseas IM channels, including Matrix, stay out of the rail while
   // their Host services remain available. This render's `emailRpcCall` never
   // reports the channel as enabled either, so the mailbox entry point is
-  // omitted: seven rail entries. The email tab is covered separately below.
-  assert.equal((markup.match(/role="tab"/g) ?? []).length, 7);
+  // omitted: eight rail entries, including remote control.
+  assert.equal((markup.match(/role="tab"/g) ?? []).length, 8);
   assert.equal((markup.match(/aria-selected="true"/g) ?? []).length, 1);
   assert.doesNotMatch(markup, /role="switch"|type="checkbox"/);
   assert.doesNotMatch(markup, /dim-chevron|扫码绑定<\/small>|扫码接入<\/small>/);
@@ -306,6 +307,61 @@ test('the general settings gear sits to the right of the update control and outs
   // The general panel only mounts once its header action is selected; the
   // action must not steal the initial selection from the first channel.
   assert.doesNotMatch(markup, /id="dim-panel-global-settings"/);
+});
+
+test('IM settings exposes remote control under the IM bot dialog', () => {
+  const markup = renderToStaticMarkup(React.createElement(IMSettingsTab, {
+    preferredSectionId: 'remoteControl',
+    remoteControl: {
+      read: async () => ({ enabled: true, available: true }),
+      setEnabled: async () => {},
+      open: async () => {},
+    },
+    emailRpcCall: async () => ({ ok: true, value: { enabled: false } }),
+  }));
+
+  assert.match(markup, /id="dim-tab-remoteControl"/);
+  assert.match(markup, /data-im-remote-control/);
+  assert.match(markup, /启用远程控制/);
+  assert.match(markup, /打开配对界面/);
+});
+
+test('remote control settings read, toggle and open through the desktop service', async () => {
+  let enabled = false;
+  let opened = 0;
+  const remoteControl = {
+    read: async () => ({ enabled, available: true }),
+    setEnabled: async (next) => { enabled = next; },
+    open: async () => { opened += 1; },
+  };
+  let renderer;
+  await act(async () => {
+    renderer = create(React.createElement(IMSettingsTab, {
+      preferredSectionId: 'remoteControl',
+      remoteControl,
+      emailRpcCall: async () => ({ ok: true, value: { enabled: false } }),
+    }));
+    await flushTasks();
+  });
+
+  const input = renderer.root.findByProps({ 'aria-label': '启用远程控制' });
+  assert.equal(input.props.checked, false);
+  await act(async () => {
+    input.props.onChange({ target: { checked: true } });
+    await flushTasks();
+  });
+  assert.equal(enabled, true);
+  assert.equal(renderer.root.findByProps({ 'aria-label': '启用远程控制' }).props.checked, true);
+
+  const openButton = renderer.root.findAllByType('button')
+    .find((button) => nodeText(button) === '打开配对界面');
+  assert.ok(openButton);
+  await act(async () => {
+    openButton.props.onClick();
+    await flushTasks();
+  });
+  assert.equal(opened, 1);
+  act(() => renderer.unmount());
 });
 
 test('the general settings page uses an Attachments tab with contextual help and an explicit save button', () => {

@@ -140,6 +140,8 @@ const CSS = String.raw`
 .dim-logoTelegram svg { width: 21px; height: 21px; }
 .dim-logoOffice { color: white; background: linear-gradient(145deg, #12213f, #3964fe); }
 .dim-logoOffice svg { width: 23px; height: 23px; }
+.dim-logoRemoteControl { color: var(--dim-blue); background: color-mix(in srgb, var(--dim-blue) 11%, white); border: 1px solid color-mix(in srgb, var(--dim-blue) 22%, var(--dsw-alias-border-l2, #dfe1e5)); }
+.dim-remoteControlGlyph { font-size: 18px; line-height: 1; font-weight: 700; }
 .dim-logoMatrix { color: white; background: #0dbd8b; }
 .dim-logoMatrix svg { width: 22px; height: 22px; }
 .dim-logoDiscord { color: white; background: #5865f2; }
@@ -162,6 +164,22 @@ const CSS = String.raw`
 .dim-panelHeadingTitle { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .dim-panelHeading h2 { margin: 0; color: var(--dsw-alias-label-primary, #1f2329); font-size: 18px; line-height: 24px; font-weight: 650; }
 .dim-panelHeading p { margin: 4px 0 0; color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; line-height: 20px; }
+.dim-remoteControlPanel { min-width: 0; display: grid; gap: 12px; }
+.dim-settingsCard { padding: 20px; border: 1px solid var(--dsw-alias-border-l2, #e5e6eb); border-radius: 14px; background: var(--dsw-alias-bg-layer-1, #fff); box-shadow: 0 1px 2px rgb(31 35 41 / 3%); }
+.dim-settingsCardHeading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.dim-settingsCardHeading h3 { margin: 0; color: var(--dsw-alias-label-primary, #1f2329); font-size: 16px; line-height: 22px; font-weight: 650; }
+.dim-settingsCardHeading p { margin: 5px 0 0; color: var(--dsw-alias-label-secondary, #646a73); font-size: 13px; line-height: 20px; }
+.dim-toggleRow { display: inline-flex; align-items: center; flex: none; gap: 8px; color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; line-height: 20px; white-space: nowrap; cursor: pointer; }
+.dim-toggleRow input { width: 34px; height: 20px; margin: 0; accent-color: var(--dim-blue); cursor: pointer; }
+.dim-toggleRow input:disabled { cursor: not-allowed; opacity: .55; }
+.dim-remoteControlActions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--dsw-alias-border-l1, #eef0f3); }
+.dim-primaryAction { min-height: 34px; display: inline-flex; align-items: center; justify-content: center; padding: 0 13px; border: 1px solid var(--dim-action-primary, #1763db); border-radius: 8px; color: #fff; background: var(--dim-action-primary, #1763db); font: inherit; font-size: 13px; font-weight: 560; cursor: pointer; }
+.dim-primaryAction:hover:not(:disabled) { border-color: #0958d9; background: #0958d9; }
+.dim-primaryAction:focus-visible, .dim-toggleRow input:focus-visible { outline: 2px solid color-mix(in srgb, var(--dim-blue) 70%, white); outline-offset: 2px; }
+.dim-primaryAction:disabled { opacity: .55; cursor: not-allowed; }
+.dim-settingsHint { margin: 12px 0 0; color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; line-height: 19px; }
+.dim-errorText { margin: 12px 0 0; color: var(--dsw-alias-state-error-primary, #d54941); font-size: 12px; line-height: 19px; }
+@media (max-width: 620px) { .dim-settingsCardHeading { flex-direction: column; gap: 12px; } .dim-toggleRow { align-self: flex-start; } }
 .dim-experimentalBadge { padding: 1px 6px; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 5px; color: var(--dsw-alias-label-secondary, #646a73); font-size: 11px; line-height: 17px; }
 .dim-connectSteps { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 20px 0 0; padding: 0; list-style: none; }
 .dim-connectSteps li { display: inline-flex; align-items: center; gap: 7px; color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; line-height: 20px; }
