@@ -12,5 +12,8 @@ describe('product package skeleton', () => {
     }
     expect(manifest.name).toBe(PRODUCT_PACKAGE_NAME)
     expect(manifest.dsh?.bundle?.patch).toBe('./cordis.patch.yml')
+    expect(manifest.dependencies?.['@dofe/dsh-sensteed-skill-manager']).toBe(
+      'file:../../docker-helm.dofe.ai/plugins/dsh-sensteed-skill-manager',
+    )
   })
 })

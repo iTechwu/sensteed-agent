@@ -4,7 +4,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { BundleInfo } from '@deepseek-ai/dsh-api-remotes/client'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
-import { Button, IconSettingsOutlineRegular, Switch } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Choice, MARKET_OPTIONS, marketBody, marketTitle } from '../../../dsh-plugin-desktop/src/client/DesktopSettingsSection.tsx'
 import { en as desktopEn, zh as desktopZh, type DesktopSettingsLocaleKey } from '../../../dsh-plugin-desktop/src/client/desktop-settings-locales.ts'
 import { ComputerUseSettings } from './computer-use.tsx'
@@ -72,14 +72,8 @@ function PluginControls({ context, t: translate }: PropsLocale<'desktop-next'> &
   }
   const community = bundles.find(row => row.name === COMMUNITY)
   const market = bundles.find(row => row.name === MARKET)
-  const remote = bundles.find(row => row.name === REMOTE)
   const bothMarkets = community?.enabled === true && market?.enabled === true
   const locked = (row?: BundleInfo): boolean => loading || busy || !row || row.readOnlyReason !== undefined || row.error !== undefined
-  const openRemoteSettings = (): void => {
-    const trigger = document.querySelector<HTMLButtonElement>('[data-slot="sidebar.footer.action"] button[aria-label="手机连接"][aria-haspopup="dialog"]')
-    if (trigger) { setError(''); trigger.click() }
-    else setError(t('远程控制界面尚未就绪，请稍后重试。', 'Remote control is not ready yet. Try again shortly.'))
-  }
   return <div className="dshNextPluginControls" data-next-plugin-controls>
     <section className="dshDesktopSettingsGroup" data-next-markets aria-labelledby="next-market-title">
       <div><h3 id="next-market-title">{desktopText('marketTitle')}</h3>
@@ -96,16 +90,6 @@ function PluginControls({ context, t: translate }: PropsLocale<'desktop-next'> &
       {bothMarkets && <p role="status" className="dshDesktopSettingsHint">{t('当前两个市场均已开启，请选择保留其中一个。', 'Both markets are currently enabled. Choose which one to keep.')}</p>}
     </section>
     <div className="dshNextPluginSections">
-      <section className="dshDesktopSettingsGroup" data-next-remote-control aria-labelledby="next-remote-title">
-        <div className="dshNextPluginHeading"><h3 id="next-remote-title">{t('远程控制', 'Remote control')}</h3>
-          <div className="dshNextPluginActions">
-            <Button variant="ghost" size="sm" className="dshNextSettingsGear" icon={<IconSettingsOutlineRegular />}
-              aria-label={t('远程控制设置', 'Remote control settings')} title={remote?.enabled ? t('远程控制设置', 'Remote control settings') : t('启用远程控制后打开设置', 'Enable remote control to open settings')}
-              disabled={!remote?.enabled || loading || busy} onClick={openRemoteSettings} />
-            <Switch label={t('启用远程控制', 'Enable remote control')} checked={remote?.enabled ?? false} disabled={locked(remote)} onChange={enabled => { void change(REMOTE, enabled) }} />
-          </div></div>
-        <p className="dshDesktopSettingsHint">{t('通过 Agents Anywhere 从手机或其他设备连接。启用后，在侧边栏的“手机连接”中完成配对。', 'Connect from your phone or another device with Agents Anywhere. After enabling, pair it from Phone connection in the sidebar.')}</p>
-      </section>
       <section className="dshDesktopSettingsGroup" aria-labelledby="next-computer-use-title">
         <ComputerUseSettings context={context} zh={zh} />
       </section>

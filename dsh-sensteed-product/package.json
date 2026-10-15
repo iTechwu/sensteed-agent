@@ -47,6 +47,9 @@
     "lib",
     "cordis.patch.yml"
   ],
+  "dependencies": {
+    "@dofe/dsh-sensteed-skill-manager": "file:../../docker-helm.dofe.ai/plugins/dsh-sensteed-skill-manager"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"

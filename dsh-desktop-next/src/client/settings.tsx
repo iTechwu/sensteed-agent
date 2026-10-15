@@ -32,7 +32,7 @@ export function NextDesktopSettings({ adapter, language, onOpenPlugins }: { adap
     desktopSettings={adapter.desktopSettings} notificationSettings={adapter.notificationSettings}
     capabilities={{ logging: false, windowModes: false, pluginSelectors: false, updates: false, materialRequiresRestart: false, nativeLanConfirmation: true, jobNotifications: false }}
     introNotice={<div className="dshDesktopSettingsNotice dshNextPluginSettingsNotice" data-next-plugin-settings-notice>
-      <span>{language.startsWith('zh') ? '插件市场和远程控制设置已移至插件页面。' : 'Plugin market and remote control settings have moved to the Plugins page.'}</span>
+      <span>{language.startsWith('zh') ? '插件市场在插件页面管理；远程控制设置位于 IM机器人。' : 'Manage plugin markets on the Plugins page; remote control is available under IM bots.'}</span>
       <Button variant="outline" size="sm" onClick={onOpenPlugins}>{language.startsWith('zh') ? '前往插件页面' : 'Go to Plugins'}</Button>
     </div>}
     browserActions={state && <NextBrowserActions adapter={adapter} state={state} language={language} />}

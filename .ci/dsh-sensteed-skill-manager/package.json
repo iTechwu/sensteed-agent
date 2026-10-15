@@ -13,7 +13,7 @@
     }
   },
   "files": ["cordis.patch.yml", "index.js", "lib"],
-  "scripts": { "build": "node scripts/build.mjs", "test": "node --test test/*.test.mjs", "check": "npm run build && npm test" },
+  "scripts": { "build": "node scripts/build.mjs", "test": "node --test test/*.test.mjs", "check": "npm run build && node --check src/client.js && node --check lib/client.js && npm test" },
   "dependencies": { "fflate": "^0.8.2", "yaml": "^2.9.0" },
   "license": "MIT",
   "private": true
