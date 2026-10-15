@@ -9,12 +9,14 @@ import { runInNewContext } from 'node:vm'
 export function createPage(skills = [], sharedSkills = [], createSkill = async () => {}) {
   const states = [skills, sharedSkills, '', false, 'ready']
   let cursor = 0
+  let reference
   let component
   let dictionary
   let css = ''
   const react = {
     createElement: (tag, props, ...children) => ({ tag, props: props || {}, children: children.flat(Infinity).filter(child => child != null && child !== false) }),
     useEffect() {},
+    useRef(value) { return reference ??= { current: value } },
     useState(initial) {
       const index = cursor++
       if (!(index in states)) states[index] = initial
@@ -47,9 +49,9 @@ export function createPage(skills = [], sharedSkills = [], createSkill = async (
 }
 
 export function find(node, className) {
-  if (typeof node !== 'object') return undefined
-  if (node.props.className?.split(' ').includes(className)) return node
-  return node.children.map(child => find(child, className)).find(Boolean)
+  if (!node || typeof node !== 'object') return undefined
+  if ((node.props.className || node.props.listClassName)?.split(' ').includes(className)) return node
+  return [...node.children, node.props.anchor].map(child => find(child, className)).find(Boolean)
 }
 
 const fixture = [{ name: 'release-notes', description: 'Prepare release notes', source: 'user-dsh', provider: 'filesystem' }]
@@ -57,7 +59,7 @@ const fixture = [{ name: 'release-notes', description: 'Prepare release notes', 
 test('keeps the header, toolbar, installed list and shared section as separate page blocks', () => {
   const page = createPage(fixture)
   const root = page.render()
-  assert.deepEqual(Array.from(root.children, node => node.props.className), ['sm-header', 'sm-toolbar', 'sm-installed', 'sm-shared'])
+  assert.deepEqual(Array.from(find(root, 'sm-content').children, node => node.props.className), ['sm-header', 'sm-toolbar', 'sm-installed', 'sm-shared'])
   assert.deepEqual(Array.from(find(root, 'sm-header').children, node => node.props.className), ['sm-heading-copy', 'sm-actions'])
   assert.equal(find(find(root, 'sm-row'), 'sm-row-meta').children.length, 2)
 })
@@ -68,11 +70,11 @@ test('starts skill creation from the menu instead of showing an inline form', as
   find(page.render(), 'sm-add-more').props.onClick()
   const menu = find(page.render(), 'sm-add-menu')
   assert.equal(menu.children.length, 2)
-  await menu.children[1].props.onClick()
+  await menu.children[1].props.onSelect()
   const root = page.render()
   assert.equal(started, 1)
   assert.equal(find(root, 'sm-create-form'), undefined)
-  assert.equal(root.children[1].props.className, 'sm-toolbar')
+  assert.ok(find(root, 'sm-toolbar'))
 })
 
 test('opens the conversation before its runtime is ready, then sends the skill invocation', async () => {
@@ -84,13 +86,14 @@ test('opens the conversation before its runtime is ready, then sends the skill i
   const opened = new Promise(resolve => { resolveOpened = resolve })
   const services = {
     sessions: {
-      create: async () => { events.push('create'); return 'new-session' },
+      create: async options => { assert.deepEqual(JSON.parse(JSON.stringify(options)), { workspaceId: 'workspace-1', agentPreset: 'cordis' }); events.push('create'); return 'new-session' },
       retain: id => {
         assert.equal(id, 'new-session')
         return { ready, release: () => events.push('release') }
       },
     },
     uiWorkspace: { openSession: id => { assert.equal(id, 'new-session'); events.push('open'); resolveOpened() } },
+    workspaces: { list: { getSnapshot: () => ({ items: [{ workspaceId: 'workspace-1' }] }) } },
   }
   const pending = createSkillConversation({ get: name => services[name] })
   await opened
@@ -129,9 +132,34 @@ test('shows a retryable creation error without leaving an inline form open', asy
   find(page.render(), 'sm-add-primary').props.onClick()
   assert.ok(find(page.render(), 'sm-install-form'))
   find(page.render(), 'sm-add-more').props.onClick()
-  await find(page.render(), 'sm-add-menu').children[1].props.onClick()
+  await find(page.render(), 'sm-add-menu').children[1].props.onSelect()
   const root = page.render()
   assert.equal(find(root, 'sm-install-form'), undefined)
-  assert.equal(find(root, 'sm-error').children[0], '无法打开 Agent 会话，请重试。')
+  assert.equal(find(root, 'sm-error').children[0], '无法开始创建技能，请重试。')
   assert.equal(find(root, 'sm-add-more').props.disabled, false)
+})
+
+test('ignores repeated create clicks while the first session is being created', async () => {
+  let started = 0
+  let finish
+  const page = createPage(fixture, [], () => { started++; return new Promise(resolve => { finish = resolve }) })
+  const action = find(page.render(), 'sm-add-menu').children[1].props.onSelect
+  const pending = action()
+  await action()
+  assert.equal(started, 1)
+  finish()
+  await pending
+  assert.equal(find(page.render(), 'sm-add-primary').props.disabled, false)
+})
+
+test('lets company skills be browsed directly and searches their descriptions', () => {
+  const page = createPage(fixture, [{ name: 'weekly-report', description: '公司销售周报', version: 1 }])
+  find(page.render(), 'sm-filters').children[3].props.onClick()
+  let root = page.render()
+  assert.equal(find(root, 'sm-installed'), undefined)
+  assert.ok(find(root, 'sm-shared'))
+  find(root, 'sm-search').props.onInput({ currentTarget: { value: '销售' } })
+  assert.ok(find(page.render(), 'sm-row'))
+  find(page.render(), 'sm-search').props.onInput({ currentTarget: { value: 'missing' } })
+  assert.equal(find(page.render(), 'sm-row'), undefined)
 })

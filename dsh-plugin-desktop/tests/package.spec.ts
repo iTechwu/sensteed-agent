@@ -179,6 +179,8 @@ describe('published package surface', () => {
     }
     expect(workspaceManifest.scripts?.['dofe-ui:build'])
       .toBe('node scripts/build-dofe-ui.mjs')
+    expect(manifest.scripts?.build).toContain('node ../scripts/build-dofe-ui.mjs')
+    expect(dofeUiBuild).toContain("'dsh-sensteed-skill-manager'")
     expect(dofeUiBuild).not.toContain("'dsh-yootun-audit'")
     expect(manifest.scripts?.['test:audit-ui']).toBe('node tests/browser/yootun-audit.visual.mjs')
     // check、desktop-windows、desktop-linux、desktop-macos、
