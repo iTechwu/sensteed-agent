@@ -83,6 +83,8 @@ function callWorkspaceDirectoryApi(ctx, method, ...args) {
 
 // Only domestic IM and office extensions have settings entries. Legacy RPC
 // callers remain compatible with embedded clients and existing Host services.
+const REMOTE_CONTROL_TAB_ID = 'remoteControl';
+
 const CHANNELS = Object.freeze([
   { id: 'weixin', label: '微信', description: '在微信私聊中向哪吒 Agent 发起任务。' },
   { id: 'feishu', label: '飞书', description: '在飞书私聊和群聊中，与哪吒 Agent 协作。' },
@@ -92,6 +94,7 @@ const CHANNELS = Object.freeze([
   { id: 'wecomApp', label: '企业微信应用', note: '实验功能', extended: true, description: '通过企业自建应用接入，适合有应用管理权限的团队。' },
   { id: 'email', label: '邮箱', note: '实验功能', extended: true, description: '用邮件提交任务，并通过回信接收处理结果。' },
   { id: 'office', label: 'AI Office', note: '实验功能', extended: true, description: '连接办公系统，配置任务接收与结果回传。' },
+  { id: REMOTE_CONTROL_TAB_ID, label: '远程控制', note: '桌面功能', extended: true, description: '管理手机和其他设备连接哪吒 Agent。' },
 ]);
 
 function WeixinLogo() {
@@ -131,6 +134,11 @@ function OfficeLogo() {
     h(OfficeLogoGlyph));
 }
 
+function RemoteControlLogo() {
+  return h('span', { className: 'dim-logo dim-logoRemoteControl', 'aria-hidden': 'true' },
+    h('span', { className: 'dim-remoteControlGlyph' }, '↔'));
+}
+
 function ChannelLogo({ channel }) {
   if (channel === 'weixin') return h(WeixinLogo);
   if (channel === 'feishu') return h(FeishuLogo);
@@ -139,7 +147,99 @@ function ChannelLogo({ channel }) {
   if (channel === 'wecomApp') return h(WecomAppLogo);
   if (channel === 'qq') return h(QqLogo);
   if (channel === 'email') return h(EmailLogo);
+  if (channel === REMOTE_CONTROL_TAB_ID) return h(RemoteControlLogo);
   return h(OfficeLogo);
+}
+
+function RemoteControlSettingsTab({ remoteControl }) {
+  const [state, setState] = React.useState(null);
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState('');
+  const mountedRef = React.useRef(true);
+
+  const refresh = React.useCallback(async () => {
+    if (!remoteControl) {
+      setState({ enabled: false, available: false });
+      return;
+    }
+    try {
+      const next = await remoteControl.read();
+      if (!mountedRef.current) return;
+      setState({
+        enabled: next?.enabled === true,
+        available: next?.available !== false,
+      });
+      setError('');
+    } catch {
+      if (!mountedRef.current) return;
+      setState({ enabled: false, available: false });
+      setError('暂时无法读取远程控制状态，请稍后重试。');
+    }
+  }, [remoteControl]);
+
+  React.useEffect(() => {
+    mountedRef.current = true;
+    void refresh();
+    return () => { mountedRef.current = false; };
+  }, [refresh]);
+
+  const changeEnabled = async (enabled) => {
+    if (!remoteControl || busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      await remoteControl.setEnabled(enabled);
+      await refresh();
+    } catch {
+      setError('远程控制状态更新失败，请稍后重试。');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const openPairing = async () => {
+    if (!remoteControl || busy || state?.enabled !== true) return;
+    setBusy(true);
+    setError('');
+    try {
+      await remoteControl.open();
+    } catch {
+      setError('远程控制界面尚未就绪，请稍后重试。');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const unavailable = !remoteControl || state?.available === false;
+  return h('section', { className: 'dim-remoteControlPanel', 'data-im-remote-control': true },
+    h('div', { className: 'dim-settingsCard' },
+      h('div', { className: 'dim-settingsCardHeading' },
+        h('div', null,
+          h('h3', null, '远程控制'),
+          h('p', null, '允许手机或其他设备连接当前桌面上的哪吒 Agent。')),
+        h('label', { className: 'dim-toggleRow' },
+          h('input', {
+            type: 'checkbox',
+            role: 'switch',
+            checked: state?.enabled === true,
+            disabled: unavailable || busy,
+            onChange: (event) => { void changeEnabled(event.target.checked); },
+            'aria-label': '启用远程控制',
+          }),
+          h('span', null, state?.enabled ? '已启用' : '未启用'))),
+      unavailable
+        ? h('p', { className: 'dim-settingsHint', role: 'status' }, remoteControl
+          ? '当前桌面运行状态不支持远程控制。'
+          : '当前桌面版本未提供远程控制服务。')
+        : h('div', { className: 'dim-remoteControlActions' },
+          h('button', {
+            type: 'button',
+            className: 'dim-primaryAction',
+            disabled: state?.enabled !== true || busy,
+            onClick: () => { void openPairing(); },
+          }, '打开配对界面'),
+          h('p', { className: 'dim-settingsHint' }, '启用后可在配对界面完成设备连接和访问管理。')),
+      error ? h('p', { className: 'dim-errorText', role: 'alert' }, error) : null));
 }
 
 export function LoopbackRecoveryNotice({ recovery, onNavigate = replacePageLocation }) {
@@ -176,6 +276,7 @@ export function IMSettingsTab({
   updateRpcCall,
   deliveryRpcCall,
   globalSettingsRpcCall,
+  remoteControl,
   workspaceDirectoryPicker,
   preferredSectionId,
   browserLocation = globalThis.location,
@@ -381,7 +482,9 @@ export function IMSettingsTab({
                     ? h(QqSettingsTab, { rpcCall: rpcCalls.qqRpcCall })
                     : active.id === 'email'
                       ? h(EmailSettingsTab, { rpcCall: rpcCalls.emailRpcCall })
-                      : h(OfficeSettingsTab, { rpcCall: rpcCalls.officeRpcCall }))),
+                      : active.id === 'office'
+                        ? h(OfficeSettingsTab, { rpcCall: rpcCalls.officeRpcCall })
+                        : h(RemoteControlSettingsTab, { remoteControl }))),
     ),
   ));
 }
@@ -462,6 +565,12 @@ export function apply(ctx) {
       callWorkspaceDirectoryApi(ctx, 'listDirectory', path, signal),
     pickDirectory: () => callWorkspaceDirectoryApi(ctx, 'pickDirectory'),
   });
+  let remoteControl;
+  try {
+    remoteControl = typeof ctx.get === 'function' ? ctx.get('desktopRemoteControl', false) : undefined;
+  } catch {
+    remoteControl = undefined;
+  }
 
   const panelDependencies = {
     dingtalkRpcCall,
@@ -481,6 +590,7 @@ export function apply(ctx) {
     updateRpcCall,
     deliveryRpcCall,
     globalSettingsRpcCall,
+    remoteControl,
     workspaceDirectoryPicker,
   };
   const subscribeLocale = (listener) => typeof ctx.on === 'function'

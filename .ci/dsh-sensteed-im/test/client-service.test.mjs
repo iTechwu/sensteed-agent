@@ -239,7 +239,7 @@ test('render returns fresh elements of a stable type without changing settings o
 test('preferred section is initial-only, invalid sections retain the web default', (t) => {
   const host = start(t);
   for (const id of ['weixin', 'feishu', 'dingtalk', 'wecom', 'wecomApp', 'qq',
-    'office', 'global-settings', 'matrix', 'slack', 'telegram', 'discord', 'whatsapp', 'imessage', 'unknown', undefined]) {
+    'office', 'remoteControl', 'global-settings', 'matrix', 'slack', 'telegram', 'discord', 'whatsapp', 'imessage', 'unknown', undefined]) {
     const markup = renderToStaticMarkup(host.service.render({ preferredSectionId: id }));
     const expected = !id || ['unknown', 'matrix', 'slack', 'telegram', 'discord', 'whatsapp', 'imessage'].includes(id) ? 'weixin' : id;
     assert.ok(markup.includes(`id="dim-panel-${expected}"`), String(id));
@@ -268,12 +268,12 @@ test('channel keyboard navigation wraps and remains reachable from general setti
   };
   assert.equal(tabs().filter(tab => tab.props.tabIndex === 0).length, 1);
   assert.equal(key('weixin', 'ArrowUp'), true);
-  assert.equal(panel().props.id, 'dim-panel-office');
-  assert.equal(key('office', 'ArrowRight'), true);
+  assert.equal(panel().props.id, 'dim-panel-remoteControl');
+  assert.equal(key('remoteControl', 'ArrowRight'), true);
   assert.equal(panel().props.id, 'dim-panel-weixin');
   key('weixin', 'End');
-  assert.equal(panel().props.id, 'dim-panel-office');
-  key('office', 'Home');
+  assert.equal(panel().props.id, 'dim-panel-remoteControl');
+  key('remoteControl', 'Home');
   assert.equal(panel().props.id, 'dim-panel-weixin');
   assert.equal(key('weixin', 'Tab'), false, 'normal Tab traversal must remain available');
   act(() => renderer.root.findByProps({ id: 'dim-general-settings-trigger' }).props.onClick());
