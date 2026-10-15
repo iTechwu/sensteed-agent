@@ -1,0 +1,4 @@
+interface:
+  display_name: "自动化任务"
+  short_description: "在 Sensteed-Agent 中将执行内容和时间保存为可查看、修改的自动化任务"
+  default_prompt: "使用 $sensteed-automation 帮我新建自动化任务，先了解执行内容和时间，再保存并核验结果。"

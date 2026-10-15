@@ -119,6 +119,13 @@
       "path": "machine",
       "repository": "https://github.com/iTechwu/sensteed-machine-skill",
       "resolvedSha": "d82eab1d3f7216d4cdc0761c80197e4ec819bcfd"
+    },
+    {
+      "name": "sensteed-automation",
+      "kind": "dir",
+      "path": "sensteed-automation",
+      "repository": "https://github.com/iTechwu/helm.dofe.ai",
+      "resolvedSha": "fa6b39107912dc525642d4e8bdc3954584e73bc4"
     }
   ]
 }
