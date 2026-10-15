@@ -133,6 +133,69 @@
       "path": "dsh-sensteed-create-plugin",
       "repository": "https://github.com/iTechwu/helm.dofe.ai",
       "resolvedSha": "30bb06746b3e9a977ac313350d128150c544b8f2"
+    },
+    {
+      "name": "finance-monthly-risk",
+      "kind": "dir",
+      "path": "finance-monthly-risk",
+      "repository": "https://github.com/iTechwu/helm.dofe.ai",
+      "resolvedSha": "06be24a348619ff50bf4cdfa7588fca3d7200ba3"
+    },
+    {
+      "name": "finance-cost-structure",
+      "kind": "dir",
+      "path": "finance-cost-structure",
+      "repository": "https://github.com/iTechwu/helm.dofe.ai",
+      "resolvedSha": "06be24a348619ff50bf4cdfa7588fca3d7200ba3"
+    },
+    {
+      "name": "finance-cash-pressure",
+      "kind": "dir",
+      "path": "finance-cash-pressure",
+      "repository": "https://github.com/iTechwu/helm.dofe.ai",
+      "resolvedSha": "06be24a348619ff50bf4cdfa7588fca3d7200ba3"
+    },
+    {
+      "name": "finance-budget-review",
+      "kind": "dir",
+      "path": "finance-budget-review",
+      "repository": "https://github.com/iTechwu/helm.dofe.ai",
+      "resolvedSha": "06be24a348619ff50bf4cdfa7588fca3d7200ba3"
+    },
+    {
+      "name": "finance-revenue-attainment",
+      "kind": "dir",
+      "path": "finance-revenue-attainment",
+      "repository": "https://github.com/iTechwu/helm.dofe.ai",
+      "resolvedSha": "06be24a348619ff50bf4cdfa7588fca3d7200ba3"
+    },
+    {
+      "name": "finance-data-quality",
+      "kind": "dir",
+      "path": "finance-data-quality",
+      "repository": "https://github.com/iTechwu/helm.dofe.ai",
+      "resolvedSha": "06be24a348619ff50bf4cdfa7588fca3d7200ba3"
+    },
+    {
+      "name": "finance-cost-cash-forecast",
+      "kind": "dir",
+      "path": "finance-cost-cash-forecast",
+      "repository": "https://github.com/iTechwu/helm.dofe.ai",
+      "resolvedSha": "06be24a348619ff50bf4cdfa7588fca3d7200ba3"
+    },
+    {
+      "name": "finance-budget-version-health",
+      "kind": "dir",
+      "path": "finance-budget-version-health",
+      "repository": "https://github.com/iTechwu/helm.dofe.ai",
+      "resolvedSha": "06be24a348619ff50bf4cdfa7588fca3d7200ba3"
+    },
+    {
+      "name": "finance-alert-rules-audit",
+      "kind": "dir",
+      "path": "finance-alert-rules-audit",
+      "repository": "https://github.com/iTechwu/helm.dofe.ai",
+      "resolvedSha": "06be24a348619ff50bf4cdfa7588fca3d7200ba3"
     }
   ]
 }

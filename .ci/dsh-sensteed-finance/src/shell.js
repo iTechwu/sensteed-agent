@@ -165,8 +165,8 @@ function apply(ctx) {
       const sessions = ctx.get?.('sessions')
       const navigation = ctx.get?.('uiWorkspace')
       if (!sessions || !navigation) throw new Error('conversation_unavailable')
-      const current = sessions.list.getSnapshot().ids.find(id => sessions.retainInfo(id).getSnapshot().retainedBy.mainView > 0)
-      const id = current ?? await sessions.create()
+      // 每次深度分析都从独立会话开始，避免把上一次分析的上下文带入本次结论。
+      const id = await sessions.create()
       navigation.openSession(id)
       const scoped = sessions.scope(id)
       if (scoped) {

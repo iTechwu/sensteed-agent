@@ -1041,12 +1041,17 @@ test('MCP registration is owned by the desktop login lifecycle without machine s
   assert.doesNotMatch(patch, /authorizationCredential|INTERNAL_API_SECRET|mcp-finance/u)
 })
 
-test('client source wires sidebar entry, overlay, tabs, and analysis entries', async () => {
+test('client source wires sidebar entry, overlay, tabs, and skill-backed analysis entries', async () => {
   const source = await readClientSource()
   for (const token of ['sidebar.footer.action', "name: 'main'", 'sf-overlay', 'ANALYSIS_ENTRIES', '/brief', 'backfillActual', 'runDone', 'analysis_forecast', 'PillTabs', 'BudgetView', 'sf-pilltabs', 'sf-table-fields', 'sf-table-sort-button', 'sf-sidebar-brand', 'CustomizableTextSelect', 'MultiSearchSelect', 'textChoice', '新建预算行', 'targetYear', 'adjTargetMonth']) {
     assert.match(source, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'u'))
   }
   assert.match(source, /if \(await act\('\/budget-adjustments',[\s\S]*?\)\) onClose\(\)/u)
+  for (const skill of ['finance-monthly-risk', 'finance-cost-structure', 'finance-cash-pressure', 'finance-budget-review', 'finance-revenue-attainment', 'finance-data-quality', 'finance-cost-cash-forecast', 'finance-budget-version-health', 'finance-alert-rules-audit']) {
+    assert.match(source, new RegExp(`skill: '${skill}'`, 'u'))
+  }
+  assert.ok(source.includes('return `/${entry.skill}\\n${context}`'))
+  assert.match(source, /const id = await sessions\.create\(\)/u)
   assert.doesNotMatch(source, /sf-task-departments/u, 'department assignment must use the searchable multi-select')
   assert.doesNotMatch(source, /fetch\(`https?:\/\//u, 'client must only call same-origin routes')
 })

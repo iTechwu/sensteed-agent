@@ -76,6 +76,87 @@
       "siblingDir": "../docker-helm.dofe.ai/skills/dsh-sensteed-create-plugin",
       "snapshotDir": "dsh-plugin-desktop/bundled/skills/dsh-sensteed-create-plugin",
       "resolvedSha": "30bb06746b3e9a977ac313350d128150c544b8f2"
+    },
+    {
+      "name": "finance-monthly-risk",
+      "repository": "https://github.com/iTechwu/helm.dofe.ai",
+      "ref": null,
+      "source": "sibling",
+      "siblingDir": "../docker-helm.dofe.ai/skills/finance-monthly-risk",
+      "snapshotDir": "dsh-plugin-desktop/bundled/skills/finance-monthly-risk",
+      "resolvedSha": "06be24a348619ff50bf4cdfa7588fca3d7200ba3"
+    },
+    {
+      "name": "finance-cost-structure",
+      "repository": "https://github.com/iTechwu/helm.dofe.ai",
+      "ref": null,
+      "source": "sibling",
+      "siblingDir": "../docker-helm.dofe.ai/skills/finance-cost-structure",
+      "snapshotDir": "dsh-plugin-desktop/bundled/skills/finance-cost-structure",
+      "resolvedSha": "06be24a348619ff50bf4cdfa7588fca3d7200ba3"
+    },
+    {
+      "name": "finance-cash-pressure",
+      "repository": "https://github.com/iTechwu/helm.dofe.ai",
+      "ref": null,
+      "source": "sibling",
+      "siblingDir": "../docker-helm.dofe.ai/skills/finance-cash-pressure",
+      "snapshotDir": "dsh-plugin-desktop/bundled/skills/finance-cash-pressure",
+      "resolvedSha": "06be24a348619ff50bf4cdfa7588fca3d7200ba3"
+    },
+    {
+      "name": "finance-budget-review",
+      "repository": "https://github.com/iTechwu/helm.dofe.ai",
+      "ref": null,
+      "source": "sibling",
+      "siblingDir": "../docker-helm.dofe.ai/skills/finance-budget-review",
+      "snapshotDir": "dsh-plugin-desktop/bundled/skills/finance-budget-review",
+      "resolvedSha": "06be24a348619ff50bf4cdfa7588fca3d7200ba3"
+    },
+    {
+      "name": "finance-revenue-attainment",
+      "repository": "https://github.com/iTechwu/helm.dofe.ai",
+      "ref": null,
+      "source": "sibling",
+      "siblingDir": "../docker-helm.dofe.ai/skills/finance-revenue-attainment",
+      "snapshotDir": "dsh-plugin-desktop/bundled/skills/finance-revenue-attainment",
+      "resolvedSha": "06be24a348619ff50bf4cdfa7588fca3d7200ba3"
+    },
+    {
+      "name": "finance-data-quality",
+      "repository": "https://github.com/iTechwu/helm.dofe.ai",
+      "ref": null,
+      "source": "sibling",
+      "siblingDir": "../docker-helm.dofe.ai/skills/finance-data-quality",
+      "snapshotDir": "dsh-plugin-desktop/bundled/skills/finance-data-quality",
+      "resolvedSha": "06be24a348619ff50bf4cdfa7588fca3d7200ba3"
+    },
+    {
+      "name": "finance-cost-cash-forecast",
+      "repository": "https://github.com/iTechwu/helm.dofe.ai",
+      "ref": null,
+      "source": "sibling",
+      "siblingDir": "../docker-helm.dofe.ai/skills/finance-cost-cash-forecast",
+      "snapshotDir": "dsh-plugin-desktop/bundled/skills/finance-cost-cash-forecast",
+      "resolvedSha": "06be24a348619ff50bf4cdfa7588fca3d7200ba3"
+    },
+    {
+      "name": "finance-budget-version-health",
+      "repository": "https://github.com/iTechwu/helm.dofe.ai",
+      "ref": null,
+      "source": "sibling",
+      "siblingDir": "../docker-helm.dofe.ai/skills/finance-budget-version-health",
+      "snapshotDir": "dsh-plugin-desktop/bundled/skills/finance-budget-version-health",
+      "resolvedSha": "06be24a348619ff50bf4cdfa7588fca3d7200ba3"
+    },
+    {
+      "name": "finance-alert-rules-audit",
+      "repository": "https://github.com/iTechwu/helm.dofe.ai",
+      "ref": null,
+      "source": "sibling",
+      "siblingDir": "../docker-helm.dofe.ai/skills/finance-alert-rules-audit",
+      "snapshotDir": "dsh-plugin-desktop/bundled/skills/finance-alert-rules-audit",
+      "resolvedSha": "06be24a348619ff50bf4cdfa7588fca3d7200ba3"
     }
   ],
   "plugins": [
