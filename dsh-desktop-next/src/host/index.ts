@@ -18,7 +18,10 @@ import { disableAsarArchiveView, unpackedPath } from '../asar-archive-policy.ts'
 import { maskSecrets } from '../mask-secrets.ts'
 import { parseSystemProxyProbe, SYSTEM_PROXY_ENV, withSystemProxy } from '../system-proxy.ts'
 import { watchPlatformLogin, type PlatformLoginAccount } from './platform-login.ts'
+import { installAgentPresetResolution } from './agent-preset.ts'
+import { installCuaDriverResolution } from './cua-driver.ts'
 import { installOfficeEngineResolution } from './office-engine.ts'
+import { installSkillBadgeResolution } from './skill-badge.ts'
 import * as desktopOffice from './office.ts'
 import { resolveOfficeConfig } from './office.ts'
 
@@ -32,6 +35,12 @@ export async function main(): Promise<void> {
   if (!runtimeDir || !projectDir || !home || !process.send) throw new Error('Next Host requires runtime, profile, home and IPC')
   // The Office engine runs as a native child process, so an archived payload resolves it to its unpacked copy.
   installOfficeEngineResolution(runtimeDir)
+  // The Creator preset reads its skills through the Host's filesystem service, which cannot stat inside the archive.
+  installAgentPresetResolution(runtimeDir)
+  // The computer-use driver hands its library path to the system loader, which reads no archive.
+  installCuaDriverResolution(runtimeDir)
+  // The badge skill tells the model to take its PNG from the directory it announces, which shells and the Host's filesystem service cannot read inside the archive.
+  installSkillBadgeResolution(runtimeDir)
   const preferences = parsePreferences(JSON.parse(process.env.DSH_NEXT_PREFERENCES ?? '{}'))
   configureHostLogging(preferences)
   hostLog({ source: 'host', event: 'process.start', fields: { profile: basename(projectDir), node: process.version } })

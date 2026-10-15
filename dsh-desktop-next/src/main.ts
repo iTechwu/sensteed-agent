@@ -16,6 +16,8 @@ import { preferredDesktopLocale, resolveDesktopLocale } from './menu-locale.ts'
 import { NativeLocaleStore } from './native-locale.ts'
 import { NextDesktopRuntime } from './desktop-runtime.ts'
 import { probeSystemProxy, type DesktopSystemProxyProbe } from './system-proxy.ts'
+import { resolveDesktopShellEnvironment } from './shell-environment.ts'
+import { ensureUtf8Locale } from './shell-locale.ts'
 import { DEFAULT_PROFILE, NATIVE_ACCESS_HEADER, type DesktopCommand, type DesktopState, type DesktopSettingsPage } from './desktop-contract.ts'
 import { portsChanged, parsePreferences } from './desktop-preferences.ts'
 import { NativeDesktop, applyWindowMaterial } from './native-desktop.ts'
@@ -165,11 +167,19 @@ const native = new NativeDesktop({ root, language: () => windowsLanguage, state,
   show: openMain, run, warn: error => runtime.diagnostics.append(String(error), 'warn') })
 const permissions = createNativePermissions()
 const updateInstaller = new NextUpdateInstaller({ platform: process.platform, executable: process.execPath,
+  language: () => windowsLanguage,
   log: error => runtime.diagnostics.append(String(error), 'warn') })
 const updates = new NextUpdates({ version, platform: process.platform, packaged: app.isPackaged, userData: electronData,
   request: (url, init) => net.fetch(url, { ...init, credentials: 'omit' }),
   artifactRequest: createArtifactRequest(),
   changed: () => { if (app.isReady() && !quitting) native.refresh() },
+  available: nextVersion => {
+    if (app.isReady() && !quitting) {
+      native.notifyUpdate(nextVersion, () => {
+        void promptAvailableUpdate().catch(error => runtime.diagnostics.append(String(error), 'warn'))
+      })
+    }
+  },
   log: error => runtime.diagnostics.append(String(error), 'warn'),
   prepare: (path, nextVersion, directory, signal) => updateInstaller.prepare(path, nextVersion, directory, signal),
   install: async () => {
@@ -416,6 +426,23 @@ async function confirmed(message: string, detail = t('将停止当前 Host，正
   const result = await (owner === undefined ? dialog.showMessageBox(options) : dialog.showMessageBox(owner, options))
   return result.response === 0 && !quitting
 }
+async function promptAvailableUpdate(): Promise<void> {
+  if (quitting || runtime.busy) return
+  const snapshot = updates.snapshot()
+  if (snapshot.phase !== 'available' || !snapshot.installable) return
+  const owner = raiseDialogOwner()
+  const options = {
+    type: 'info' as const,
+    title: 'DSH NEXT',
+    message: updateLabel(snapshot, windowsLanguage),
+    buttons: [t('下载更新', 'Download update'), t('稍后', 'Later')],
+    defaultId: 0,
+    cancelId: 1,
+    detail: t('下载完成后可一键安装并重启。', 'When the download finishes, choose Install and restart.'),
+  }
+  const choice = await (owner === undefined ? dialog.showMessageBox(options) : dialog.showMessageBox(owner, options))
+  if (choice.response === 0 && !quitting && !runtime.busy) void updates.download()
+}
 async function openPath(path: string): Promise<void> { const error = await shell.openPath(path); if (error) throw new Error(error) }
 
 async function command(value: unknown, source: 'app' | 'shell' | 'native' = 'app'): Promise<void> {
@@ -454,12 +481,12 @@ async function performCommand(input: Record<string, unknown>, type: string, sour
       void updates.check().then(async () => {
         if (source !== 'native' || quitting) return
         const snapshot = updates.snapshot()
-        if (snapshot.phase === 'available' && snapshot.installable) {
-          const choice = await dialog.showMessageBox({ type: 'info', title: 'DSH NEXT',
-            message: updateLabel(snapshot, windowsLanguage), buttons: [t('下载更新', 'Download update'), t('稍后', 'Later')], defaultId: 0, cancelId: 1,
-            detail: t('下载完成后可一键安装并重启。', 'When the download finishes, choose Install and restart.') })
-          if (choice.response === 0 && !quitting) void updates.download()
-        } else await dialog.showMessageBox({ type: 'info', title: 'DSH NEXT', message: updateLabel(snapshot, windowsLanguage) })
+        if (snapshot.phase === 'available' && snapshot.installable) await promptAvailableUpdate()
+        else {
+          const owner = raiseDialogOwner()
+          const options = { type: 'info' as const, title: 'DSH NEXT', message: updateLabel(snapshot, windowsLanguage) }
+          await (owner === undefined ? dialog.showMessageBox(options) : dialog.showMessageBox(owner, options))
+        }
       }).catch(error => runtime.diagnostics.append(String(error), 'warn'))
     } else if (type === 'download-update') void updates.download()
     else {
@@ -772,6 +799,12 @@ async function main(): Promise<void> {
   if (process.platform === 'darwin' && !app.isPackaged) app.dock?.setIcon(join(root, 'build', 'app-icon-mac.png'))
   // Recovery can open without a Host; Chromium's app locale may differ from the OS language.
   windowsLanguage = preferredDesktopLocale([...app.getPreferredSystemLanguages(), app.getLocale()])
+  // Finder and Dock launches carry no login-shell exports, so the Host, its terminals and tool subprocesses
+  // would run with the minimal system PATH and no locale. Recover the exports the Desktop variants
+  // recover, then make sure a UTF-8 locale is set, as Terminal.app does for the shells it opens.
+  const shellEnvironment = await resolveDesktopShellEnvironment({ environment: process.env, home: app.getPath('home'), isPackaged: app.isPackaged, platform: process.platform })
+  for (const [name, value] of Object.entries(shellEnvironment.updates)) process.env[name] = value
+  const fallbackLocale = ensureUtf8Locale(process.env, process.platform, app.getPreferredSystemLanguages())
   // Read once, before anything can start a Host: a proxy client's "system proxy" switch sets no
   // environment variable, and only Chromium can evaluate it (PAC/WPAD included). Changing the
   // proxy takes effect on the next application start.
@@ -924,10 +957,12 @@ async function main(): Promise<void> {
   runtime.safeMode = safeModeRequested
   runtime.recoveryMode = process.argv.includes(RECOVERY_ARGUMENT)
   runtime.initialize()
+  runtime.diagnostics.record({ source: 'desktop', event: 'shell-environment.resolved', fields: { source: shellEnvironment.source,
+    fallbackReason: shellEnvironment.fallbackReason ?? null, recovered: Object.keys(shellEnvironment.updates).join(' ') || null, fallbackLocale: fallbackLocale ?? null } })
   if (dataLocation.error && !runtime.safeMode) { runtime.recoveryMode = true; runtime.report(dataLocation.error) }
   if (app.isPackaged) {
     // Packaging sealed the payload with the shell, dsh, platform and architectures it was released for.
-    try { verifyPackagedRuntimeIdentity(join(process.resourcesPath, DESKTOP_RUNTIME_FILE), { version, dshVersion: readInstalledPackageVersion(root, '@deepseek-ai/dsh'), platform: process.platform, arch: process.arch }) }
+    try { verifyPackagedRuntimeIdentity(join(root, DESKTOP_RUNTIME_FILE), { version, dshVersion: readInstalledPackageVersion(root, '@deepseek-ai/dsh'), platform: process.platform, arch: process.arch }) }
     catch (error) { runtime.recoveryMode = true; runtime.report(error) }
   }
   if (!runtime.safeMode && !runtime.recoveryMode) {
@@ -1035,7 +1070,6 @@ app.on('before-quit', event => {
         app.quit()
         return
       }
-      if (process.platform === 'darwin') { if (finish()) runtime.diagnostics.end(true); return }
     }
     if (!finish()) return
     runtime.diagnostics.end(true)

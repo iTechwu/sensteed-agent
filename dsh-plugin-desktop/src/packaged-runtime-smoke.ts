@@ -13,14 +13,12 @@ import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import type {} from '@deepseek-ai/dsh-session-persistence'
 import { verifyBundledSkills } from './packaged-filesystem-smoke.ts'
 import { rgPath } from '@vscode/ripgrep'
 import AdmZip from 'adm-zip'
 import { exportDiagnosticsZip } from './diagnostic-export.ts'
 import { installProfilePackageResolver } from './module-resolution.ts'
-import { disableAsarArchiveView } from './asar-archive-policy.ts'
-
-disableAsarArchiveView(import.meta.url)
 
 const OK_MARKER = 'DSH_PACKAGED_RUNTIME_OK'
 
@@ -32,29 +30,26 @@ const installAnchor = new URL('../package.json', import.meta.url)
 const packagedAsarRoot = /(?:^|[\\/])app\.asar(?:\.unpacked)?[\\/]/u
 const packagedDirectoryRoot = /(?:^|[\\/])app[\\/]/u
 const usesAsar = packagedAsarRoot.test(installAnchor.pathname)
-const packagedRgPath = usesAsar
-  ? rgPath.replace(/app\.asar[\\/]/u, 'app.asar.unpacked/')
-  : rgPath
 assert(
   usesAsar || packagedDirectoryRoot.test(installAnchor.pathname),
   `did not start from a packaged application root: ${installAnchor.pathname}`,
 )
 assert(
   usesAsar
-    ? /(?:^|[\\/])app\.asar\.unpacked[\\/]/u.test(packagedRgPath)
-    : packagedDirectoryRoot.test(packagedRgPath),
-  `resolved ripgrep outside the packaged application root: ${packagedRgPath}`,
+    ? /(?:^|[\\/])app\.asar\.unpacked[\\/]/u.test(rgPath)
+    : packagedDirectoryRoot.test(rgPath),
+  `resolved ripgrep outside the packaged application root: ${rgPath}`,
 )
-assert(existsSync(packagedRgPath), `cannot find ripgrep at ${packagedRgPath}`)
-const rgVersion = execFileSync(packagedRgPath, ['--version'], { encoding: 'utf8', windowsHide: true })
+assert(existsSync(rgPath), `cannot find ripgrep at ${rgPath}`)
+const rgVersion = execFileSync(rgPath, ['--version'], { encoding: 'utf8', windowsHide: true })
 assert(/^ripgrep\s/u.test(rgVersion), `received an invalid ripgrep version: ${JSON.stringify(rgVersion.trim())}`)
 if (process.platform === 'win32') {
-  const sessionBackend = await import('@deepseek-ai/dsh-session-persistence-jsonl')
-  const resolvedBackend = 'apply' in sessionBackend
-    ? sessionBackend
-    : (sessionBackend as unknown as { default: typeof sessionBackend }).default
+  const sessionBackend = await import('@deepseek-ai/dsh-session-persistence-jsonl') as {
+    default?: unknown
+    apply?: unknown
+  }
   assert(
-    typeof resolvedBackend.apply === 'function',
+    typeof (sessionBackend.default ?? sessionBackend.apply) === 'function',
     'could not import the Windows JSONL session backend without fs-ext',
   )
 } else {
@@ -66,11 +61,10 @@ if (process.platform === 'win32') {
 async function smokeSessionMigration(): Promise<void> {
   const { Context } = await import('@deepseek-ai/cordis')
   const { SessionId } = await import('@deepseek-ai/dsh-session')
-  // 打包运行时的 ESM 互操作可能把模块命名空间包进 default,归一化后再挂载。
-  const persistenceModule = await import('@deepseek-ai/dsh-session-persistence-jsonl')
-  const JsonlSessionPersistence = 'apply' in persistenceModule
-    ? persistenceModule
-    : (persistenceModule as unknown as { default: typeof persistenceModule }).default
+  const sessionBackend = await import('@deepseek-ai/dsh-session-persistence-jsonl')
+  const JsonlSessionPersistence = (
+    'default' in sessionBackend ? sessionBackend.default : sessionBackend
+  ) as Parameters<InstanceType<typeof Context>['plugin']>[0]
   const root = mkdtempSync(join(tmpdir(), 'dsh-packaged-session-migration-'))
   const id = SessionId('packaged-migration')
   const directory = join(root, '_no-cwd', id)
@@ -239,10 +233,7 @@ try {
   rmSync(root, { recursive: true, force: true })
 }
 
-const applicationRoot = fileURLToPath(new URL('./', installAnchor))
-// `bundled/skills` sits beside `lib/` inside the same ASAR; passing it lets the
-// smoke also assert every app-bundled third-party skill is discoverable.
-await verifyBundledSkills(applicationRoot, join(applicationRoot, 'bundled', 'skills'))
+await verifyBundledSkills(fileURLToPath(new URL('./', installAnchor)))
 await smokeSessionMigration()
 await smokeDiagnosticExportWorker()
 

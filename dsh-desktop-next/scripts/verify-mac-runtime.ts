@@ -2,6 +2,7 @@
 import { spawnSync } from 'node:child_process'
 import { join, resolve } from 'node:path'
 import { workspaceDependencyPaths } from '@deepseek-ai/dsh-tool-workspace-dependencies'
+import { archivedPayload, verifyUpdaterManifestShim } from './packaged-payload.ts'
 import { expectedNextVersion, verifyNextRuntimeTree } from './prepare-runtime.ts'
 import { readSignedEntitlements } from './sign-runtime.ts'
 
@@ -18,10 +19,11 @@ const runCommand: RunCommand = (command, args) => {
 }
 
 /**
- * Verify every payload of a mounted application: manifests, files and CPU slices for both CPUs;
- * imports, the Node version and pnpm on the host's CPU; and, for a signed release, hardened-runtime
- * signatures with the upstream entitlement policy: JIT for Node, unsigned executable memory only for
- * x64 Node, no entitlements for Python.
+ * Verify every payload of a mounted application: the manifest copy the updaters of earlier
+ * releases read first; manifests, files and CPU slices for both CPUs; imports, the Node version
+ * and pnpm on the host's CPU; and, for a signed release, hardened-runtime signatures with the
+ * upstream entitlement policy: JIT for Node, unsigned executable memory only for x64 Node, no
+ * entitlements for Python.
  * @param appPath - Mounted `DSH NEXT.app`.
  * @param signed - Whether the release carries Developer ID signatures.
  * @param run - Command executor.
@@ -30,7 +32,11 @@ const runCommand: RunCommand = (command, args) => {
 export function verifyNextMacRuntime(
   appPath: string, signed: boolean, run: RunCommand = runCommand, readEntitlements: (file: string) => Record<string, unknown> = readSignedEntitlements,
 ): void {
-  const runtimeRoot = join(appPath, 'Contents', 'Resources', 'runtime')
+  const resources = join(appPath, 'Contents', 'Resources')
+  // The same path a 2.0.14 to 2.0.17 updater reads in the mounted image before it trusts the application.
+  const archived = archivedPayload(resources)
+  try { verifyUpdaterManifestShim(resources, archived, 'darwin', expectedNextVersion(desktopRoot)) } finally { archived.close() }
+  const runtimeRoot = join(resources, 'runtime')
   for (const { arch, directory, manifest } of verifyNextRuntimeTree(runtimeRoot, 'darwin', expectedNextVersion(desktopRoot))) {
     const entries = workspaceDependencyPaths(directory, manifest)
     if (entries.node === undefined || entries.pnpm === undefined) throw new Error(`Next runtime: ${directory} resolves no Node or pnpm entry`)

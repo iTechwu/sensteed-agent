@@ -22,9 +22,12 @@ it('verifies a payload after relocation without depending on build paths', () =>
   const before = verify(app)
   expect(before.files.map(file => file.path)).toContain('lib/main.js')
   expect(before.files.some(file => file.path === DESKTOP_RUNTIME_FILE)).toBe(false)
-  expect(before.files.every(file => file.machO === false && file.unpacked === false)).toBe(true)
+  expect(before.files.every(file => file.machO === false)).toBe(true)
+  expect(Object.keys(before.files[0]!)).toEqual(['path', 'bytes', 'sha256', 'executable', 'machO'])
   cpSync(app, join(app, '..', 'moved'), { recursive: true })
   expect(verify(join(app, '..', 'moved'))).toEqual(before)
+  // Build steps that already hold the parsed descriptor need not read it again.
+  expect(verifyPayload(physicalPayload(app), readDesktopRuntime(join(app, DESKTOP_RUNTIME_FILE)), '2.0.0-next', FIXTURE_TARGET)).toEqual(before)
 })
 
 it.each(['changed', 'same-size', 'extra', 'missing'])('checks %s payload bytes only during build verification', (operation) => {
@@ -36,6 +39,8 @@ it.each(['changed', 'same-size', 'extra', 'missing'])('checks %s payload bytes o
   if (operation === 'missing') rmSync(join(app, 'lib', 'main.js'))
   expect(readDesktopRuntime(join(app, DESKTOP_RUNTIME_FILE))).toEqual(before)
   expect(() => verify(app)).toThrow(/integrity/u)
+  // The failure names the first file that differs, so a build log says what moved.
+  expect(() => verify(app)).toThrow({ changed: /changed lib\/main\.js/u, 'same-size': /changed lib\/main\.js/u, extra: /unexpected extra/u, missing: /missing lib\/main\.js/u }[operation]!)
 })
 
 it('rejects filesystem links and incompatible targets', () => {
@@ -51,7 +56,7 @@ it('reads file inventory records unchanged during startup', () => {
   const app = fixture()
   const path = join(app, DESKTOP_RUNTIME_FILE)
   const descriptor = JSON.parse(readFileSync(path, 'utf8')) as { files: unknown[] }
-  descriptor.files.unshift({ path: '../outside', bytes: -1.5, sha256: 'unchecked', unpacked: 'unchecked', executable: 'unchecked', machO: 'unchecked' })
+  descriptor.files.unshift({ path: '../outside', bytes: -1.5, sha256: 'unchecked', executable: 'unchecked', machO: 'unchecked' })
   writeFileSync(path, JSON.stringify(descriptor))
   expect(readDesktopRuntime(path).files).toEqual(descriptor.files)
 })
@@ -134,14 +139,27 @@ it('tolerates code-signing rewrites of Mach-O files and signature directories, b
   writeFileSync(join(app, 'lib', 'main.js'), 'export const tampered = 1\n')
   expect(() => verify(app, '2.0.0-next', FIXTURE_TARGET, { afterCodeSigning: true })).toThrow(/changed lib\/main\.js/u)
   writeFileSync(join(app, 'lib', 'main.js'), 'export {}\n')
-  const path = join(app, DESKTOP_RUNTIME_FILE)
-  const relocated = JSON.parse(readFileSync(path, 'utf8')) as { files: { path: string; unpacked: boolean }[] }
-  relocated.files.find(file => file.path === 'lib/main.js')!.unpacked = true
-  writeFileSync(path, JSON.stringify(relocated))
-  expect(() => verify(app, '2.0.0-next', FIXTURE_TARGET, { afterCodeSigning: true })).toThrow(/placement changed for lib\/main\.js/u)
-  writeFileSync(path, `${JSON.stringify(sealed, undefined, 2)}\n`)
   rmSync(join(app, 'node_modules', 'native', 'binary.node'))
   expect(() => verify(app, '2.0.0-next', FIXTURE_TARGET, { afterCodeSigning: true })).toThrow(/missing payload file/u)
+})
+
+it('lets a build step accept a rewrite it can prove equivalent, and nothing else', () => {
+  const app = fixture()
+  writeFileSync(join(app, 'lib', 'main.js'), 'export {}\r')
+  const seen: string[] = []
+  const accept = (file: { path: string }, shipped: Buffer): boolean => { seen.push(file.path); return shipped.toString('utf8') === 'export {}\r' }
+  expect(verify(app, '2.0.0-next', FIXTURE_TARGET, { acceptRewrite: accept }).release).toEqual(FIXTURE_RELEASE)
+  expect(seen).toEqual(['lib/main.js'])
+  expect(() => verify(app, '2.0.0-next', FIXTURE_TARGET, { acceptRewrite: () => false })).toThrow(/changed lib\/main\.js/u)
+  // Signed verification consults it for the files it still compares.
+  expect(verify(app, '2.0.0-next', FIXTURE_TARGET, { afterCodeSigning: true, acceptRewrite: accept }).release).toEqual(FIXTURE_RELEASE)
+  expect(() => verify(app, '2.0.0-next', FIXTURE_TARGET, { afterCodeSigning: true })).toThrow(/changed lib\/main\.js/u)
+  // Missing and unexpected files are never rewrites.
+  writeFileSync(join(app, 'extra'), '')
+  expect(() => verify(app, '2.0.0-next', FIXTURE_TARGET, { acceptRewrite: () => true })).toThrow(/unexpected extra/u)
+  rmSync(join(app, 'extra'))
+  rmSync(join(app, 'lib', 'main.js'))
+  expect(() => verify(app, '2.0.0-next', FIXTURE_TARGET, { acceptRewrite: () => true })).toThrow(/missing lib\/main\.js/u)
 })
 
 it('checks the running application against the sealed identity at startup', () => {

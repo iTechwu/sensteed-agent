@@ -29,7 +29,8 @@ const APP_ID = (JSON.parse(readFileSync(join(desktopRoot, 'package.json'), 'utf8
  * `${version}` artifact name. That produces an installable, correctly signed
  * release whose version differs from the source tree, without editing any
  * version declaration. Only the two shapes the Next channel accepts are allowed.
- * The bundled interpreter payloads record the same version.
+ * The bundled interpreter payloads and the prepared archive payload record the
+ * same version.
  */
 const TEST_BUILD_VERSION = process.env.DSH_NEXT_BUILD_VERSION
 if (TEST_BUILD_VERSION !== undefined && !/^[0-9]+\.[0-9]+\.[0-9]+-next(?:\.[0-9]+)?$/u.test(TEST_BUILD_VERSION)) {
@@ -39,10 +40,14 @@ const buildVersion = expectedNextVersion(desktopRoot)
 const run = (command: string, args: readonly string[], cwd: string, env: NodeJS.ProcessEnv): void => {
   // Windows resolves the CLI path with backslashes.
   const isBuilder = args.includes('electron-builder') || args.some(arg => arg.replaceAll('\\', '/').endsWith('electron-builder/cli.js'))
+  // Beta skips electron-builder's dependency rebuild with npmRebuild=false. electron-builder honours
+  // that flag before it calls beforeBuild, and only a beforeBuild answer makes it leave node_modules
+  // to the prepared payload, so Next drops the flag: its beforeBuild hook declines the rebuild too.
+  const withoutRebuildFlag = isBuilder ? args.filter(arg => arg !== '--config.npmRebuild=false') : args
   const forwarded = TEST_BUILD_VERSION !== undefined && isBuilder
-    ? [...args, `--config.extraMetadata.version=${TEST_BUILD_VERSION}`, `--config.buildVersion=${TEST_BUILD_VERSION}`]
-    : args
-  if (forwarded !== args) console.log(`Packaging with test build version ${TEST_BUILD_VERSION}; source manifests are unchanged.`)
+    ? [...withoutRebuildFlag, `--config.extraMetadata.version=${TEST_BUILD_VERSION}`, `--config.buildVersion=${TEST_BUILD_VERSION}`]
+    : withoutRebuildFlag
+  if (TEST_BUILD_VERSION !== undefined && isBuilder) console.log(`Packaging with test build version ${TEST_BUILD_VERSION}; source manifests are unchanged.`)
   runNextPackagingCommand(command, forwarded, cwd, env, workspaceRoot)
 }
 const listCodeSigningIdentities = (env: NodeJS.ProcessEnv): string => {
@@ -61,10 +66,26 @@ async function prepareInterpreters(sign?: (runtimeRoot: string) => Promise<void>
   verifyNextRuntimeTree(root, process.platform, buildVersion)
   smokeNextRuntime(root, process.platform)
 }
-/** The shared flows call this right before electron-builder; the payloads were prepared before they started. */
-const prepareRuntime = (): void => {
-  if (process.platform === 'darwin') prepareNextMacRuntime(desktopRoot)
-  verifyNextRuntimeTree(nextRuntimeBuildPaths(desktopRoot).runtime, process.platform, buildVersion)
+/**
+ * Materialize and seal the payload electron-builder archives. A separate process keeps the
+ * manifest transformer it borrows from electron-builder out of this entry point.
+ * @param platform - Platform being packaged.
+ */
+const preparePayload = (platform: NodeJS.Platform): void => {
+  const result = spawnSync(process.execPath, [join(desktopRoot, 'scripts', 'prepare-payload.ts'), '--platform', platform,
+    ...(TEST_BUILD_VERSION === undefined ? [] : ['--version', TEST_BUILD_VERSION])], { cwd: desktopRoot, env: process.env, stdio: 'inherit' })
+  if (result.error) throw result.error
+  if (result.status !== 0) throw new Error(`Next payload preparation exited with ${String(result.status)}`)
+}
+/**
+ * The shared flows call this right before electron-builder: the interpreter payloads were prepared
+ * before they started and must still verify, and the archive payload is prepared now.
+ * @param platform - Platform being packaged; the shared flows package the host platform.
+ */
+const prepareRuntime = (platform: NodeJS.Platform = process.platform): void => {
+  if (platform === 'darwin') prepareNextMacRuntime(desktopRoot)
+  verifyNextRuntimeTree(nextRuntimeBuildPaths(desktopRoot).runtime, platform, buildVersion)
+  preparePayload(platform)
 }
 const mode = process.argv[2]
 const outputDir = join(desktopRoot, 'dist', mode === 'mac' ? 'mac-release' : 'mac-smoke')

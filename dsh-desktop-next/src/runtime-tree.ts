@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto'
 import { lstatSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { isAbsolute, join, relative, sep } from 'node:path'
 
-/** Descriptor written beside `app.asar` in the application resources. */
+/** Descriptor sealed at the payload root; a packaged application carries it inside `app.asar`. */
 export const DESKTOP_RUNTIME_FILE = 'desktop-runtime.json'
 
 /** Release facts shared by one Electron shell and the dsh runtime it carries. */
@@ -33,13 +33,11 @@ export interface DesktopSharedPackage {
   readonly path: string
 }
 
-/** Final bytes, placement, executable permission and Mach-O identity of one payload file. */
+/** Final bytes, executable permission and Mach-O identity of one payload file, wherever the archive places it. */
 export interface DesktopRuntimeFile {
   readonly path: string
   readonly bytes: number
   readonly sha256: string
-  /** Physical file beside the archive rather than an archive entry. */
-  readonly unpacked: boolean
   readonly executable: boolean
   /** Mach-O image; macOS code signing rewrites these after the descriptor is sealed. */
   readonly machO: boolean
@@ -85,10 +83,16 @@ export interface PackagedRuntimeIdentity {
 export interface VerifyPayloadOptions {
   /**
    * Accept code-signing rewrites: Mach-O files and `_CodeSignature` contents may differ from the
-   * sealed bytes, and new files may exist. Every recorded file must still exist with its
-   * placement and permission.
+   * sealed bytes, and new files may exist. Every recorded file must still exist with its permission.
    */
   readonly afterCodeSigning?: boolean
+  /**
+   * Accept a recorded file whose shipped bytes differ when this returns true for the record and
+   * the shipped bytes. Build steps use it for rewrites they can prove equivalent, such as the
+   * `Info.plist` files a universal merge re-serializes. Missing and unexpected files are never
+   * rewrites.
+   */
+  readonly acceptRewrite?: (file: DesktopRuntimeFile, shipped: Buffer) => boolean
 }
 
 const PACKAGE_NAME = /^(?:@[a-z0-9][a-z0-9._~-]*\/[a-z0-9][a-z0-9._~-]*|[a-z0-9][a-z0-9._~-]*)$/u
@@ -151,11 +155,11 @@ function isMachO(body: Buffer): boolean {
 
 function runtimeFile(entry: PayloadEntry, body: Buffer): DesktopRuntimeFile {
   return { path: entry.path, bytes: body.byteLength, sha256: createHash('sha256').update(body).digest('hex'),
-    unpacked: entry.unpacked, executable: entry.executable, machO: isMachO(body) }
+    executable: entry.executable, machO: isMachO(body) }
 }
 
 /**
- * Inventory a payload: every file's final bytes, placement and permissions.
+ * Inventory a payload: every file's final bytes and permissions.
  * @param source - Payload to read completely.
  * @returns Sorted inventory; executable permissions are false on Windows.
  */
@@ -192,7 +196,7 @@ function readManifest(source: PayloadSource, path: string): unknown {
 }
 
 /**
- * Seal the final payload after Electron Builder assembled it.
+ * Seal a complete payload: the prepared tree before Electron Builder archives it.
  * @param source - Complete payload.
  * @param descriptorFile - Where the descriptor is written; outside the payload's inventory.
  * @param release - Matching shell, dsh, Electron and pnpm versions.
@@ -221,12 +225,11 @@ export function sealPayload(
 }
 
 /**
- * Read packaged metadata and check the shared package records.
- * @param descriptorFile - Descriptor beside the archive.
+ * Validate packaged metadata and check the shared package records.
+ * @param value - Parsed descriptor document.
  * @returns Runtime metadata whose file inventory is verified only during packaging.
  */
-export function readDesktopRuntime(descriptorFile: string): DesktopRuntimeDescriptor {
-  const value: unknown = JSON.parse(readFileSync(descriptorFile, 'utf8'))
+export function parseDesktopRuntime(value: unknown): DesktopRuntimeDescriptor {
   if (!record(value) || value.schemaVersion !== 1 || !Array.isArray(value.sharedPackages) || !Array.isArray(value.files)) {
     throw new Error('desktop runtime: invalid descriptor')
   }
@@ -248,15 +251,24 @@ export function readDesktopRuntime(descriptorFile: string): DesktopRuntimeDescri
   return { schemaVersion: 1, release, platform, archs, sharedPackages, files: value.files as DesktopRuntimeFile[] }
 }
 
+/**
+ * Read packaged metadata from the descriptor file and check the shared package records.
+ * @param descriptorFile - Descriptor at the application root; inside Electron, `app.asar` reads like a directory.
+ * @returns Runtime metadata whose file inventory is verified only during packaging.
+ */
+export function readDesktopRuntime(descriptorFile: string): DesktopRuntimeDescriptor {
+  return parseDesktopRuntime(JSON.parse(readFileSync(descriptorFile, 'utf8')))
+}
+
 /** Whether a recorded path belongs to a nested code-signature directory that signing rewrites. */
 function isCodeSignatureEntry(path: string): boolean {
   return path.split('/').includes('_CodeSignature')
 }
 
 /**
- * Verify every payload file against its recorded bytes, placement and permissions at build time.
- * @param source - Assembled payload.
- * @param descriptorFile - Descriptor sealed by {@link sealPayload}.
+ * Verify every payload file against its recorded bytes and permissions at build time.
+ * @param source - Prepared or assembled payload.
+ * @param descriptor - Descriptor sealed by {@link sealPayload}, or the file holding it.
  * @param expectedVersion - Version the payload must declare: the product version, or the
  * `DSH_NEXT_BUILD_VERSION` a drill build was given.
  * @param target - Required platform and architectures.
@@ -264,9 +276,9 @@ function isCodeSignatureEntry(path: string): boolean {
  * @returns Validated runtime descriptor.
  */
 export function verifyPayload(
-  source: PayloadSource, descriptorFile: string, expectedVersion: string, target: NextRuntimeTarget, options: VerifyPayloadOptions = {},
+  source: PayloadSource, descriptor: DesktopRuntimeDescriptor | string, expectedVersion: string, target: NextRuntimeTarget, options: VerifyPayloadOptions = {},
 ): DesktopRuntimeDescriptor {
-  const descriptor = readDesktopRuntime(descriptorFile)
+  if (typeof descriptor === 'string') descriptor = readDesktopRuntime(descriptor)
   const expected = parseTarget(target.platform, target.archs)
   if (descriptor.platform !== expected.platform || descriptor.archs.join(',') !== expected.archs.join(',')) {
     throw new Error('desktop runtime: incompatible platform/architecture')
@@ -281,22 +293,31 @@ export function verifyPayload(
     }
   }
   // Windows has no portable Unix executable permission bits.
-  const comparable = (items: readonly DesktopRuntimeFile[]): unknown => process.platform === 'win32'
-    ? items.map(({ executable: _executable, ...item }) => item) : items
   if (options.afterCodeSigning === true) {
     for (const file of descriptor.files) {
       const entry = source.entry(file.path)
       if (entry === undefined) throw new Error(`desktop runtime: missing payload file ${file.path}`)
-      if (entry.unpacked !== file.unpacked) throw new Error(`desktop runtime: placement changed for ${file.path}`)
       if (process.platform !== 'win32' && entry.executable !== file.executable) throw new Error(`desktop runtime: permission changed for ${file.path}`)
       if (file.machO || isCodeSignatureEntry(file.path)) continue
-      const actual = runtimeFile(entry, entry.read())
-      if (actual.bytes !== file.bytes || actual.sha256 !== file.sha256) throw new Error(`desktop runtime: payload file changed ${file.path}`)
+      const body = entry.read()
+      const actual = runtimeFile(entry, body)
+      if (actual.bytes === file.bytes && actual.sha256 === file.sha256) continue
+      if (options.acceptRewrite?.(file, body) !== true) throw new Error(`desktop runtime: payload file changed ${file.path}`)
     }
     return descriptor
   }
-  if (JSON.stringify(comparable(descriptor.files)) !== JSON.stringify(comparable(inventoryPayload(source)))) {
-    throw new Error('desktop runtime: integrity verification failed')
+  // Every recorded file, byte for byte, and nothing else; the failure names the first difference.
+  const fail = (detail: string): never => { throw new Error(`desktop runtime: integrity verification failed: ${detail}`) }
+  const recorded = new Set(descriptor.files.map(file => file.path))
+  for (const entry of source.list()) if (!recorded.has(entry.path)) fail(`unexpected ${entry.path}`)
+  for (const file of descriptor.files) {
+    const entry = source.entry(file.path)
+    if (entry === undefined) return fail(`missing ${file.path}`)
+    if (process.platform !== 'win32' && entry.executable !== file.executable) return fail(`permission changed for ${file.path}`)
+    const body = entry.read()
+    const actual = runtimeFile(entry, body)
+    if (actual.bytes === file.bytes && actual.sha256 === file.sha256 && actual.machO === file.machO) continue
+    if (options.acceptRewrite?.(file, body) !== true) return fail(`changed ${file.path}`)
   }
   return descriptor
 }
@@ -317,7 +338,7 @@ export function readInstalledPackageVersion(appRoot: string, name: string): stri
  * Check at startup that the installed payload is the one this application was released with.
  * File bytes are verified only during packaging; here the descriptor must exist, parse, and
  * name the running shell, dsh runtime, platform and architecture.
- * @param descriptorFile - Descriptor beside the archive.
+ * @param descriptorFile - Descriptor at the application root; inside Electron, `app.asar` reads like a directory.
  * @param identity - Facts of the running application.
  * @returns The sealed descriptor.
  */

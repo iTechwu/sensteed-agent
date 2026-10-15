@@ -40,7 +40,10 @@ it('migrates a released code session through the installed format worker and pre
   try {
     await mkdir(directory, { recursive: true })
     await writeFile(join(directory, 'session.v2.jsonl'), source)
-    await ctx.plugin(JsonlSessionPersistence, { root, compression: 'none' })
+    const plugin = (
+      'default' in JsonlSessionPersistence ? JsonlSessionPersistence.default : JsonlSessionPersistence
+    ) as Parameters<Context['plugin']>[0]
+    await ctx.plugin(plugin, { root, compression: 'none' })
     const handle = await ctx.sessionPersistence.open(id, 'write')
     try {
       expect(handle.header).toMatchObject({ version: 4, agentPreset: 'ptc' })

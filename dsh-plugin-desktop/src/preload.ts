@@ -3,7 +3,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { installBootSplash } from './boot-splash.ts'
 import { BRAND_DISPLAY_NAME } from './generated-product-identity.ts'
-import { DESKTOP_FILE_PATH_BRIDGE } from './file-path-bridge-contract.ts'
+import { DESKTOP_HOST_PATHS_BRIDGE } from './file-path-bridge-contract.ts'
 import { DESKTOP_NATIVE_DIRECTORY_PICKER_CHANNEL } from './directory-picker-contract.ts'
 import {
   DESKTOP_RENDERER_ACTION_CHANNEL,
@@ -12,9 +12,9 @@ import {
   type DesktopRendererActionsBridge,
 } from './renderer-actions-contract.ts'
 
-contextBridge.exposeInMainWorld(DESKTOP_FILE_PATH_BRIDGE, {
-  /** Resolve only genuine disk-backed Web File objects selected by the operator. */
-  getPathForFile(file: File): string {
+contextBridge.exposeInMainWorld(DESKTOP_HOST_PATHS_BRIDGE, {
+  /** Absolute harness-host path of one genuine disk-backed Web File picked by the operator. */
+  pathFor(file: File): string {
     return webUtils.getPathForFile(file)
   },
 })
