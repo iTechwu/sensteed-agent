@@ -2,6 +2,13 @@
   "schemaVersion": 1,
   "skills": [
     {
+      "name": "skill-creator",
+      "kind": "dir",
+      "path": "skill-creator",
+      "repository": "https://github.com/openai/skills",
+      "resolvedSha": "49f948faa9258a0c61caceaf225e179651397431"
+    },
+    {
       "name": "dashi-ppt",
       "kind": "dir",
       "path": "dashi-ppt",
@@ -112,13 +119,6 @@
       "path": "machine",
       "repository": "https://github.com/iTechwu/sensteed-machine-skill",
       "resolvedSha": "d82eab1d3f7216d4cdc0761c80197e4ec819bcfd"
-    },
-    {
-      "name": "skill-creator",
-      "kind": "dir",
-      "path": "skill-creator",
-      "repository": "https://github.com/openai/skills",
-      "resolvedSha": "49f948faa9258a0c61caceaf225e179651397431"
     }
   ]
 }

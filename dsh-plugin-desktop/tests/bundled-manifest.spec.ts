@@ -89,12 +89,14 @@ describe('bundled manifest', () => {
     }
   })
 
-  it('resolves the github-sourced plugin write-back to the sibling checkout', async () => {
+  it('resolves every default plugin to the sibling checkout', async () => {
     const manifest = await loadManifest(REPO_ROOT)
+    for (const plugin of manifest.plugins) {
+      expect(plugin.source, plugin.name).toBe('sibling')
+    }
     const soup = manifest.plugins.find((plugin: PluginEntry) => plugin.name === 'dsh-soup')
     expect(soup).toMatchObject({
-      source: 'github',
-      upstream: 'https://github.com/lyhue1991/dsh-soup',
+      source: 'sibling',
       siblingDir: '../docker-helm.dofe.ai/plugins/dsh-soup',
     })
   })
