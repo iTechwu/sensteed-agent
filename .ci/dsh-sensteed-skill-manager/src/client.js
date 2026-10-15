@@ -194,7 +194,7 @@ function SkillManagerPage({ view, t, createSkill }) {
 
   return h('section', { className: 'sm-page', 'aria-labelledby': 'sm-title' },
     h('header', { className: 'sm-header' },
-      h('div', null, h('h2', { id: 'sm-title' }, t('title')), h('p', null, t('description'))),
+      h('div', { className: 'sm-heading-copy' }, h('h2', { id: 'sm-title' }, t('title')), h('p', null, t('description'))),
       h('div', { className: 'sm-actions' },
         h('button', { type: 'button', className: 'sm-icon', 'aria-label': t('refresh'), title: t('refresh'), disabled: busy || state === 'loading' || state === 'refreshing', onClick: () => void refresh() }, '↻'),
         h('span', { className: 'sm-add-group', role: 'group', 'aria-label': t('chooseAddMethod') },
@@ -206,7 +206,7 @@ function SkillManagerPage({ view, t, createSkill }) {
               h('span', null, h('strong', null, t('install')), h('small', null, t('installHint')))),
             h('button', { type: 'button', role: 'menuitem', className: 'sm-add-menu-item', onClick: openCreate },
               h('span', { className: 'sm-menu-icon', 'aria-hidden': true }, '✦'),
-              h('span', null, h('strong', null, t('create')), h('small', null, t('createHint'))))) : null)),
+              h('span', null, h('strong', null, t('create')), h('small', null, t('createHint'))))) : null))),
     notice ? h('p', { className: 'sm-notice', role: 'status' }, notice) : null,
     refreshError && state === 'ready' ? h('div', { className: 'sm-inline-error', role: 'alert' }, refreshError, h('button', { type: 'button', className: 'sm-quiet', onClick: () => void refresh() }, t('retry'))) : null,
     formOpen ? h('form', { className: 'sm-install-form', role: 'dialog', 'aria-label': t('install'), onSubmit: install, onKeyDown: event => { if (event.key === 'Escape') { event.stopPropagation(); closeInstall() } } },
@@ -244,9 +244,10 @@ function SkillManagerPage({ view, t, createSkill }) {
             : visibleSkills.length === 0 ? h('p', { className: 'sm-state' }, t('noMatches'))
             : visibleSkills.map(skill => h('article', { className: 'sm-row', key: `${skill.provider}:${skill.name}` },
               h('div', { className: 'sm-glyph', 'aria-hidden': true }, '✳'),
-              h('div', { className: 'sm-copy' }, h('strong', null, skill.name), h('p', null, skill.description)),
-              h('span', { className: `sm-source${skill.source === 'bundled' ? ' is-bundled' : ''}` }, skill.source === 'bundled' ? t('bundled') : t('local')),
-              skill.source !== 'bundled' ? h('button', { type: 'button', className: 'sm-row-action', disabled: busy, onClick: () => void publish(skill.name) }, t('publish')) : null))),
+              h('div', { className: 'sm-copy' }, h('strong', null, skill.name), h('p', { title: skill.description }, skill.description)),
+              h('div', { className: 'sm-row-meta' },
+                h('span', { className: `sm-source${skill.source === 'bundled' ? ' is-bundled' : ''}` }, skill.source === 'bundled' ? t('bundled') : t('local')),
+                skill.source !== 'bundled' ? h('button', { type: 'button', className: 'sm-row-action', disabled: busy, onClick: () => void publish(skill.name) }, t('publish')) : null)))),
       ),
     h('section', { className: 'sm-shared', 'aria-labelledby': 'sm-shared-title' },
       h('div', { className: 'sm-section-heading' }, h('h3', { id: 'sm-shared-title' }, t('shared')), h('span', null, String(sharedSkills.length))),
@@ -259,13 +260,13 @@ function SkillManagerPage({ view, t, createSkill }) {
             const canUpdate = Boolean(localSkill?.shared && localSkill.shared.sha256 !== skill.sha256)
             return h('article', { className: 'sm-row', key: `shared:${skill.name}` },
               h('div', { className: 'sm-glyph sm-shared-glyph', 'aria-hidden': true }, '✳'),
-              h('div', { className: 'sm-copy' }, h('strong', null, skill.name), h('p', null, skill.description)),
-              h('span', { className: 'sm-version' }, `v${skill.version}`),
-              skill.canManage ? h('button', { type: 'button', className: 'sm-row-action is-danger', disabled: busy, onClick: () => void withdraw(skill.name) }, t('withdraw')) : null,
-              h('button', { type: 'button', className: 'sm-row-action', disabled: busy || (isInstalled && !canUpdate), onClick: () => void installShared(skill.name) }, canUpdate ? t('sharedUpdate') : isInstalled ? t('sharedInstalled') : t('sharedInstall'))
+              h('div', { className: 'sm-copy' }, h('strong', null, skill.name), h('p', { title: skill.description }, skill.description)),
+              h('div', { className: 'sm-row-meta' },
+                h('span', { className: 'sm-version' }, `v${skill.version}`),
+                skill.canManage ? h('button', { type: 'button', className: 'sm-row-action is-danger', disabled: busy, onClick: () => void withdraw(skill.name) }, t('withdraw')) : null,
+                h('button', { type: 'button', className: 'sm-row-action', disabled: busy || (isInstalled && !canUpdate), onClick: () => void installShared(skill.name) }, canUpdate ? t('sharedUpdate') : isInstalled ? t('sharedInstalled') : t('sharedInstall')))
             )
           }))),
-      error ? h('div', { className: 'sm-error', role: 'alert' }, error) : null),
     error && !formOpen && !createOpen ? h('div', { className: 'sm-error', role: 'alert' }, error) : null)
 }
 
@@ -302,8 +303,10 @@ function apply(ctx) {
     const style = document.createElement('style')
     style.dataset.plugin = '@dofe/dsh-sensteed-skill-manager'
     style.textContent = `
-      .sm-page{box-sizing:border-box;height:100%;overflow:auto;padding:40px 56px;align-content:start;display:grid;gap:20px;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);min-width:0}
-      .sm-header{display:flex;min-height:72px;align-items:center;justify-content:space-between;gap:16px;padding:8px 0 16px;border-bottom:1px solid var(--dsw-alias-border-l1)}
+      .sm-page{box-sizing:border-box;flex:1;width:100%;height:100%;min-height:0;min-width:0;overflow:auto;padding:calc(28px + var(--dsh-frame-top-clearance,0px)) 48px 48px;display:flex;flex-direction:column;align-items:center;gap:24px;container:skill-manager / inline-size;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary)}
+      .sm-page> *{box-sizing:border-box;flex:none;width:100%;max-width:960px;min-width:0}
+      .sm-header{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:16px;padding-bottom:8px}
+      .sm-heading-copy{flex:1 1 240px;min-width:0}.sm-actions{flex:none;white-space:nowrap}
       .sm-header h2{margin:0;font-size:20px;font-weight:650;line-height:1.3}.sm-header p,.sm-create p{margin:5px 0 0;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:1.5}
       .sm-actions,.sm-form-actions{display:flex;align-items:center;gap:8px}.sm-icon{width:36px;height:36px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-secondary);font-size:21px;cursor:pointer}.sm-icon:hover,.sm-quiet:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
       .sm-primary,.sm-secondary,.sm-quiet{min-height:36px;padding:0 13px;border:1px solid var(--dsw-alias-border-l1);border-radius:6px;font:inherit;font-size:13px;cursor:pointer}.sm-primary{border-color:var(--dsw-alias-button-primary-fill);background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground)}.sm-secondary{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}.sm-quiet{background:transparent;color:var(--dsw-alias-label-secondary)}.sm-primary:disabled,.sm-secondary:disabled,.sm-quiet:disabled{cursor:wait;opacity:.55}
@@ -312,7 +315,12 @@ function apply(ctx) {
       .sm-state{padding:28px 12px;color:var(--dsw-alias-label-secondary);font-size:13px}.sm-error,.sm-inline-error{color:var(--dsw-alias-state-error-primary)}.sm-error button,.sm-inline-error button{margin-left:8px}.sm-inline-error{font-size:13px}.sm-notice,.sm-refreshing{margin:0;color:var(--dsw-alias-state-success-primary);font-size:13px}.sm-refreshing{color:var(--dsw-alias-label-secondary)}
       .sm-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}.sm-search{box-sizing:border-box;width:min(100%,360px);height:36px;padding:0 10px;border:1px solid var(--dsw-alias-border-l1);border-radius:6px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;font-size:13px}.sm-search:focus-visible,.sm-create-input:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}.sm-filters{display:flex;gap:4px}.sm-filter{min-height:32px;padding:0 9px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;cursor:pointer}.sm-filter:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}.sm-filter.is-active{border-color:var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
       .sm-install-form,.sm-create-form{display:grid;gap:12px;padding:18px;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;background:var(--dsw-alias-bg-layer-1)}.sm-form-heading{display:grid;gap:4px}.sm-form-heading strong{font-size:14px}.sm-form-heading p{margin:0;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:1.45}.sm-install-form label{display:grid;gap:7px;font-size:13px;font-weight:550}.sm-install-form input{box-sizing:border-box;width:100%;height:38px;padding:0 10px;border:1px solid var(--dsw-alias-border-l1);border-radius:6px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit}.sm-install-form input:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}.sm-install-form p{margin:0;color:var(--dsw-alias-label-secondary);font-size:12px}.sm-form-actions{justify-content:flex-end}.sm-create-input{box-sizing:border-box;width:100%;min-height:96px;padding:10px;border:1px solid var(--dsw-alias-border-l1);border-radius:6px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;font-size:13px;line-height:1.5;resize:vertical}.sm-create-input:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}
-      @media(max-width:620px){.sm-page{padding:20px 16px}.sm-header{align-items:flex-start}.sm-actions{align-items:flex-start}.sm-row{gap:10px;padding-inline:4px}.sm-glyph{flex-basis:40px;width:40px;height:40px}.sm-source{font-size:11px}.sm-toolbar{align-items:stretch}.sm-search{width:100%}.sm-add-menu{right:-8px}}
+      .sm-installed,.sm-shared,.sm-list{min-width:0}.sm-shared{display:grid;gap:10px;padding-top:24px}.sm-section-heading h3,.sm-source,.sm-row-action,.sm-filter,.sm-version{white-space:nowrap}
+      .sm-row{display:grid;grid-template-columns:48px minmax(0,1fr) auto;padding:14px 0;gap:16px}.sm-row-meta{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px}.sm-copy strong{display:block;overflow-wrap:anywhere;line-height:1.5}.sm-copy p{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;line-height:1.55}.sm-state{margin:0}.sm-form-actions{flex-wrap:wrap}
+      .sm-add-group,.sm-filters{flex-shrink:0}.sm-add-primary,.sm-add-more{white-space:nowrap}.sm-add-menu{max-width:100cqw}.sm-search{min-width:0}.sm-icon{flex:none}.sm-filters{flex-wrap:wrap}
+      @container skill-manager (max-width:600px){.sm-row{grid-template-columns:40px minmax(0,1fr);gap:8px 12px}.sm-row-meta{grid-column:2;justify-content:flex-start}.sm-glyph{width:40px;height:40px;grid-row:1 / span 2;align-self:start}.sm-search{width:100%}.sm-toolbar{gap:12px}.sm-heading-copy{flex-basis:100%}.sm-actions{width:100%;justify-content:flex-end}}
+      @media(max-width:760px){.sm-page{padding-inline:24px}}
+      @media(max-width:420px){.sm-page{padding-inline:16px}.sm-install-form,.sm-create-form{padding:14px}}
     `
     document.head.appendChild(style)
     return () => style.remove()
