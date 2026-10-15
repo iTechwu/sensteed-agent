@@ -16,7 +16,7 @@ function ComparisonsView({ ctx }) {
   const path = validA && validB ? mode === 'monthly' ? `/finance/budget-snapshots/compare?snapshotAId=${validA}&snapshotBId=${validB}` : mode === 'versions' ? `/finance/budget-versions/detail-diff?baseVersionId=${validA}&targetVersionId=${validB}` : `/finance/budget/versions/diff?baseVersionId=${validA}&targetVersionId=${validB}` : null
   const comparison = useFinanceResource(path, revision)
   useEffect(() => { setA(''); setB(''); setDialog(null) }, [mode, ctx.year, targetYear])
-  const versionLabel = row => mode === 'monthly' ? `${row.label} · ${row.frozenThroughMonth}+${12 - row.frozenThroughMonth}` : `${row.name} · ${row.status}${row.isPrimary ? ' · 主版本' : ''}`
+  const versionLabel = row => mode === 'monthly' ? `${row.label} · ${row.frozenThroughMonth}+${12 - row.frozenThroughMonth}` : `${row.name} · ${financeLabel(row.status)}${row.isPrimary ? ' · 主版本' : ''}`
   const selectedVersions = [baseRows.find(row => row.id === validA), targetRows.find(row => row.id === validB)]
   const trial = mode !== 'monthly' && selectedVersions.some(row => row?.status === 'DRAFT' || row?.status === 'CONFIRMED')
   const rows = financeRows(comparison.data)

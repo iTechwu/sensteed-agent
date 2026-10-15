@@ -17993,6 +17993,9 @@ importers:
       '@deepseek-ai/dsh':
         specifier: '>=0.2.0-rc.0 <1'
         version: 0.2.0-rc.2(f778798ef4374baa909b05ce2d7ab530)
+      '@dofe/dsh-sensteed-skill-manager':
+        specifier: file:../../docker-helm.dofe.ai/plugins/dsh-sensteed-skill-manager
+        version: file:../docker-helm.dofe.ai/plugins/dsh-sensteed-skill-manager
     devDependencies:
       '@deepseek-ai/dsh-api-remotes':
         specifier: workspace:*

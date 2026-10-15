@@ -52,7 +52,7 @@ function financeColumns(fields) {
     if (value === null || value === undefined) return '—'
     if (typeof value === 'number') return formatNumber(value)
     if (key === 'changeRate') return `${formatNumber(Number(value) * 100)}%`
-    if (['status', 'scope', 'changeType', 'action', 'expenseType', 'type'].includes(key)) return FINANCE_VALUE_LABELS[value] || String(value)
+    if (['status', 'scope', 'changeType', 'action', 'expenseType', 'planType', 'type', 'kind', 'category', 'bizSystem', 'docType', 'transport', 'dataset', 'stage', 'severity', 'formulaVersion'].includes(key)) return financeLabel(value)
     if (/At$/.test(key)) return new Date(value).toLocaleString('zh-CN', { hour12: false })
     if (typeof value === 'object') return h(FinanceEvidence, { value })
     return String(value)
@@ -60,11 +60,28 @@ function financeColumns(fields) {
 }
 function FinanceEvidence({ value }) {
   if (value === null || value === undefined) return h('span', null, '—')
-  if (typeof value !== 'object') return h('span', null, FINANCE_VALUE_LABELS[value] || String(value))
+  if (typeof value !== 'object') return h('span', null, financeLabel(value))
   return h('div', { className: 'sf-evidence' }, ...Object.entries(value).map(([key, item]) =>
     h('div', { key, className: 'sf-evidence-item' }, h('small', null, FINANCE_FIELD_LABELS[key] || key), h(FinanceEvidence, { value: item }))))
 }
-const FINANCE_VALUE_LABELS = { GLOBAL: '全域', ORG: '指定主体', DEPARTMENT: '指定部门', SELF: '本人', DRAFT: '草稿', CONFIRMED: '已确认', PUBLISHED: '已发布', LOCKED: '已锁定', OPEN: '开放中', CLOSED: '已关闭', PENDING: '待填写', SUBMITTED: '已提交', REJECTED: '已退回', VOIDED: '已作废', SUCCESS: '成功', FAILED: '失败', RUNNING: '处理中', APPROVED: '已批准', IN_REVIEW: '评审中', OBSOLETE: '已作废', PROPOSED: '提案', APPLIED: '已落账', CANCELLED: '已撤销', HEADQUARTERS: '总部', HEZHONG: '合众', ADDED: '新增', REMOVED: '移除', INCREASED: '调增', DECREASED: '调减', MOVED: '移位', SUBMIT_REVIEW: '提交评审', APPROVE: '批准', REJECT: '驳回', BUDGET: '预算', PAYMENT_PLAN: '付款计划', REVENUE_PLAN: '收入计划' }
+const FINANCE_VALUE_LABELS = {
+  GLOBAL: '全域', ORG: '指定主体', DEPARTMENT: '指定部门', SELF: '本人', HEADQUARTERS: '总部', HEZHONG: '合众',
+  DRAFT: '草稿', CONFIRMED: '已确认', PUBLISHED: '已发布', LOCKED: '已锁定', OPEN: '开放中', CLOSED: '已关闭',
+  PENDING: '待处理', SUBMITTED: '已提交', REJECTED: '已退回', VOIDED: '已作废', SUCCESS: '成功', FAILED: '失败', RUNNING: '处理中',
+  APPROVED: '已批准', IN_REVIEW: '评审中', OBSOLETE: '已作废', PROPOSED: '待落账', APPLIED: '已落账', CANCELLED: '已撤销',
+  ADDED: '新增', REMOVED: '移除', INCREASED: '调增', DECREASED: '调减', MOVED: '转移', SUBMIT_REVIEW: '提交评审', APPROVE: '批准', REJECT: '驳回',
+  PURCHASE: '采购', REIMBURSEMENT: '报销', INCOME: '收入', PAYROLL: '薪酬', TAX: '税费', OTHER: '其他',
+  PR_PAYMENT: 'PR付款', NEW_RETAIL: '新零售', DIRECT_PARTS: '直采零件', PROJECT_OPERATION: '项目运营', FIXED_OPERATION: '固定运营', MODEL_SPECIFIC: '模型专项', NON_PROJECT: '非项目',
+  BUDGET: '预算', PAYMENT_PLAN: '付款计划', REVENUE_PLAN: '收入计划', BUDGET_LINE: '预算明细', CASH_SUMMARY: '资金汇总',
+  FINANCE_PLAN: '财务计划', OA: 'OA系统', NC: 'NC系统', ERP: 'ERP系统', TREASURY: '资金系统', DSS: 'DSS', FEISHU: '飞书',
+  FEISHU_RAW_SNAPSHOT: '飞书原始快照', FEISHU_CSV_SNAPSHOT: '飞书 CSV 快照', FETCH: '采集', NORMALIZE: '标准化', VALIDATE: '校验', PERSIST: '入库',
+  INFO: '提示', WARN: '警告', CRITICAL: '重大', ACTIVE: '已生效',
+}
+function financeLabel(value) {
+  if (value === null || value === undefined || value === '') return '—'
+  const raw = String(value)
+  return FINANCE_VALUE_LABELS[raw] || FINANCE_VALUE_LABELS[raw.toUpperCase()] || raw
+}
 const FINANCE_FIELD_LABELS = { scopeType: '数据范围', yearFrom: '起始年度', yearTo: '截止年度', openingBalance: '期初余额', safetyLine: '现金安全线', linkedCePackageId: '关联成本包', monthlyOutflows: '月度支出假设', tax: '税费假设', outputRate: '销项税率', inputRate: '进项税率', workingCapital: '营运资金假设', payableMonths: '应付账期（月）', inventoryDays: '存货周转（天）', labor: '人工假设', hoursPerUnit: '单台人工时', ratePerHour: '人工费率', overhead: '制造费用假设', kwhPerUnit: '单台电耗', pricePerKwh: '综合电价', otherPerUnit: '其他单台费用', materialCost: '材料费', laborCost: '人工费', processCost: '加工费', otherCost: '其他费用', year: '年度', month: '月份', note: '说明', title: '名称', rows: '明细', plannedAmount: '计划金额', actualAmount: '实际金额', costItemId: '费用项目', description: '业务说明', task: '活动', taskId: '活动记录', departmentId: '部门记录', orgId: '主体记录', reason: '原因', submittedAt: '提交时间', createdAt: '创建时间', submissionNo: '提交版本', submittedByName: '提交人', changes: '变更明细', payload: '审计证据', laborRate: '人工费率', overheadRate: '制造费率', committed: '已确认', failed: '失败', accepted: '已接收', rejected: '异常行', error: '错误', id: '记录', totalAmount: '金额（元）', totalDelta: '总成本差额（元）', amount: '金额（元）', count: '条数', field: '字段', before: '变更前', after: '变更后', nodeId: '物料节点', diff: '差额', total: '总计', run: '计算批次', status: '状态', created: '新建', skipped: '跳过', results: '逐条回执', outputs: '输出', sourceRef: '来源引用', totalCost: '总成本', qty: '数量', estimate: '估算' }
 function financeFieldValue(values, key) { return key.split('.').reduce((value, part) => value?.[part], values) }
 function financeSetField(values, key, value) {
