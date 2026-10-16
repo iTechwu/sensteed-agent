@@ -72,7 +72,7 @@ class PublicationTests(unittest.TestCase):
         self.env = dict(TOS_ACCESS_KEY_ID='test-id', TOS_SECRET_ACCESS_KEY='test-secret',
                         TOS_REGION='test-region', TOS_ENDPOINT='tos.example.com',
                         TOS_PUBLIC_BASE_URL='https://downloads.example.com',
-                        DESKTOP_VERSION='2.0.11-beta.18', GITHUB_SHA='a' * 40, UPSTREAM_SHA='b' * 40,
+                        DESKTOP_VERSION='2.0.11-beta.202610160930', GITHUB_SHA='a' * 40, UPSTREAM_SHA='b' * 40,
                         GITHUB_RUN_ID='123', GITHUB_RUN_ATTEMPT='2', RELEASE='false')
         self.config = publisher.settings(self.env)
         self.context = publisher.release_context(self.env)
@@ -81,7 +81,7 @@ class PublicationTests(unittest.TestCase):
             folder = self.root / platform
             folder.mkdir()
             for ending in endings:
-                (folder / ('Sensteed-Agent-Beta-2.0.11-beta.18-' + ending)).write_bytes(b'installer payload')
+                (folder / ('Sensteed-Agent-Beta-2.0.11-beta.202610160930-' + ending)).write_bytes(b'installer payload')
 
     def test_accepts_installer_larger_than_one_gibibyte(self):
         path = next((self.root / 'macos').iterdir())
@@ -94,6 +94,13 @@ class PublicationTests(unittest.TestCase):
     def test_signed_url_helper_is_defined_before_script_entrypoint(self):
         source = Path(__file__).with_name('publish-tos.py').read_text()
         self.assertLess(source.index('def signed_download_url('), source.index("if __name__ == '__main__':"))
+
+    def test_upload_stamp_prefers_version_timestamp_and_falls_back_to_run_time(self):
+        self.assertEqual(publisher.upload_stamp('2.0.11-beta.202610160930'), '26101609')
+        self.assertEqual(publisher.upload_stamp('0.2.1-alpha.2-beta.202610131600'), '26101316')
+        for version in ['2.0.11-beta.18', '2.0.11', None]:
+            with self.subTest(version=version):
+                self.assertRegex(publisher.upload_stamp(version), r'^\d{8}$')
 
     def test_harness_timestamp_versions_publish_all_artifacts_and_manifest(self):
         version = '0.2.1-alpha.2-beta.202610131600'
@@ -125,7 +132,7 @@ class PublicationTests(unittest.TestCase):
         client = FakeTos()
         key, manifest = publisher.publish(client, self.config, self.context, self.root)
         self.assertEqual(len(manifest['artifacts']), 5)
-        self.assertTrue(key.startswith('sensteed-agent/candidates/' + 'a' * 40 + '/123-2/'))
+        self.assertTrue(key.startswith('sensteed-agent/26101609/2.0.11-beta.202610160930-123-2/'))
         self.assertEqual([call[0] for call in client.calls], ['upload'] * 5 + ['presign'] * 6 + ['put'])
         self.assertTrue(client.calls[-1][2]['forbid_overwrite'])
         self.assertTrue(all(item['signing'] == 'unsigned' for item in manifest['artifacts']))
@@ -133,7 +140,7 @@ class PublicationTests(unittest.TestCase):
 
     def test_publishes_actual_electron_builder_filenames_from_ci(self):
         macos = next((self.root / 'macos').iterdir())
-        macos.rename(macos.with_name('Sensteed-Agent Beta-2.0.11-beta.18-arm64.dmg'))
+        macos.rename(macos.with_name('Sensteed-Agent Beta-2.0.11-beta.202610160930-arm64.dmg'))
         for suffix, architecture in [('.AppImage', 'x86_64'), ('.deb', 'amd64')]:
             path = next((self.root / 'linux').glob('*' + suffix))
             path.rename(path.with_name(path.name.replace('-x64', '-' + architecture)))
@@ -190,7 +197,7 @@ class PublicationTests(unittest.TestCase):
         for suffix, architecture in [('.AppImage', 'x86_64'), ('.deb', 'amd64')]:
             path = next((self.root / 'linux').glob('*' + suffix))
             actual_name = path.name.replace('-x64', '-' + architecture)
-            rejected = [actual_name.replace('beta.18', 'beta.180'),
+            rejected = [actual_name.replace('beta.202610160930', 'beta.2026101609300'),
                         actual_name.replace(architecture, 'arm64'),
                         actual_name.replace(architecture, 'amd64' if architecture == 'x86_64' else 'x86_64')]
             for name in rejected:
@@ -201,7 +208,7 @@ class PublicationTests(unittest.TestCase):
                     publisher.publish(client, self.config, self.context, self.root)
                 self.assertIn(name, str(error.exception))
                 self.assertIn('linux', str(error.exception))
-                self.assertIn('2.0.11-beta.18', str(error.exception))
+                self.assertIn('2.0.11-beta.202610160930', str(error.exception))
                 self.assertEqual(client.calls, [])
                 renamed.rename(path)
 
@@ -218,7 +225,7 @@ class PublicationTests(unittest.TestCase):
         for previous in [None, {'version': '2.0.11-beta.9'}]:
             client = FakeTos(previous=previous)
             key, manifest = publisher.publish(client, self.config, self.context, self.root)
-            self.assertIn('/releases/beta/2.0.11-beta.18/', key)
+            self.assertIn('sensteed-agent/26101609/2.0.11-beta.202610160930-123-2/', key)
             self.assertEqual(client.calls[-1][1], 'sensteed-agent/channels/beta.json')
             self.assertEqual(client.calls[-2][1], key)
             self.assertEqual(manifest['artifacts'][0]['signing'], 'signed-notarized')
@@ -231,7 +238,7 @@ class PublicationTests(unittest.TestCase):
 
     def test_equal_or_newer_channel_prevents_uploads(self):
         self.context['release'] = True
-        for version in ['2.0.11-beta.18', '2.0.11-beta.19', '2.0.12-beta.1']:
+        for version in ['2.0.11-beta.202610160930', '2.0.11-beta.202610160931', '2.0.12-beta.202610161010']:
             client = FakeTos(previous={'version': version})
             with self.assertRaisesRegex(ValueError, 'newer'):
                 publisher.publish(client, self.config, self.context, self.root)
@@ -250,7 +257,7 @@ class PublicationTests(unittest.TestCase):
         for mode in ['missing', 'empty', 'extra', 'version']:
             client = FakeTos()
             extra = self.root / 'linux' / 'debug.log'
-            renamed = target.with_name(target.name.replace('beta.18', 'beta.180'))
+            renamed = target.with_name(target.name.replace('beta.202610160930', 'beta.2026101609300'))
             if mode == 'missing':
                 target.unlink()
             elif mode == 'empty':
@@ -292,7 +299,7 @@ class PublicationTests(unittest.TestCase):
         client = FakeTos()
         publisher.probe(client, self.config, self.env)
         self.assertEqual(len(client.calls), 1)
-        self.assertEqual(client.calls[0][1], 'sensteed-agent/diagnostics/123-2/probe.txt')
+        self.assertEqual(client.calls[0][1], 'sensteed-agent/26101609/diagnostics/123-2/probe.txt')
         with self.assertRaisesRegex(ValueError, 'verification'):
             publisher.probe(FakeTos(corrupt_head=True), self.config, self.env)
 
