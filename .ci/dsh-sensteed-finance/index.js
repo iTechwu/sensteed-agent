@@ -1,3 +1,4 @@
+import { needsCompleteList, completeFinanceList } from './lib/list-pagination.js'
 // Sensteed 财务看板宿主端。浏览器只访问同源 /api/desktop/sensteed/finance* 路由；
 // 所有 datasource 请求复用宿主飞书登录 token，由服务端验证身份与租户：
 // 统计/录入走本插件的 MCP 代理（与 Agent 的 mcp__finance__* 同一数据面），口径完全一致。
@@ -105,7 +106,7 @@ export function apply(ctx, overrides = {}) {
             result: {
               tenantId: config.tenantId,
               operator: config.operatorId,
-              orgs: orgs.data.orgs || [],
+              orgs: orgs.data.list ?? orgs.data.orgs ?? [],
               usage: 'tenantId 用于所有 mcp__finance__* 工具入参；金额单位一律为元；分析首选 mcp__finance__finance_analysis_brief 建立口径基线。',
             },
           }
@@ -498,6 +499,8 @@ async function financeApiCall(fetchImpl, config, toolName, args, observedAt, log
     const route = resolveFinanceRoute(toolName, args)
     if (!route) return { ok: false, error: 'finance_tool_unavailable' }
     const query = route.method === 'GET' ? stripPathFields(stripControlFields(args)) : undefined
+    const complete = route.method === 'GET' && needsCompleteList(route.path, query)
+    if (complete) Object.assign(query, {page: 1, limit: 200})
     const body = route.method === 'GET' || route.method === 'DELETE' ? undefined : stripPathFields(stripControlFields(route.body ?? args))
     const url = buildFinanceUrl(route.path, query)
     const response = await timedFetch(fetchImpl, url, {
@@ -526,8 +529,13 @@ async function financeApiCall(fetchImpl, config, toolName, args, observedAt, log
       logger?.info?.(`sensteed finance: ${toolName} datasource business code ${payload.code} msg ${payload.msg ?? '∅'} — data ${payload.data === undefined ? 'absent' : 'present'}`)
       return { ok: false, error: payload.msg || '财务操作失败' }
     }
-    const data = payload?.data
+    let data = payload?.data
     if (data === undefined) return { ok: false, error: 'empty_result' }
+    if (complete) data = await completeFinanceList(data, async pagination => {
+      const next = await financeApiCall(fetchImpl, config, toolName, { ...args, ...pagination }, observedAt, logger)
+      if (!next.ok) throw new Error(next.error)
+      return next.data
+    })
     return { ok: true, data, meta: { asOf: observedAt.toISOString() } }
   } catch (error) {
     logger?.info?.(`sensteed finance: REST call ${toolName} failed: ${String(error)}`)
@@ -768,6 +776,8 @@ async function dispatchPublicContract(fetchImpl, config, path, req, res, logger)
     && new RegExp('^' + template.replace(/:[A-Za-z]+/g, '[A-Za-z0-9_-]+') + '$').test(path))
   if (!matched) return sendJson(res, 404, { ok: false, error: '未开放的财务接口' })
   const query = Object.fromEntries([...new URL(req.url, 'http://localhost').searchParams].filter(([key]) => PUBLIC_QUERY_KEYS.has(key)))
+  const complete = req.method === 'GET' && needsCompleteList(path, query)
+  if (complete) Object.assign(query, {page: 1, limit: 200})
   let body
   if (req.method !== 'GET') {
     const parsed = await readJsonBody(req)
@@ -787,7 +797,15 @@ async function dispatchPublicContract(fetchImpl, config, path, req, res, logger)
     if (!payload || payload.data === undefined || (payload.code !== undefined && !isSuccessfulDatasourceCode(payload.code))) {
       return sendJson(res, 502, { ok: false, error: payload?.msg || '财务操作失败' })
     }
-    return sendJson(res, 200, { ok: true, data: payload.data })
+    const data = complete ? await completeFinanceList(payload.data, async pagination => {
+      const next = await timedFetch(fetchImpl, buildFinanceUrl(path, { ...query, ...pagination }), {
+        method: 'GET', headers: { accept: 'application/json', 'x-api-version': '1', authorization: `Bearer ${config.token}` },
+      })
+      const body = await next.json().catch(() => null)
+      if (!next.ok || !body || body.data === undefined || (body.code !== undefined && !isSuccessfulDatasourceCode(body.code))) throw new Error('财务列表后续页加载失败')
+      return body.data
+    }) : payload.data
+    return sendJson(res, 200, { ok: true, data })
   } catch {
     logger?.info?.(`sensteed finance: ${req.method} ${path} unavailable`)
     return sendJson(res, 503, { ok: false, error: '财务服务暂不可用，请稍后重试' })

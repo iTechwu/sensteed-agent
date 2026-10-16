@@ -2104,3 +2104,27 @@ test('ledger and cash requests preserve the dimensions supplied by a business li
   await new Promise(resolve => setImmediate(resolve))
   assert.ok(requests.some(path => path.startsWith('/revenue-plans?year=2027&orgId=org-1')))
 })
+
+test('bootstrap and public CE evidence read every page', async () => {
+  const rows=Array.from({length:201},(_,i)=>({id:String(i),name:'主体'+i}))
+  const calls=[]
+  const {routes,tools}=await loadHost({fetch:async url=>{
+    const u=new URL(url); calls.push(u)
+    const page=Number(u.searchParams.get('page')||1), limit=Number(u.searchParams.get('limit')||200)
+    return mcpJson({list:rows.slice((page-1)*limit,page*limit),total:201,page,limit})
+  }})
+  const bootstrap=await tools.get('sensteed_finance_bootstrap').execute({})
+  assert.equal(bootstrap.ok,true)
+  assert.equal(bootstrap.result.orgs.length,201)
+  const result=await invokeRoute(routes.get(BASE),'GET',BASE+'/rest/ce/packages/p/quotes')
+  assert.equal(result.status,200)
+  assert.equal(result.body.data.list.length,201)
+  assert.equal(calls.filter(u=>u.pathname.endsWith('/quotes')).length,2)
+})
+test('public later-page denial never returns partial evidence',async()=>{
+  const rows=Array.from({length:200},(_,i)=>({id:String(i)}))
+  const {routes}=await loadHost({fetch:async url=>new URL(url).searchParams.get('page')==='2' ? mcpJson({},403) : mcpJson({list:rows,total:201,page:1,limit:200})})
+  const result=await invokeRoute(routes.get(BASE),'GET',BASE+'/rest/ce/packages/p/quotes')
+  assert.equal(result.body.ok,false)
+  assert.equal(result.body.data,undefined)
+})
