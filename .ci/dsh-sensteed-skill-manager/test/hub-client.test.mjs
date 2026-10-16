@@ -94,3 +94,11 @@ test('discards an in-flight response after switching accounts', async () => {
   await assert.rejects(pending, { code: 'HUB_WORKSPACE_CHANGED' })
   assert.equal(client.workspaceId, undefined)
 })
+
+test('rejects a context response that silently replaces a previously verified workspace selection',async () => {
+  let returned=team
+  const client=new HubCatalogClient(ctx,{fetch:async()=>ok(me(returned))})
+  await client.select(team)
+  returned=second
+  await assert.rejects(client.context(),{code:'HUB_INVALID_RESPONSE'})
+})

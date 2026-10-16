@@ -254,7 +254,7 @@ test('opens hub entries through the ticket exchange URL and falls back to the pl
   page.render()
   await new Promise(resolve => setTimeout(resolve, 0))
   // 服务端未上线:回退直开网页
-  const openButton = () => find(page.render(), 'sm-row').children.find(child => child?.props?.className === 'sm-row-meta').children.at(-1)
+  const openButton = () => find(page.render(), 'sm-row').children.find(child => child?.props?.className === 'sm-row-meta').children.find(child => child?.tag === 'button' && child.children[0] === '在 Hub 查看')
   await openButton().props.onClick()
   assert.deepEqual(opened, [`https://ai.hozonauto.com/plugins/skills/${hubItem.skillId}`])
   // 换票服务可用:打开票据交换地址
@@ -280,4 +280,32 @@ test('renders local skills before stalled remote sources and preserves a healthy
   const hubSection = find(page.render(), 'sm-hub')
   assert.ok(find(hubSection, 'sm-row'))
   assert.equal(find(hubSection, 'sm-inline-error').children[0], 'Skills unavailable')
+})
+
+test('shows a review and explicit confirm/cancel before enterprise execution; plugins remain unsupported',async () => {
+  const id='c78ad665-640e-4053-9791-336cd7b1199d',calls=[]
+  const fetchMock=async(path,init)=>{
+    calls.push({path,body:init?.body})
+    if(path.includes('?source=hub'))return {ok:true,json:async()=>({hubSkills:[{skillId:id,slug:'reviewed-skill',displayName:'Reviewed',stableVersion:'1.0.0'}],hubPlugins:[{pluginId:id,displayName:'Plugin',stableVersion:'1.0.0'}]})}
+    if(path.includes('?source='))return {ok:true,json:async()=>({skills:[],sharedSkills:[]})}
+    if(path.endsWith('/operations'))return {ok:true,json:async()=>({installed:[],operations:[]})}
+    if(path.endsWith('/preview'))return {ok:true,json:async()=>({intentId:id,action:'install',installName:'reviewed-skill',version:'1.0.0',existingVersion:null,workspace:{ssoTeam:{name:'企业'}},compatibility:{authorDeclared:'>=0.2.0',tested:false},accessDeclaration:{containsScripts:false,networkHosts:[],fileAccess:'none'},sharedScope:true})}
+    if(path.endsWith('/execute'))return {ok:true,json:async()=>({state:'WRITTEN'})}
+    throw Error('unexpected route')
+  }
+  const page=createPage([],[],async()=>{},{fetch:fetchMock}),all=(node)=>node && typeof node==='object'?[node,...node.children.flatMap(all)]:[]
+  page.render();await new Promise(resolve=>setTimeout(resolve,0))
+  let nodes=all(page.render()),install=nodes.find(node=>node.tag==='button' && node.children[0]==='安装')
+  assert.ok(nodes.some(node=>node.children[0]==='插件尚不支持安装'))
+  await install.props.onClick()
+  assert.equal(calls.filter(call=>call.path.endsWith('/execute')).length,0)
+  let dialog=all(page.render()).find(node=>node.props.role==='dialog')
+  assert.ok(dialog);assert.ok(all(dialog).some(node=>node.children[0]==='此操作影响本机所有 Profile 的共享技能。'))
+  all(dialog).find(node=>node.tag==='button'&&node.children[0]==='取消').props.onClick()
+  assert.equal(all(page.render()).some(node=>node.props.role==='dialog'),false)
+  nodes=all(page.render());await nodes.find(node=>node.tag==='button'&&node.children[0]==='安装').props.onClick()
+  dialog=all(page.render()).find(node=>node.props.role==='dialog')
+  await all(dialog).find(node=>node.tag==='button'&&node.children[0]==='确认安装').props.onClick()
+  assert.equal(calls.filter(call=>call.path.endsWith('/execute')).length,1)
+  assert.deepEqual(JSON.parse(calls.find(call=>call.path.endsWith('/execute')).body),{intentId:id})
 })

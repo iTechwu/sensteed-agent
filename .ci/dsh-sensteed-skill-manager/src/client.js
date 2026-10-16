@@ -17,6 +17,7 @@ const COPY = {
     publish: '上传到公司', publishing: '正在上传…', publishSuccess: '已发布到公司技能库', publishError: '发布失败，请稍后重试。',
     shared: '公司共享（旧版）', sharedEmpty: '公司技能库还没有技能', sharedUnavailable: '暂时无法读取公司技能库', sharedInstall: '安装', sharedUpdate: '更新', sharedInstalled: '已安装', sharedLoading: '正在读取公司技能库…',
     hub: '企业 Hub', hubEmpty: '企业 Hub 目录还没有内容', hubUnavailable: '暂时无法读取企业 Hub（需桌面端登录企业账号）', hubOpen: '在 Hub 查看', hubSkillsTitle: 'Hub 技能', hubPluginsTitle: 'Hub 插件', hubHint: '目录原文可直接查看；发布并获批准后才可安装。', workspace: '工作空间', unpublished: '尚未发布', hubLoading: '正在读取企业目录…', hubSignIn: '登录企业账号', hubSigningIn: '正在打开登录…',
+    hubScripts: '含脚本', hubFiles: '文件访问', hubAccessNone: '无', hubAccessSelected: '用户选择的文件', hubAccessWorkspace: '工作区文件', hubAccessSystem: '系统文件', hubNetwork: '网络访问', hubNone: '无', hubYes: '是', hubNo: '否', hubInstall: '安装', hubUpdate: '更新', hubRemove: '移除', hubUnsupported: '插件尚不支持安装', hubConfirmTitle: '确认企业技能操作', hubConfirm: '确认', hubShared: '此操作影响本机所有 Profile 的共享技能。', hubDeclaration: '作者访问声明（尚无运行兼容性测试）', hubWritten: '已写入，等待发现或重载', hubDiscovered: '已由技能服务发现', hubRemoved: '企业技能已移除', hubConflict: '本机内容冲突', hubWorking: '本机操作进行中', hubNotExecuted: '操作未执行，请重新查看计划', hubPending: '回执待同步', hubAttention: '操作需要核对；本机内容和恢复材料已保留', hubUnknown: '授权消费结果未知；本机技能未变更',
     withdraw: '撤回', withdrawing: '正在撤回…', withdrawSuccess: '已从公司技能库撤回',
     installHint: '可粘贴单技能仓库，或合集仓库中某个技能的 /tree/ 分支目录链接。来源可信后再安装。Skill 会在本机加载。',
     installError: '安装失败，请检查仓库地址和技能结构。', installSuccess: '已安装 {name}', bundled: '内置', local: '本机',
@@ -33,6 +34,7 @@ const COPY = {
     publish: 'Share with company', publishing: 'Publishing…', publishSuccess: 'Published to company skills', publishError: 'Could not publish this skill. Try again.',
     shared: 'Company shared', sharedEmpty: 'No company skills yet', sharedUnavailable: 'Company skills are temporarily unavailable', sharedInstall: 'Install', sharedUpdate: 'Update', sharedInstalled: 'Installed', sharedLoading: 'Loading company skills…',
     hub: 'Company hub', hubEmpty: 'The company hub catalog is empty', hubUnavailable: 'The company hub is temporarily unavailable (desktop enterprise sign-in required)', hubOpen: 'Open in hub', hubSkillsTitle: 'Hub skills', hubPluginsTitle: 'Hub plugins', hubHint: 'Catalog documents can be viewed directly. Installation requires an approved release.', workspace: 'Workspace', unpublished: 'Not published', hubLoading: 'Loading enterprise catalog…', hubSignIn: 'Sign in to company', hubSigningIn: 'Opening sign-in…',
+    hubScripts: 'Scripts', hubFiles: 'File access', hubAccessNone: 'None', hubAccessSelected: 'User selected files', hubAccessWorkspace: 'Workspace files', hubAccessSystem: 'System files', hubNetwork: 'Network access', hubNone: 'None', hubYes: 'Yes', hubNo: 'No', hubInstall: 'Install', hubUpdate: 'Update', hubRemove: 'Remove', hubUnsupported: 'Plugin installation is not supported yet', hubConfirmTitle: 'Confirm enterprise skill operation', hubConfirm: 'Confirm ', hubShared: 'This changes shared skills for every local Profile.', hubDeclaration: 'Author access declaration (no runtime compatibility test)', hubWritten: 'Written; awaiting discovery or reload', hubDiscovered: 'Discovered by the skill service', hubRemoved: 'Enterprise skill removed', hubConflict: 'Local content conflict', hubWorking: 'Local operation in progress', hubNotExecuted: 'Operation did not run; review a new plan', hubPending: 'Receipt pending sync', hubAttention: 'Review required; local content and recovery evidence preserved', hubUnknown: 'Consumption outcome unknown; local skill unchanged',
     withdraw: 'Withdraw', withdrawing: 'Withdrawing…', withdrawSuccess: 'Removed from company skills',
     installHint: 'Paste a single-skill repository or a /tree/ link to one skill in a collection. Install trusted sources only.',
     installError: 'Installation failed. Check the repository URL and skill structure.', installSuccess: 'Installed {name}', bundled: 'Built in', local: 'Local',
@@ -99,13 +101,17 @@ async function openHubItem(kind, id, workspaceId) {
   window.open(fallback, '_blank', 'noopener')
 }
 
-function hubRow(item, t, workspaceId) {
+function hubRow(item, t, workspaceId, installed, preview, busy) {
   return h('article', { className: 'sm-row', key: `hub:${item.kind}:${item.id}` },
     h('div', { className: 'sm-glyph', 'aria-hidden': true }, h(IconSkillOutlineRegular, { size: 24 })),
     h('div', { className: 'sm-copy' }, h('strong', null, item.displayName || item.name), h('p', { title: item.description }, item.description)),
     h('div', { className: 'sm-row-meta' },
       h('span', { className: 'sm-version' }, item.version ? `v${item.version}` : t('unpublished')),
-      h('button', { type: 'button', className: 'sm-row-action', onClick: () => openHubItem(item.kind, item.id, workspaceId) }, t('hubOpen'))))
+      h('button', { type: 'button', className: 'sm-row-action', onClick: () => openHubItem(item.kind, item.id, workspaceId) }, t('hubOpen')),
+      installed?.localModified ? h('span',{className:'sm-inline-error'},t('hubConflict')) : null,
+      item.kind === 'plugin' ? h('span', {className:'sm-version'},t('hubUnsupported')) : h(React.Fragment,null,
+        h('button',{type:'button',className:'sm-row-action',disabled:busy || !item.version || (installed?.version === item.version && !installed?.localModified),onClick:() => preview(item,installed ? 'update' : 'install')},t(installed ? 'hubUpdate' : 'hubInstall')),
+        installed ? h('button',{type:'button',className:'sm-row-action',disabled:busy,onClick:() => preview(item,'uninstall')},t('hubRemove')) : null)))
 }
 
 function SkillManagerPage({ view, t, createSkill, panelInfo }) {
@@ -132,6 +138,11 @@ function SkillManagerPage({ view, t, createSkill, panelInfo }) {
   const [hubWorkspaceId, setHubWorkspaceId] = useState('')
   const [hubSourceErrors, setHubSourceErrors] = useState({})
   const [hubLoading, setHubLoading] = useState(false)
+  const [hubIntent,setHubIntent] = useState(null)
+  const [hubInstalled,setHubInstalled] = useState([])
+  const [hubOperations,setHubOperations] = useState([])
+  const hubConfirmRef = useRef(null)
+  useEffect(() => { if (hubIntent) hubConfirmRef.current?.focus() },[hubIntent])
   const operation = useRef(false)
   const refreshGeneration = useRef(0)
   // The main slot stays mounted while the user moves between global panels.
@@ -165,7 +176,7 @@ function SkillManagerPage({ view, t, createSkill, panelInfo }) {
     const current = () => refreshGeneration.current === generation
     setState(skills.length > 0 ? 'refreshing' : 'loading')
     setSharedLoading(true); setHubLoading(true)
-    setError(''); setRefreshError(''); setNotice('')
+    setError(''); setRefreshError(''); setNotice(''); setHubIntent(null)
     await Promise.allSettled([
       request('?source=local').then(body => {
         if (!current()) return
@@ -189,6 +200,10 @@ function SkillManagerPage({ view, t, createSkill, panelInfo }) {
         setHubSourceErrors({ skills: body.hubSkillsError, plugins: body.hubPluginsError })
         setHubError(body.hubWorkspaceError || '')
         setHubSsoRequired(body.hubErrorCode === 'HUB_SSO_REQUIRED')
+        void request('/hub/skills/operations').then(result => {
+          if (!current()) return
+          setHubInstalled(result.installed || []); setHubOperations(result.operations || [])
+        }).catch(() => { if (current()) { setHubInstalled([]); setHubOperations([]) } })
       }).catch(() => {
         if (!current()) return
         setHubSkills([]); setHubPlugins([]); setHubWorkspaces([]); setHubWorkspaceId('')
@@ -198,6 +213,7 @@ function SkillManagerPage({ view, t, createSkill, panelInfo }) {
   }
   const selectWorkspace = async workspaceId => {
     ++refreshGeneration.current
+    setHubIntent(null); setHubInstalled([]); setHubOperations([])
     setHubLoading(true); setHubError(''); setHubSkills([]); setHubPlugins([])
     try {
       await request('/hub/workspace', { method: 'POST', body: JSON.stringify({ workspaceId }) })
@@ -234,6 +250,24 @@ function SkillManagerPage({ view, t, createSkill, panelInfo }) {
     finally { setHubSigningIn(false) }
   }
   useEffect(() => { if (isActive) void refresh() }, [isActive])
+  const previewHub = async (item,action) => {
+    if (operation.current) return
+    operation.current = true; setBusy(true); setError(''); setHubIntent(null)
+    try { setHubIntent(await request('/hub/skills/preview',{method:'POST',body:JSON.stringify({skillId:item.id,action})})) }
+    catch (cause) { setError(cause.message) }
+    finally { operation.current = false; setBusy(false) }
+  }
+  const executeHub = async () => {
+    if (operation.current || !hubIntent) return
+    operation.current = true; setBusy(true); setError('')
+    try {
+      await requestLong('/hub/skills/execute',{method:'POST',body:JSON.stringify({intentId:hubIntent.intentId})})
+      setHubIntent(null); await refresh()
+    } catch (cause) { setError(cause.message); setHubIntent(null) }
+    finally { operation.current = false; setBusy(false) }
+  }
+  const operationLabel = value => value.status === 'ABORTED' ? t('hubNotExecuted') : value.status === 'CONSUME_UNKNOWN' ? t('hubUnknown') : value.status === 'NEEDS_ATTENTION' ? t('hubAttention')
+    : !value.state ? t('hubWorking') : value.state === 'DISCOVERED' ? t('hubDiscovered') : value.state === 'REMOVED' ? t('hubRemoved') : t('hubWritten')
   if (view === 'summary') return t('description')
 
   const install = async event => {
@@ -354,8 +388,8 @@ function SkillManagerPage({ view, t, createSkill, panelInfo }) {
               h('div', { className: 'sm-glyph', 'aria-hidden': true }, h(IconSkillOutlineRegular, { size: 24 })),
               h('div', { className: 'sm-copy' }, h('strong', null, skill.name), h('p', { title: skill.description }, skill.description)),
               h('div', { className: 'sm-row-meta' },
-                h('span', { className: `sm-source${skill.source === 'bundled' ? ' is-bundled' : ''}` }, skill.source === 'bundled' ? t('bundled') : t('local')),
-                skill.source !== 'bundled' ? h('button', { type: 'button', className: 'sm-row-action', disabled: busy, onClick: () => void publish(skill.name) }, t('publish')) : null)))),
+                h('span', { className: `sm-source${skill.source === 'bundled' ? ' is-bundled' : ''}` }, skill.source === 'bundled' ? t('bundled') : skill.source === 'hub' ? t('hub') : skill.shared ? t('shared') : t('local')),
+                skill.source !== 'bundled' && skill.source !== 'hub' ? h('button', { type: 'button', className: 'sm-row-action', disabled: busy, onClick: () => void publish(skill.name) }, t('publish')) : null)))),
       ) : null,
     sourceFilter === 'all' || sourceFilter === 'shared' ? h('section', { className: 'sm-shared', 'aria-labelledby': 'sm-shared-title' },
       h('div', { className: 'sm-section-heading' }, h('h3', { id: 'sm-shared-title' }, t('shared')), h('span', null, String(visibleShared.length))),
@@ -392,8 +426,19 @@ function SkillManagerPage({ view, t, createSkill, panelInfo }) {
         h('div', { className: 'sm-list', key: domain },
           items.length > 0 || hubSourceErrors[domain] ? h('h4', { className: 'sm-hub-group' }, title) : null,
           hubSourceErrors[domain] && !hubError ? h('p', { className: 'sm-inline-error', role: 'status' }, hubSourceErrors[domain]) : null,
-          items.map(item => hubRow(item, t, hubWorkspaceId))))) : null,
+          items.map(item => hubRow(item, t, hubWorkspaceId, hubInstalled.find(value => value.skillId === item.id), previewHub, busy))))) : null,
     error && !formOpen ? h('div', { className: 'sm-error', role: 'alert' }, error) : null),
+    hubOperations.length ? h('div',{className:'sm-notice',role:'status'},hubOperations.slice(-5).map(value => h('p',{key:value.operationId},`${value.installName}: ${operationLabel(value)}${value.receiptPending ? ` · ${t('hubPending')}` : ''}`))) : null,
+    hubIntent ? h('section',{className:'sm-overlay',role:'dialog','aria-modal':true,'aria-label':t('hubConfirmTitle'),onKeyDown:event => {
+      if (event.key === 'Escape' && !busy) setHubIntent(null)
+      if (event.key === 'Tab') { const controls = [...event.currentTarget.querySelectorAll('button:not(:disabled)')]; const first=controls[0],last=controls.at(-1); if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() } }
+    }},h('div',{className:'sm-install-dialog'},
+      h('h2',null,`${t('hubConfirmTitle')} · ${t(hubIntent.action === 'uninstall' ? 'hubRemove' : hubIntent.action === 'update' ? 'hubUpdate' : 'hubInstall')}`),h('p',null,`${hubIntent.workspace?.ssoTeam?.name || ''} · ${hubIntent.installName} · ${hubIntent.existingVersion || '—'} → ${hubIntent.action === 'uninstall' ? '—' : hubIntent.version}`),
+      h('p',null,t('hubShared')),h('p',null,t('hubDeclaration')),
+      h('p',null,`${hubIntent.compatibility.authorDeclared} · ${t('hubScripts')}: ${hubIntent.accessDeclaration.containsScripts ? t('hubYes') : t('hubNo')} · ${t('hubFiles')}: ${t({'none':'hubAccessNone','user-selected':'hubAccessSelected','workspace':'hubAccessWorkspace','system':'hubAccessSystem'}[hubIntent.accessDeclaration.fileAccess])}`),
+      h('p',null,`${t('hubNetwork')}: ${hubIntent.accessDeclaration.networkHosts.join(', ') || t('hubNone')}`),
+      h('button',{ref:hubConfirmRef,type:'button',disabled:busy,onClick:() => void executeHub()},busy ? t('installing') : `${t('hubConfirm')}${t(hubIntent.action === 'uninstall' ? 'hubRemove' : hubIntent.action === 'update' ? 'hubUpdate' : 'hubInstall')}`),
+      h('button',{type:'button',disabled:busy,onClick:() => setHubIntent(null)},t('cancel')))) : null,
     formOpen ? h('div', { className: 'sm-overlay', role: 'dialog', 'aria-modal': true, 'aria-labelledby': 'sm-install-title',
       onClick: event => { if (event.target === event.currentTarget) closeInstall() } },
       h('div', { className: 'sm-install-dialog', role: 'document' },

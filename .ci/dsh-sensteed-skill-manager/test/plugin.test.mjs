@@ -127,7 +127,7 @@ test('rejects traversal and symbolic-link entries in shared skill archives', () 
     'SKILL.md': new TextEncoder().encode('---\nname: unsafe\ndescription: Unsafe\n---\n'),
     '../escape.txt': new TextEncoder().encode('outside'),
   }))
-  assert.throws(() => __test.validateZipArchive(traversal), /unsafe/u)
+  assert.throws(() => __test.validateZipArchive(traversal), { code: 'HUB_UNSAFE_ARCHIVE' })
 })
 
 test('rejects archive path collisions and the install marker filename', () => {

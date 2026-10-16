@@ -12,27 +12,77 @@ export function hubSession(ctx) {
 
 function failure(code, message) { return Object.assign(new Error(message), { code }) }
 
+const ID_PATH = '[0-9a-f-]{36}'
+const JSON_ROUTES = [
+  ['GET', /^\/skillhub\/v1\/(me|workspaces|skills|plugins)(?:\?page=\d+&limit=100)?$/u],
+  ['GET', new RegExp(`^/skillhub/v1/skills/${ID_PATH}$`, 'iu')],
+  ['GET', new RegExp(`^/skillhub/v1/skills/releases/${ID_PATH}/manifest$`, 'iu')],
+  ['POST', /^\/skillhub\/v1\/devices\/bind$/u],
+  ['POST', /^\/skillhub\/v1\/skills\/(install-plans|installation-reports)$/u],
+  ['POST', new RegExp(`^/skillhub/v1/skills/install-plans/${ID_PATH}/(authorize|consume)$`, 'iu')],
+  ['POST', new RegExp(`^/skillhub/v1/skills/releases/${ID_PATH}/download-grants$`, 'iu')],
+]
+export async function boundedBody(response, maximum) {
+  const declared = response.headers?.get?.('content-length')
+  if (declared && (!/^\d+$/u.test(declared) || Number(declared) > maximum)) throw failure('HUB_RESPONSE_TOO_LARGE', 'Hub 返回内容超过限制。')
+  if (!response.body) {
+    // Response-shaped test doubles have no reader; real fetch bodies always do.
+    const bytes = Buffer.from(JSON.stringify(await response.json()))
+    if (bytes.length > maximum) throw failure('HUB_RESPONSE_TOO_LARGE', 'Hub 返回内容超过限制。')
+    return bytes
+  }
+  const reader = response.body.getReader(); const chunks = []; let count = 0
+  try {
+    while (true) {
+      const {done,value} = await reader.read()
+      if (done) break
+      count += value.length
+      if (count > maximum) throw failure('HUB_RESPONSE_TOO_LARGE', 'Hub 返回内容超过限制。')
+      chunks.push(Buffer.from(value))
+    }
+    return Buffer.concat(chunks)
+  } finally { await reader.cancel().catch(() => {}); reader.releaseLock() }
+}
 export async function callHubCatalog(ctx, path, options = {}) {
-  const session = options.session || hubSession(ctx)
+  const session = options.session || hubSession(ctx), method = options.method || 'GET'
   if (!session) throw failure('HUB_SSO_REQUIRED', '请先在桌面端登录企业账号。')
-  if (!path.startsWith('/skillhub/v1/')) throw failure('HUB_INVALID_REQUEST', '无效的 Hub 请求。')
+  if (!JSON_ROUTES.some(([verb,pattern]) => verb === method && pattern.test(path))) throw failure('HUB_INVALID_REQUEST', '无效的 Hub 请求。')
   let response
   try {
     response = await (options.fetch || globalThis.fetch)(`${HUB_API_BASE}${path}`, {
-      redirect: 'error', signal: options.signal || AbortSignal.timeout(15_000),
+      method, redirect: 'error', credentials: 'omit', cache: 'no-store', signal: options.signal || AbortSignal.timeout(15_000),
       headers: {
         Accept: 'application/json', Authorization: `Bearer ${session.accessToken}`,
+        ...(method === 'POST' ? { 'Content-Type':'application/json' } : {}),
         ...(options.workspaceId ? { 'x-current-tenant': options.workspaceId } : {}),
       },
+      ...(method === 'POST' ? { body: JSON.stringify(options.body) } : {}),
     })
   } catch { throw failure('HUB_UNAVAILABLE', '暂时无法连接企业 Hub，请稍后重试。') }
-  const envelope = await response.json().catch(() => null)
   if (response.status === 401) throw failure('HUB_SSO_REQUIRED', '企业登录已失效，请重新登录。')
-  if (response.status === 403) throw failure('HUB_ACCESS_DENIED', '当前账号无权访问此工作空间。')
-  if (!response.ok || envelope?.code !== 200 || !envelope?.data) {
+  if (response.status === 403) throw failure('HUB_ACCESS_DENIED', '当前账号无权执行此操作，请确认成员权限和设备状态。')
+  let envelope
+  try { envelope = JSON.parse((await boundedBody(response,2 * 1024 * 1024)).toString('utf8')) } catch (error) { if (error.code) throw error }
+  if (![200,201,202].includes(response.status) || !response.ok || envelope?.code !== 200 || !envelope?.data) {
     throw failure('HUB_UNAVAILABLE', '企业 Hub 返回异常，请稍后重试。')
   }
   return envelope.data
+}
+export async function downloadHubArchive(ctx, grant, options = {}) {
+  if (!UUID.test(grant?.grantId || '') || !Number.isFinite(Date.parse(grant.expiresAt)) || Date.parse(grant.expiresAt) <= Date.now()) throw failure('HUB_INVALID_RESPONSE','下载授权无效或已过期。')
+  const path = `/plugins/api/skillhub/v1/downloads/${grant.grantId}/content`
+  if (![path,`https://ai.hozonauto.com${path}`].includes(grant.downloadUrl)) throw failure('HUB_INVALID_RESPONSE','下载地址未通过安全校验。')
+  const session = options.session || hubSession(ctx)
+  if (!session) throw failure('HUB_SSO_REQUIRED','请先登录企业账号。')
+  let response
+  try {
+    response = await (options.fetch || globalThis.fetch)(`https://ai.hozonauto.com${path}`, {
+      redirect:'error', credentials:'omit', cache:'no-store', signal:AbortSignal.timeout(30_000),
+      headers:{ Accept:'application/zip', Authorization:`Bearer ${session.accessToken}`, 'x-current-tenant':options.workspaceId },
+    })
+  } catch { throw failure('HUB_UNAVAILABLE','技能下载中断，请重新确认。') }
+  if (response.status !== 200 || response.headers?.get?.('content-type')?.split(';')[0] !== 'application/zip') throw failure('HUB_DOWNLOAD_FAILED','技能下载未通过认证。')
+  return boundedBody(response,10 * 1024 * 1024)
 }
 
 export async function allHubPages(ctx, path, options = {}) {
@@ -64,7 +114,11 @@ function sourceError(error) {
 }
 
 export class HubCatalogClient {
-  constructor(ctx, options = {}) { this.ctx = ctx; this.fetch = options.fetch }
+  constructor(ctx, options = {}) {
+    this.ctx = ctx; this.fetch = options.fetch; this.revision = 0
+    this.unwatch = ctx.dofeAuth?.watchBinding?.(() => { this.revision += 1 })
+  }
+  dispose() { this.unwatch?.() }
 
   identity() {
     const session = hubSession(this.ctx)
@@ -86,7 +140,7 @@ export class HubCatalogClient {
     const options = { fetch: this.fetch, session: snapshot.session, workspaceId: selection, signal: AbortSignal.timeout(15_000) }
     const me = await callHubCatalog(this.ctx, '/skillhub/v1/me', options)
     if (!UUID.test(me.workspace?.ssoTeam?.id || '') || !UUID.test(me.tenantId || '') || !Array.isArray(me.permissions)
-      || (workspaceId && me.workspace.ssoTeam.id !== workspaceId)) {
+      || ((workspaceId || this.workspaceId) && me.workspace.ssoTeam.id !== (workspaceId || this.workspaceId))) {
       throw failure('HUB_INVALID_RESPONSE', '工作空间身份不匹配，请重新选择。')
     }
     this.assertCurrent(snapshot)

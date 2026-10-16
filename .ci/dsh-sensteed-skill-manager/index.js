@@ -6,7 +6,11 @@ import { homedir, tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { promisify } from 'node:util'
 import { parse as parseYaml } from 'yaml'
-import { unzipSync, zipSync } from 'fflate'
+import { zipSync } from 'fflate'
+import { validateZipArchive, unpackSkillArchive } from './skill-archive.js'
+import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
+import { HubSkillInstaller, safeHubError } from './hub-skill-installer.js'
+import { readJson } from './hub-install-store.js'
 import { HUB_API_BASE, HUB_WEB_BASE, HubCatalogClient, callHubCatalog, hubSession } from './hub-client.js'
 
 const execFileAsync = promisify(execFile)
@@ -24,7 +28,7 @@ const SHARED_INSTALL_MARKER = '.sensteed-shared-skill.json'
 export const inject = ['webServer', 'skills', 'credentials', 'dofeAuth', 'connection']
 
 export function skillRoot(environment = process.env, home = homedir()) {
-  return resolve(environment.DSH_HOME || join(home, '.dsh'), 'skills')
+  return join(resolveDshHome(environment.DSH_HOME?.trim() || join(home, '.dsh'), {}), 'skills')
 }
 
 export function parseSkillFrontmatter(text) {
@@ -202,7 +206,7 @@ async function installSkill(url, options = {}) {
     const rootStat = await lstat(root)
     if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) throw new Error('The local skill directory is not a regular directory.')
     const destination = join(root, metadata.name)
-    if (await exists(destination)) throw new Error(`The skill "${metadata.name}" is already installed.`)
+    if (await exists(destination) || await readJson(join(dirname(root),'.sensteed-hub','receipts',`${metadata.name}.json`))) throw new Error(`The skill "${metadata.name}" is already installed or owned by Hub.`)
     staging = join(root, `.${metadata.name}.${randomUUID()}.tmp`)
     await cp(source, staging, {
       recursive: true,
@@ -268,77 +272,11 @@ async function readArchiveBody(req) {
   return body
 }
 
-function validateZipArchive(archive) {
-  if (archive.length < 22 || archive.length > MAX_ARCHIVE_BYTES) throw new Error('Skill archive exceeds the 10 MiB limit.')
-  let eocd = -1
-  for (let offset = archive.length - 22; offset >= Math.max(0, archive.length - 65_557); offset -= 1) {
-    if (archive.readUInt32LE(offset) === 0x06054b50) { eocd = offset; break }
-  }
-  if (eocd < 0) throw new Error('Skill archive is invalid.')
-  const count = archive.readUInt16LE(eocd + 10)
-  const directorySize = archive.readUInt32LE(eocd + 12)
-  const directoryOffset = archive.readUInt32LE(eocd + 16)
-  if (!count || count > MAX_ARCHIVE_FILES || directoryOffset + directorySize > eocd) throw new Error('Skill archive directory is invalid.')
-  const names = new Set()
-  const files = new Set()
-  const directories = new Set()
-  const portableNames = new Set()
-  let totalSize = 0
-  let offset = directoryOffset
-  for (let index = 0; index < count; index += 1) {
-    if (archive.readUInt32LE(offset) !== 0x02014b50) throw new Error('Skill archive directory is invalid.')
-    const flags = archive.readUInt16LE(offset + 8)
-    const method = archive.readUInt16LE(offset + 10)
-    const compressedSize = archive.readUInt32LE(offset + 20)
-    const uncompressedSize = archive.readUInt32LE(offset + 24)
-    const nameLength = archive.readUInt16LE(offset + 28)
-    const extraLength = archive.readUInt16LE(offset + 30)
-    const commentLength = archive.readUInt16LE(offset + 32)
-    const externalAttributes = archive.readUInt32LE(offset + 38)
-    const name = archive.subarray(offset + 46, offset + 46 + nameLength).toString('utf8')
-    const pathName = name.endsWith('/') ? name.slice(0, -1) : name
-    const segments = pathName.split('/')
-    const portableName = pathName.normalize('NFC').toLocaleLowerCase('en-US')
-    const fileType = (externalAttributes >>> 16) & 0o170000
-    if (
-      !name || name.includes('\\') || name.includes('\0') || name.includes(':') || name.startsWith('/') || /^[A-Za-z]:/u.test(name) ||
-      segments.some(part => part === '..' || part === '.' || part.endsWith('.') || part.endsWith(' ')) ||
-      segments.some(part => /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/iu.test(part)) ||
-      portableName === SHARED_INSTALL_MARKER.toLocaleLowerCase('en-US') || portableNames.has(portableName) || names.has(name) ||
-      flags & 1 || ![0, 8].includes(method) || fileType === 0o120000 ||
-      compressedSize === 0xffffffff || uncompressedSize === 0xffffffff
-    ) throw new Error('Skill archive contains an unsafe or unsupported entry.')
-    let parent = ''
-    for (const rawSegment of segments.slice(0, -1)) {
-      const segment = rawSegment.normalize('NFC').toLocaleLowerCase('en-US')
-      parent = parent ? `${parent}/${segment}` : segment
-      if (files.has(parent)) throw new Error('Skill archive contains conflicting file and directory paths.')
-      directories.add(parent)
-    }
-    const isDirectory = name.endsWith('/')
-    if ((isDirectory && files.has(portableName)) || (!isDirectory && directories.has(portableName))) {
-      throw new Error('Skill archive contains conflicting file and directory paths.')
-    }
-    if (isDirectory) directories.add(portableName)
-    else files.add(portableName)
-    portableNames.add(portableName)
-    names.add(name)
-    totalSize += uncompressedSize
-    if (totalSize > MAX_UNPACKED_BYTES || (compressedSize > 0 && uncompressedSize / compressedSize > 200)) {
-      throw new Error('Skill archive expands beyond the 25 MiB limit.')
-    }
-    offset += 46 + nameLength + extraLength + commentLength
-  }
-  if (offset !== directoryOffset + directorySize || ![...names].some(name => name === 'SKILL.md')) {
-    throw new Error('Skill archive must contain SKILL.md at its root.')
-  }
-  return names
-}
 
 async function packLocalSkill(ctx, name) {
   if (!SKILL_NAME.test(name || '')) throw new Error('Skill name is invalid.')
   const listed = (await listSkills(ctx)).find(skill => skill.name === name && skill.source !== 'bundled')
-  if (!listed?.path) throw new Error('Only local skills can be published.')
+  if (!listed?.path || listed.source === 'hub' || await readJson(join(dirname(skillRoot()), '.sensteed-hub', 'receipts', `${name}.json`))) throw new Error('Only local skills can be published. Hub-managed skills cannot be republished through the legacy library.')
   const root = await realpath(skillRoot())
   const skillFile = await realpath(listed.path)
   const directory = await realpath(dirname(skillFile))
@@ -373,9 +311,10 @@ async function packLocalSkill(ctx, name) {
 }
 
 async function installArchive(root, expectedName, archive, expectedSha256, version = 1) {
+  if (await readJson(join(dirname(root), '.sensteed-hub', 'receipts', `${expectedName}.json`))) throw new Error('A Hub-managed skill cannot be replaced by the legacy library.')
   if (createHash('sha256').update(archive).digest('hex') !== expectedSha256) throw new Error('Skill archive checksum does not match.')
   const names = validateZipArchive(archive)
-  const entries = unzipSync(archive)
+  const entries = unpackSkillArchive(archive)
   const metadata = parseSkillFrontmatter(Buffer.from(entries['SKILL.md']).toString('utf8'))
   if (metadata.name !== expectedName) throw new Error('Skill archive name does not match the shared listing.')
   if (!Number.isSafeInteger(version) || version < 1) throw new Error('Shared skill version is invalid.')
@@ -527,10 +466,11 @@ export async function listSkills(ctx) {
   const skills = await ctx.skills.list()
   return Promise.all(skills.map(async skill => {
     const shared = await readSharedInstallMarker(skill)
+    const managed = SKILL_NAME.test(skill.name) ? await readJson(join(dirname(skillRoot()),'.sensteed-hub','receipts',`${skill.name}.json`)).catch(() => undefined) : undefined
     return {
       name: skill.name,
       description: skill.description,
-      source: skill.source,
+      source: managed?.source === 'hub' && skill.source !== 'bundled' && typeof skill.path === 'string' && resolve(skill.path) === join(skillRoot(),skill.name,'SKILL.md') ? 'hub' : skill.source,
       provider: skill.provider,
       path: skill.path,
       ...(shared ? { shared } : {}),
@@ -541,6 +481,9 @@ export async function listSkills(ctx) {
 export function apply(ctx, overrides = {}) {
   if (overrides.registerHostRoute === false) return undefined
   const hub = new HubCatalogClient(ctx, { fetch: overrides.fetch })
+  const installer = new HubSkillInstaller(ctx,hub,{...overrides.hubInstallOptions,parseSkill:parseSkillFrontmatter})
+  const replay = setInterval(() => { void installer.status().catch(() => {}) },30_000)
+  replay.unref?.()
   const route = ctx.webServer.register({
     kind: 'prefix',
     path: ROUTE,
@@ -558,7 +501,7 @@ export function apply(ctx, overrides = {}) {
       if (req.method === 'GET' && req.url?.split('?', 1)[0] === ROUTE) {
         try {
           const source = new URL(req.url, 'http://localhost').searchParams.get('source')
-          if (source === 'local') return respond(res, 200, { skills: await listSkills(ctx) })
+          if (source === 'local') return respond(res, 200, { skills: (await listSkills(ctx)).map(({ path, ...skill }) => skill) })
           if (source === 'shared') {
             const result = await callSharedSkills(ctx, '?page=1&limit=200', { fetch: overrides.fetch })
               .catch(error => ({ unavailable: error instanceof Error ? error.message : 'Company skills are unavailable.', list: [] }))
@@ -585,7 +528,7 @@ export function apply(ctx, overrides = {}) {
             hubView(),
           ])
           return respond(res, 200, {
-            skills,
+            skills: skills.map(({ path, ...skill }) => skill),
             sharedSkills: shared.list || [],
             sharedTotal: shared.total || 0,
             sharedError: shared.unavailable || null,
@@ -597,6 +540,18 @@ export function apply(ctx, overrides = {}) {
       const requestPath = req.url?.split('?', 1)[0]
       const sharedName = safeRouteName(requestPath)
       try {
+        if (requestPath.startsWith(`${ROUTE}/hub/skills/`)) {
+          try {
+            if (req.method === 'POST' && requestPath === `${ROUTE}/hub/skills/preview`) return respond(res,200,await installer.preview(await readJsonBody(req)))
+            if (req.method === 'POST' && requestPath === `${ROUTE}/hub/skills/execute`) return respond(res,200,await installer.execute(await readJsonBody(req)))
+            if (req.method === 'GET' && requestPath === `${ROUTE}/hub/skills/operations`) {
+              const query = new URL(req.url,'http://localhost').searchParams
+              if ([...query.keys()].some(key => key !== 'operationId') || query.getAll('operationId').length > 1) return respond(res,400,{error:'操作编号无效。'})
+              return respond(res,200,await installer.status(query.get('operationId') || undefined))
+            }
+            return respond(res,404,{error:'企业技能操作不存在。'})
+          } catch (error) { return respond(res,error.code === 'HUB_SSO_REQUIRED' ? 401 : 400,safeHubError(error)) }
+        }
         if (req.method === 'POST' && requestPath === `${ROUTE}/hub/view-url`) {
           const body = await readJsonBody(req)
           const id = body.id
@@ -643,7 +598,7 @@ export function apply(ctx, overrides = {}) {
       }
     },
   })
-  return () => route?.()
+  return () => { clearInterval(replay); hub.dispose(); route?.() }
 }
 
 export const __test = { safeGitHubUrl, skillSource, inspectGitSkill, installSkill, validateSkillTree, validateZipArchive, installArchive, packLocalSkill, SHARED_SKILLS_URL, HUB_API_BASE, callHubCatalog, hubSession, hubViewUrl }
