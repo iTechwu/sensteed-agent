@@ -202,6 +202,7 @@ export class HubSkillInstaller {
         await this.phase(operation,'SWAPPING')
         const destination = this.store.target(plan.installName), backup = join(this.store.directory,'backups',operationId)
         if (before.state.exists) {
+          this.hub.assertCurrent(context.snapshot)
           await rename(destination,backup); await syncDirectory(this.store.root); await syncDirectory(dirname(backup))
           requireValue((await treeState(backup)).treeDigest === before.state.treeDigest,'HUB_LOCAL_MODIFIED')
         }
@@ -209,6 +210,7 @@ export class HubSkillInstaller {
         if (files) {
           requireValue(!(await statOptional(destination)),'HUB_LOCAL_CONFLICT')
           requireValue((await treeState(stage)).treeDigest === staged.treeDigest,'HUB_LOCAL_MODIFIED')
+          this.hub.assertCurrent(context.snapshot)
           await rename(stage,destination); await syncDirectory(this.store.root); await syncDirectory(dirname(stage))
         }
         await this.phase(operation,'PUBLISHED')

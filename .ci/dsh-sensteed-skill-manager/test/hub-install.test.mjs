@@ -183,6 +183,26 @@ test('switching actor after durable CONSUMING aborts before sending consume',asy
   assert.equal((await f.installer.store.operations())[0].phase,'ABORTED')
 })
 
+test('switching actor after SWAPPING cannot begin install, update or uninstall target changes',async t => {
+  for (const action of ['install','update','uninstall']) {
+    const f=await fixture(t)
+    if(action!=='install')await f.installer.execute({intentId:(await f.installer.preview({action:'install',skillId})).intentId})
+    const before=action==='install'?null:await readFile(join(f.home,'skills','reviewed-skill','SKILL.md'),'utf8')
+    if(action==='update')f.release=artifact('1.1.0')
+    const intent=await f.installer.preview({action,skillId})
+    f.installer.options.afterPhase=async phase=>{if(phase==='SWAPPING')f.switchActor()}
+    const result=await f.installer.execute({intentId:intent.intentId})
+    assert.equal(result.status,'NEEDS_ATTENTION')
+    if(before===null)assert.deepEqual(await readdir(join(f.home,'skills')),[])
+    else assert.equal(await readFile(join(f.home,'skills','reviewed-skill','SKILL.md'),'utf8'),before)
+    assert.deepEqual(await readdir(join(f.home,'.sensteed-hub','backups')),[])
+    const operation=(await f.installer.store.operations()).find(row=>row.operationId===result.operationId)
+    assert.equal(operation.identity.operator,'sso-actor')
+    assert.equal(operation.events[0].state,'DISCOVERY_FAILED')
+    assert.equal(result.receiptPending,true)
+  }
+})
+
 test('stale registry bodies cannot claim discovery and offline receipts replay byte-identically only under the original actor',async t => {
   const f=await fixture(t); f.ctx.skills.get=async()=>({content:'stale'});f.offline=true
   const result=await f.installer.execute({intentId:(await f.installer.preview({action:'install',skillId})).intentId})
