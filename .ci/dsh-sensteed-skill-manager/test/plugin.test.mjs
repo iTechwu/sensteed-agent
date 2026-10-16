@@ -173,3 +173,27 @@ test('preflights Git tree sizes before checking out skill blobs', async () => {
     await assert.rejects(__test.inspectGitSkill(root), /too many files/u)
   } finally { await rm(root, { recursive: true, force: true }) }
 })
+
+test('hubViewUrl exchanges a one-time ticket and falls back to the plain page', async () => {
+  const session = { dofeAuth: { getDatasourceSession: () => ({ accessToken: 'tok' }) } }
+  const anonymous = { dofeAuth: { getDatasourceSession: () => undefined } }
+  // 无桌面会话:直开网页
+  assert.deepEqual(await __test.hubViewUrl(anonymous, 'skills'), { url: 'https://ai.hozonauto.com/plugins/skills' })
+  // 服务端未上线(404):回退直开
+  assert.deepEqual(await __test.hubViewUrl(session, 'skills', { fetch: async () => ({ ok: false, status: 404, json: async () => null }) }),
+    { url: 'https://ai.hozonauto.com/plugins/skills' })
+  // 换票成功:拼票据交换地址,ticket 与 next 一并编码
+  const requests = []
+  const viewUrl = await __test.hubViewUrl(session, 'plugins', { fetch: async (url, init) => {
+    requests.push([url, init.method, JSON.parse(init.body), init.headers.Authorization])
+    return { ok: true, json: async () => ({ code: 200, data: { ticket: 'Abc123-._x9z' + 'q'.repeat(10), expiresIn: 30 } }) }
+  } })
+  assert.equal(requests[0][0], 'https://ai.hozonauto.com/plugins/api/auth/ticket')
+  assert.equal(requests[0][1], 'POST')
+  assert.deepEqual(requests[0][2], { next: '/plugins' })
+  assert.equal(requests[0][3], 'Bearer tok')
+  assert.equal(viewUrl.url, 'https://ai.hozonauto.com/plugins/api/auth/oidc/exchange?ticket=Abc123-._x9zqqqqqqqqqq&next=%2Fplugins')
+  // 票据格式不符(过短/含特殊字符):回退直开
+  assert.deepEqual(await __test.hubViewUrl(session, 'skills', { fetch: async () => ({ ok: true, json: async () => ({ code: 200, data: { ticket: 'bad ticket!' } }) }) }),
+    { url: 'https://ai.hozonauto.com/plugins/skills' })
+})
