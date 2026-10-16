@@ -111,6 +111,15 @@ test('rejects CRC corruption, central/local mismatch, special devices, excessive
   }
 })
 
+test('rejects Windows-dangerous characters in files and implicit parent directories',() => {
+  for(const character of ['<','>','"','|','?','*']) {
+    for(const path of [`unsafe${character}.txt`,`unsafe${character}/safe.txt`]) {
+      assert.throws(()=>unpackSkillArchive(artifact('1.0.0',{[path]:Buffer.from('x')}).archive),{code:'HUB_UNSAFE_ARCHIVE'})
+    }
+  }
+  assert.equal(unpackSkillArchive(artifact('1.0.0',{'合法-目录/文档.txt':Buffer.from('valid')}).archive)['合法-目录/文档.txt'].toString(),'valid')
+})
+
 test('pins grant content exactly and bounds streamed JSON and binary responses',async () => {
   for (const downloadUrl of ['https://evil.invalid/x',`/plugins/api/skillhub/v1/downloads/${grantId}/content?x=1`,`/plugins/api/skillhub/v1/downloads/${randomUUID()}/content`,`/plugins/api/skillhub/v1/downloads/${grantId}/%63ontent`]) {
     await assert.rejects(downloadHubArchive({}, {grantId,expiresAt:new Date(Date.now()+60000).toISOString(),downloadUrl},{session:{accessToken:'x'},fetch:() => {throw Error('must never fetch')}}),{code:'HUB_INVALID_RESPONSE'})
@@ -212,6 +221,64 @@ test('stale registry bodies cannot claim discovery and offline receipts replay b
   f.offline=false;f.switchActor();await f.installer.status();assert.equal(f.reports.length,0)
   f.restoreActor();await f.installer.status()
   assert.equal(JSON.stringify(f.reports),original)
+})
+
+async function pendingOutbox(t,options={}) {
+  const f=await fixture(t,options);f.offline=true
+  await f.installer.execute({intentId:(await f.installer.preview({action:'install',skillId})).intentId})
+  const operation=(await f.installer.store.operations())[0]
+  operation.retryAt=0;operation.retryCount=0;await f.installer.store.save(operation)
+  f.offline=false
+  return f
+}
+
+test('bounds each outbox batch and resumes unacknowledged events in order with original identity and payload',async t => {
+  const f=await pendingOutbox(t,{outboxMaxEvents:3})
+  const first=(await f.installer.store.operations())[0],second=structuredClone(first),foreign=structuredClone(first)
+  second.operationId=randomUUID();second.events.forEach(event=>{event.operationId=second.operationId})
+  foreign.operationId=randomUUID();foreign.identity.operator='other-actor';foreign.events.forEach(event=>{event.operationId=foreign.operationId})
+  await f.installer.store.save(second);await f.installer.store.save(foreign)
+  const operations=await f.installer.store.operations()
+  const expected=operations.filter(row=>row.identity.operator==='sso-actor').flatMap(row=>row.events)
+  const context=await f.installer.current();context.identity.deviceId=randomUUID()
+  await f.installer.store.lock('hub-outbox',()=>f.installer.flush(context))
+  assert.deepEqual(f.reports,expected.slice(0,3))
+  assert.equal((await f.installer.store.operations()).flatMap(row=>row.acked).length,3)
+  await f.installer.store.lock('hub-outbox',()=>f.installer.flush(context))
+  assert.deepEqual(f.reports,expected)
+  assert.equal(f.reports.every(row=>row.deviceId===deviceId),true)
+  assert.deepEqual((await f.installer.store.operations()).find(row=>row.operationId===foreign.operationId).acked,[])
+})
+
+test('stops an outbox batch at its elapsed budget and continues byte-identically on the next batch',async t => {
+  let now=0
+  const f=await pendingOutbox(t,{outboxBudgetMs:20,outboxNow:()=>now}),context=await f.installer.current()
+  const original=(await f.installer.store.operations())[0].events
+  const call=f.installer.call.bind(f.installer)
+  f.installer.call=async(...args)=>{const result=await call(...args);now+=20;return result}
+  await f.installer.store.lock('hub-outbox',()=>f.installer.flush(context))
+  assert.deepEqual(f.reports,original.slice(0,1))
+  await f.installer.store.lock('hub-outbox',()=>f.installer.flush(context))
+  assert.deepEqual(f.reports,original)
+})
+
+test('uses the remaining outbox budget to abort a stalled report and preserves pending events without ACK',async t => {
+  const f=await pendingOutbox(t,{outboxBudgetMs:25}),original=(await f.installer.store.operations())[0].events
+  const fetch=f.hub.fetch;let aborted=false,attempts=0
+  f.hub.fetch=async(url,init)=>{
+    if(!url.endsWith('/skills/installation-reports'))return fetch(url,init)
+    attempts++
+    return new Promise((resolve,reject)=>{
+      const guard=setTimeout(()=>reject(Error('outbox request exceeded its budget')),1000)
+      init.signal.addEventListener('abort',()=>{clearTimeout(guard);aborted=true;reject(init.signal.reason)},{once:true})
+    })
+  }
+  const context=await f.installer.current()
+  await f.installer.store.lock('hub-outbox',()=>f.installer.flush(context))
+  assert.equal(aborted,true);assert.equal(attempts,1)
+  const operation=(await f.installer.store.operations())[0]
+  assert.deepEqual(operation.events,original);assert.deepEqual(operation.acked,[])
+  assert.equal(operation.retryCount,1);assert.equal(operation.retryAt>Date.now(),true)
 })
 
 test('recovery restores a backed-up old tree and reconstructs receipts after a published target',async t => {

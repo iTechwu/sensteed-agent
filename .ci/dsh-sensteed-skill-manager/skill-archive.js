@@ -62,7 +62,7 @@ export function validateZipArchive(input) {
     if (!(flags & 0x800) && nameBuffer.some(byte => byte > 127)) fail()
     const isDir = name.endsWith('/'), path = isDir ? name.slice(0, -1) : name, parts = path.split('/')
     const key = path.normalize('NFC').toLowerCase()
-    if (!name || path.length > 240 || parts.length > 12 || /[\\\0:\x00-\x1f\x7f]/u.test(name) || name.startsWith('/')
+    if (!name || path.length > 240 || parts.length > 12 || /[\\\0<>:"|?*\x00-\x1f\x7f]/u.test(name) || name.startsWith('/')
       || parts.some(part => !part || part === '.' || part === '..' || /[. ]$/u.test(part) || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/iu.test(part))
       || key === '.sensteed-shared-skill.json' || portable.has(key) || names.has(name)
       || (flags & ~0x080e) || ![0, 8].includes(method) || ![0, isDir ? 0o040000 : 0o100000].includes(type)

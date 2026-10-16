@@ -1,11 +1,13 @@
 import { randomUUID } from 'node:crypto'
 import { lstat, mkdir, open, readFile, readdir, realpath, rename } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
+import { performance } from 'node:perf_hooks'
 import { callHubCatalog, downloadHubArchive, HUB_API_BASE } from './hub-client.js'
 import { unpackSkillArchive, fileManifestDigest, jcs, sha256 } from './skill-archive.js'
 import { HubInstallStore, readJson, safePath, statOptional, syncDirectory, treeState } from './hub-install-store.js'
 import { NAME, UUID, requireValue, trustedKeys, planDigest, verifyPlan, verifyRelease } from './hub-release-verifier.js'
 const PREFIX = '/skillhub/v1'
+const OUTBOX_MAX_EVENTS = 16, OUTBOX_BUDGET_MS = 2_000
 const messages = {
   HUB_LOCAL_CONFLICT:'同名技能来自内置、本机、旧共享或其他企业，不能覆盖。',
   HUB_LOCAL_MODIFIED:'本机技能已被修改，已保留内容。请备份处理后重新确认。',
@@ -41,10 +43,10 @@ export class HubSkillInstaller {
     this.hub.assertCurrent(context.snapshot)
     return {...context,identity:{...identity,actorRef:device.ownerRef,deviceId:device.deviceId}}
   }
-  async call(context,path,body) {
+  async call(context,path,body,signal = AbortSignal.timeout(15_000)) {
     this.hub.assertCurrent(context.snapshot)
     let result
-    try { result = await callHubCatalog(this.ctx,`${PREFIX}${path}`,{...context.options,signal:AbortSignal.timeout(15_000),...(body === undefined ? {} : {method:'POST',body})}) }
+    try { result = await callHubCatalog(this.ctx,`${PREFIX}${path}`,{...context.options,signal,...(body === undefined ? {} : {method:'POST',body})}) }
     catch (error) {
       if (error.code === 'HUB_ACCESS_DENIED' && context.identity && path === '/skills/install-plans') await this.store.invalidateDevice(context.identity)
       throw error
@@ -313,13 +315,22 @@ export class HubSkillInstaller {
       errorCode:operation.errorCode || (operation.phase === 'CONSUME_UNKNOWN' ? 'HUB_CONSUME_UNKNOWN' : null)}
   }
   async flush(context) {
+    // Bound one cooperative lock turn; durable ACK saves still finish before yielding.
+    const maximum = this.options.outboxMaxEvents ?? OUTBOX_MAX_EVENTS, budget = this.options.outboxBudgetMs ?? OUTBOX_BUDGET_MS
+    requireValue(Number.isInteger(maximum) && maximum >= 1 && maximum <= OUTBOX_MAX_EVENTS
+      && Number.isFinite(budget) && budget >= 1 && budget <= OUTBOX_BUDGET_MS,'HUB_INVALID_REQUEST')
+    const now = this.options.outboxNow || (() => performance.now()), deadline = now() + budget
+    let sent = 0
     for (const operation of await this.store.operations()) {
       if (!sameOwner(operation.identity,context.identity) || !['DONE','NEEDS_ATTENTION'].includes(operation.phase) || (operation.retryAt || 0) > Date.now()) continue
       for (const event of operation.events) {
         if (operation.acked.includes(event.seq)) continue
+        const remaining = deadline - now()
+        if (sent >= maximum || remaining <= 0) return
+        sent++
         try {
           // Use original device and payload. A new binding never rewrites a pending receipt.
-          const ack = await this.call(context,'/skills/installation-reports',event)
+          const ack = await this.call(context,'/skills/installation-reports',event,AbortSignal.timeout(Math.ceil(remaining)))
           requireValue(ack?.ack === true && Object.keys(ack).length === 1,'HUB_INVALID_RESPONSE')
           operation.acked.push(event.seq); await this.store.save(operation)
         } catch {
