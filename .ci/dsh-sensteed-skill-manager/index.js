@@ -497,8 +497,8 @@ function safeRouteName(path) {
 }
 
 // 「在 Hub 查看」的免登录跳转:用桌面 SSO Bearer 向 Nest 换一次性短票,
-// 浏览器凭票换网页会话,不再要求用户在网页重复登录(一次桌面登录,全部
-// 企业服务无感)。服务端未上线或任何一步失败都回退直开网页,行为与
+// 网页端消费票据引导登录态,不再要求用户在网页重复登录(一次桌面登录,
+// 全部企业服务无感)。服务端未上线或任何一步失败都回退直开网页,行为与
 // 此前一致;契约见 docs/skillhub-ticket-auth.md。
 async function hubViewUrl(ctx, target, overrides = {}) {
   const fallback = { url: `${HUB_WEB_BASE}/${target}` }
@@ -516,7 +516,7 @@ async function hubViewUrl(ctx, target, overrides = {}) {
     const payload = await response.json().catch(() => null)
     const ticket = typeof payload?.data?.ticket === 'string' ? payload.data.ticket : undefined
     if (!ticket || !/^[A-Za-z0-9._-]{16,256}$/u.test(ticket)) return fallback
-    return { url: `${HUB_WEB_BASE}/api/auth/oidc/exchange?ticket=${encodeURIComponent(ticket)}&next=${encodeURIComponent(`/${target}`)}` }
+    return { url: `${HUB_WEB_BASE}?tt=${encodeURIComponent(ticket)}&next=${encodeURIComponent(`/${target}`)}` }
   }
   catch { return fallback }
 }
