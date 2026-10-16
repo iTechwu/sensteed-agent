@@ -1746,3 +1746,63 @@ test('entry blocks unconfirmed text and clears the warning once a value is confi
   field.props.onChange('未确认付款方')
   assert.equal(clientNodes(harness.render()).some(node => node.type?.name === 'Notice'), false)
 })
+
+test('payment plan detail shows the saved actual payment date', async () => {
+  const source = (await Promise.all(['src/components.js', 'src/format.js', 'src/views/cash.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  const harness = clientHarness(source, 'PlanDetailDialog', { PLAN_LABELS: {}, financeEnumLabel: value => value, financeDisplayValue: value => value })
+  const tree = harness.render({ plan: { planType: 'OTHER', actualPaidAt: '2026-11-11T16:00:00.000Z' }, t: key => key, onClose() {} })
+  assert.ok(clientNodes(tree).some(node => node.children.includes('2026-11-12')))
+  const empty = harness.render({ plan: { planType: 'OTHER', actualPaidAt: null }, t: key => key, onClose() {} })
+  assert.ok(clientNodes(empty).some(node => node.children.includes('actualPaidDate')))
+})
+
+test('closing payment remainder requires a reason, retains failure input and closes only on success', async () => {
+  const source = (await Promise.all(['src/components.js', 'src/format.js', 'src/views/cash.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  const harness = clientHarness(source, 'CloseRemainingDialog')
+  const writes = []; let closed = 0; let saved = false
+  const props = { plan: { id: 'p1', remainingAmount: 99000 }, t: key => key, busy: false,
+    onClose: () => closed++, act: async (...args) => { writes.push(args); return saved } }
+  let tree = harness.render(props)
+  assert.equal(tree.props.footer[1].props.disabled, true)
+  clientNodes(tree).find(node => node.type?.name === 'Textarea').props.onChange('合同结算完成')
+  tree = harness.render(props)
+  await tree.props.footer[1].props.onClick()
+  assert.deepEqual(writes[0], ['/rest/finance/payment-plans/p1/close-remaining', { reason: '合同结算完成' }])
+  assert.equal(closed, 0)
+  assert.equal(clientNodes(harness.render(props)).find(node => node.type?.name === 'Textarea').props.value, '合同结算完成')
+  tree = harness.render({ ...props, busy: true })
+  assert.equal(tree.props.footer[1].props.disabled, true)
+  saved = true
+  tree = harness.render(props)
+  await tree.props.footer[1].props.onClick()
+  assert.equal(closed, 1)
+})
+
+test('only finance writers can close a positive, open payment remainder', async () => {
+  const source = (await Promise.all(['src/components.js', 'src/format.js', 'src/views/cash.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  for (const [canWrite, row, expected] of [
+    [true, { remainingAmount: 99000, status: '部分支付' }, true],
+    [false, { remainingAmount: 99000 }, false],
+    [true, { remainingAmount: 0 }, false],
+    [true, { remainingAmount: 99000, status: '剩余不再执行' }, false],
+  ]) {
+    const harness = clientHarness(source, 'PlansTab', { PAGE_SIZE: 20 })
+    const tree = harness.render({ rows: [row], canWrite, t: key => key, onPage() {} })
+    const table = clientNodes(tree).find(node => node.type?.name === 'Table')
+    const actions = table.props.columns.find(column => column.key === 'actions').render(row)
+    assert.equal(clientNodes(actions).some(node => node.children.includes('closeRemaining')), expected)
+  }
+})
+
+test('public close-remaining forwards only the new product action and preserves denial', async () => {
+  const calls = []
+  const { routes } = await loadHost({ fetch: async (url, init) => {
+    calls.push({ url: String(url), init }); return mcpJson({}, 403)
+  } })
+  const result = await invokeRoute(routes.get(BASE), 'POST', BASE + '/rest/finance/payment-plans/p1/close-remaining', { reason: '合同结算完成' }, { 'content-type': 'application/json' })
+  assert.equal(result.status, 403)
+  const call = calls.at(-1)
+  assert.equal(new URL(call.url).pathname, '/api/finance/payment-plans/p1/close-remaining')
+  assert.equal(call.init.method, 'POST')
+  assert.equal(JSON.parse(call.init.body).reason, '合同结算完成')
+})
