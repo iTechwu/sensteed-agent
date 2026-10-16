@@ -21,7 +21,7 @@ const MAX_ARCHIVE_FILES = 500
 const SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const SHARED_INSTALL_MARKER = '.sensteed-shared-skill.json'
 
-export const inject = ['webServer', 'skills', 'credentials', 'dofeAuth']
+export const inject = ['webServer', 'skills', 'credentials', 'dofeAuth', 'connection']
 
 export function skillRoot(environment = process.env, home = homedir()) {
   return resolve(environment.DSH_HOME || join(home, '.dsh'), 'skills')
@@ -545,6 +545,15 @@ export function apply(ctx, overrides = {}) {
     kind: 'prefix',
     path: ROUTE,
     async handler(req, res) {
+      // Prefix handlers bypass Connection's /api bridge; admit before any body,
+      // remote identity lookup or disk operation, including read-only listings.
+      let admission
+      try { admission = ctx.connection?.admit(req) } catch { /* fail closed */ }
+      if (!admission || 'rejection' in admission) {
+        const status = admission?.rejection === 403 ? 403 : 401
+        return respond(res, status, { error: status === 401 ? 'Host authentication is required.' : 'Host access is forbidden.' })
+      }
+      if (admission.peer?.principal?.kind !== 'owner') return respond(res, 403, { error: 'Host owner access is required.' })
       if (!isSameOrigin(req, ctx.webServer.port)) return respond(res, 403, { error: 'Local same-origin access is required.' })
       if (req.method === 'GET' && req.url?.split('?', 1)[0] === ROUTE) {
         try {
