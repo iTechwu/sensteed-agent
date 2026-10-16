@@ -96,13 +96,13 @@ function PlanAdjustDetailDialog({ id, t, onClose }) {
   return h(Dialog, { title: `${t('adjustmentOf')} ${adjustment?.code ?? ''}`, onClose },
     h('div', { className: 'sf-stack' },
       adjustment ? h('div', { className: 'sf-row' },
-        h(Pill, { tone: ADJ_STATUS_TONES[adjustment.status] ?? 'muted' }, t(ADJ_STATUS_KEYS[adjustment.status] ?? adjustment.status)),
+        h(Pill, { tone: ADJ_STATUS_TONES[adjustment.status] ?? 'muted' }, financeEnumLabel(adjustment.status, t, ADJ_STATUS_KEYS)),
         h('span', { className: 'sf-note' }, `${wan(adjustment.oldAmount) ?? '—'} → ${wan(adjustment.newAmount) ?? '—'} ${t('unitYuan')}`)) : null,
       adjustment?.reason ? h('p', { className: 'sf-note' }, `${t('increaseReason')}：${adjustment.reason}`) : null,
       flow.length ? h('div', null, h('strong', null, t('flow')), h('div', { className: 'sf-timeline' }, ...flow.map((item, index) =>
         h('div', { key: index, className: 'sf-timeline-row' },
           h('span', { className: 'sf-timeline-dot' }),
-          h('div', { className: 'sf-timeline-main' }, h('span', null, `${financeLabel(item.action ?? item.toStatus)} · ${item.operatorName ?? item.operator ?? '—'}`), h('small', null, shortDate(item.at ?? item.createdAt) ?? '')),
+          h('div', { className: 'sf-timeline-main' }, h('span', null, `${financeDisplayValue(item.action ?? item.toStatus, item.action ? 'action' : 'toStatus')} · ${item.operatorName ?? item.operator ?? '—'}`), h('small', null, shortDate(item.at ?? item.createdAt) ?? '')),
           h('span', { className: 'sf-note' }, item.note ?? ''))))) : null))
 }
 
@@ -168,14 +168,14 @@ function PlansTab({ rows, total, page, onPage, t, busy, act, canWrite = true, on
     h(Table, { tableId: 'finance-PlansTab-1',
       columns: [
         { label: t('org'), key: 'orgName', stickyLeft: true },
-        { label: t('planType'), key: 'planType', render: row => t(PLAN_LABELS[row.planType] ?? row.planType) },
+        { label: t('planType'), key: 'planType', render: row => financeEnumLabel(row.planType, t, PLAN_LABELS) },
         { label: t('description'), key: 'description' },
         { label: t('planMonth'), key: 'planMonth', sortValue: row => row.planMonth ?? row.month, render: row => mm(row.planMonth ?? row.month), num: true },
         { label: t('planned'), key: 'plannedAmount', render: row => wan(row.plannedAmount) ?? '—', num: true },
         { label: t('actual'), key: 'actualAmount', render: row => { const over = finite(row.actualAmount) !== null && finite(row.plannedAmount) !== null && row.actualAmount > row.plannedAmount; return h('span', { className: over ? 'sf-neg' : '' }, wan(row.actualAmount) ?? '—') }, num: true },
         { label: t('remaining'), key: 'remainingAmount', render: row => wan(row.remainingAmount) ?? '—', num: true },
         { label: t('scheduleDate'), key: 'scheduleDate', render: row => shortDate(row.scheduleDate) ?? '—', num: true },
-        { label: t('priority'), key: 'priority', render: row => row.priority ? h(Pill, { tone: row.priority === 'HIGH' ? 'rose' : row.priority === 'MEDIUM' ? 'amber' : 'muted' }, t(PRIORITIES.find(([id]) => id === row.priority)?.[1] ?? row.priority)) : '—' },
+        { label: t('priority'), key: 'priority', render: row => row.priority ? h(Pill, { tone: row.priority === 'HIGH' ? 'rose' : row.priority === 'MEDIUM' ? 'amber' : 'muted' }, financeEnumLabel(row.priority, t, Object.fromEntries(PRIORITIES))) : '—' },
         {
           label: t('actions'), key: 'actions', sortable: false,
           render: row => h('div', { className: 'sf-row', style: { flexWrap: 'nowrap', justifyContent: 'flex-end' } },
@@ -234,12 +234,12 @@ function IncreaseDialog({ plan, t, onClose, act }) {
 
 function PlanDetailDialog({ plan, t, onClose }) {
   const fields = [
-    [t('org'), plan.orgName], [t('planType'), t(PLAN_LABELS[plan.planType] ?? plan.planType)], [t('description'), plan.description],
+    [t('org'), plan.orgName], [t('planType'), financeEnumLabel(plan.planType, t, PLAN_LABELS)], [t('description'), plan.description],
     [t('department'), plan.departmentName], [t('costItem'), plan.costItemName], [t('planMonth'), plan.planMonth ? `${plan.planMonth} 月` : '—'],
     [t('planned'), wan(plan.plannedAmount)], [t('actual'), wan(plan.actualAmount)], [t('variance'), wan(plan.varianceAmount)],
-    [t('remaining'), wan(plan.remainingAmount)], [t('scheduleDate'), shortDate(plan.scheduleDate)], [t('priority'), plan.priority ? t(PRIORITIES.find(([id]) => id === plan.priority)?.[1] ?? plan.priority) : '—'],
+    [t('remaining'), wan(plan.remainingAmount)], [t('scheduleDate'), shortDate(plan.scheduleDate)], [t('priority'), plan.priority ? financeEnumLabel(plan.priority, t, Object.fromEntries(PRIORITIES)) : '—'],
     [t('acceptAcceptance'), plan.acceptsAcceptance ? '✓' : '—'], [t('cashAmount'), wan(plan.plannedCashAmount)], [t('acceptanceAmount'), wan(plan.plannedAcceptanceAmount)],
-    [t('payee'), plan.payeeName], [t('statusCol'), financeLabel(plan.status)],
+    [t('payee'), plan.payeeName], [t('statusCol'), financeDisplayValue(plan.status, 'status')],
   ]
   return h(Dialog, { title: t('planDetail'), onClose },
     h('dl', { className: 'sf-evidence' }, ...fields.map(([label, value], index) =>
@@ -268,7 +268,7 @@ function PlanAdjustmentsTab({ t, revision, reloadTick, busy, act, canWrite = tru
         columns: [
           { label: t('adjustmentOf'), key: 'code' },
           { label: t('amount'), key: 'amount', sortValue: row => row.newAmount - row.oldAmount, render: row => h('span', null, `${wan(row.oldAmount) ?? '—'} → ${wan(row.newAmount) ?? '—'} `, h('span', { className: 'sf-pos' }, `（${deltaOf(row)}）`)), num: true },
-          { label: t('statusCol'), key: 'status', render: row => h(Pill, { tone: ADJ_STATUS_TONES[row.status] ?? 'muted' }, t(ADJ_STATUS_KEYS[row.status] ?? row.status)) },
+          { label: t('statusCol'), key: 'status', render: row => h(Pill, { tone: ADJ_STATUS_TONES[row.status] ?? 'muted' }, financeEnumLabel(row.status, t, ADJ_STATUS_KEYS)) },
           { label: t('lastSeen'), key: 'submittedAt', render: row => shortDate(row.submittedAt) ?? '—', num: true },
           {
             label: t('actions'), key: 'actions', sortable: false,

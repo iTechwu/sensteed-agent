@@ -2,7 +2,8 @@
 
 function sendErrorReason(error) {
   const message = error instanceof Error ? error.message : String(error)
-  return message.replace(/\s+/gu, ' ').trim().slice(0, 180) || 'unknown_error'
+  const reasons = { conversation_unavailable: '会话服务暂不可用', conversation_service_unavailable: '会话服务暂不可用', session_unavailable: '未找到可用会话' }
+  return Object.hasOwn(reasons, message) ? reasons[message] : financeErrorText(message)
 }
 
 function sendToAgent(prompt, setNotice, t) {

@@ -60,7 +60,7 @@ function budgetVersionLabel(version) {
   const statuses = { DRAFT: '草稿', CONFIRMED: '已确认', PUBLISHED: '已发布', LOCKED: '已锁定' }
   const frozen = version.frozenThroughMonth > 0 ? `（冻结至 ${version.frozenThroughMonth} 月）` : ''
   const name = version.year && version.type
-    ? `${version.year} 年${types[version.type] || ''}预算 · ${statuses[version.status] || version.status}${frozen}`
+    ? `${version.year} 年${types[version.type] || ''}预算 · ${statuses[version.status] || '未知状态'}${frozen}`
     : version.name
   const amount = finite(version.budgetTotal)
   const parts = [name, version.isPrimary ? '主版本' : null,

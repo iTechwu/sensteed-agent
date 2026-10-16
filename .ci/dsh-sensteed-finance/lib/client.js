@@ -76,6 +76,7 @@ window.__ModuleLoader__.load({
 
     const copy = {
       zh: {
+        mobile: '手机号', email: '邮箱', hubSubtitle: '财务数据工作台',
         expenseProject: '项目运营成本', expenseFixed: '固定运营成本', expenseModel: '车型专属成本', expenseNonProject: '非项目类',
         planPurchase: '采购付款', planOther: '其他类付款', planNewRetail: '新零售', planPrPayment: 'PR 付款', planDirectParts: '直采零部件',
         entrySaveAction: '保存并生效（财务代录）', entryBackfillAction: '回填并自动计算', entryAnnual: '年度（不分月）', entryOptional: '可不选', entryIncomeRequired: '请选择收入项目，或确认本次自定义值。', entryPaymentSaved: '付款计划已入库', entryRevenueSaved: '收入计划已入库', entryBudgetSaved: '预算行已入库', entryActualsSaved: '实际数已回填，差额/剩余/状态已自动更新',
@@ -98,7 +99,7 @@ window.__ModuleLoader__.load({
         tabOverview: '经营总览', tabBudget: '预算执行', tabOperations: '经营分析', tabCash: '资金分析', tabAlerts: '预警中心', tabDatacenter: '数据中心', tabEntry: '录入', tabAnalyze: '深度分析',
         year: '年度', org: '主体', allOrgs: '全部主体（集团）', loading: '正在加载财务数据...', retry: '重新加载', loadError: '数据加载失败', refreshedAt: '更新于', unitWan: '万元', unitYuan: '元', unitNote: '单位：万元', total: '合计',
         kpiBudget: '年度预算', kpiPrSubmitted: '已打 PR', kpiPrEstimated: '预计 PR', kpiPaid: '实际付款', kpiAlerts: '未处理预警', kpiExecRate: '预算执行率', kpiPayRate: 'PR 付款率', kpiNetInflow: '实际净流入', kpiRevenueAch: '收入达成', kpiSpendExec: '支出执行', kpiHealth: '预算健康度',
-        trendTitle: 'PR 与付款月度趋势', month: '月份', amount: '金额', empty: '暂无数据', orgSummary: '主体预算执行', alertSummary: '未处理预警 TOP5', orgSummaryFull: '分主体汇总', showFirst: '仅显示前 {n} 条，可缩小范围或翻页', partialLoad: '部分数据块加载失败，当前展示已获取部分；刷新可重试。',
+        trendTitle: 'PR 与付款月度趋势', month: '月份', amount: '金额', empty: '暂无数据', orgSummary: '主体预算执行', alertSummary: '未处理预警（最多 5 条）', orgSummaryFull: '分主体汇总', showFirst: '仅显示前 {n} 条，可缩小范围或翻页', partialLoad: '部分数据块加载失败，当前展示已获取部分；刷新可重试。',
         statusOver: '超预算', statusWatch: '关注', statusNormal: '正常', dash: '—', unknown: '未知',
         incomeAch: '收支达成', drill: '下钻', workbenchTitle: '待我处理', workbenchHint: '按当前年度和主体聚合待办，点击即可进入处理页面。', pendingFiling: '待处理填报', pendingFilingHint: '财务填报任务', pendingQuality: '数据质量待处理', pendingQualityHint: '未分配主体 / 缺失金额等', pendingAlerts: '待处理预警', pendingAlertsHint: '当前年度规则引擎结果', workbenchEmpty: '当前没有待处理事项', loadPartial: '部分数据加载失败，已展示可用内容。', dataCenterRetry: '重新加载数据中心', dataCenterLoading: '正在加载数据中心...', dataCenterFailed: '数据中心加载失败', dataCenterPartial: '数据中心部分内容加载失败', qualityIssues: '质量问题', qualityCritical: '严重问题', qualityWarn: '警告问题', latestSync: '最近同步', noSourceConfig: '暂无已接入数据源配置', noSourceConfigHint: '数据源同步完成后，配置与批次会在这里展示。',
         // 预算
@@ -121,7 +122,7 @@ window.__ModuleLoader__.load({
         // 资金
         cashSummaryV: '资金汇总', cashPlans: '排款工作台', cashAdjustments: '调增审批', cashRevenue: '收入计划', cashMatrix: '资金矩阵（主体 × 月）', prevEndBalance: '上月末余额', plannedIncome: '预计收入', plannedExpense: '预计支出', projectedBalance: '预计余额', actualIncome: '实际收入', actualExpense: '实际支出', actualBalance: '实际余额',
         schedule: '排款', scheduleDate: '排款日期', priority: '优先级', priHigh: '高', priMid: '中', priLow: '低', acceptAcceptance: '接受承兑', cashAmount: '现汇金额（元）', acceptanceAmount: '承兑金额（元）', planDetail: '计划详情', increase: '申请调增', newAmount: '调增后金额（元）', increaseReason: '调增理由（必填）', increaseHint: '调增后金额必须大于当前计划金额', payee: '收款方', planMonth: '排款月份', planMonthRequired: '排款月份必填', statusCol: '状态',
-        revenueVs: '计划 vs 实际到账',
+        revenueVs: '计划与实际到账',
         // 预警
         alertsTitle: '预警清单', sevCritical: '重大', sevWarn: '警告', sevInfo: '提示', sevResolved: '已解决', stPending: '待处理', stConfirmed: '已确认', stResolved: '已解决', stIgnored: '已忽略', alertType: '类型', alertTitleCol: '标题', detail: '说明', firstSeen: '首次发现', lastSeen: '最近出现', alertMonth: '月份',
         rulesUnconfirmed: '预警规则集尚未确认生效：当前不生成正式告警。以内置默认阈值确认后规则引擎才开始产出。', rulesConfirmed: '预警规则集 v{v} 已生效（{date} 确认）', confirmDefaultRules: '以内置默认阈值确认生效', confirmRulesTitle: '确认预警规则集', alertDetail: '预警详情', evidence: '证据快照', viewSource: '查看源数据', sourceBudget: '下钻预算', sourceCash: '下钻资金', sourceQuality: '下钻数据质量',
@@ -147,6 +148,7 @@ window.__ModuleLoader__.load({
         submit: '提交', cancel: '取消', submitted: '已提交', saved: '已保存', deleted: '已删除', confirm: '确认', close: '关闭', actions: '操作', runEngine: '触发预警引擎', running: '执行中', runDone: '已触发：新建 {created} · 更新 {updated} · 关闭 {resolved}', backfill: '回填', backfillActual: '回填实际值', submitConfirm: '确认提交？', opFailed: '操作失败', refreshed: '已刷新', required: '必填', invalidJson: '表映射必须是合法 JSON。',
       },
       en: {
+        mobile: 'Mobile', email: 'Email', hubSubtitle: 'Finance Data Hub',
         expenseProject: 'Project operating costs', expenseFixed: 'Fixed operating costs', expenseModel: 'Model-specific costs', expenseNonProject: 'Non-project costs',
         planPurchase: 'Purchase payment', planOther: 'Other payment', planNewRetail: 'New retail payment', planPrPayment: 'PR payment', planDirectParts: 'Direct parts purchase',
         entrySaveAction: 'Save and apply (finance entry)', entryBackfillAction: 'Backfill and calculate', entryAnnual: 'Annual (no month)', entryOptional: 'Optional', entryIncomeRequired: 'Select an income item or confirm a custom value.', entryPaymentSaved: 'Payment plan saved', entryRevenueSaved: 'Revenue plan saved', entryBudgetSaved: 'Budget line saved', entryActualsSaved: 'Actuals saved; variance, remaining and status recalculated',
@@ -221,10 +223,13 @@ window.__ModuleLoader__.load({
     const snapshot = () => opened
 
     async function api(path, options) {
-      const response = await fetch(`${BASE}${path}`, { credentials: 'same-origin', redirect: 'error', headers: { Accept: 'application/json', ...(options?.body ? { 'Content-Type': 'application/json' } : {}) }, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS), ...options })
+      let response
+      try {
+        response = await fetch(`${BASE}${path}`, { credentials: 'same-origin', redirect: 'error', headers: { Accept: 'application/json', ...(options?.body ? { 'Content-Type': 'application/json' } : {}) }, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS), ...options })
+      } catch (error) { throw new Error(financeErrorText(error?.name === 'TimeoutError' ? 'upstream_timeout' : error?.message)) }
       const body = await response.json().catch(() => null)
       if (!response.ok || !body || (body.ok === false && !Object.keys(body).some(key => !['ok', 'error'].includes(key) && body[key] && !body[key].error))) {
-        const error = new Error(body?.error || `http_${response.status}`)
+        const error = new Error(financeErrorText(body?.error, response.status))
         error.status = response.status
         throw error
       }
@@ -304,7 +309,7 @@ window.__ModuleLoader__.load({
       const statuses = { DRAFT: '草稿', CONFIRMED: '已确认', PUBLISHED: '已发布', LOCKED: '已锁定' }
       const frozen = version.frozenThroughMonth > 0 ? `（冻结至 ${version.frozenThroughMonth} 月）` : ''
       const name = version.year && version.type
-        ? `${version.year} 年${types[version.type] || ''}预算 · ${statuses[version.status] || version.status}${frozen}`
+        ? `${version.year} 年${types[version.type] || ''}预算 · ${statuses[version.status] || '未知状态'}${frozen}`
         : version.name
       const amount = finite(version.budgetTotal)
       const parts = [name, version.isPrimary ? '主版本' : null,
@@ -1137,17 +1142,17 @@ window.__ModuleLoader__.load({
         if (value === null || value === undefined) return '—'
         if (typeof value === 'number') return formatNumber(value)
         if (key === 'changeRate') return `${formatNumber(Number(value) * 100)}%`
-        if (['status', 'scope', 'changeType', 'action', 'expenseType', 'planType', 'type', 'kind', 'category', 'bizSystem', 'docType', 'transport', 'dataset', 'stage', 'severity', 'formulaVersion'].includes(key)) return financeLabel(value)
+        if (FINANCE_ENUM_FIELDS.has(key) || ['currency', 'error', 'errorSummary'].includes(key)) return financeDisplayValue(value, key)
         if (/At$/.test(key)) return new Date(value).toLocaleString('zh-CN', { hour12: false })
         if (typeof value === 'object') return h(FinanceEvidence, { value })
-        return String(value)
+        return typeof value === 'boolean' ? (value ? '是' : '否') : String(value)
       } }))
     }
-    function FinanceEvidence({ value }) {
+    function FinanceEvidence({ value, field }) {
       if (value === null || value === undefined) return h('span', null, '—')
-      if (typeof value !== 'object') return h('span', null, financeLabel(value))
+      if (typeof value !== 'object') return h('span', null, financeDisplayValue(value, field))
       return h('div', { className: 'sf-evidence' }, ...Object.entries(value).map(([key, item]) =>
-        h('div', { key, className: 'sf-evidence-item' }, h('small', null, FINANCE_FIELD_LABELS[key] || key), h(FinanceEvidence, { value: item }))))
+        h('div', { key, className: 'sf-evidence-item' }, h('small', { title: key }, Array.isArray(value) ? `第 ${Number(key) + 1} 项` : financeFieldLabel(key)), h(FinanceEvidence, { value: item, field: Array.isArray(value) ? field : key }))))
     }
     const FINANCE_VALUE_LABELS = {
       GLOBAL: '全域', ORG: '指定主体', DEPARTMENT: '指定部门', SELF: '本人', HEADQUARTERS: '总部', HEZHONG: '合众',
@@ -1156,18 +1161,127 @@ window.__ModuleLoader__.load({
       APPROVED: '已批准', IN_REVIEW: '评审中', OBSOLETE: '已作废', PROPOSED: '待落账', APPLIED: '已落账', CANCELLED: '已撤销',
       ADDED: '新增', REMOVED: '移除', INCREASED: '调增', DECREASED: '调减', MOVED: '转移', SUBMIT_REVIEW: '提交评审', APPROVE: '批准', REJECT: '驳回',
       PURCHASE: '采购', REIMBURSEMENT: '报销', INCOME: '收入', PAYROLL: '薪酬', TAX: '税费', OTHER: '其他',
-      PR_PAYMENT: 'PR付款', NEW_RETAIL: '新零售', DIRECT_PARTS: '直采零件', PROJECT_OPERATION: '项目运营', FIXED_OPERATION: '固定运营', MODEL_SPECIFIC: '模型专项', NON_PROJECT: '非项目',
+      PR_PAYMENT: 'PR 付款', NEW_RETAIL: '新零售', DIRECT_PARTS: '直采零部件', PROJECT_OPERATION: '项目运营成本', FIXED_OPERATION: '固定运营成本', MODEL_SPECIFIC: '车型专属成本', NON_PROJECT: '非项目类', AUTOMOTIVE_PARTS: '汽车零部件',
       BUDGET: '预算', PAYMENT_PLAN: '付款计划', REVENUE_PLAN: '收入计划', BUDGET_LINE: '预算明细', CASH_SUMMARY: '资金汇总',
       FINANCE_PLAN: '财务计划', OA: 'OA系统', NC: 'NC系统', ERP: 'ERP系统', TREASURY: '资金系统', DSS: 'DSS', FEISHU: '飞书',
       FEISHU_RAW_SNAPSHOT: '飞书原始快照', FEISHU_CSV_SNAPSHOT: '飞书 CSV 快照', FETCH: '采集', NORMALIZE: '标准化', VALIDATE: '校验', PERSIST: '入库',
       INFO: '提示', WARN: '警告', CRITICAL: '重大', ACTIVE: '已生效',
+      POSTED: '已过账', IN_APPROVAL: '审批中', PARTIAL: '部分支付', PAID: '已支付', PENDING_REVIEW: '待核对',
+      COMPLETED: '已完成', DONE: '已完成', EXPIRED: '已失效', SUPERSEDED: '已被替代', RETIRED: '已停用',
+      ACKNOWLEDGED: '已确认', RESOLVED: '已解决', MUTED: '已静默', IGNORED: '已忽略',
+      BUDGET_OVERRUN: '预算超支', EXECUTION_SLOW: '执行滞后', CASH_GAP: '资金缺口', DATA_QUALITY: '数据质量',
+      INITIAL: '初始预算', ADJUSTED: '调整预算', ROLLING: '滚动预测', MERGED: '合并预算',
+      NEW_BUDGET: '新增预算', TRANSFER_SAME_DEPT: '同部门调拨', TRANSFER_CROSS_DEPT: '跨部门调拨', REDUCE: '追减',
+      FULL: '全额结转', PERCENT: '比例结转', EXPIRE: '过期清零', IN: '调入', OUT: '调出',
+      HIGH: '高', MEDIUM: '中', LOW: '低', GROUP: '集团', COMPANY: '公司', BUSINESS_LINE: '业务线',
+      DEPT_FILLER: '部门填报人', DEPT_LEADER: '部门负责人', DEPT_COLLABORATOR: '信息协同人', BOSS: '老板',
+      FINANCE_STAFF: '财务专员', FINANCE_OWNER: '财务负责人', MANAGEMENT: '管理层',
+      PAYMENT_REQUEST: '采购申请', ESTIMATED: '预计采购', IMPORTED: '导入口径', PUBLISHED_FACTS: '已发布事实口径',
+      ACTION_REQUIRED: '待我处理', RELATED_TO_ME: '与我相关', SYSTEM: '系统通知',
+      FILING: '填报', FACT_BATCH: '事实批次', BUDGET_ADJUSTMENT: '预算调整', PLAN_ADJUSTMENT: '计划调整',
+      CREATE: '创建', UPDATE: '更新', SUBMIT: '提交', CONFIRM: '确认', PUBLISH: '发布', ACTIVATE: '生效',
+      POST: '过账', CANCEL: '撤销', REOPEN: '重开', LOCK: '锁定', CLONE: '复制', VOID: '作废',
+      BOTTOM_UP: '自下而上估算', TOP_DOWN: '目标成本反算', QUOTE: '报价估算',
+      REVENUE: '收入', RECEIPT: '回款', CASH_BALANCE: '月末现金', FUNDING_GAP: '资金缺口', PAYMENT: '实际付款',
+      INVENTORY_HOLDING: '存货占用', LABOR_COST: '人工成本', OVERHEAD_COST: '制造费用',
+      DSS_NOT_CONFIGURED: 'DSS 未配置', DSS_NO_DATA: 'DSS 无数据', DSS_CALL_FAILED: 'DSS 调用失败',
+      UNKNOWN: '待核查', RAW_STAGED: '原始数据已暂存，未发布', FETCHED_UNMAPPED: '已采集，待配置字段映射',
+      NORMALIZED_STAGED: '标准记录已暂存，未发布', NO_DATA: '本次无数据',
+      'formula-v1': '第 1 版公式', 'formula-v2': '第 2 版公式', 'formula-v3': '第 3 版公式',
     }
-    function financeLabel(value) {
+    function financeLabel(value, fallback) {
       if (value === null || value === undefined || value === '') return '—'
       const raw = String(value)
-      return FINANCE_VALUE_LABELS[raw] || FINANCE_VALUE_LABELS[raw.toUpperCase()] || raw
+      const key = Object.hasOwn(FINANCE_VALUE_LABELS, raw) ? raw : raw.toUpperCase()
+      return Object.hasOwn(FINANCE_VALUE_LABELS, key) ? FINANCE_VALUE_LABELS[key] : fallback ?? raw
     }
     const FINANCE_FIELD_LABELS = { scopeType: '数据范围', yearFrom: '起始年度', yearTo: '截止年度', openingBalance: '期初余额', safetyLine: '现金安全线', linkedCePackageId: '关联成本包', monthlyOutflows: '月度支出假设', tax: '税费假设', outputRate: '销项税率', inputRate: '进项税率', workingCapital: '营运资金假设', payableMonths: '应付账期（月）', inventoryDays: '存货周转（天）', labor: '人工假设', hoursPerUnit: '单台人工时', ratePerHour: '人工费率', overhead: '制造费用假设', kwhPerUnit: '单台电耗', pricePerKwh: '综合电价', otherPerUnit: '其他单台费用', materialCost: '材料费', laborCost: '人工费', processCost: '加工费', otherCost: '其他费用', year: '年度', month: '月份', note: '说明', title: '名称', rows: '明细', plannedAmount: '计划金额', actualAmount: '实际金额', costItemId: '费用项目', description: '业务说明', task: '活动', taskId: '活动记录', departmentId: '部门记录', orgId: '主体记录', reason: '原因', submittedAt: '提交时间', createdAt: '创建时间', submissionNo: '提交版本', submittedByName: '提交人', changes: '变更明细', payload: '审计证据', laborRate: '人工费率', overheadRate: '制造费率', committed: '已确认', failed: '失败', accepted: '已接收', rejected: '异常行', error: '错误', id: '记录', totalAmount: '金额（元）', totalDelta: '总成本差额（元）', amount: '金额（元）', count: '条数', field: '字段', before: '变更前', after: '变更后', nodeId: '物料节点', diff: '差额', total: '总计', run: '计算批次', status: '状态', created: '新建', skipped: '跳过', results: '逐条回执', outputs: '输出', sourceRef: '来源引用', totalCost: '总成本', qty: '数量', estimate: '估算' }
+    // Only contract fields are interpreted as enums; names, notes and identifiers stay verbatim.
+    const FINANCE_ENUM_FIELDS = new Set(['status', 'syncStatus', 'alertType', 'scope', 'scopeType', 'changeType', 'action', 'expenseType', 'planType', 'type', 'kind', 'category', 'bizSystem', 'docType', 'transport', 'transportUsed', 'dataset', 'stage', 'severity', 'formulaVersion', 'fallbackReason', 'priority', 'role', 'sourceType', 'source', 'mode', 'algo', 'side', 'caliber', 'fromStatus', 'toStatus'])
+    Object.assign(FINANCE_FIELD_LABELS, {
+      ok: '结果', enabled: '启用', active: '生效', acceptsAcceptance: '接受承兑', isPrimary: '主版本', fullAccess: '全量数据访问',
+      budgetAmount: '预算金额', executionRate: '执行率', execRate: '执行率', threshold: '阈值', ruleVersion: '规则版本',
+      prSubmittedAmount: '已打采购申请金额', prEstimatedAmount: '预计采购金额', paidAmount: '实际付款金额',
+      plannedIncome: '预计收入', plannedExpense: '预计支出', actualIncome: '实际收入', actualExpense: '实际支出',
+      remainingAmount: '剩余金额', varianceAmount: '差额', oldAmount: '调整前金额', newAmount: '调整后金额',
+      projectedBalance: '预计余额', actualBalance: '实际余额', prevEndBalance: '上月末余额',
+      expenseType: '费用类别', planType: '付款类型', recordType: '采购申请类型', priority: '优先级', planMonth: '排款月份',
+      plannedCashAmount: '现汇金额', plannedAcceptanceAmount: '承兑金额', scheduleDate: '排款日期', actualDate: '实际日期',
+      type: '类型', kind: '类别', category: '分类', sourceType: '来源类型', source: '来源', scope: '范围',
+      role: '角色', permission: '功能权限', permissions: '功能权限', scopes: '数据范围', action: '操作', mode: '结转方式',
+      percent: '比例', expireMonth: '过期月份', side: '调拨方向', fromStatus: '原状态', toStatus: '新状态',
+      bizSystem: '业务系统', docType: '单据类型', dataset: '数据集', transport: '传输通道', transportUsed: '实际通道',
+      stage: '处理阶段', fallbackReason: '回退原因', errorSummary: '失败原因', stats: '数据摘要',
+      fetched: '采集', inserted: '新增', updated: '更新', duplicated: '重复', totalRows: '总行数', successRows: '成功行数', failedRows: '失败行数',
+      batchId: '批次', batchKey: '批次编号', batchNo: '报价批次', headerRows: '主表行数', detailRows: '明细行数',
+      amountTotal: '汇总金额', currency: '币种', sourceFile: '来源文件', sourceDocNo: '来源单号', sourcePath: '来源路径',
+      startedAt: '开始时间', finishedAt: '完成时间', updatedAt: '更新时间', confirmedAt: '确认时间', publishedAt: '发布时间',
+      dueAt: '截止时间', readAt: '阅读时间', expiresAt: '到期时间', startsAt: '生效时间', revokedAt: '撤销时间',
+      version: '版本', versionId: '预算版本', formulaVersion: '公式版本', frozenThroughMonth: '冻结截至月份',
+      paramVersionId: '参数版本', params: '业务参数', runId: '计算批次', newVersionId: '新预算版本',
+      lineCount: '明细行数', rowCount: '行数', budgetTotal: '预算总额', assignmentId: '填报记录', assignments: '指派明细',
+      departmentName: '部门', orgName: '主体', costItemName: '费用科目', taskTitle: '活动名称', assigneeName: '填报人',
+      userId: '用户记录', userName: '人员', displayName: '显示名称', systemUserId: '系统用户', memberId: '成员记录',
+      submittedBy: '提交人记录', actorName: '操作者', operatorName: '操作人', operator: '操作人', grantReason: '授权原因',
+      name: '名称', code: '编号', label: '名称', message: '说明', detail: '详情', notes: '备注',
+      product: '产品', quantity: '数量', unitPrice: '单价', receiptRate: '回款率', changeType: '变化类型', delta: '差额', changeRate: '变化率',
+      package: '成本包', packageId: '成本包记录', modelCode: '车型编码', targetPrice: '目标售价', targetCost: '目标成本', profitTarget: '目标利润',
+      nodes: '物料明细', partNo: '零件号', parentPartNo: '父级零件号', parentId: '父级节点', level: '层级', unit: '单位',
+      unitCost: '单位成本', extendedCost: '展开成本', nodeCount: '节点数', leafCount: '叶子节点数', algo: '估算方式',
+      affectedCount: '影响节点数', estimateUnitCost: '估算单位成本', targetUnitCost: '目标单位成本', gap: '缺口',
+      supplierName: '供应商', price: '报价', target: '目标系统', fileRef: '文件引用', success: '成功',
+      rule: '规则', result: '结果', difference: '差异', meaning: '业务含义', normalizedAmount: '折算金额', taxBasis: '含税口径',
+      primaryAmount: '主要金额', amounts: '金额明细', dimensions: '业务维度', checks: '核对结果', workflow: '审批流程',
+      value: '值', reasonCode: '原因', errors: '错误明细', validationErrors: '校验错误', severity: '严重程度', alertType: '预警类型',
+      details: '明细', summary: '汇总', data: '数据', meta: '附加信息',
+    })
+    function financeFieldLabel(key) {
+      if (Object.hasOwn(FINANCE_FIELD_LABELS, key)) return FINANCE_FIELD_LABELS[key]
+      return /[\u3400-\u9fff]/u.test(key) ? key : '其他字段'
+    }
+    function financeDisplayValue(value, field) {
+      if (value === null || value === undefined || value === '') return '—'
+      if (typeof value === 'boolean') return value ? '是' : '否'
+      if (field === 'error' || field === 'errorSummary') return financeErrorText(value)
+      if (field === 'permission') return Object.hasOwn(FINANCE_PERMISSION_NAMES, value) ? FINANCE_PERMISSION_NAMES[value] : '未识别权限'
+      if (field === 'field') return financeFieldLabel(String(value))
+      if (field === 'syncStatus' && value === 'PARTIAL') return '部分成功'
+      if (field === 'stage' && value === 'PARTIAL') return '存在待核对记录，未发布'
+      if (field === 'currency') return ({ CNY: '人民币', RMB: '人民币', USD: '美元', EUR: '欧元', JPY: '日元', HKD: '港币', GBP: '英镑' })[value] || String(value)
+      if (['bizSystem', 'docType', 'transport', 'transportUsed', 'dataset', 'source', 'formulaVersion'].includes(field)) return financeLabel(value)
+      if (FINANCE_ENUM_FIELDS.has(field)) return financeLabel(value, /[\u3400-\u9fff]/u.test(String(value)) ? String(value) : '未识别类型')
+      return typeof value === 'number' ? formatNumber(value) : String(value)
+    }
+    function financeEnumLabel(value, t, keys = {}) {
+      if (Object.hasOwn(keys, value)) return t(keys[value])
+      return financeLabel(value, t('unknown'))
+    }
+    function financeErrorText(value, status) {
+      if (Array.isArray(value)) return [...new Set(value.map(item => financeErrorText(item, status)))].join('；')
+      const raw = String(value || '').trim()
+      const errors = {
+        upstream_timeout: '财务服务响应超时，请稍后重试。', upstream_unreachable: '无法连接财务服务，请检查网络后重试。',
+        empty_result: '财务服务未返回结果，请刷新后重试。', invalid_adjustment_response: '预算调整结果无效，请刷新后核对。',
+        finance_tool_unavailable: '此项财务功能暂不可用，请联系管理员。',
+        'body too large': '提交内容过大，请减少明细行数后重试。', 'invalid JSON body': '提交的数据格式无效，请检查后重试。',
+        'body must be a JSON object': '提交的数据格式无效，请检查后重试。',
+      }
+      if (Object.hasOwn(errors, raw)) return errors[raw]
+      if (/[\u3400-\u9fff]/u.test(raw)) return raw
+      const validation = raw.match(/^(\w+) must (not be less than|not be greater than|be a number conforming to the specified constraints|be a string|be a UUID|not be empty)(.*)$/i)
+      if (validation && Object.hasOwn(FINANCE_FIELD_LABELS, validation[1])) {
+        const messages = { 'not be less than': '不得小于', 'not be greater than': '不得大于', 'be a number conforming to the specified constraints': '须为有效数字', 'be a string': '须为文本', 'be a uuid': '须为有效记录编号', 'not be empty': '不能为空' }
+        const limit = validation[3].trim().match(/^-?\d+(?:\.\d+)?$/)?.[0] || ''
+        return `${financeFieldLabel(validation[1])}${messages[validation[2].toLowerCase()]}${limit ? ` ${limit}` : ''}`
+      }
+      if (status === 401 || /unauthorized|session.expired/i.test(raw)) return '登录已过期，请重新使用飞书登录。'
+      if (status === 403 || /forbidden/i.test(raw)) return '当前账号没有此项财务操作权限。'
+      if (/timeout|timed out|aborted/i.test(raw)) return '财务服务响应超时，请稍后重试。'
+      if (status === 400) return '填报数据校验失败，请检查必填项、金额与期间。'
+      if (status === 404) return '未找到对应的财务记录，请刷新后核对年度、主体和科目。'
+      return '财务服务暂不可用，请检查网络或稍后重试。'
+    }
+
     function financeFieldValue(values, key) { return key.split('.').reduce((value, part) => value?.[part], values) }
     function financeSetField(values, key, value) {
       const next = { ...values }; const parts = key.split('.'); let target = next
@@ -1524,7 +1638,7 @@ window.__ModuleLoader__.load({
       const groups = new Map()
       for (const row of rows) {
         const key = `${row.orgName ?? t('unassigned')}|${row.expenseType ?? ''}|${row.departmentName ?? ''}`
-        if (!groups.has(key)) groups.set(key, { label: [row.orgName ?? t('unassigned'), row.expenseType ? t(EXPENSE_LABELS[row.expenseType] ?? row.expenseType) : '', row.departmentName].filter(Boolean).join(' / '), months: {}, total: { budget: 0, pr: 0, paid: 0, prEstimated: 0 } })
+        if (!groups.has(key)) groups.set(key, { label: [row.orgName ?? t('unassigned'), row.expenseType ? financeEnumLabel(row.expenseType, t, EXPENSE_LABELS) : '', row.departmentName].filter(Boolean).join(' / '), months: {}, total: { budget: 0, pr: 0, paid: 0, prEstimated: 0 } })
         const group = groups.get(key)
         const month = row.month ?? 0
         group.months[month] = {
@@ -1596,7 +1710,7 @@ window.__ModuleLoader__.load({
         h(Card, { title: `${month} ${t('monthCol')} · ${t('orgSummaryFull')}`, unit: t('unitNote') }, h(Table, { tableId: 'finance-MonthView-1',
           columns: [
             { label: t('org'), key: 'orgName', render: row => row.orgName ?? t('unassigned'), stickyLeft: true },
-            { label: t('expenseType'), key: 'expenseType', render: row => row.expenseType ? t(EXPENSE_LABELS[row.expenseType] ?? row.expenseType) : '—' },
+            { label: t('expenseType'), key: 'expenseType', render: row => row.expenseType ? financeEnumLabel(row.expenseType, t, EXPENSE_LABELS) : '—' },
             { label: t('kpiBudget'), key: 'budgetAmount', render: row => wan(row.budgetAmount) ?? '—', num: true },
             { label: t('kpiPrSubmitted'), key: 'prSubmittedAmount', render: row => wan(row.prSubmittedAmount) ?? '—', num: true },
             { label: t('kpiPaid'), key: 'paidAmount', render: row => wan(row.paidAmount) ?? '—', num: true },
@@ -1616,7 +1730,7 @@ window.__ModuleLoader__.load({
             { label: t('org'), key: 'orgName', render: row => row.orgName ?? h(Badge, { tone: 'amber' }, t('unassigned')), stickyLeft: true },
             { label: t('department'), key: 'departmentName' },
             { label: t('costItem'), key: 'costItemName' },
-            { label: t('expenseType'), key: 'expenseType', render: row => row.expenseType ? t(EXPENSE_LABELS[row.expenseType] ?? row.expenseType) : '—' },
+            { label: t('expenseType'), key: 'expenseType', render: row => row.expenseType ? financeEnumLabel(row.expenseType, t, EXPENSE_LABELS) : '—' },
             { label: t('monthCol'), key: 'month', sortValue: row => row.month, render: row => mm(row.month), num: true },
             { label: t('kpiBudget'), key: 'budgetAmount', render: row => wan(row.budgetAmount) ?? '—', num: true },
             { label: t('kpiPrSubmitted'), key: 'prSubmittedAmount', render: row => wan(row.prSubmittedAmount) ?? '—', num: true },
@@ -1631,7 +1745,7 @@ window.__ModuleLoader__.load({
       const occupied = (finite(line.prSubmittedAmount) ?? 0) + (finite(line.paidAmount) ?? 0) + (finite(line.allocatedAmount) ?? 0)
       return h(Dialog, { title: t('budgetLinesTitle'), onClose },
         h('dl', { className: 'sf-evidence' },
-          ...[['org', line.orgName ?? t('unassigned')], ['department', line.departmentName ?? '—'], ['costItem', line.costItemName ?? '—'], ['month', mm(line.month)], ['expenseType', line.expenseType ? t(EXPENSE_LABELS[line.expenseType] ?? line.expenseType) : '—']].map(([key, value]) =>
+          ...[['org', line.orgName ?? t('unassigned')], ['department', line.departmentName ?? '—'], ['costItem', line.costItemName ?? '—'], ['month', mm(line.month)], ['expenseType', line.expenseType ? financeEnumLabel(line.expenseType, t, EXPENSE_LABELS) : '—']].map(([key, value]) =>
             h('div', { key, className: 'sf-evidence-item' }, h('small', null, t(key)), h('strong', null, value))),
           ...[[t('kpiBudget'), line.budgetAmount], [t('kpiPrSubmitted'), line.prSubmittedAmount], [t('kpiPrEstimated'), line.prEstimatedAmount], [t('kpiPaid'), line.paidAmount], [t('available'), line.availableAmount]].map(([label, value]) =>
             h('div', { key: label, className: 'sf-evidence-item' }, h('small', null, label), h('strong', null, wan(value) ?? '—')))))
@@ -1650,7 +1764,7 @@ window.__ModuleLoader__.load({
           { label: t('department'), key: 'departmentName' },
           { label: t('monthCol'), key: 'month', sortValue: row => row.month, render: row => mm(row.month), num: true },
           { label: t('amount'), key: 'budgetAmount', render: row => wan(row.budgetAmount) ?? '—', num: true },
-          { label: t('statusCol'), key: 'status', render: row => row.status ? h(Pill, { tone: /完成|已批|通过|已发布|已生效/.test(financeLabel(row.status)) ? 'green' : /审批|待|处理/.test(financeLabel(row.status)) ? 'blue' : 'muted' }, financeLabel(row.status)) : '—' },
+          { label: t('statusCol'), key: 'status', render: row => row.status ? h(Pill, { tone: /完成|已批|通过|已发布|已生效/.test(financeDisplayValue(row.status, 'status')) ? 'green' : /审批|待|处理/.test(financeDisplayValue(row.status, 'status')) ? 'blue' : 'muted' }, financeDisplayValue(row.status, 'status')) : '—' },
         ],
         rows, empty: t('empty'),
       }), h(Pager, { page, total: pr?.data?.total ?? pr?.total, limit: PAGE_SIZE, onPage }))
@@ -1724,7 +1838,7 @@ window.__ModuleLoader__.load({
       }, [status, page, revision, reloadTick])
       const rows = data?.adjustments || []
       const toneOf = state => ADJ_STATUS_TONES[state] ?? 'muted'
-      const labelOf = state => t(ADJ_STATUS_KEYS[state] ?? state)
+      const labelOf = state => financeEnumLabel(state, t, ADJ_STATUS_KEYS)
       return h('div', { className: 'sf-stack' },
         h('div', { className: 'sf-row-between' },
           h(PillTabs, { tabs: ADJ_STATUSES, value: status, onChange: value => { setStatus(value); onPage(1) }, t }),
@@ -1733,7 +1847,7 @@ window.__ModuleLoader__.load({
           h(Table, { tableId: 'finance-AdjustmentsView-1',
             columns: [
               { label: t('adjustmentOf'), key: 'code', render: row => `${row.code ?? ''}` },
-              { label: t('adjType'), key: 'type', render: row => t(ADJ_TYPES.find(([id]) => id === row.type)?.[1] ?? row.type) },
+              { label: t('adjType'), key: 'type', render: row => financeEnumLabel(row.type, t, Object.fromEntries(ADJ_TYPES)) },
               { label: t('amount'), key: 'totalAmount', render: row => wan(row.totalAmount) ?? '—', num: true },
               { label: t('statusCol'), key: 'status', render: row => h(Pill, { tone: toneOf(row.status) }, labelOf(row.status)) },
               { label: t('lastSeen'), key: 'submittedAt', render: row => shortDate(row.submittedAt) ?? '—', num: true },
@@ -1822,7 +1936,7 @@ window.__ModuleLoader__.load({
       const flow = detail?.flows || detail?.statusLogs || []
       return h(Dialog, { title: `${t('adjustmentOf')} ${detail?.code ?? ''}`, onClose },
         h('div', { className: 'sf-stack' },
-          detail ? h('div', { className: 'sf-row' }, h(Pill, { tone: ADJ_STATUS_TONES[detail.status] ?? 'muted' }, t(ADJ_STATUS_KEYS[detail.status] ?? detail.status)), h('span', { className: 'sf-note' }, `${t('adjType')}：${t(ADJ_TYPES.find(([tid]) => tid === detail.type)?.[1] ?? detail.type)}`)) : null,
+          detail ? h('div', { className: 'sf-row' }, h(Pill, { tone: ADJ_STATUS_TONES[detail.status] ?? 'muted' }, financeEnumLabel(detail.status, t, ADJ_STATUS_KEYS)), h('span', { className: 'sf-note' }, `${t('adjType')}：${financeEnumLabel(detail.type, t, Object.fromEntries(ADJ_TYPES))}`)) : null,
           h(Table, { tableId: 'finance-AdjustDetailDialog-1',
             columns: [
               { label: t('inOut'), key: 'side', render: row => h(Badge, { tone: row.side === 'IN' ? 'green' : 'rose' }, row.side === 'IN' ? t('lineIn') : t('lineOut')) },
@@ -1835,7 +1949,7 @@ window.__ModuleLoader__.load({
           flow.length ? h('div', null, h('strong', null, t('flow')), h('div', { className: 'sf-timeline' }, ...flow.map((item, index) =>
             h('div', { key: index, className: 'sf-timeline-row' },
               h('span', { className: 'sf-timeline-dot' }),
-              h('div', { className: 'sf-timeline-main' }, h('span', null, `${financeLabel(item.action ?? item.toStatus)} · ${item.operatorName ?? item.operator ?? '—'}`), h('small', null, shortDate(item.at ?? item.createdAt) ?? '')),
+              h('div', { className: 'sf-timeline-main' }, h('span', null, `${financeDisplayValue(item.action ?? item.toStatus, item.action ? 'action' : 'toStatus')} · ${item.operatorName ?? item.operator ?? '—'}`), h('small', null, shortDate(item.at ?? item.createdAt) ?? '')),
               h('span', { className: 'sf-note' }, item.note ?? ''))))) : null))
     }
 
@@ -1879,7 +1993,7 @@ window.__ModuleLoader__.load({
         h(Card, { title: t('allocRecent'), unit: t('unitNote') },
           h(Table, { tableId: 'finance-AllocationsView-2',
             columns: [
-              { label: t('dataset'), key: 'sourceType' },
+              { label: t('dataset'), key: 'sourceType', render: row => financeDisplayValue(row.sourceType, 'sourceType') },
               { label: t('adjLineBudget'), key: 'budgetLine', sortValue: row => row.budgetLine ? lineLabel(row.budgetLine) : row.budgetLineName ?? row.budgetLineId, render: row => row.budgetLineName ?? row.budgetLineId ?? '—' },
               { label: t('amount'), key: 'amount', render: row => wan(row.amount) ?? '—', num: true },
               { label: t('actions'), key: 'actions', sortable: false, render: row => h(LinkButton, { onClick: () => act(`/allocations/${row.id}/remove`, {}) }, t('allocRemove')) },
@@ -1915,8 +2029,8 @@ window.__ModuleLoader__.load({
         h(Card, { title: t('viewVersions'), actions: [h(LinkButton, { key: 'diff', onClick: () => onDialog({ kind: 'versionDiff' }) }, t('verDiff'))] }, h(Table, { tableId: 'finance-VersionsView-1',
           columns: [
             { label: t('verName'), render: row => h('span', null, row.name, ' ', row.isPrimary ? h(Badge, { key: 'p', tone: 'blue' }, t('primaryTag')) : null), stickyLeft: true },
-            { label: t('verType'), key: 'type' },
-            { label: t('verStatus'), key: 'status', render: row => h(Pill, { tone: VERSION_STATUS_TONES[row.status] ?? 'muted' }, t(VERSION_STATUS_KEYS[row.status] ?? row.status)) },
+            { label: t('verType'), key: 'type', render: row => financeDisplayValue(row.type, 'type') },
+            { label: t('verStatus'), key: 'status', render: row => h(Pill, { tone: VERSION_STATUS_TONES[row.status] ?? 'muted' }, financeEnumLabel(row.status, t, VERSION_STATUS_KEYS)) },
             { label: t('verLines'), key: 'lineCount', num: true },
             { label: t('kpiBudget'), key: 'budgetTotal', render: row => wan(row.budgetTotal) ?? '—', num: true },
             { label: t('kpiPrSubmitted'), key: 'prSubmittedTotal', render: row => wan(row.prSubmittedTotal) ?? '—', num: true },
@@ -1945,7 +2059,7 @@ window.__ModuleLoader__.load({
       }, [revision, reloadTick])
       return h(Card, { title: t('carryoverRules'), actions: [h(LinkButton, { key: 'add', onClick: () => onDialog({ kind: 'carryover' }) }, h(Glyph, { name: 'plus', size: 12 }), t('ruleAdd'))] }, h(Table, { tableId: 'finance-CarryoverCard-1',
         columns: [
-          { label: t('expenseType'), key: 'expenseType', render: row => row.expenseType ? t(EXPENSE_LABELS[row.expenseType] ?? row.expenseType) : t('all') },
+          { label: t('expenseType'), key: 'expenseType', render: row => row.expenseType ? financeEnumLabel(row.expenseType, t, EXPENSE_LABELS) : t('all') },
           { label: t('carryoverMode'), key: 'mode', render: row => row.mode === 'FULL' ? t('modeFull') : row.mode === 'PERCENT' ? `${t('modePercent')} ${row.percent ?? 100}%` : `${t('modeExpire')} ${t('expireMonth')} ${row.expireMonth ?? '—'}` },
           { label: t('statusCol'), key: 'enabled', render: row => h(Pill, { tone: row.enabled ? 'green' : 'muted' }, row.enabled ? t('ruleEnabled') : t('ruleDisabled')) },
           { label: t('actions'), key: 'actions', sortable: false, render: row => h('div', { className: 'sf-row', style: { justifyContent: 'flex-end', flexWrap: 'nowrap' } },
@@ -1975,7 +2089,7 @@ window.__ModuleLoader__.load({
         h(PrimaryButton, { key: 'ok', onClick: submit }, t('submit')),
       ] },
         h('div', { className: 'sf-stack' },
-          h(FormRow, { label: t('carryoverMode') }, h(Select, { value: mode, onChange: setMode, options: [['FULL', 'modeFull'], ['PERCENT', 'modePercent'], ['EXPIRE', 'modeExpire']] })),
+          h(FormRow, { label: t('carryoverMode') }, h(Select, { value: mode, onChange: setMode, options: [['FULL', t('modeFull')], ['PERCENT', t('modePercent')], ['EXPIRE', t('modeExpire')]] })),
           h(FormRow, { label: t('expenseType') }, h(Select, { value: expenseType, onChange: setExpenseType, options: EXPENSE_TYPES.map(([id, label]) => [id, t(label)]), placeholder: t('all') })),
           mode === 'PERCENT' ? h(FormRow, { label: t('percent') }, h(Field, { type: 'number', min: 1, max: 100, value: percent, onChange: setPercent })) : null,
           mode === 'EXPIRE' ? h(FormRow, { label: t('expireMonth') }, h(Field, { type: 'number', min: 1, max: 12, value: expireMonth, onChange: setExpireMonth })) : null))
@@ -2002,7 +2116,7 @@ window.__ModuleLoader__.load({
           h(Table, { tableId: 'finance-VersionDiffDialog-1',
             columns: [
               { label: t('org'), key: 'orgName', render: row => row.orgName ?? '—', stickyLeft: true },
-              { label: t('expenseType'), key: 'expenseType', render: row => row.expenseType ? t(EXPENSE_LABELS[row.expenseType] ?? row.expenseType) : '—' },
+              { label: t('expenseType'), key: 'expenseType', render: row => row.expenseType ? financeEnumLabel(row.expenseType, t, EXPENSE_LABELS) : '—' },
               { label: t('diffAmount'), key: 'diffAmount', render: row => { const value = finite(row.diffAmount); return h('span', { className: value < 0 ? 'sf-neg' : 'sf-pos' }, wan(value) ?? '—') }, num: true },
             ],
             rows, empty: t('empty'),
@@ -2044,7 +2158,7 @@ window.__ModuleLoader__.load({
     const OP_TOPICS = [
       ['预算执行', '预算执行率 / 支付率', '预算汇总 + 付款台账', true],
       ['资金链', '月度余额 / 缺口月份', '资金汇总', true],
-      ['收入达成', '计划 vs 实际到账', '收入计划', true],
+      ['收入达成', '计划与实际到账', '收入计划', true],
       ['成本结构', '三类费用占比与漂移', '预算汇总（三类费用）', true],
       ['数据质量', '未分配主体 / 缺失金额', '数据质量清单', true],
       ['项目毛利', '项目维度收入-成本', '项目台账（待导入）', false],
@@ -2081,7 +2195,7 @@ window.__ModuleLoader__.load({
       }
       const shareTones = ['a', 'b', 'c', 'd']
       const shareSegments = Object.entries(byType).map(([key, value], index) => ({
-        label: t(EXPENSE_LABELS[key] ?? key), value, tone: shareTones[index % shareTones.length],
+        label: financeEnumLabel(key, t, EXPENSE_LABELS), value, tone: shareTones[index % shareTones.length],
       }))
 
       const netByMonth = new Map()
@@ -2225,13 +2339,13 @@ window.__ModuleLoader__.load({
       return h(Dialog, { title: `${t('adjustmentOf')} ${adjustment?.code ?? ''}`, onClose },
         h('div', { className: 'sf-stack' },
           adjustment ? h('div', { className: 'sf-row' },
-            h(Pill, { tone: ADJ_STATUS_TONES[adjustment.status] ?? 'muted' }, t(ADJ_STATUS_KEYS[adjustment.status] ?? adjustment.status)),
+            h(Pill, { tone: ADJ_STATUS_TONES[adjustment.status] ?? 'muted' }, financeEnumLabel(adjustment.status, t, ADJ_STATUS_KEYS)),
             h('span', { className: 'sf-note' }, `${wan(adjustment.oldAmount) ?? '—'} → ${wan(adjustment.newAmount) ?? '—'} ${t('unitYuan')}`)) : null,
           adjustment?.reason ? h('p', { className: 'sf-note' }, `${t('increaseReason')}：${adjustment.reason}`) : null,
           flow.length ? h('div', null, h('strong', null, t('flow')), h('div', { className: 'sf-timeline' }, ...flow.map((item, index) =>
             h('div', { key: index, className: 'sf-timeline-row' },
               h('span', { className: 'sf-timeline-dot' }),
-              h('div', { className: 'sf-timeline-main' }, h('span', null, `${financeLabel(item.action ?? item.toStatus)} · ${item.operatorName ?? item.operator ?? '—'}`), h('small', null, shortDate(item.at ?? item.createdAt) ?? '')),
+              h('div', { className: 'sf-timeline-main' }, h('span', null, `${financeDisplayValue(item.action ?? item.toStatus, item.action ? 'action' : 'toStatus')} · ${item.operatorName ?? item.operator ?? '—'}`), h('small', null, shortDate(item.at ?? item.createdAt) ?? '')),
               h('span', { className: 'sf-note' }, item.note ?? ''))))) : null))
     }
 
@@ -2297,14 +2411,14 @@ window.__ModuleLoader__.load({
         h(Table, { tableId: 'finance-PlansTab-1',
           columns: [
             { label: t('org'), key: 'orgName', stickyLeft: true },
-            { label: t('planType'), key: 'planType', render: row => t(PLAN_LABELS[row.planType] ?? row.planType) },
+            { label: t('planType'), key: 'planType', render: row => financeEnumLabel(row.planType, t, PLAN_LABELS) },
             { label: t('description'), key: 'description' },
             { label: t('planMonth'), key: 'planMonth', sortValue: row => row.planMonth ?? row.month, render: row => mm(row.planMonth ?? row.month), num: true },
             { label: t('planned'), key: 'plannedAmount', render: row => wan(row.plannedAmount) ?? '—', num: true },
             { label: t('actual'), key: 'actualAmount', render: row => { const over = finite(row.actualAmount) !== null && finite(row.plannedAmount) !== null && row.actualAmount > row.plannedAmount; return h('span', { className: over ? 'sf-neg' : '' }, wan(row.actualAmount) ?? '—') }, num: true },
             { label: t('remaining'), key: 'remainingAmount', render: row => wan(row.remainingAmount) ?? '—', num: true },
             { label: t('scheduleDate'), key: 'scheduleDate', render: row => shortDate(row.scheduleDate) ?? '—', num: true },
-            { label: t('priority'), key: 'priority', render: row => row.priority ? h(Pill, { tone: row.priority === 'HIGH' ? 'rose' : row.priority === 'MEDIUM' ? 'amber' : 'muted' }, t(PRIORITIES.find(([id]) => id === row.priority)?.[1] ?? row.priority)) : '—' },
+            { label: t('priority'), key: 'priority', render: row => row.priority ? h(Pill, { tone: row.priority === 'HIGH' ? 'rose' : row.priority === 'MEDIUM' ? 'amber' : 'muted' }, financeEnumLabel(row.priority, t, Object.fromEntries(PRIORITIES))) : '—' },
             {
               label: t('actions'), key: 'actions', sortable: false,
               render: row => h('div', { className: 'sf-row', style: { flexWrap: 'nowrap', justifyContent: 'flex-end' } },
@@ -2363,12 +2477,12 @@ window.__ModuleLoader__.load({
 
     function PlanDetailDialog({ plan, t, onClose }) {
       const fields = [
-        [t('org'), plan.orgName], [t('planType'), t(PLAN_LABELS[plan.planType] ?? plan.planType)], [t('description'), plan.description],
+        [t('org'), plan.orgName], [t('planType'), financeEnumLabel(plan.planType, t, PLAN_LABELS)], [t('description'), plan.description],
         [t('department'), plan.departmentName], [t('costItem'), plan.costItemName], [t('planMonth'), plan.planMonth ? `${plan.planMonth} 月` : '—'],
         [t('planned'), wan(plan.plannedAmount)], [t('actual'), wan(plan.actualAmount)], [t('variance'), wan(plan.varianceAmount)],
-        [t('remaining'), wan(plan.remainingAmount)], [t('scheduleDate'), shortDate(plan.scheduleDate)], [t('priority'), plan.priority ? t(PRIORITIES.find(([id]) => id === plan.priority)?.[1] ?? plan.priority) : '—'],
+        [t('remaining'), wan(plan.remainingAmount)], [t('scheduleDate'), shortDate(plan.scheduleDate)], [t('priority'), plan.priority ? financeEnumLabel(plan.priority, t, Object.fromEntries(PRIORITIES)) : '—'],
         [t('acceptAcceptance'), plan.acceptsAcceptance ? '✓' : '—'], [t('cashAmount'), wan(plan.plannedCashAmount)], [t('acceptanceAmount'), wan(plan.plannedAcceptanceAmount)],
-        [t('payee'), plan.payeeName], [t('statusCol'), financeLabel(plan.status)],
+        [t('payee'), plan.payeeName], [t('statusCol'), financeDisplayValue(plan.status, 'status')],
       ]
       return h(Dialog, { title: t('planDetail'), onClose },
         h('dl', { className: 'sf-evidence' }, ...fields.map(([label, value], index) =>
@@ -2397,7 +2511,7 @@ window.__ModuleLoader__.load({
             columns: [
               { label: t('adjustmentOf'), key: 'code' },
               { label: t('amount'), key: 'amount', sortValue: row => row.newAmount - row.oldAmount, render: row => h('span', null, `${wan(row.oldAmount) ?? '—'} → ${wan(row.newAmount) ?? '—'} `, h('span', { className: 'sf-pos' }, `（${deltaOf(row)}）`)), num: true },
-              { label: t('statusCol'), key: 'status', render: row => h(Pill, { tone: ADJ_STATUS_TONES[row.status] ?? 'muted' }, t(ADJ_STATUS_KEYS[row.status] ?? row.status)) },
+              { label: t('statusCol'), key: 'status', render: row => h(Pill, { tone: ADJ_STATUS_TONES[row.status] ?? 'muted' }, financeEnumLabel(row.status, t, ADJ_STATUS_KEYS)) },
               { label: t('lastSeen'), key: 'submittedAt', render: row => shortDate(row.submittedAt) ?? '—', num: true },
               {
                 label: t('actions'), key: 'actions', sortable: false,
@@ -2470,7 +2584,7 @@ window.__ModuleLoader__.load({
     const ALERT_TYPES = [
       ['BUDGET_OVERRUN', 'typeOverrun'], ['EXECUTION_SLOW', 'typeSlow'], ['CASH_GAP', 'typeCashGap'], ['DATA_QUALITY', 'typeQuality'],
     ]
-    const alertTypeLabel = (value, t) => t((ALERT_TYPES.find(([id]) => id === value) ?? [])[1] ?? value)
+    const alertTypeLabel = (value, t) => financeEnumLabel(value, t, Object.fromEntries(ALERT_TYPES))
     const ALERT_STATUS_OPTIONS = [['OPEN', 'stPending'], ['CONFIRMED', 'stConfirmed'], ['RESOLVED', 'stResolved'], ['IGNORED', 'stIgnored'], ['', 'stAll']]
 
     function AlertsView({ ctx, t, onDrill }) {
@@ -2572,8 +2686,7 @@ window.__ModuleLoader__.load({
           h('div', { className: 'sf-stack' },
             h('div', { className: 'sf-row' }, h(SeverityBadge, { severity: detail.severity, t }), h(Pill, { tone: 'muted' }, alertTypeLabel(detail.alertType, t) ?? '—'), h('span', { className: 'sf-note' }, `${shortDate(detail.firstSeenAt) ?? '—'} → ${shortDate(detail.lastSeenAt) ?? '—'}`)),
             h('p', { className: 'sf-note' }, detail.detail ?? detail.title ?? ''),
-            detail.evidence && Object.keys(detail.evidence).length ? h('div', null, h('strong', null, t('evidence')), h('div', { className: 'sf-evidence' }, ...Object.entries(detail.evidence).map(([key, value]) =>
-              h('div', { key, className: 'sf-evidence-item' }, h('small', null, key), h('strong', null, typeof value === 'object' ? JSON.stringify(value) : String(value ?? '—')))))) : null,
+            detail.evidence && Object.keys(detail.evidence).length ? h('div', null, h('strong', null, t('evidence')), h(FinanceEvidence, { value: detail.evidence })) : null,
             h('div', { className: 'sf-row' }, h(PrimaryButton, { onClick: () => { const [tab, params] = drillTarget(detail.alertType); setDetail(null); onDrill(tab, params) } }, t('viewSource'))))) : null,
       )
     }
@@ -2688,7 +2801,7 @@ window.__ModuleLoader__.load({
               h(FormRow, { label: t('tableMapping') }, h(SearchSelect, { value: syncForm.tableMappingKey, onChange: value => setSyncForm(current => ({ ...current, tableMappingKey: value })), options: mappingOptions, allowCustom: true, placeholder: t('tableMapping') })),
             ),
             h('div', { className: 'sf-row-between' }, h('span', { className: 'sf-note' }, t('dsSyncHint')), h(PrimaryButton, { busy, disabled: !syncForm.bizSystem.trim(), onClick: sync }, t('syncNow'))),
-            syncResult ? h('div', { className: 'sf-note', role: 'status' }, `${t('syncFetched')} ${syncResult.fetched ?? 0} · ${t('dsTransport')} ${financeLabel(syncResult.transport)} · ${t('processingStage')} ${financeLabel(syncResult.stage)}${syncResult.batchId ? ` · ${syncResult.batchId}` : ''}`) : null,
+            syncResult ? h('div', { className: 'sf-note', role: 'status' }, `${t('syncFetched')} ${syncResult.fetched ?? 0} · ${t('dsTransport')} ${financeLabel(syncResult.transport)} · ${t('processingStage')} ${financeDisplayValue(syncResult.stage, 'stage')}${syncResult.batchId ? ` · ${syncResult.batchId}` : ''}`) : null,
           )) : null,
         h(Card, { title: t('dsConfigs'), actions: canManage ? h(PrimaryButton, { busy, onClick: () => setConfigDialog({}) }, h(Glyph, { name: 'plus', size: 12 }), t('dsAdd')) : null }, h(React.Fragment, null,
           h(Table, { tableId: 'finance-DataCenterView-configs', minColumns: '900px',
@@ -2710,7 +2823,7 @@ window.__ModuleLoader__.load({
             { label: t('successRate'), key: 'successRate', num: true, render: row => `${row.successRate ?? 0}%` },
             { label: t('fallbackRate'), key: 'fallbackRate', num: true, render: row => `${row.fallbackRate ?? 0}%` },
             { label: t('emptyRate'), key: 'emptyResultRate', num: true, render: row => `${row.emptyResultRate ?? 0}%` },
-            { label: t('avgDuration'), key: 'avgDurationMs', num: true, render: row => `${row.avgDurationMs ?? 0} ms` },
+            { label: t('avgDuration'), key: 'avgDurationMs', num: true, render: row => `${row.avgDurationMs ?? 0} 毫秒` },
             { label: t('latestSync'), key: 'lastSuccessAt', render: row => shortDate(row.lastSuccessAt) ?? '—' },
           ], rows: metrics || [], empty: metrics ? t('empty') : t('loading'),
         })),
@@ -2722,12 +2835,12 @@ window.__ModuleLoader__.load({
               { label: t('bizSystem'), key: 'bizSystem', render: row => financeLabel(row.bizSystem) },
               { label: t('docType'), key: 'docType', render: row => financeLabel(row.docType) },
               { label: t('dsTransport'), key: 'transportUsed', render: row => financeLabel(row.transportUsed) },
-              { label: t('dsFallback'), key: 'fallbackReason', render: row => row.fallbackReason ? h(Badge, { tone: 'amber' }, row.fallbackReason) : '—' },
-              { label: t('batchStatus'), key: 'status', render: row => h(Pill, { tone: runTone(row) }, financeLabel(row.status)) },
-              { label: t('processingStage'), key: 'stage', render: row => financeLabel(row.stage) },
+              { label: t('dsFallback'), key: 'fallbackReason', render: row => row.fallbackReason ? h(Badge, { tone: 'amber' }, financeLabel(row.fallbackReason, '回退原因待核查')) : '—' },
+              { label: t('batchStatus'), key: 'status', render: row => h(Pill, { tone: runTone(row) }, financeDisplayValue(row.status, 'syncStatus')) },
+              { label: t('processingStage'), key: 'stage', render: row => financeDisplayValue(row.stage, 'stage') },
               { label: t('batchId'), key: 'batchId', render: row => row.batchId ?? '—' },
               { label: t('dataSummary'), key: 'stats', render: row => runStats(row.stats) },
-              { label: t('errorSummary'), key: 'errorSummary', render: row => row.errorSummary ? h('span', { className: 'sf-text-danger' }, row.errorSummary) : '—' },
+              { label: t('errorSummary'), key: 'errorSummary', render: row => row.errorSummary ? h('span', { className: 'sf-text-danger' }, financeErrorText(row.errorSummary)) : '—' },
             ], rows: runList, empty: t('empty'), rowKey: 'id',
           })),
           h(Card, { title: t('qualityTitle') }, h(Table, { tableId: 'finance-DataCenterView-quality',
@@ -2740,12 +2853,12 @@ window.__ModuleLoader__.load({
           }))),
         h(Card, { title: t('batchesTitle') }, h(Table, { tableId: 'finance-DataCenterView-batches',
           columns: [
-            { label: t('bizType'), key: 'bizType' },
+            { label: t('bizType'), key: 'bizType', render: row => financeLabel(row.bizType, '业务类型待核查') },
             { label: t('sourceFile'), key: 'sourceFile' },
             { label: t('rows'), key: 'totalRows', num: true },
             { label: t('successRows'), key: 'successRows', num: true },
             { label: t('failedRows'), key: 'failedRows', num: true },
-              { label: t('batchStatus'), key: 'status', render: row => financeLabel(row.status) },
+              { label: t('batchStatus'), key: 'status', render: row => financeDisplayValue(row.status, 'syncStatus') },
             { label: t('startedAt'), key: 'startedAt', render: row => shortDate(row.startedAt) ?? '—', num: true },
           ], rows: batchList, empty: t('empty'),
         })),
@@ -3131,8 +3244,8 @@ window.__ModuleLoader__.load({
           h(Table, {
             columns: [
               { label: t('memberUser'), key: 'name', stickyLeft: true },
-              { label: 'mobile', key: 'mobile' },
-              { label: 'email', key: 'email' },
+              { label: t('mobile'), key: 'mobile' },
+              { label: t('email'), key: 'email' },
               { label: '同步时间', key: 'syncedAt', render: row => shortDate(row.syncedAt) ?? '—' },
               { label: t('systemUserId'), key: 'systemUserId', sortValue: row => Boolean(row.systemUserId), render: row => row.systemUserId ? h(Badge, { tone: 'green' }, '✓') : h(Badge, { tone: 'amber' }, t('unmappedOnly')) },
               { label: t('actions'), key: 'actions', sortable: false, render: row => h(LinkButton, { onClick: () => onDialog({ kind: 'mapUser', contact: row }) }, t('mapUser')) },
@@ -3293,7 +3406,7 @@ window.__ModuleLoader__.load({
             year: entryYear,
             paymentPlans: paymentRows
               .filter(row => row.id)
-              .map(row => [row.id, [row.description || row.planType || '付款计划', row.orgName, row.planMonth ? `${row.planMonth}月` : null, row.id.slice(0, 8)].filter(Boolean).join(' · ')]),
+              .map(row => [row.id, [row.description || financeEnumLabel(row.planType, t, PLAN_LABELS) || '付款计划', row.orgName, row.planMonth ? `${row.planMonth}月` : null, row.id.slice(0, 8)].filter(Boolean).join(' · ')]),
             revenuePlans: revenueRows.filter(row => row.id).map(row => [row.id, [row.itemName || '收入计划', row.orgName, row.month ? `${row.month}月` : null, row.id.slice(0, 8)].filter(Boolean).join(' · ')]),
             payees: unique(paymentRows.map(row => row.payeeName)),
             costItems: unique(paymentRows.map(row => row.costItemName)),
@@ -3462,7 +3575,8 @@ window.__ModuleLoader__.load({
 
     function sendErrorReason(error) {
       const message = error instanceof Error ? error.message : String(error)
-      return message.replace(/\s+/gu, ' ').trim().slice(0, 180) || 'unknown_error'
+      const reasons = { conversation_unavailable: '会话服务暂不可用', conversation_service_unavailable: '会话服务暂不可用', session_unavailable: '未找到可用会话' }
+      return Object.hasOwn(reasons, message) ? reasons[message] : financeErrorText(message)
     }
 
     function sendToAgent(prompt, setNotice, t) {
@@ -3563,7 +3677,7 @@ window.__ModuleLoader__.load({
               { key: 'name', label: t('bomPackages'), render: row => h(GhostButton, { onClick: () => setSelected(row.id), 'aria-pressed': row.id === selected }, row.name) },
               { key: 'modelCode', label: t('bomModel') },
               { key: 'version', label: t('bomVersion') },
-              { key: 'status', label: t('bomStatus'), render: row => t(`bomStatus${row.status}`) },
+              { key: 'status', label: t('bomStatus'), render: row => financeEnumLabel(row.status, t, { DRAFT: 'bomStatusDRAFT', IN_REVIEW: 'bomStatusIN_REVIEW', APPROVED: 'bomStatusAPPROVED', OBSOLETE: 'bomStatusOBSOLETE' }) },
               { key: 'targetCost', label: `${t('bomTarget')} (${t('unitYuan')})`, render: row => amount(row.targetCost) },
             ] }),
             h(Pager, { page, total: packages.total, limit: PAGE_SIZE, onPage: setPage }))),
@@ -3716,14 +3830,14 @@ window.__ModuleLoader__.load({
       const memberOptions = financeRows(members.data).filter(row => row.enabled !== false).map(row => [row.systemUserId || row.userId, row.displayName || row.name || row.systemUserId || row.userId]).filter(([id]) => id)
       return h('div', { className: 'sf-stack' },
         h(Card, { title: '我的权限可用范围' }, h(FinanceResource, { resource: me }, h(Table, { tableId: 'finance-my-permissions', rows: (me.data?.permissions || []).map(permission => ({ permission, scopes: me.data?.scopes?.find(row => row.permission === permission)?.scopes || [] })), empty: '暂无权限', columns: [
-          { key: 'permission', label: '功能', render: row => FINANCE_PERMISSION_NAMES[row.permission] || row.permission },
+          { key: 'permission', label: '功能', render: row => FINANCE_PERMISSION_NAMES[row.permission] || '未识别权限' },
           { key: 'scopes', label: '数据范围', render: row => h(FinanceEvidence, { value: row.scopes }) },
         ] }))),
         manage ? h(Card, { title: '财务授权管理', actions: [h(GhostButton, { key: 'create', onClick: () => setDialog({ kind: 'create', title: '新增授权' }) }, '新增授权')] },
           h('div', { className: 'sf-row' }, h(SearchSelect, { value: userId, onChange: value => { setUserId(value); setPage(1) }, options: memberOptions, placeholder: '全部成员' }), h('label', null, h('input', { type: 'checkbox', checked: activeOnly, onChange: event => { setActiveOnly(event.target.checked); setPage(1) } }), '仅生效授权')),
           h(Notice, null, action.notice), h(FinanceResource, { resource: grants }, h(Table, { tableId: 'finance-grants', rows: financeRows(grants.data), empty: '暂无显式授权', columns: [
             ...financeColumns([['userName', '人员'], ['scopeType', '范围'], ['orgId', '主体'], ['departmentId', '部门'], ['yearFrom', '起始年度'], ['yearTo', '截止年度'], ['expiresAt', '有效期'], ['grantReason', '原因']]),
-            { key: 'permission', label: '功能', render: row => FINANCE_PERMISSION_NAMES[row.permission] || row.permission },
+            { key: 'permission', label: '功能', render: row => FINANCE_PERMISSION_NAMES[row.permission] || '未识别权限' },
             { key: 'actions', label: '操作', sortable: false, render: row => !row.revokedAt ? h(GhostButton, { disabled: action.busy, onClick: () => setDialog({ kind: 'revoke', title: '撤销授权', id: row.id }) }, '撤销授权') : '已撤销' },
           ] })), h(Pager, { page, total: grants.data?.total, limit: 20, onPage: setPage })) : null,
         dialog ? h(FinanceFormDialog, { title: dialog.title, initial: { scopeType: 'SELF' }, onClose: () => setDialog(null),
@@ -3810,7 +3924,7 @@ window.__ModuleLoader__.load({
           h('form', { className: 'sf-row', onSubmit: event => { event.preventDefault(); setSearch(searchInput.trim()); setPage(1) } }, h(Field, { 'aria-label': '来源记录搜索', value: searchInput, onChange: setSearchInput, placeholder: '单据号或关键词', maxLength: 100 }), h(GhostButton, { type: 'submit' }, '搜索'))),
         h(Card, { title: '来源记录' }, h(FinanceResource, { resource: records }, h(Table, { tableId: `finance-source-${scope}`, rows, empty: '暂无来源记录', onRowClick: setSelected, columns: [
           ...financeColumns([['sourceDocNo', '单据号'], ['tableName', '来源表'], ['revision', '修订版本'], ['createdAt', '入库时间']]),
-          { key: 'category', label: '财务分类', render: row => financeLabel(row.financialAnalysis?.category || '未分类') },
+          { key: 'category', label: '财务分类', render: row => financeDisplayValue(row.financialAnalysis?.category || '未分类', 'category') },
           ...[...fieldLabels].map(([key, label]) => ({ key: `field:${key}`, label, sortValue: row => sourceCellText(row.fields?.find(field => field.key === key)?.value), render: row => sourceCellText(row.fields?.find(field => field.key === key)?.value, label) })),
         ] })), h(Pager, { page, total: records.data?.total, limit: 20, onPage: setPage })),
         selected ? h(Dialog, { title: `来源详情：${selected.sourceDocNo}`, onClose: () => setSelected(null) }, h(FinanceEvidence, { value: selected.financialAnalysis }), h(Table, { tableId: 'finance-source-detail', rows: selected.fields || [], columns: [{ key: 'label', label: '字段' }, { key: 'value', label: '值', render: row => sourceCellText(row.value, row.label) }], empty: '无来源字段' })) : null)
@@ -3844,7 +3958,7 @@ window.__ModuleLoader__.load({
       const path = validA && validB ? mode === 'monthly' ? `/finance/budget-snapshots/compare?snapshotAId=${validA}&snapshotBId=${validB}` : mode === 'versions' ? `/finance/budget-versions/detail-diff?baseVersionId=${validA}&targetVersionId=${validB}` : `/finance/budget/versions/diff?baseVersionId=${validA}&targetVersionId=${validB}` : null
       const comparison = useFinanceResource(path, revision)
       useEffect(() => { setA(''); setB(''); setDialog(null) }, [mode, ctx.year, targetYear])
-      const versionLabel = row => mode === 'monthly' ? `${row.label} · ${row.frozenThroughMonth}+${12 - row.frozenThroughMonth}` : `${row.name} · ${financeLabel(row.status)}${row.isPrimary ? ' · 主版本' : ''}`
+      const versionLabel = row => mode === 'monthly' ? `${row.label} · ${row.frozenThroughMonth}+${12 - row.frozenThroughMonth}` : `${row.name} · ${financeDisplayValue(row.status, 'status')}${row.isPrimary ? ' · 主版本' : ''}`
       const selectedVersions = [baseRows.find(row => row.id === validA), targetRows.find(row => row.id === validB)]
       const trial = mode !== 'monthly' && selectedVersions.some(row => row?.status === 'DRAFT' || row?.status === 'CONFIRMED')
       const rows = financeRows(comparison.data)
@@ -3927,9 +4041,9 @@ window.__ModuleLoader__.load({
       const resultTable = (resource, title, columns) => h(Card, { title, unit: '元' }, h(FinanceResource, { resource }, h(Table, { tableId: `engine-${title}`, rows: financeRows(resource.data), empty: validId ? '暂无记录' : '请选择预算版本', columns: financeColumns(columns) })))
       const run = async (target, body, method) => { const result = await action.run(target, body, method); setReceipt(result); return result }
       return h('div', { className: 'sf-stack' },
-        h(FinanceResource, { resource: versions }, h(FormRow, { label: '预算版本' }, h(Select, { 'aria-label': '编制预算版本', value: validId || '', options: rows.map(row => [row.id, `${row.name} · ${financeLabel(row.status)}${row.isPrimary ? ' · 主版本' : ''}`]), placeholder: '选择预算版本', onChange: selectVersion }))),
+        h(FinanceResource, { resource: versions }, h(FormRow, { label: '预算版本' }, h(Select, { 'aria-label': '编制预算版本', value: validId || '', options: rows.map(row => [row.id, `${row.name} · ${financeDisplayValue(row.status, 'status')}${row.isPrimary ? ' · 主版本' : ''}`]), placeholder: '选择预算版本', onChange: selectVersion }))),
         h(Notice, null, action.notice),
-        version ? h('p', { className: 'sf-note' }, `${financeLabel(version.status)} · ${version.lineCount ?? 0} 行。草稿可编辑；确认、发布和锁定以服务端状态与发布检查为准。`) : null,
+        version ? h('p', { className: 'sf-note' }, `${financeDisplayValue(version.status, 'status')} · ${version.lineCount ?? 0} 行。草稿可编辑；确认、发布和锁定以服务端状态与发布检查为准。`) : null,
         validId && (canEdit || canPublish) ? h('div', { className: 'sf-row' },
           canEdit ? h(GhostButton, { disabled: action.busy, onClick: () => setDialog({ kind: 'roll', title: '创建滚动预测草稿' }) }, '创建滚动草稿') : null,
           draft && canEdit ? h(GhostButton, { disabled: action.busy, onClick: () => setDialog({ kind: 'params', title: '新建/更新预算参数' }) }, '维护预算参数') : null,
@@ -3946,7 +4060,7 @@ window.__ModuleLoader__.load({
           { key: 'actions', label: '操作', sortable: false, render: row => canEdit && draft && canEdit ? h(GhostButton, { disabled: action.busy, onClick: () => setDialog({ kind: 'remove', title: '移除草稿销量输入', row }) }, '移除输入') : null },
         ] }))),
         resultTable(runs, '计算批次历史', [['formulaVersion', '公式版本'], ['status', '状态'], ['paramVersionId', '参数版本'], ['startedAt', '计算时间'], ['errorSummary', '失败原因']]),
-        h('div', { className: 'sf-row' }, h(Select, { 'aria-label': '计算结果批次', value: validRun, onChange: setRunId, options: runRows.map(row => [row.id, `${row.formulaVersion} ${row.startedAt} ${financeLabel(row.status)}`]), placeholder: '选择计算结果' }), h(Select, { 'aria-label': '差异基准批次', value: validBase, onChange: setBaseRunId, options: runRows.map(row => [row.id, `${row.formulaVersion} ${row.startedAt}`]), placeholder: '选择差异基准' })),
+        h('div', { className: 'sf-row' }, h(Select, { 'aria-label': '计算结果批次', value: validRun, onChange: setRunId, options: runRows.map(row => [row.id, `${financeDisplayValue(row.formulaVersion, 'formulaVersion')} ${row.startedAt} ${financeDisplayValue(row.status, 'status')}`]), placeholder: '选择计算结果' }), h(Select, { 'aria-label': '差异基准批次', value: validBase, onChange: setBaseRunId, options: runRows.map(row => [row.id, `${financeDisplayValue(row.formulaVersion, 'formulaVersion')} ${row.startedAt}`]), placeholder: '选择差异基准' })),
         resultTable(outputs, '计算结果', [['kind', '指标'], ['year', '年度'], ['month', '月份'], ['amount', '金额']]),
         resultTable(diff, '计算批次差异', [['kind', '指标'], ['year', '年度'], ['month', '月份'], ['before', '基准'], ['after', '对比'], ['delta', '差额']]),
         h(FinanceResource, { resource: statements }, ...[['income', '管理利润表', [['revenue', '收入'], ['expense', '费用'], ['tax', '税费'], ['profit', '利润']]], ['cashflow', '管理现金流量表', [['inflow', '流入'], ['outflow', '流出'], ['endingBalance', '月末余额']]], ['balance', '简化资产负债表', [['cash', '现金'], ['receivable', '应收'], ['payable', '应付'], ['inventory', '存货'], ['equity', '权益']]]].map(([key, title, columns]) => h(Card, { key, title, unit: '元' }, h(Table, { tableId: `engine-${key}`, rows: statements.data?.[key] || [], columns: financeColumns([['year', '年度'], ['month', '月份'], ...columns]), empty: '请选择计算结果批次' })))),
@@ -4178,7 +4292,7 @@ window.__ModuleLoader__.load({
         h('main', { className: 'sf-shell', 'aria-labelledby': 'sf-title', ref: shellRef, tabIndex: -1 },
           h('div', { className: 'sf-sidebar-brand' },
             h('span', { className: 'sf-sidebar-brand-mark' }, h(Glyph, { name: 'data', size: 18 })),
-            h('div', null, h('strong', null, '有谦财务数据中心'), h('small', null, 'Finance Data Hub'))),
+            h('div', null, h('strong', null, '有谦财务数据中心'), h('small', null, t('hubSubtitle')))),
           h('header', { className: 'sf-header' },
             h('div', { className: 'sf-header-main' },
               h('p', { className: 'sf-eyebrow' }, t('eyebrow')),

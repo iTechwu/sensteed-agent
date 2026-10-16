@@ -334,8 +334,8 @@ function DirectoryCard({ contacts, keyword, setKeyword, onlyUnmapped, setOnlyUnm
       h(Table, {
         columns: [
           { label: t('memberUser'), key: 'name', stickyLeft: true },
-          { label: 'mobile', key: 'mobile' },
-          { label: 'email', key: 'email' },
+          { label: t('mobile'), key: 'mobile' },
+          { label: t('email'), key: 'email' },
           { label: '同步时间', key: 'syncedAt', render: row => shortDate(row.syncedAt) ?? '—' },
           { label: t('systemUserId'), key: 'systemUserId', sortValue: row => Boolean(row.systemUserId), render: row => row.systemUserId ? h(Badge, { tone: 'green' }, '✓') : h(Badge, { tone: 'amber' }, t('unmappedOnly')) },
           { label: t('actions'), key: 'actions', sortable: false, render: row => h(LinkButton, { onClick: () => onDialog({ kind: 'mapUser', contact: row }) }, t('mapUser')) },
@@ -496,7 +496,7 @@ function EntryPanel({ year, orgs, departments, t, onSaved }) {
         year: entryYear,
         paymentPlans: paymentRows
           .filter(row => row.id)
-          .map(row => [row.id, [row.description || row.planType || '付款计划', row.orgName, row.planMonth ? `${row.planMonth}月` : null, row.id.slice(0, 8)].filter(Boolean).join(' · ')]),
+          .map(row => [row.id, [row.description || financeEnumLabel(row.planType, t, PLAN_LABELS) || '付款计划', row.orgName, row.planMonth ? `${row.planMonth}月` : null, row.id.slice(0, 8)].filter(Boolean).join(' · ')]),
         revenuePlans: revenueRows.filter(row => row.id).map(row => [row.id, [row.itemName || '收入计划', row.orgName, row.month ? `${row.month}月` : null, row.id.slice(0, 8)].filter(Boolean).join(' · ')]),
         payees: unique(paymentRows.map(row => row.payeeName)),
         costItems: unique(paymentRows.map(row => row.costItemName)),

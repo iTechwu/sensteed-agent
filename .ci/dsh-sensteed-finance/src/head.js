@@ -72,6 +72,7 @@ const ANALYSIS_ENTRIES = [
 
 const copy = {
   zh: {
+    mobile: '手机号', email: '邮箱', hubSubtitle: '财务数据工作台',
     expenseProject: '项目运营成本', expenseFixed: '固定运营成本', expenseModel: '车型专属成本', expenseNonProject: '非项目类',
     planPurchase: '采购付款', planOther: '其他类付款', planNewRetail: '新零售', planPrPayment: 'PR 付款', planDirectParts: '直采零部件',
     entrySaveAction: '保存并生效（财务代录）', entryBackfillAction: '回填并自动计算', entryAnnual: '年度（不分月）', entryOptional: '可不选', entryIncomeRequired: '请选择收入项目，或确认本次自定义值。', entryPaymentSaved: '付款计划已入库', entryRevenueSaved: '收入计划已入库', entryBudgetSaved: '预算行已入库', entryActualsSaved: '实际数已回填，差额/剩余/状态已自动更新',
@@ -94,7 +95,7 @@ const copy = {
     tabOverview: '经营总览', tabBudget: '预算执行', tabOperations: '经营分析', tabCash: '资金分析', tabAlerts: '预警中心', tabDatacenter: '数据中心', tabEntry: '录入', tabAnalyze: '深度分析',
     year: '年度', org: '主体', allOrgs: '全部主体（集团）', loading: '正在加载财务数据...', retry: '重新加载', loadError: '数据加载失败', refreshedAt: '更新于', unitWan: '万元', unitYuan: '元', unitNote: '单位：万元', total: '合计',
     kpiBudget: '年度预算', kpiPrSubmitted: '已打 PR', kpiPrEstimated: '预计 PR', kpiPaid: '实际付款', kpiAlerts: '未处理预警', kpiExecRate: '预算执行率', kpiPayRate: 'PR 付款率', kpiNetInflow: '实际净流入', kpiRevenueAch: '收入达成', kpiSpendExec: '支出执行', kpiHealth: '预算健康度',
-    trendTitle: 'PR 与付款月度趋势', month: '月份', amount: '金额', empty: '暂无数据', orgSummary: '主体预算执行', alertSummary: '未处理预警 TOP5', orgSummaryFull: '分主体汇总', showFirst: '仅显示前 {n} 条，可缩小范围或翻页', partialLoad: '部分数据块加载失败，当前展示已获取部分；刷新可重试。',
+    trendTitle: 'PR 与付款月度趋势', month: '月份', amount: '金额', empty: '暂无数据', orgSummary: '主体预算执行', alertSummary: '未处理预警（最多 5 条）', orgSummaryFull: '分主体汇总', showFirst: '仅显示前 {n} 条，可缩小范围或翻页', partialLoad: '部分数据块加载失败，当前展示已获取部分；刷新可重试。',
     statusOver: '超预算', statusWatch: '关注', statusNormal: '正常', dash: '—', unknown: '未知',
     incomeAch: '收支达成', drill: '下钻', workbenchTitle: '待我处理', workbenchHint: '按当前年度和主体聚合待办，点击即可进入处理页面。', pendingFiling: '待处理填报', pendingFilingHint: '财务填报任务', pendingQuality: '数据质量待处理', pendingQualityHint: '未分配主体 / 缺失金额等', pendingAlerts: '待处理预警', pendingAlertsHint: '当前年度规则引擎结果', workbenchEmpty: '当前没有待处理事项', loadPartial: '部分数据加载失败，已展示可用内容。', dataCenterRetry: '重新加载数据中心', dataCenterLoading: '正在加载数据中心...', dataCenterFailed: '数据中心加载失败', dataCenterPartial: '数据中心部分内容加载失败', qualityIssues: '质量问题', qualityCritical: '严重问题', qualityWarn: '警告问题', latestSync: '最近同步', noSourceConfig: '暂无已接入数据源配置', noSourceConfigHint: '数据源同步完成后，配置与批次会在这里展示。',
     // 预算
@@ -117,7 +118,7 @@ const copy = {
     // 资金
     cashSummaryV: '资金汇总', cashPlans: '排款工作台', cashAdjustments: '调增审批', cashRevenue: '收入计划', cashMatrix: '资金矩阵（主体 × 月）', prevEndBalance: '上月末余额', plannedIncome: '预计收入', plannedExpense: '预计支出', projectedBalance: '预计余额', actualIncome: '实际收入', actualExpense: '实际支出', actualBalance: '实际余额',
     schedule: '排款', scheduleDate: '排款日期', priority: '优先级', priHigh: '高', priMid: '中', priLow: '低', acceptAcceptance: '接受承兑', cashAmount: '现汇金额（元）', acceptanceAmount: '承兑金额（元）', planDetail: '计划详情', increase: '申请调增', newAmount: '调增后金额（元）', increaseReason: '调增理由（必填）', increaseHint: '调增后金额必须大于当前计划金额', payee: '收款方', planMonth: '排款月份', planMonthRequired: '排款月份必填', statusCol: '状态',
-    revenueVs: '计划 vs 实际到账',
+    revenueVs: '计划与实际到账',
     // 预警
     alertsTitle: '预警清单', sevCritical: '重大', sevWarn: '警告', sevInfo: '提示', sevResolved: '已解决', stPending: '待处理', stConfirmed: '已确认', stResolved: '已解决', stIgnored: '已忽略', alertType: '类型', alertTitleCol: '标题', detail: '说明', firstSeen: '首次发现', lastSeen: '最近出现', alertMonth: '月份',
     rulesUnconfirmed: '预警规则集尚未确认生效：当前不生成正式告警。以内置默认阈值确认后规则引擎才开始产出。', rulesConfirmed: '预警规则集 v{v} 已生效（{date} 确认）', confirmDefaultRules: '以内置默认阈值确认生效', confirmRulesTitle: '确认预警规则集', alertDetail: '预警详情', evidence: '证据快照', viewSource: '查看源数据', sourceBudget: '下钻预算', sourceCash: '下钻资金', sourceQuality: '下钻数据质量',
@@ -143,6 +144,7 @@ const copy = {
     submit: '提交', cancel: '取消', submitted: '已提交', saved: '已保存', deleted: '已删除', confirm: '确认', close: '关闭', actions: '操作', runEngine: '触发预警引擎', running: '执行中', runDone: '已触发：新建 {created} · 更新 {updated} · 关闭 {resolved}', backfill: '回填', backfillActual: '回填实际值', submitConfirm: '确认提交？', opFailed: '操作失败', refreshed: '已刷新', required: '必填', invalidJson: '表映射必须是合法 JSON。',
   },
   en: {
+    mobile: 'Mobile', email: 'Email', hubSubtitle: 'Finance Data Hub',
     expenseProject: 'Project operating costs', expenseFixed: 'Fixed operating costs', expenseModel: 'Model-specific costs', expenseNonProject: 'Non-project costs',
     planPurchase: 'Purchase payment', planOther: 'Other payment', planNewRetail: 'New retail payment', planPrPayment: 'PR payment', planDirectParts: 'Direct parts purchase',
     entrySaveAction: 'Save and apply (finance entry)', entryBackfillAction: 'Backfill and calculate', entryAnnual: 'Annual (no month)', entryOptional: 'Optional', entryIncomeRequired: 'Select an income item or confirm a custom value.', entryPaymentSaved: 'Payment plan saved', entryRevenueSaved: 'Revenue plan saved', entryBudgetSaved: 'Budget line saved', entryActualsSaved: 'Actuals saved; variance, remaining and status recalculated',
@@ -217,10 +219,13 @@ const subscribe = listener => { listeners.add(listener); return () => listeners.
 const snapshot = () => opened
 
 async function api(path, options) {
-  const response = await fetch(`${BASE}${path}`, { credentials: 'same-origin', redirect: 'error', headers: { Accept: 'application/json', ...(options?.body ? { 'Content-Type': 'application/json' } : {}) }, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS), ...options })
+  let response
+  try {
+    response = await fetch(`${BASE}${path}`, { credentials: 'same-origin', redirect: 'error', headers: { Accept: 'application/json', ...(options?.body ? { 'Content-Type': 'application/json' } : {}) }, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS), ...options })
+  } catch (error) { throw new Error(financeErrorText(error?.name === 'TimeoutError' ? 'upstream_timeout' : error?.message)) }
   const body = await response.json().catch(() => null)
   if (!response.ok || !body || (body.ok === false && !Object.keys(body).some(key => !['ok', 'error'].includes(key) && body[key] && !body[key].error))) {
-    const error = new Error(body?.error || `http_${response.status}`)
+    const error = new Error(financeErrorText(body?.error, response.status))
     error.status = response.status
     throw error
   }

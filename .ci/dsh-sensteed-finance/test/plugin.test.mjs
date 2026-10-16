@@ -83,7 +83,7 @@ test('selector popups stay within the viewport and reposition on resize without 
 })
 
 test('matrix and detail tables expose sortable raw values for formatted finance columns', async () => {
-  const files = ['src/format.js', 'src/components.js', 'src/views/budget.js', 'src/views/cash.js']
+  const files = ['src/format.js', 'src/components.js', 'src/workflows.js', 'src/views/budget.js', 'src/views/cash.js']
   const source = (await Promise.all(files.map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
   const budgetRow = { id: 'line-1', orgName: '主体一', month: 1, expenseType: 'FIXED_OPERATION', budgetAmount: 10000, prSubmittedAmount: 2000, prEstimatedAmount: 500, paidAmount: 1000 }
   const cases = [
@@ -493,11 +493,13 @@ test('entry lists distinguish loading, empty, and failed requests with retry act
 test('client preserves HTTP status so member permission failures are distinguished from network errors', async () => {
   const head = await readFile(new URL('src/head.js', root), 'utf8')
   const requestSource = head.slice(head.indexOf('async function api('), head.indexOf('// One idempotency key'))
-  const read = new Function('fetch', 'AbortSignal', 'BASE', 'REQUEST_TIMEOUT_MS', requestSource + '\nreturn api')
+  const workflows = await readFile(new URL('src/workflows.js', root), 'utf8')
+  const financeErrorText = new Function(workflows + '\nreturn financeErrorText')()
+  const read = new Function('fetch', 'AbortSignal', 'BASE', 'REQUEST_TIMEOUT_MS', 'financeErrorText', requestSource + '\nreturn api')
   const response = status => ({ ok: status === 200, status, json: async () => status === 200 ? { data: { list: [] } } : { error: 'permission_denied' } })
-  const denied = read(async () => response(403), { timeout: () => undefined }, '/finance', 30000)
-  await assert.rejects(denied('/members'), error => error.status === 403 && error.message === 'permission_denied')
-  const unavailable = read(async () => response(503), { timeout: () => undefined }, '/finance', 30000)
+  const denied = read(async () => response(403), { timeout: () => undefined }, '/finance', 30000, financeErrorText)
+  await assert.rejects(denied('/members'), error => error.status === 403 && error.message.includes('权限'))
+  const unavailable = read(async () => response(503), { timeout: () => undefined }, '/finance', 30000, financeErrorText)
   await assert.rejects(unavailable('/members'), error => error.status === 503)
 
   const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8')

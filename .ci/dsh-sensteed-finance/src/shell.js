@@ -131,7 +131,7 @@ function Dashboard({ t, embedded = false, onClose = closeOverlay }) {
     h('main', { className: 'sf-shell', 'aria-labelledby': 'sf-title', ref: shellRef, tabIndex: -1 },
       h('div', { className: 'sf-sidebar-brand' },
         h('span', { className: 'sf-sidebar-brand-mark' }, h(Glyph, { name: 'data', size: 18 })),
-        h('div', null, h('strong', null, '有谦财务数据中心'), h('small', null, 'Finance Data Hub'))),
+        h('div', null, h('strong', null, '有谦财务数据中心'), h('small', null, t('hubSubtitle')))),
       h('header', { className: 'sf-header' },
         h('div', { className: 'sf-header-main' },
           h('p', { className: 'sf-eyebrow' }, t('eyebrow')),

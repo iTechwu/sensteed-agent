@@ -4,7 +4,7 @@
 const ALERT_TYPES = [
   ['BUDGET_OVERRUN', 'typeOverrun'], ['EXECUTION_SLOW', 'typeSlow'], ['CASH_GAP', 'typeCashGap'], ['DATA_QUALITY', 'typeQuality'],
 ]
-const alertTypeLabel = (value, t) => t((ALERT_TYPES.find(([id]) => id === value) ?? [])[1] ?? value)
+const alertTypeLabel = (value, t) => financeEnumLabel(value, t, Object.fromEntries(ALERT_TYPES))
 const ALERT_STATUS_OPTIONS = [['OPEN', 'stPending'], ['CONFIRMED', 'stConfirmed'], ['RESOLVED', 'stResolved'], ['IGNORED', 'stIgnored'], ['', 'stAll']]
 
 function AlertsView({ ctx, t, onDrill }) {
@@ -106,8 +106,7 @@ function AlertsView({ ctx, t, onDrill }) {
       h('div', { className: 'sf-stack' },
         h('div', { className: 'sf-row' }, h(SeverityBadge, { severity: detail.severity, t }), h(Pill, { tone: 'muted' }, alertTypeLabel(detail.alertType, t) ?? '—'), h('span', { className: 'sf-note' }, `${shortDate(detail.firstSeenAt) ?? '—'} → ${shortDate(detail.lastSeenAt) ?? '—'}`)),
         h('p', { className: 'sf-note' }, detail.detail ?? detail.title ?? ''),
-        detail.evidence && Object.keys(detail.evidence).length ? h('div', null, h('strong', null, t('evidence')), h('div', { className: 'sf-evidence' }, ...Object.entries(detail.evidence).map(([key, value]) =>
-          h('div', { key, className: 'sf-evidence-item' }, h('small', null, key), h('strong', null, typeof value === 'object' ? JSON.stringify(value) : String(value ?? '—')))))) : null,
+        detail.evidence && Object.keys(detail.evidence).length ? h('div', null, h('strong', null, t('evidence')), h(FinanceEvidence, { value: detail.evidence })) : null,
         h('div', { className: 'sf-row' }, h(PrimaryButton, { onClick: () => { const [tab, params] = drillTarget(detail.alertType); setDetail(null); onDrill(tab, params) } }, t('viewSource'))))) : null,
   )
 }
