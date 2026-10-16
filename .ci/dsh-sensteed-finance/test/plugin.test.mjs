@@ -230,6 +230,30 @@ test('search drafts and Escape preserve the committed department; explicit selec
   assert.equal(input().props.value, '')
 })
 
+test('entry picker matches web: button opens search, Escape preserves selection and choosing closes it', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8')
+  const changes = []
+  const harness = clientHarness(source, 'SearchSelect')
+  const props = { buttonTrigger: true, name: 'costItemId', value: 'travel', placeholder: '费用科目', options: [['travel', '差旅费'], ['office', '办公费']], onChange: value => changes.push(value) }
+  let tree = harness.render(props)
+  const trigger = () => clientNodes(tree).find(node => node.props.className === 'sf-search-trigger')
+  const search = () => clientNodes(tree).find(node => node.props.type === 'search')
+  assert.equal(trigger().props['aria-expanded'], false)
+  assert.ok(clientNodes(tree).some(node => node.children.includes('差旅费')))
+  trigger().props.onClick(); tree = harness.render(props)
+  search().props.onChange({ target: { value: '办公' } }); tree = harness.render(props)
+  tree.props.onKeyDown({ key: 'Escape', preventDefault() {}, stopPropagation() {} }); tree = harness.render(props)
+  assert.equal(trigger().props['aria-expanded'], false)
+  assert.deepEqual(changes, [])
+  assert.equal(clientNodes(tree).find(node => node.props.type === 'hidden').props.value, 'travel')
+  trigger().props.onClick(); tree = harness.render(props)
+  assert.equal(search().props.value, '')
+  clientNodes(tree).find(node => node.props.role === 'option' && node.props.key === 'office').props.onClick()
+  tree = harness.render(props)
+  assert.deepEqual(changes, ['office'])
+  assert.equal(trigger().props['aria-expanded'], false)
+})
+
 test('custom search requires confirmation and form reset clears both visible and submitted values', async () => {
   const source = await readFile(new URL('src/components.js', root), 'utf8')
   let reset
@@ -571,7 +595,7 @@ async function budgetEntryHarness(overrides = {}) {
     post: async (path, body) => { writes.push({ path, body }); if (overrides.post) await overrides.post(path, body) },
   })
   const render = () => harness.render(props)
-  const settle = async () => { harness.flushEffects(); await new Promise(resolve => setImmediate(resolve)); return render() }
+  const settle = async () => { render(); harness.flushEffects(); await new Promise(resolve => setImmediate(resolve)); return render() }
   const switchKind = kind => { clientNodes(render()).find(node => node.type?.name === 'PillTabs').props.onChange(kind); return render() }
   const submit = () => render().props.onSubmit({ currentTarget: formElement, preventDefault() {} })
   render(); await settle(); switchKind('budget'); await settle()
@@ -586,7 +610,7 @@ test('budget entry uses active master-data IDs instead of payment history or cus
   assert.equal(picker.type.name, 'SearchSelect')
   assert.deepEqual(picker.props.options, [['travel', '差旅费']])
   assert.ok(!picker.props.allowCustom)
-  assert.equal(picker.props.required, true)
+  assert.ok(!picker.props.required)
   assert.deepEqual(nodes.find(node => node.props.name === 'orgId').props.options, [['org-1', '有谦']])
   assert.equal(nodes.find(node => node.props.name === 'year').props.value, '2026')
   await harness.submit()
@@ -594,8 +618,8 @@ test('budget entry uses active master-data IDs instead of payment history or cus
   assert.equal(harness.resetCount, 1)
 })
 
-test('budget preflight blocks empty, failed and inactive catalogs and unpublished or missing years', async () => {
-  for (const failure of ['empty-costs', 'inactive-costs', 'cost-error', 'version-error', 'no-primary', 'draft']) {
+test('budget preflight blocks unpublished or missing years', async () => {
+  for (const failure of ['version-error', 'no-primary', 'draft']) {
     const harness = await budgetEntryHarness({ api: async path => {
       if ((failure === 'cost-error' && path === '/cost-items') || (failure === 'version-error' && path.startsWith('/budget-versions'))) throw new Error('offline')
       return { data: { list: path === '/cost-items'
@@ -610,7 +634,7 @@ test('budget preflight blocks empty, failed and inactive catalogs and unpublishe
 })
 
 test('budget rejects unknown cost IDs and invalid amounts without losing input', async () => {
-  for (const values of [{ costItemId: 'unknown' }, { costItemId: '' }, { budgetAmount: 'NaN' }, { budgetAmount: '' }, { budgetAmount: '-1' }, { budgetAmount: '0' }, { month: '13' }]) {
+  for (const values of [{ costItemId: 'unknown' }, { budgetAmount: 'NaN' }, { budgetAmount: '' }, { budgetAmount: '-1' }, { budgetAmount: '0' }, { month: '13' }]) {
     const harness = await budgetEntryHarness({ values })
     await harness.submit()
     assert.equal(harness.writes.length, 0)
@@ -1587,4 +1611,136 @@ test('department roles cannot see direct financial entry while finance staff can
     const tree = harness.render({ ctx: { year: 2026, orgs: [], departments: [], financeWriter }, t: key => key })
     assert.equal(clientNodes(tree).some(node => node.type?.name === 'EntryPanel'), financeWriter)
   }
+})
+
+
+test('empty custom fields explain creation and keep unconfirmed text visible and invalid after blur', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8')
+  for (const required of [false, true]) {
+    let validity = ''
+    const harness = clientHarness(source, 'SearchSelect')
+    const props = { name: 'itemNameChoice', placeholder: '收入项目', allowCustom: true, preserveDraft: true, required, options: [] }
+    let tree = harness.render(props)
+    const inputElement = { focus() {}, setCustomValidity: value => { validity = value } }
+    clientNodes(tree).find(node => node.props.role === 'combobox').props.ref.current = inputElement
+    harness.flushEffects()
+    clientNodes(tree).find(node => node.props.role === 'combobox').props.onFocus()
+    tree = harness.render(props)
+    assert.ok(clientNodes(tree).some(node => node.type === 'p' && node.children.some(text => typeof text === 'string' && /输入.*新增/.test(text))))
+    clientNodes(tree).find(node => node.props.role === 'combobox').props.onChange({ target: { value: '  新收入项目  ' } })
+    tree = harness.render(props)
+    tree.props.onBlur({ currentTarget: { contains: () => false }, relatedTarget: null })
+    tree = harness.render(props)
+    harness.flushEffects()
+    assert.equal(clientNodes(tree).find(node => node.props.role === 'combobox').props.value, '  新收入项目  ')
+    assert.equal(clientNodes(tree).find(node => node.props.name === 'itemNameChoice').props.value, '')
+    assert.match(validity, /确认/)
+    clientNodes(tree).find(node => node.props.role === 'combobox').props.onFocus()
+    tree = harness.render(props)
+    tree.props.onKeyDown({ key: 'Enter', target: inputElement, preventDefault() {} })
+    tree = harness.render(props)
+    harness.flushEffects()
+    assert.equal(clientNodes(tree).find(node => node.props.name === 'itemNameChoice').props.value, '新收入项目')
+    assert.equal(validity, '')
+  }
+})
+
+test('budget can omit an optional cost category when the catalog is empty or unavailable', async () => {
+  for (const failure of ['empty', 'inactive', 'offline']) {
+    const harness = await budgetEntryHarness({ values: { costItemId: '' }, api: async path => {
+      if (path === '/cost-items' && failure === 'offline') throw new Error('offline')
+      return { data: { list: path === '/cost-items' ? failure === 'inactive' ? [{ id: 'old', active: false }] : [] : path.startsWith('/budget-versions') ? [{ year: 2026, isPrimary: true }] : [] } }
+    } })
+    assert.equal(clientNodes(harness.render()).find(node => node.type?.name === 'PrimaryButton').props.disabled, false)
+    await harness.submit()
+    assert.equal(harness.writes.length, 1)
+    assert.equal(Object.hasOwn(harness.writes[0].body, 'costItemId'), false)
+  }
+})
+
+test('cold-start revenue accepts confirmed custom values and refreshes history only after saving', async () => {
+  let fail = true
+  const harness = await budgetEntryHarness({ values: { itemNameChoice: '新项目', payerNameChoice: '新付款方', incomeTypeNameChoice: '销售收入', plannedAmount: '50000', month: '6' }, post: async () => { if (fail) throw new Error('保存失败') } })
+  harness.switchKind('revenue')
+  const before = harness.reads.filter(path => path.startsWith('/revenue-plans')).length
+  await harness.submit()
+  assert.equal(harness.resetCount, 0)
+  fail = false
+  await harness.submit()
+  assert.deepEqual(harness.writes[1], { path: '/revenue-plans', body: { orgId: 'org-1', year: 2026, itemName: '新项目', plannedAmount: 50000, month: 6, payerName: '新付款方', incomeTypeName: '销售收入' } })
+  await harness.settle()
+  assert.ok(harness.reads.filter(path => path.startsWith('/revenue-plans')).length > before)
+})
+
+test('empty backfill offers creation for the selected plan type', async () => {
+  const harness = await budgetEntryHarness()
+  harness.switchKind('backfill')
+  const type = clientNodes(harness.render()).find(node => node.type?.name === 'Select' && node.props.value === 'payment')
+  type.props.onChange('revenue')
+  const create = clientNodes(harness.render()).find(node => node.type?.name === 'LinkButton' && node.children.includes('createRevenuePlan'))
+  assert.ok(create)
+  create.props.onClick()
+  assert.equal(clientNodes(harness.render()).find(node => node.type?.name === 'PillTabs').props.value, 'revenue')
+})
+
+test('direct-entry amounts render business labels rather than unresolved translation keys', async () => {
+  const head = await readFile(new URL('src/head.js', root), 'utf8')
+  const dictionary = head.slice(head.indexOf('const copy ='), head.indexOf('\n// ---- 打开/关闭状态'))
+  const copy = new Function(dictionary + '\nreturn copy')()
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8')
+  for (const [locale, expected] of [['zh', '计划金额（元）'], ['en', 'Planned amount（CNY）']]) {
+    const harness = clientHarness(source, 'EntryPanel')
+    const props = { year: 2026, orgs: [], departments: [], t: key => copy[locale][key] ?? key }
+    for (const kind of ['payment', 'revenue']) {
+      clientNodes(harness.render(props)).find(node => node.type?.name === 'PillTabs').props.onChange(kind)
+      assert.ok(clientNodes(harness.render(props)).some(node => node.type?.name === 'FormRow' && node.props.label === expected))
+    }
+  }
+})
+
+test('cash plan columns translate actual, remaining and variance amounts', async () => {
+  const head = await readFile(new URL('src/head.js', root), 'utf8')
+  const copy = new Function(head.slice(head.indexOf('const copy ='), head.indexOf('\n// ---- 打开/关闭状态')) + '\nreturn copy')()
+  const source = (await Promise.all(['src/components.js', 'src/format.js', 'src/views/cash.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  for (const [component, props, expected] of [
+    ['PlansTab', { rows: [], page: 1 }, ['计划金额', '实际金额', '剩余金额']],
+    ['RevenueTab', { revenues: { list: [] }, page: 1 }, ['计划金额', '实际金额', '差额']],
+  ]) {
+    const harness = clientHarness(source, component, { PAGE_SIZE: 20 })
+    const tree = harness.render({ ...props, t: key => copy.zh[key] ?? key, onPage() {} })
+    const table = clientNodes(tree).find(node => node.type?.name === 'Table')
+    for (const label of expected) assert.ok(table.props.columns.some(column => column.label === label), component + ': ' + label)
+  }
+})
+
+test('button custom picker exposes pending drafts to the form until explicitly confirmed', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8')
+  const harness = clientHarness(source, 'SearchSelect')
+  const props = { name: 'payerNameChoice', buttonTrigger: true, allowCustom: true, preserveDraft: true, options: [], placeholder: '付款方' }
+  let tree = harness.render(props)
+  clientNodes(tree).find(node => node.props.className === 'sf-search-trigger').props.onClick()
+  tree = harness.render(props)
+  clientNodes(tree).find(node => node.props.type === 'search').props.onChange({ target: { value: ' 新付款方 ' } })
+  tree = harness.render(props)
+  tree.props.onBlur({ currentTarget: { contains: () => false }, relatedTarget: null })
+  tree = harness.render(props)
+  assert.equal(clientNodes(tree).find(node => node.props.name === 'payerNameChoiceDraft')?.props.value, '新付款方')
+  assert.ok(clientNodes(tree).find(node => node.props.className === 'sf-search-trigger').children.some(node => node.children?.includes('新付款方')))
+  clientNodes(tree).find(node => node.props.className === 'sf-search-trigger').props.onClick()
+  tree = harness.render(props)
+  clientNodes(tree).find(node => node.props.role === 'option').props.onClick()
+  tree = harness.render(props)
+  assert.equal(clientNodes(tree).find(node => node.props.name === 'payerNameChoiceDraft').props.value, '')
+  assert.equal(clientNodes(tree).find(node => node.props.name === 'payerNameChoice').props.value, '新付款方')
+})
+
+test('entry blocks unconfirmed text and clears the warning once a value is confirmed', async () => {
+  const harness = await budgetEntryHarness({ values: { itemNameChoice: '收入', payerNameChoiceDraft: '未确认付款方', plannedAmount: '100' } })
+  harness.switchKind('revenue')
+  await harness.submit()
+  assert.equal(harness.writes.length, 0)
+  assert.equal(harness.resetCount, 0)
+  const field = clientNodes(harness.render()).find(node => node.type?.name === 'CustomizableTextSelect' && node.props.name === 'payerName')
+  field.props.onChange('未确认付款方')
+  assert.equal(clientNodes(harness.render()).some(node => node.type?.name === 'Notice'), false)
 })

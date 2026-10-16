@@ -468,6 +468,7 @@ function EntryPanel({ year, orgs, departments, t, onSaved }) {
   const [versionError, setVersionError] = useState(false)
   const [retry, setRetry] = useState(0)
   const savingRef = useRef(false)
+  const [formRevision, setFormRevision] = useState(0)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState(null)
   const [history, setHistory] = useState({ paymentPlans: [], revenuePlans: [], payees: [], costItems: [], items: [], payers: [], incomeTypes: [] })
@@ -509,7 +510,7 @@ function EntryPanel({ year, orgs, departments, t, onSaved }) {
   }, [entryYear, retry])
 
   useEffect(() => {
-    if (kind !== 'budget') return
+    if (kind !== 'budget' && kind !== 'payment') return
     let cancelled = false
     setCostItems(null); setCostError(false)
     api('/cost-items').then(value => {
@@ -529,7 +530,7 @@ function EntryPanel({ year, orgs, departments, t, onSaved }) {
   }, [kind, entryYear, retry])
 
   const primaryVersion = versions?.find(version => version.isPrimary && Number(version.year) === Number(entryYear))
-  const budgetReady = !costError && Boolean(costItems?.length) && !versionError && Boolean(primaryVersion)
+  const budgetReady = !versionError && Boolean(primaryVersion)
   const backfillPlans = backfillKind === 'payment' ? history.paymentPlans : history.revenuePlans
   const backfillReady = historyLoaded && history.year === entryYear && !historyError[backfillKind] && Boolean(backfillPlans.length)
 
@@ -541,6 +542,13 @@ function EntryPanel({ year, orgs, departments, t, onSaved }) {
     const num = key => Number(form.get(key))
     const text = key => { const value = String(form.get(key) || '').trim(); return value || undefined }
     const textChoice = key => text(key + 'Choice')
+    const customFields = kind === 'payment' ? ['payeeName', 'costItemName'] : kind === 'revenue' ? ['itemName', 'payerName', 'incomeTypeName'] : []
+    const pendingField = customFields.find(key => text(key + 'ChoiceDraft'))
+    if (pendingField) {
+      setNotice(t('entryCustomPending'))
+      formElement.querySelector?.(`[data-finance-pending="${pendingField}Choice"]`)?.click()
+      return
+    }
     const amountKey = kind === 'budget' ? 'budgetAmount' : kind === 'backfill' ? 'actualAmount' : 'plannedAmount'
     const amount = num(amountKey)
     const monthKey = kind === 'payment' ? 'planMonth' : 'month'
@@ -549,8 +557,9 @@ function EntryPanel({ year, orgs, departments, t, onSaved }) {
       (kind !== 'backfill' && (!orgOptions.some(([id]) => id === text('orgId')) || num('year') !== Number(entryYear) || num('year') < 2000 || num('year') > 2100 || !Number.isInteger(num('year')) || !validMonth))) {
       setNotice(t('entryInvalid')); return
     }
+    if (kind === 'revenue' && !textChoice('itemName')) { setNotice(t('entryIncomeRequired')); return }
     if (kind === 'budget' && !budgetReady) { setNotice(t('versionMissing')); return }
-    if (kind === 'budget' && !costItems.some(item => item.id === text('costItemId'))) { setNotice(t('costRequired')); return }
+    if (kind === 'budget' && text('costItemId') && (costError || !costItems?.some(item => item.id === text('costItemId')))) { setNotice(t('costRequired')); return }
     if (kind === 'backfill' && (!backfillReady || !backfillPlans.some(([id]) => id === text('planId')))) { setNotice(t('selectPlan')); return }
     savingRef.current = true
     setBusy(true); setNotice(null)
@@ -564,6 +573,8 @@ function EntryPanel({ year, orgs, departments, t, onSaved }) {
         payload.planMonth = num('planMonth')
         if (textChoice('payeeName')) payload.payeeName = textChoice('payeeName')
         if (textChoice('costItemName')) payload.costItemName = textChoice('costItemName')
+        if (text('departmentId')) payload.departmentId = text('departmentId')
+        if (text('expenseType')) payload.expenseType = text('expenseType')
       } else if (kind === 'revenue') {
         path = '/revenue-plans'
         payload = { orgId: text('orgId'), year: num('year'), itemName: textChoice('itemName'), plannedAmount: num('plannedAmount') }
@@ -575,7 +586,7 @@ function EntryPanel({ year, orgs, departments, t, onSaved }) {
         payload = { orgId: text('orgId'), year: num('year'), expenseType: text('expenseType'), budgetAmount: num('budgetAmount') }
         if (text('month')) payload.month = num('month')
         if (text('departmentId')) payload.departmentId = text('departmentId')
-        payload.costItemId = text('costItemId')
+        if (text('costItemId')) payload.costItemId = text('costItemId')
         if (text('note')) payload.note = text('note')
       } else {
         path = `/${backfillKind === 'payment' ? 'payment-plans' : 'revenue-plans'}/${text('planId')}/actuals`
@@ -583,59 +594,69 @@ function EntryPanel({ year, orgs, departments, t, onSaved }) {
         if (text('actualPaidAt')) payload.actualPaidAt = new Date(`${text('actualPaidAt')}T00:00:00`).toISOString()
       }
       await post(path, payload)
-      setNotice(t('submitted'))
+      setNotice(t(kind === 'backfill' ? 'entryActualsSaved' : kind === 'budget' ? 'entryBudgetSaved' : kind === 'payment' ? 'entryPaymentSaved' : 'entryRevenueSaved'))
       formElement.reset()
+      setFormRevision(value => value + 1)
+      setRetry(value => value + 1)
       onSaved?.()
     } catch (error) { setNotice(`${t('opFailed')}: ${error.message}`) } finally { savingRef.current = false; setBusy(false) }
   }
 
-  return h('form', { className: 'sf-card', key: kind, onSubmit: submit },
+  return h('form', { className: 'sf-card', key: `${kind}-${formRevision}`, onSubmit: submit },
     h('div', { className: 'sf-card-head' }, h('h2', null, t('entryTitle')), h('span', { className: 'sf-card-unit' }, t('unitYuan'))),
     h('div', { className: 'sf-card-body' }, h('div', { className: 'sf-stack' },
       h('p', { className: 'sf-note' }, t('entryHint')),
       h('fieldset', { className: 'sf-fieldset sf-stack', disabled: busy, 'aria-busy': busy },
       h(PillTabs, { tabs: [['payment', 'entryPaymentPlan'], ['revenue', 'entryRevenuePlan'], ['budget', 'entryBudgetLine'], ['backfill', 'entryBackfill']], value: kind, onChange: value => { setKind(value); setNotice(null) }, t }),
-      h('div', { className: 'sf-form' },
+      h('div', { className: 'sf-form sf-entry-form' },
         kind !== 'backfill' ? [
-          h(FormRow, { key: 'org', label: t('org') }, h(SearchSelect, { name: 'orgId', required: true, options: orgOptions, placeholder: t('org') })),
+          h(FormRow, { key: 'org', label: t('org') }, h(SearchSelect, { buttonTrigger: true, name: 'orgId', required: true, disabled: !orgOptions.length, options: orgOptions, placeholder: t('org') })),
+          !orgOptions.length ? h('p', { key: 'org-empty', className: 'sf-note', role: 'status' }, t('entryOrgEmpty')) : null,
           h(FormRow, { key: 'year', label: t('year') }, h(Select, { name: 'year', value: entryYear, onChange: value => { setEntryYear(value); setNotice(null) }, required: true, options: years, placeholder: t('year') })),
         ] : [
           h(FormRow, { key: 'backfill-year', label: t('year') }, h(Select, { value: entryYear, onChange: setEntryYear, options: years })),
           h(FormRow, { key: 'backfill-kind', label: t('backfillKind') }, h(Select, { value: backfillKind, onChange: setBackfillKind, options: [['payment', t('entryPaymentPlan')], ['revenue', t('entryRevenuePlan')]] })),
-          h(FormRow, { key: 'plan', label: t('selectPlan') }, h(SearchSelect, { key: `${backfillKind}-${entryYear}`, name: 'planId', required: true, disabled: !backfillReady, options: backfillPlans, placeholder: t('selectPlan') })),
+          h(FormRow, { key: 'plan', label: t('selectPlan') }, h(SearchSelect, { buttonTrigger: true, key: `${backfillKind}-${entryYear}`, name: 'planId', required: true, disabled: !backfillReady, options: backfillPlans, placeholder: t('selectPlan') })),
           historyError[backfillKind] ? h('div', { key: 'plan-error', role: 'alert' }, `${t('opFailed')}: ${t('selectPlan')}`, h(LinkButton, { onClick: () => setRetry(value => value + 1) }, t('retry'))) : null,
-          historyLoaded && !backfillPlans.length ? h('p', { key: 'plan-empty', className: 'sf-note' }, `${t('empty')} · ${t(backfillKind === 'payment' ? 'entryPaymentPlan' : 'entryRevenuePlan')}`) : null,
+          historyLoaded && history.year === entryYear && !historyError[backfillKind] && !backfillPlans.length ? h('div', { key: 'plan-empty', className: 'sf-stack' },
+            h('p', { className: 'sf-note' }, t('backfillEmpty')),
+            h(LinkButton, { onClick: () => { setKind(backfillKind); setNotice(null) } }, t(backfillKind === 'payment' ? 'createPaymentPlan' : 'createRevenuePlan'))) : null,
         ],
         kind === 'payment' ? [
           h(FormRow, { key: 'pt', label: t('planType') }, h(Select, { name: 'planType', required: true, options: PLAN_TYPES.map(([id, label]) => [id, t(label)]) })),
           h(FormRow, { key: 'pd', label: t('description') }, h(Field, { name: 'description', required: true, maxLength: 500 })),
           h(FormRow, { key: 'pm', label: `${t('planMonth')} *` }, h(Select, { name: 'planMonth', required: true, options: months, placeholder: t('planMonth') })),
-          h(FormRow, { key: 'py', label: t('payee') }, h(CustomizableTextSelect, { name: 'payeeName', options: history.payees, placeholder: t('payee') })),
-          h(FormRow, { key: 'pc', label: t('costItem') }, h(CustomizableTextSelect, { name: 'costItemName', options: history.costItems, placeholder: t('costItem') })),
+          h(FormRow, { key: 'py', label: t('payee') }, h(CustomizableTextSelect, { buttonTrigger: true, onChange: () => setNotice(null), name: 'payeeName', options: history.payees, placeholder: t('payee') })),
+          h(FormRow, { key: 'pc', label: t('costItem') }, h(CustomizableTextSelect, { buttonTrigger: true, onChange: () => setNotice(null), name: 'costItemName', options: [...new Set([...(costItems || []).map(item => item.name), ...history.costItems])], placeholder: t('costItem'), maxLength: 100 })),
+          h(FormRow, { key: 'pdept', label: t('department') }, h(SearchSelect, { buttonTrigger: true, name: 'departmentId', options: departmentOptions, placeholder: t('department') })),
+          h(FormRow, { key: 'pexpense', label: t('expenseType') }, h(Select, { name: 'expenseType', options: [['', t('entryOptional')], ...EXPENSE_TYPES.map(([id, label]) => [id, t(label)])] })),
           h(FormRow, { key: 'pa', label: `${t('planned')}（${t('unitYuan')}）` }, h(Field, { name: 'plannedAmount', type: 'number', min: 0.01, step: '0.01', required: true })),
         ] : kind === 'revenue' ? [
-          h(FormRow, { key: 'ri', label: t('itemName') }, h(CustomizableTextSelect, { name: 'itemName', options: history.items, placeholder: t('itemName'), required: true })),
-          h(FormRow, { key: 'rm', label: t('month') }, h(Select, { name: 'month', options: months, placeholder: t('month') })),
-          h(FormRow, { key: 'rp', label: t('payer') }, h(CustomizableTextSelect, { name: 'payerName', options: history.payers, placeholder: t('payer') })),
-          h(FormRow, { key: 'rt', label: t('incomeType') }, h(CustomizableTextSelect, { name: 'incomeTypeName', options: history.incomeTypes, placeholder: t('incomeType') })),
+          h(FormRow, { key: 'ri', label: t('itemName') }, h(CustomizableTextSelect, { buttonTrigger: true, onChange: () => setNotice(null), name: 'itemName', options: history.items, placeholder: t('itemName'), required: true })),
+          h(FormRow, { key: 'rm', label: t('month') }, h(Select, { name: 'month', options: [['', t('entryAnnual')], ...months], placeholder: t('month') })),
+          h(FormRow, { key: 'rp', label: t('payer') }, h(CustomizableTextSelect, { buttonTrigger: true, onChange: () => setNotice(null), name: 'payerName', options: history.payers, placeholder: t('payer') })),
+          h(FormRow, { key: 'rt', label: t('incomeType') }, h(CustomizableTextSelect, { buttonTrigger: true, onChange: () => setNotice(null), name: 'incomeTypeName', options: history.incomeTypes, placeholder: t('incomeType'), maxLength: 100 })),
           h(FormRow, { key: 'ra', label: `${t('planned')}（${t('unitYuan')}）` }, h(Field, { name: 'plannedAmount', type: 'number', min: 0.01, step: '0.01', required: true })),
         ] : kind === 'budget' ? [
           h(FormRow, { key: 'be', label: t('expenseType') }, h(Select, { name: 'expenseType', required: true, options: EXPENSE_TYPES.map(([id, label]) => [id, t(label)]) })),
-          h(FormRow, { key: 'bm', label: t('month') }, h(Select, { name: 'month', options: months, placeholder: t('month') })),
-          h(FormRow, { key: 'bd', label: t('department') }, h(SearchSelect, { name: 'departmentId', options: departmentOptions, placeholder: t('department') })),
-          h(FormRow, { key: 'bc', label: t('costItem') }, h(SearchSelect, { name: 'costItemId', required: true, disabled: costError || !costItems?.length, options: (costItems || []).map(item => [item.id, item.name]), placeholder: t('costItem') })),
-          h('div', { key: 'budget-check', className: 'sf-stack', role: 'status' },
+          h(FormRow, { key: 'bm', label: t('month') }, h(Select, { name: 'month', options: [['', t('entryAnnual')], ...months], placeholder: t('month') })),
+          h(FormRow, { key: 'bd', label: t('department') }, h(SearchSelect, { buttonTrigger: true, name: 'departmentId', options: departmentOptions, placeholder: t('department') })),
+          h(FormRow, { key: 'bc', label: t('costItem') }, h(SearchSelect, { buttonTrigger: true, name: 'costItemId', disabled: costError || !costItems?.length, options: (costItems || []).map(item => [item.id, item.name]), placeholder: t('costItem') })),
+          h('div', { key: 'budget-check', className: 'sf-stack sf-entry-wide', role: 'status' },
             h('p', { className: 'sf-note' }, t('budgetEntryHint')),
             h('p', { className: 'sf-note' }, versionError ? t('versionLoadFailed') : versions === null ? t('versionLoading') : !primaryVersion ? t('versionMissing') : budgetVersionLabel(primaryVersion)),
             costError || costItems === null || !costItems.length ? h('p', { className: 'sf-note' }, t(costError ? 'costLoadFailed' : costItems === null ? 'costLoading' : 'costEmpty')) : null,
             costError || versionError || (versions && !primaryVersion) || (costItems && !costItems.length) ? h(LinkButton, { onClick: () => setRetry(value => value + 1) }, t('retry')) : null),
           h(FormRow, { key: 'ba', label: `${t('budgetEntryAmount')}（${t('unitYuan')}）` }, h(Field, { name: 'budgetAmount', type: 'number', min: 0.01, step: '0.01', required: true })),
-          h(FormRow, { key: 'bn', label: t('note') }, h(Field, { name: 'note', maxLength: 500 })),
+          h(FormRow, { key: 'bn', wide: true, label: t('note') }, h(Field, { name: 'note', maxLength: 500 })),
         ] : [
           h(FormRow, { key: 'aa', label: t('actualAmountL') }, h(Field, { name: 'actualAmount', type: 'number', min: 0, step: '0.01', required: true })),
           h(FormRow, { key: 'ad', label: t('actualDateL') }, h(Field, { name: 'actualPaidAt', type: 'date' })),
         ],
-        h('div', { className: 'sf-form-actions' },
-          h(PrimaryButton, { type: 'submit', busy, disabled: (kind === 'budget' && !budgetReady) || (kind === 'backfill' && !backfillReady) }, busy ? t('running') : t('submit')),
+        ['payment', 'revenue'].includes(kind) && historyError[kind] ? h('div', { role: 'status', className: 'sf-stack' },
+          h('p', { className: 'sf-note' }, t('entryHistoryFailed')),
+          h(LinkButton, { onClick: () => setRetry(value => value + 1) }, t('retry'))) : null,
+        h('div', { className: 'sf-form-actions sf-entry-wide' },
+          h(PrimaryButton, { type: 'submit', busy, disabled: (kind !== 'backfill' && !orgOptions.length) || (kind === 'budget' && !budgetReady) || (kind === 'backfill' && !backfillReady) }, busy ? t('running') : t(kind === 'backfill' ? 'entryBackfillAction' : 'entrySaveAction')),
           notice ? h('div', { role: 'status', 'aria-live': 'polite' }, h(Notice, null, notice)) : null))))))
 }

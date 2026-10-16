@@ -74,11 +74,17 @@ const copy = {
   zh: {
     expenseProject: '项目运营成本', expenseFixed: '固定运营成本', expenseModel: '车型专属成本', expenseNonProject: '非项目类',
     planPurchase: '采购付款', planOther: '其他类付款', planNewRetail: '新零售', planPrPayment: 'PR 付款', planDirectParts: '直采零部件',
+    entrySaveAction: '保存并生效（财务代录）', entryBackfillAction: '回填并自动计算', entryAnnual: '年度（不分月）', entryOptional: '可不选', entryIncomeRequired: '请选择收入项目，或确认本次自定义值。', entryPaymentSaved: '付款计划已入库', entryRevenueSaved: '收入计划已入库', entryBudgetSaved: '预算行已入库', entryActualsSaved: '实际数已回填，差额/剩余/状态已自动更新',
     budgetEntryAmount: '本行预算金额', budgetEntryHint: '预算行直接计入所选年度已发布主版本；新年度预算请先完成编制与发布。',
-    costLoading: '正在加载费用科目…', costLoadFailed: '费用科目加载失败，请重试。', costEmpty: '暂无启用费用科目，请联系财务负责人维护科目主数据。', costRequired: '请从费用科目目录选择有效科目。',
+    costLoading: '正在加载费用科目…', costLoadFailed: '费用科目加载失败，可留空录入或重试。', costEmpty: '暂无启用费用科目，可留空录入；需要分类时请联系财务负责人维护科目主数据。', costRequired: '请从费用科目目录选择有效科目。',
     versionLoading: '正在检查年度预算主版本…', versionLoadFailed: '预算版本检查失败，请重试。', versionMissing: '该年度暂无已发布预算主版本，请先完成预算编制并发布，或选择已有主版本的年度。',
     entryInvalid: '请核对主体、年度、月份及金额。', entryFinanceOnly: '直接录入仅对财务岗位开放，部门请通过填报任务提交。',
-    backfillKind: '回填类型',
+    backfillKind: '回填类型', planned: '计划金额', actual: '实际金额', remaining: '剩余金额', variance: '差额', all: '全部',
+    entryCustomPending: '请先确认已输入的自定义值：选择匹配项，或点击“使用本次自定义值”。',
+    entryOrgEmpty: '暂无可用主体，请先同步组织目录或联系财务负责人配置主体。',
+    entryHistoryFailed: '历史选项加载失败，仍可输入并确认本次自定义值。',
+    backfillEmpty: '当前年度暂无可回填计划，请先创建付款计划或收入计划。',
+    createPaymentPlan: '创建付款计划', createRevenuePlan: '创建收入计划',
 
     tabEngine: '预算编制', tabComparisons: '预算比较', tabReview: '复核中心', tabSources: '来源记录', tabFacts: '已发布事实', tabNotifications: '通知中心', tabPermissions: '权限中心', descEngine: '业务假设、销量输入、预算计算与滚动预测', descComparisons: '月结滚动、跨年与版本明细比较', descReview: '填报、事实批次与调整单集中复核', descSources: '来源暂存明细与财务归类追溯', descFacts: '审核发布口径与草稿分列', descNotifications: '待我处理、与我相关与系统通知', descPermissions: '生效权限、数据范围与授权管理',
     bomStatus: '状态', tabBom: '成本 BOM', descBom: '按成本包查看物料明细、估算与成本汇总', bomPackages: '成本包', bomVersion: '版本', bomModel: '车型 / 项目', bomTarget: '目标成本', bomTotal: '估算总成本', bomPart: '零件号', bomName: '物料名称', bomQty: '数量', bomLevel: '层级', bomUnit: '单位成本', bomExtended: '展开成本', bomSelect: '请选择成本包查看物料明细', bomScope: '成本包按项目与版本管理，不受年度和主体筛选影响。', bomDetail: '物料明细', bomRollupError: '成本汇总加载失败，物料明细仍可查看。', bomNodeCount: '节点数', bomLeafCount: '叶子节点数', bomStatusDRAFT: '草稿', bomStatusIN_REVIEW: '评审中', bomStatusAPPROVED: '已审定', bomStatusOBSOLETE: '已作废',
@@ -121,7 +127,7 @@ const copy = {
     // 录入
     filingTasks: '任务管理（财务）', myFiling: '我的填报（部门）', createTask: '发起任务', taskTitle: '任务名称', taskType: '类型', typeBudget: '预算', typePlan: '排款', taskYear: '年度', taskMonth: '月份', taskDue: '截止时间', taskDepartments: '指派部门（可多选）', selectAll: '全选', taskInstructions: '填报说明', taskOwner: '负责人', taskReviewer: '财务审核人', taskAllowModify: '允许窗口内修改', taskFreezeMonth: '冻结当前自然月', taskStartDraft: '存为草稿（发布前部门不可见）', taskPublish: '创建并发布', taskProgress: '任务进度', closeTask: '关闭任务', taskClosed: '已关闭', departmentCol: '部门', progressCol: '进度', dueCol: '截止', assignmentTitle: '填报明细', rowsEditor: '行编辑（月份 / 说明 / 金额）', addRow: '加一行', saveDraft: '暂存草稿', submitFiling: '提交', commitFiling: '复核定稿', reopenFiling: '重开', reopenReason: '重开原因（必填，并入审计）', overdue: '已超期', assignee: '填报人',
     directory: '飞书通讯录', dirSync: '同步通讯录', dirSearch: '搜索姓名/手机/邮箱', mapUser: '绑定用户', systemUserId: '系统用户 ID', unmappedOnly: '只看未绑定', employmentRecords: '归属记录（调岗切分）', empCreate: '登记归属', empUser: '系统用户', empDept: '归属部门', empStart: '起始日期', membersTitle: '成员与角色', role: '角色', roleNameDEPT_FILLER: '部门填报人', roleNameDEPT_LEADER: '部门负责人', roleNameDEPT_COLLABORATOR: '信息协同人', roleNameBOSS: '老板', roleNameFINANCE_STAFF: '财务专员', roleNameFINANCE_OWNER: '财务负责人', roleNameMANAGEMENT: '管理层', removeMember: '移除', memberUser: '用户', memberDept: '部门', enabledCol: '启用',
-    entryTitle: '财务数据录入', entryPaymentPlan: '付款计划', entryRevenuePlan: '收入计划', entryBudgetLine: '预算行', entryBackfill: '回填实际', description: '付款描述', planType: '计划类型', note: '备注', itemName: '收入项目', payer: '付款方', incomeType: '收入类型', recordType: 'PR 类型', prSubmittedL: '已打 PR', prEstimatedL: '预计 PR', selectPlan: '选择计划', actualAmountL: '实际金额（元）', actualDateL: '实际日期（可空）', entryHint: '录入直接写入财务数据中心；提交前请核对金额与期间。提交后建议在预警页触发一次规则引擎。', entryRules: '录入规则', entryRulesList: '金额一律为元；排款月份必填；预算行挂当年主版本；回填实际自动重算差额与剩余。', preCheck: '录入前检查', preCheckOk: '数据质量正常，可以录入', preCheckBad: '存在未分配主体记录 {n} 条，建议先完成分配再录入',
+    entryTitle: '财务数据录入', entryPaymentPlan: '付款计划', entryRevenuePlan: '收入计划', entryBudgetLine: '预算行', entryBackfill: '回填实际', description: '付款描述', planType: '付款类型', note: '备注', itemName: '收入项目', payer: '付款方', incomeType: '收入类型', recordType: 'PR 类型', prSubmittedL: '已打 PR', prEstimatedL: '预计 PR', selectPlan: '选择计划记录', actualAmountL: '实际金额（元）', actualDateL: '实际日期（可空）', entryHint: '单条数据直接写入财务数据中心；保存前请核对主体、年度、金额与期间。', entryRules: '录入规则', entryRulesList: '金额一律为元；排款月份必填；预算行挂当年主版本；回填实际自动重算差额与剩余。', preCheck: '录入前检查', preCheckOk: '数据质量正常，可以录入', preCheckBad: '存在未分配主体记录 {n} 条，建议先完成分配再录入',
     // 深度分析
     analysis_risk: '月度风险预判', analysis_risk_desc: '按预算超支/执行偏慢/资金缺口/数据质量四类输出风险清单，附影响金额与建议动作。',
     analysis_cost: '成本结构分析', analysis_cost_desc: '三类费用与主体维度拆解成本占比，识别集中度风险并预判下季度成本。',
@@ -139,11 +145,17 @@ const copy = {
   en: {
     expenseProject: 'Project operating costs', expenseFixed: 'Fixed operating costs', expenseModel: 'Model-specific costs', expenseNonProject: 'Non-project costs',
     planPurchase: 'Purchase payment', planOther: 'Other payment', planNewRetail: 'New retail payment', planPrPayment: 'PR payment', planDirectParts: 'Direct parts purchase',
+    entrySaveAction: 'Save and apply (finance entry)', entryBackfillAction: 'Backfill and calculate', entryAnnual: 'Annual (no month)', entryOptional: 'Optional', entryIncomeRequired: 'Select an income item or confirm a custom value.', entryPaymentSaved: 'Payment plan saved', entryRevenueSaved: 'Revenue plan saved', entryBudgetSaved: 'Budget line saved', entryActualsSaved: 'Actuals saved; variance, remaining and status recalculated',
     budgetEntryAmount: 'Budget amount for this line', budgetEntryHint: 'Budget lines write directly to the published primary version. Prepare and publish a budget before entering a new year.',
-    costLoading: 'Loading cost items…', costLoadFailed: 'Cost items failed to load. Please retry.', costEmpty: 'No active cost items. Ask the finance owner to maintain the catalog.', costRequired: 'Select a valid cost item from the catalog.',
+    costLoading: 'Loading cost items…', costLoadFailed: 'Cost items failed to load. Leave this optional field blank or retry.', costEmpty: 'No active cost items. Leave this optional field blank or ask the finance owner to maintain the catalog.', costRequired: 'Select a valid cost item from the catalog.',
     versionLoading: 'Checking the primary budget version…', versionLoadFailed: 'Could not check budget versions. Please retry.', versionMissing: 'No published primary budget exists for this year. Prepare and publish a budget first, or select another year.',
     entryInvalid: 'Check the organization, year, month and amount.', entryFinanceOnly: 'Direct entry is for finance roles. Departments should submit filing tasks.',
-    backfillKind: 'Backfill type',
+    backfillKind: 'Backfill type', planned: 'Planned amount', actual: 'Actual amount', remaining: 'Remaining amount', variance: 'Variance', all: 'All',
+    entryCustomPending: 'Confirm the entered text by selecting a match or choosing the custom value before saving.',
+    entryOrgEmpty: 'No organizations available. Sync the directory or ask the finance owner to configure one.',
+    entryHistoryFailed: 'History could not be loaded. You can still enter and confirm a custom value.',
+    backfillEmpty: 'No plans to backfill for this year. Create a payment or revenue plan first.',
+    createPaymentPlan: 'Create payment plan', createRevenuePlan: 'Create revenue plan',
 
     tabEngine: 'Budget planning', tabComparisons: 'Budget comparisons', tabReview: 'Review center', tabSources: 'Source records', tabFacts: 'Published facts', tabNotifications: 'Notifications', tabPermissions: 'Permissions', descEngine: 'Assumptions, sales inputs, calculation and rolling forecasts', descComparisons: 'Monthly, yearly and version comparisons', descReview: 'Review submissions, batches and adjustments', descSources: 'Source data and classification traceability', descFacts: 'Published facts and draft data shown separately', descNotifications: 'Action required, related and system messages', descPermissions: 'Effective permissions, scopes and grants',
     bomStatus: 'Status', tabBom: 'Cost BOM', descBom: 'Material details, estimates and cost rollups by cost package', bomPackages: 'Cost packages', bomVersion: 'Version', bomModel: 'Model / project', bomTarget: 'Target cost', bomTotal: 'Estimated total cost', bomPart: 'Part number', bomName: 'Material', bomQty: 'Quantity', bomLevel: 'Level', bomUnit: 'Unit cost', bomExtended: 'Extended cost', bomSelect: 'Select a cost package to view its materials', bomScope: 'Cost packages are scoped by project and version; year and organization filters do not apply.', bomDetail: 'Material details', bomRollupError: 'Cost rollup failed to load; material details remain available.', bomNodeCount: 'Nodes', bomLeafCount: 'Leaf nodes', bomStatusDRAFT: 'Draft', bomStatusIN_REVIEW: 'In review', bomStatusAPPROVED: 'Approved', bomStatusOBSOLETE: 'Obsolete',
