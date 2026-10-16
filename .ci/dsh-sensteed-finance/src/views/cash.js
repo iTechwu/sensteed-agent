@@ -1,5 +1,12 @@
 // 片段 5/7 视图：资金（四子视图：资金汇总/排款工作台/调增审批/收入计划；排款/调增/详情 Dialog）
 
+// 实付日期按财务业务时区展示，避免中国本地零点保存为 UTC 后退一天。
+function actualPaymentDate(value) {
+  if (!value) return null
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString('sv-SE', { timeZone: 'Asia/Shanghai' })
+}
+
 const PRIORITIES = [['HIGH', 'priHigh'], ['MEDIUM', 'priMid'], ['LOW', 'priLow']]
 
 function CashView({ ctx, t, onDrill }) {
@@ -75,6 +82,7 @@ function CashView({ ctx, t, onDrill }) {
     tab === 'adjustments' ? h(PlanAdjustmentsTab, { t, revision, reloadTick, busy, act, canWrite, canVerify, onDialog: setDialog }) : null,
     tab === 'revenue' ? h(RevenueTab, { revenues, page: revenuePage, onPage: setRevenuePage, t, canWrite, onBackfill: row => setDialog({ kind: 'backfill', row }) }) : null,
 
+    dialog?.kind === 'closeRemaining' && canWrite ? h(CloseRemainingDialog, { plan: dialog.plan, t, busy, onClose: () => setDialog(null), act }) : null,
     dialog?.kind === 'schedule' ? h(ScheduleDialog, { plan: dialog.plan, t, onClose: () => setDialog(null), act }) : null,
     dialog?.kind === 'increase' ? h(IncreaseDialog, { plan: dialog.plan, t, onClose: () => setDialog(null), act }) : null,
     dialog?.kind === 'planDetail' ? h(PlanDetailDialog, { plan: dialog.plan, t, onClose: () => setDialog(null) }) : null,
@@ -174,12 +182,15 @@ function PlansTab({ rows, total, page, onPage, t, busy, act, canWrite = true, on
         { label: t('planned'), key: 'plannedAmount', render: row => wan(row.plannedAmount) ?? '—', num: true },
         { label: t('actual'), key: 'actualAmount', render: row => { const over = finite(row.actualAmount) !== null && finite(row.plannedAmount) !== null && row.actualAmount > row.plannedAmount; return h('span', { className: over ? 'sf-neg' : '' }, wan(row.actualAmount) ?? '—') }, num: true },
         { label: t('remaining'), key: 'remainingAmount', render: row => wan(row.remainingAmount) ?? '—', num: true },
+        { label: t('actualPaidDate'), key: 'actualPaidAt', render: row => actualPaymentDate(row.actualPaidAt) ?? '—', num: true },
+        { label: t('statusCol'), key: 'status', render: row => financeDisplayValue(row.status, 'status') },
         { label: t('scheduleDate'), key: 'scheduleDate', render: row => shortDate(row.scheduleDate) ?? '—', num: true },
         { label: t('priority'), key: 'priority', render: row => row.priority ? h(Pill, { tone: row.priority === 'HIGH' ? 'rose' : row.priority === 'MEDIUM' ? 'amber' : 'muted' }, financeEnumLabel(row.priority, t, Object.fromEntries(PRIORITIES))) : '—' },
         {
           label: t('actions'), key: 'actions', sortable: false,
           render: row => h('div', { className: 'sf-row', style: { flexWrap: 'nowrap', justifyContent: 'flex-end' } },
             h(LinkButton, { onClick: () => onDialog({ kind: 'planDetail', plan: row }) }, t('actDetail')),
+            canWrite && finite(row.remainingAmount) > 0 && row.status !== '剩余不再执行' ? h(LinkButton, { disabled: busy, onClick: () => onDialog({ kind: 'closeRemaining', plan: row }) }, t('closeRemaining')) : null,
             canWrite ? h(LinkButton, { disabled: busy, onClick: () => onDialog({ kind: 'schedule', plan: row }) }, t('schedule')) : null,
             canWrite ? h(LinkButton, { disabled: busy, onClick: () => onDialog({ kind: 'increase', plan: row }) }, t('increase')) : null),
         },
@@ -187,6 +198,23 @@ function PlansTab({ rows, total, page, onPage, t, busy, act, canWrite = true, on
       rows, empty: t('empty'),
     }),
     h(Pager, { page, total, limit: PAGE_SIZE, onPage }))
+}
+
+function CloseRemainingDialog({ plan, t, onClose, act, busy }) {
+  const [reason, setReason] = useState('')
+  const invalid = busy || !reason.trim()
+  const submit = async () => {
+    if (invalid) return
+    const saved = await act(`/rest/finance/payment-plans/${plan.id}/close-remaining`, { reason: reason.trim() })
+    if (saved !== false) onClose()
+  }
+  return h(Dialog, { title: t('closeRemaining'), onClose: busy ? () => {} : onClose, footer: [
+    h(GhostButton, { key: 'cancel', disabled: busy, onClick: onClose }, t('cancel')),
+    h(PrimaryButton, { key: 'ok', disabled: invalid, onClick: submit }, t('closeRemainingConfirm')),
+  ] }, h('div', { className: 'sf-stack' },
+    h('p', { className: 'sf-note' }, `${plan.description ?? ''} · ${t('remaining')}：${wan(plan.remainingAmount) ?? '—'}`),
+    h('p', { className: 'sf-note' }, t('closeRemainingHint')),
+    h(FormRow, { label: t('closeRemainingReason') }, h(Textarea, { value: reason, onChange: setReason, maxLength: 500, disabled: busy }))))
 }
 
 function ScheduleDialog({ plan, t, onClose, act }) {
@@ -237,7 +265,7 @@ function PlanDetailDialog({ plan, t, onClose }) {
     [t('org'), plan.orgName], [t('planType'), financeEnumLabel(plan.planType, t, PLAN_LABELS)], [t('description'), plan.description],
     [t('department'), plan.departmentName], [t('costItem'), plan.costItemName], [t('planMonth'), plan.planMonth ? `${plan.planMonth} 月` : '—'],
     [t('planned'), wan(plan.plannedAmount)], [t('actual'), wan(plan.actualAmount)], [t('variance'), wan(plan.varianceAmount)],
-    [t('remaining'), wan(plan.remainingAmount)], [t('scheduleDate'), shortDate(plan.scheduleDate)], [t('priority'), plan.priority ? financeEnumLabel(plan.priority, t, Object.fromEntries(PRIORITIES)) : '—'],
+    [t('remaining'), wan(plan.remainingAmount)], [t('actualPaidDate'), actualPaymentDate(plan.actualPaidAt)], [t('scheduleDate'), shortDate(plan.scheduleDate)], [t('priority'), plan.priority ? financeEnumLabel(plan.priority, t, Object.fromEntries(PRIORITIES)) : '—'],
     [t('acceptAcceptance'), plan.acceptsAcceptance ? '✓' : '—'], [t('cashAmount'), wan(plan.plannedCashAmount)], [t('acceptanceAmount'), wan(plan.plannedAcceptanceAmount)],
     [t('payee'), plan.payeeName], [t('statusCol'), financeDisplayValue(plan.status, 'status')],
   ]
