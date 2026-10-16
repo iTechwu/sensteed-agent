@@ -20,7 +20,7 @@ const FILES = [
   'src/views/datacenter.js',
   'src/views/entry.js', 'src/views/configured-entry.js',
   'src/views/analyze.js',
-  'src/views/bom.js', 'src/views/notifications.js', 'src/views/permissions.js', 'src/views/review.js', 'src/views/sources.js', 'src/views/comparisons.js', 'src/views/facts.js', 'src/views/engine.js', 'src/views/filing.js',
+  'src/views/bom.js', 'src/views/notifications.js', 'src/views/permissions.js', 'src/views/review.js', 'src/views/sources.js', 'src/views/comparisons.js', 'src/views/facts.js', 'src/views/engine.js', 'src/views/filing.js', 'src/views/budget-filing.js',
   'src/shell.js',
 ]
 

@@ -1,4 +1,4 @@
-// 片段 5/7 视图：资金（四子视图：资金汇总/排款工作台/调增审批/收入计划；排款/调增/详情 Dialog）
+// 片段 5/7 视图：资金（四子视图：资金汇总/排款工作台/调整审批/收入计划；排款/调整/详情 Dialog）
 
 // 实付日期按财务业务时区展示，避免中国本地零点保存为 UTC 后退一天。
 function actualPaymentDate(value) {
@@ -18,7 +18,7 @@ function CashView({ ctx, t, onDrill }) {
   const [cash, setCash] = useState(null)
   const [plans, setPlans] = useState(null)
   const [revenues, setRevenues] = useState(null)
-  const [filters, setFilters] = useState({ planType: '', departmentId: '', month: ctx.drillParams?.month ? String(ctx.drillParams.month) : '', unassigned: false })
+  const [filters, setFilters] = useState({ planType: ctx.drillParams?.planType || '', departmentId: ctx.drillParams?.departmentId || '', month: ctx.drillParams?.month ? String(ctx.drillParams.month) : '', unassigned: false })
   const [page, setPage] = useState(1)
   const [revenuePage, setRevenuePage] = useState(1)
   const [busy, setBusy] = useState(false)
@@ -99,7 +99,7 @@ function PlanAdjustDetailDialog({ id, t, onClose }) {
     api(`/plan-adjustments/${id}`).then(value => { if (!cancelled) setDetail(value.data) }).catch(() => { if (!cancelled) setDetail({ error: true }) })
     return () => { cancelled = true }
   }, [id])
-  const flow = detail?.flows || detail?.statusLogs || []
+  const flow = detail?.logs || detail?.flows || detail?.statusLogs || []
   const adjustment = detail?.adjustment ?? detail
   return h(Dialog, { title: `${t('adjustmentOf')} ${adjustment?.code ?? ''}`, onClose },
     h('div', { className: 'sf-stack' },
@@ -231,19 +231,75 @@ function ScheduleDialog({ plan, t, onClose, act }) {
       accepts ? h(FormRow, { label: t('acceptanceAmount') }, h(Field, { type: 'number', min: '0', step: '0.01', value: acceptanceAmount, onChange: setAcceptanceAmount })) : null))
 }
 
+function validPlanAdjustment(plan, value, reason) {
+  const before = finite(plan.plannedAmount), after = finite(value), actual = finite(plan.actualAmount)
+  return before !== null && after !== null && after >= 0 && after !== before
+    && /^\d+(\.\d{1,2})?$/.test(String(value).trim()) && Boolean(reason.trim())
+    && (after > before || actual !== null && after >= actual)
+}
+
 function IncreaseDialog({ plan, t, onClose, act }) {
   const [newAmount, setNewAmount] = useState('')
   const [reason, setReason] = useState('')
-  const invalid = finite(newAmount) === null || Number(newAmount) <= Number(plan.plannedAmount ?? 0) || !reason.trim()
-  const submit = async () => { if (invalid) return; const saved = await act('/plan-adjustments', { planId: plan.id, newAmount: Number(newAmount), reason: reason.trim() }); if (saved !== false) onClose() }
-  return h(Dialog, { title: `${t('increase')} · ${plan.description ?? ''}`, onClose, footer: [
-    h(GhostButton, { key: 'cancel', onClick: onClose }, t('cancel')),
-    h(PrimaryButton, { key: 'ok', disabled: invalid, onClick: submit }, t('submit')),
+  const [draftId, setDraftId] = useState(null)
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState(null)
+  const lock = useRef(false), draftRef = useRef(null)
+  const invalid = !validPlanAdjustment(plan, newAmount, reason)
+  const close = () => { if (!lock.current) onClose() }
+  const submit = async () => {
+    if (invalid || lock.current) return
+    lock.current = true; setPending(true); setError(null)
+    try {
+      if (!draftRef.current) {
+        const result = await post(`/rest/finance/payment-plans/${plan.id}/adjustments`, { newAmount: Number(newAmount), reason: reason.trim() })
+        const id = result.data?.id || result.data?.adjustment?.id
+        if (!id) throw new Error(t('opFailed'))
+        draftRef.current = id; setDraftId(id)
+      }
+      const saved = await act(`/rest/finance/payment-plan-adjustments/${draftRef.current}/submit`, {})
+      if (saved !== false) onClose()
+    } catch (err) { setError(err.message) } finally { lock.current = false; setPending(false) }
+  }
+  return h(Dialog, { title: `${t('increase')} · ${plan.description ?? ''}`, onClose: close, footer: [
+    h(GhostButton, { key: 'cancel', disabled: pending, onClick: close }, t('cancel')),
+    h(PrimaryButton, { key: 'ok', disabled: invalid || pending, onClick: submit }, t('submit')),
   ] },
     h('div', { className: 'sf-stack' },
+      error ? h('p', { role: 'alert' }, error) : null,
+      draftId ? h('p', { className: 'sf-note' }, t('adjustmentDraftSaved')) : null,
       h('p', { className: 'sf-note' }, `${t('planned')}：${wan(plan.plannedAmount) ?? '—'} ${t('unitYuan')} · ${t('increaseHint')}`),
-      h(FormRow, { label: t('newAmount') }, h(Field, { type: 'number', min: '0.01', step: '0.01', value: newAmount, onChange: setNewAmount })),
-      h(FormRow, { label: t('increaseReason'), wide: true }, h(Textarea, { value: reason, onChange: setReason, maxLength: 500 }))))
+      h(FormRow, { label: t('newAmount') }, h(Field, { type: 'number', min: '0', step: '0.01', disabled: pending || Boolean(draftId), value: newAmount, onChange: setNewAmount })),
+      h(FormRow, { label: t('increaseReason'), wide: true }, h(Textarea, { disabled: pending || Boolean(draftId), value: reason, onChange: setReason, maxLength: 500 }))))
+}
+
+function PlanPayments({ planId, t }) {
+  const [page, setPage] = useState(1), [data, setData] = useState(null), [retry, setRetry] = useState(0)
+  useEffect(() => {
+    let cancelled = false; setData(null)
+    api(`/rest/finance/payment-plans/${planId}/payments?page=${page}&limit=20`)
+      .then(value => { if (!cancelled) setData(value.data) })
+      .catch(() => { if (!cancelled) setData({ error: true }) })
+    return () => { cancelled = true }
+  }, [planId, page, retry])
+  if (!data) return h('p', { role: 'status' }, t('loading'))
+  if (data.error) return h('div', { role: 'alert' }, t('paymentReadFailed'), h(LinkButton, { onClick: () => setRetry(value => value + 1) }, t('retry')))
+  const evidence = { CONFIRMED: 'paymentConfirmed', RETURNED: 'paymentReturned', PENDING: 'paymentPending', UNKNOWN: 'paymentUnknown' }
+  return h('div', { className: 'sf-stack' },
+    h('strong', null, t('paymentTransactions')),
+    data.message ? h('p', { className: 'sf-note' }, data.message) : null,
+    h('p', { className: 'sf-note' }, t('paymentCoverageUnknown')),
+    h(Table, { tableId: 'finance-plan-payments', rows: data.list || [], empty: t('paymentNone'), columns: [
+      { key: 'paymentNo', label: t('paymentNumber') },
+      { key: 'processNo', label: t('paymentProcess') },
+      { key: 'paidAt', label: t('actualPaidDate'), render: row => actualPaymentDate(row.paidAt) ?? '—' },
+      { key: 'status', label: t('statusCol'), render: row => `${row.status ?? '—'} · ${t(evidence[row.evidence] || 'paymentUnknown')}` },
+      { key: 'currency', label: t('paymentCurrency') },
+      { key: 'amount', label: t('amount'), num: true, render: row => wan(row.amount) ?? '—' },
+      { key: 'cashAmount', label: t('cashAmount'), num: true, render: row => wan(row.cashAmount) ?? '—' },
+      { key: 'acceptanceAmount', label: t('acceptanceAmount'), num: true, render: row => wan(row.acceptanceAmount) ?? '—' },
+    ] }),
+    h(Pager, { page, total: data.total, limit: 20, onPage: setPage }))
 }
 
 function PlanDetailDialog({ plan, t, onClose }) {
@@ -257,10 +313,11 @@ function PlanDetailDialog({ plan, t, onClose }) {
   ]
   return h(Dialog, { title: t('planDetail'), onClose },
     h('dl', { className: 'sf-evidence' }, ...fields.map(([label, value], index) =>
-      h('div', { key: index, className: 'sf-evidence-item' }, h('small', null, label), h('strong', null, value ?? '—')))))
+      h('div', { key: index, className: 'sf-evidence-item' }, h('small', null, label), h('strong', null, value ?? '—')))),
+    h(PlanPayments, { key: plan.id, planId: plan.id, t }))
 }
 
-// ---- 调增审批台 ----
+// ---- 调整审批台 ----
 
 function PlanAdjustmentsTab({ t, revision, reloadTick, busy, act, canWrite = true, canVerify = true, onDialog }) {
   const [status, setStatus] = useState('SUBMITTED')
@@ -296,7 +353,7 @@ function PlanAdjustmentsTab({ t, revision, reloadTick, busy, act, canWrite = tru
         ],
         rows, empty: t('empty'),
       }),
-      h(Pager, { page, total: data?.total, limit: PAGE_SIZE, onPage })),
+      h(Pager, { page, total: data?.total, limit: PAGE_SIZE, onPage: setPage })),
     // 驳回理由 Dialog 与详情 Dialog 由外壳层渲染——这里通过 onDialog 请求，但 Dialog 需要在 CashView 层挂载
     null)
 }

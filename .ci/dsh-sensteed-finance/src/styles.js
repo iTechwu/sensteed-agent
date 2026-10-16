@@ -82,4 +82,5 @@ const css = `
 .sf-mobile-nav{display:none}
 @media(max-width:900px){.sf-tabs{display:none}.sf-mobile-nav{display:flex;align-items:center;gap:10px;grid-column:1;grid-row:3;padding:10px 16px;border-bottom:1px solid var(--sf-line);min-width:0}.sf-mobile-nav span{flex-shrink:0;font-size:12px;color:var(--sf-ink2)}.sf-mobile-nav select{width:100%;min-width:0;min-height:36px;border:1px solid var(--sf-line2);border-radius:6px;background:var(--sf-card);color:var(--sf-ink);padding:4px 8px;font:inherit}}
 @media(max-width:520px){.sf-form-grid{grid-template-columns:minmax(0,1fr)}}
+.sf-budget-filing-form .sf-form-row{grid-template-columns:minmax(0,1fr);gap:6px}.sf-budget-filing-form{max-width:none;min-width:0}.sf-budget-filing-rows{list-style:none;margin:0;padding:0}.sf-budget-filing-rows p,.sf-budget-filing-rows strong{overflow-wrap:anywhere}
 `

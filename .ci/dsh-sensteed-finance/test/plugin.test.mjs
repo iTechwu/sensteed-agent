@@ -1976,3 +1976,131 @@ test('budget receipt navigates to the saved year and exact record and never show
   assert.match(paths[0], /year=2027&lineId=record-1/)
   assert.deepEqual(clientNodes(detail).find(node => node.type?.name === 'Table').props.rows, [line])
 })
+
+test('budget filing uses the web destination and the public row workflow instead of the generic assignment editor', async () => {
+  const navigation = await readFile(new URL('src/navigation.js', root), 'utf8')
+  const destination = new Function(navigation + '\nreturn financeBusinessDestination')()
+  assert.deepEqual(destination('/filing/budget?year=2027&task=11111111-1111-4111-8111-111111111111'), { tab: 'budget-filing', params: { year: '2027', taskId: '11111111-1111-4111-8111-111111111111' } })
+  const calls = []
+  const { routes } = await loadHost({ fetch: async (url, init) => { calls.push({ url: String(url), init }); return mcpJson({ id: 'row-1' }) } })
+  for (const [method, path, body] of [
+    ['GET', '/finance/budget-filing?year=2027&taskId=task-1', null],
+    ['GET', '/finance/feishu/organization-directory', null],
+    ['POST', '/finance/budget-filing/as-1/rows', { action: 'SAVE', row: { plannedAmount: 10 } }],
+    ['POST', '/finance/budget-filing/as-1/department', { action: 'SUBMIT' }],
+    ['POST', '/finance/budget-filing/tasks/task-1/copy', { title: '第二轮', reason: '调整' }],
+  ]) {
+    assert.equal((await invokeRoute(routes.get(BASE), method, BASE + '/rest' + path, body, { 'content-type': 'application/json' })).status, 200)
+    assert.equal(new URL(calls.at(-1).url).pathname, '/api' + path.split('?')[0])
+  }
+})
+
+test('budget row form rejects stale categories, invalid months and monetary precision before saving', async () => {
+  const source = await readFile(new URL('src/views/budget-filing.js', root), 'utf8')
+  const parse = new Function(source + '\nreturn financeBudgetRowBody')()
+  const value = { costItemId: 'c1', month: '12', plannedAmount: '1250.50', description: '  设备升级  ' }
+  assert.deepEqual(parse(value, [{ id: 'c1' }]), { costItemId: 'c1', month: 12, plannedAmount: 1250.5, description: '设备升级' })
+  for (const patch of [{ costItemId: 'stale' }, { month: 13 }, { month: 1.5 }, { plannedAmount: '' }, { plannedAmount: 0 }, { plannedAmount: '1.00001' }, { plannedAmount: 1e12 }, { description: '  ' }]) assert.throws(() => parse({ ...value, ...patch }, [{ id: 'c1' }]))
+})
+
+test('budget card only offers server-approved actions and carries the row revision to review', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/budget-filing.js', root), 'utf8')
+  const writes = [], notices = []
+  const harness = clientHarness(source, 'BudgetFilingCard', { useFinanceAction: () => ({ run: async (path, body) => { writes.push({ path, body }); return { id: 'r1' } }, report: message => notices.push(message) }) })
+  const props = { card: { id: 'a1', taskId: 't1', title: '预算', departmentActions: [], canCreate: false, rows: [{ id: 'r1', revision: 7, reviewStatus: 'INITIAL_REVIEW', actions: ['INITIAL_APPROVE'], plannedAmount: 10, month: 1 }] }, costItems: [], onRefresh: message => notices.push(message) }
+  const tree = harness.render(props)
+  const buttons = clientNodes(tree).filter(node => node.type?.name === 'GhostButton')
+  assert.deepEqual(buttons.map(node => node.children.join('')), ['初审通过'])
+  await buttons[0].props.onClick()
+  assert.deepEqual(writes, [{ path: '/finance/budget-filing/a1/rows', body: { action: 'INITIAL_APPROVE', rowId: 'r1', revision: 7 } }])
+  assert.ok(notices.includes('条目进度已更新'))
+})
+
+test('budget rejection retains the entered reason after failure and locks immediate duplicate confirmation', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/budget-filing.js', root), 'utf8')
+  let rejectWrite, writes = 0
+  const harness = clientHarness(source, 'BudgetFilingDecisionDialog')
+  const props = { decision: { action: 'REJECT', row: { id: 'r1' } }, onClose() {}, onSave: () => { writes++; return new Promise((resolve, reject) => { rejectWrite = reject }) } }
+  let tree = harness.render(props)
+  clientNodes(tree).find(node => node.type?.name === 'Textarea').props.onChange('请补充依据')
+  tree = harness.render(props)
+  const confirm = tree.props.footer.find(node => node.props.key === 'confirm').props.onClick
+  const pending = confirm()
+  await confirm()
+  assert.equal(writes, 1)
+  tree = harness.render(props)
+  assert.equal(tree.props.dismissDisabled, true)
+  rejectWrite(new Error('记录版本已变更，请刷新核对'))
+  await pending
+  tree = harness.render(props)
+  assert.equal(clientNodes(tree).find(node => node.type?.name === 'Textarea').props.value, '请补充依据')
+  assert.ok(clientNodes(tree).some(node => node.props.role === 'alert' && node.children.includes('记录版本已变更，请刷新核对')))
+  assert.equal(tree.props.dismissDisabled, false)
+})
+
+test('budget draft save preserves fields after a denial and cannot be sent twice before a rerender', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/budget-filing.js', root), 'utf8')
+  let writes = 0, rejectWrite
+  const harness = clientHarness(source, 'BudgetFilingRowDialog')
+  const props = { card: { year: 2027, title: '年度', departmentName: '研发部' }, row: { id: 'r1', revision: 3, costItemId: 'c1', month: 2, plannedAmount: 25.5, description: '试验费用' }, costItems: [{ id: 'c1', name: '材料' }], onClose() {}, onSave: () => { writes++; return new Promise((resolve, reject) => { rejectWrite = reject }) } }
+  let tree = harness.render(props)
+  const form = clientNodes(tree).find(node => node.type === 'form')
+  const pending = form.props.onSubmit({ preventDefault() {} })
+  await form.props.onSubmit({ preventDefault() {} })
+  assert.equal(writes, 1)
+  rejectWrite(new Error('填报窗口已关闭'))
+  await pending
+  tree = harness.render(props)
+  assert.equal(clientNodes(tree).find(node => node.type?.name === 'Field' && node.props['aria-label'] === '金额（元）').props.value, '25.5')
+  assert.ok(clientNodes(tree).some(node => node.props.role === 'alert' && node.children.includes('填报窗口已关闭')))
+})
+
+test('busy dialogs cannot be dismissed by Escape, backdrop or the close button', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8')
+  let closed = 0
+  const harness = clientHarness(source, 'Dialog')
+  const tree = harness.render({ title: '保存中', dismissDisabled: true, onClose: () => closed++ })
+  tree.props.onMouseDown({ target: 1, currentTarget: 1 })
+  const panel = clientNodes(tree).find(node => node.props.role === 'dialog')
+  panel.props.onKeyDown({ key: 'Escape', preventDefault() {}, stopPropagation() {} })
+  assert.equal(closed, 0)
+  assert.equal(clientNodes(tree).find(node => node.props['aria-label'] === '关闭').props.disabled, true)
+})
+
+test('business links preserve cash subpages and PR types so the same link opens the same content', async () => {
+  const source = await readFile(new URL('src/navigation.js', root), 'utf8')
+  const resolve = new Function(source + '\nreturn financeBusinessDestination')()
+  assert.deepEqual(resolve('/cash?tab=revenue&year=2027&org=company-1'), { tab: 'cash', params: { view: 'revenue', year: '2027', orgId: 'company-1' } })
+  assert.deepEqual(resolve('/budget?view=ledger&recordType=ESTIMATED&month=10&year=2027'), { tab: 'budget', params: { view: 'ledger', recordType: 'ESTIMATED', month: '10', year: '2027' } })
+  assert.deepEqual(resolve('/alerts?status=RESOLVED&severity=WARN'), { tab: 'alerts', params: { status: 'RESOLVED', severity: 'WARN' } })
+  assert.equal(resolve('/filing/budget?task=broken'), null)
+  assert.deepEqual(resolve('/cash?tab=arbitrary&month=99'), { tab: 'cash', params: {} })
+})
+
+test('execution rate follows the web submitted-PR basis and never treats an unknown amount as zero', async () => {
+  const source = await readFile(new URL('src/format.js', root), 'utf8')
+  const rate = new Function(source + '\nreturn execRateOf')()
+  assert.equal(rate(50, 20, 100), 0.5)
+  assert.equal(rate(0, 20, 100), 0)
+  assert.equal(rate(null, 20, 100), null)
+  assert.equal(rate(50, 20, 0), null)
+})
+
+test('ledger and cash requests preserve the dimensions supplied by a business link', async () => {
+  const components = await readFile(new URL('src/components.js', root), 'utf8')
+  const format = await readFile(new URL('src/format.js', root), 'utf8')
+  const ctx = { year: '2027', orgId: 'org-1', orgs: [], departments: [], revision: 0, financeWriter: false, permissions: [], drillParams: { view: 'ledger', month: '10', recordType: 'ESTIMATED' } }
+  const requests = []
+  const budget = clientHarness(components + '\n' + format + '\n' + await readFile(new URL('src/views/budget.js', root), 'utf8'), 'BudgetView', {
+    api: async path => { requests.push(path); return { data: { list: [] } } }, PAGE_SIZE: 20, BUDGET_LINE_LIMIT: 200,
+  })
+  budget.render({ ctx, t: key => key }); budget.flushEffects()
+  await new Promise(resolve => setImmediate(resolve))
+  assert.ok(requests.some(path => path.startsWith('/pr?') && path.includes('recordType=ESTIMATED') && path.includes('month=10') && path.includes('orgId=org-1')))
+  const cash = clientHarness(components + '\n' + await readFile(new URL('src/views/cash.js', root), 'utf8'), 'CashView', {
+    api: async path => { requests.push(path); return { data: { list: [] } } }, PAGE_SIZE: 20,
+  })
+  cash.render({ ctx: { ...ctx, drillParams: { view: 'revenue' } }, t: key => key }); cash.flushEffects()
+  await new Promise(resolve => setImmediate(resolve))
+  assert.ok(requests.some(path => path.startsWith('/revenue-plans?year=2027&orgId=org-1')))
+})

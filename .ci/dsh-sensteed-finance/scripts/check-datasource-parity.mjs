@@ -13,7 +13,7 @@ const paths = [
   '/dashboard', '/budget', '/budget-engine', '/cash', '/operations', '/alerts', '/data-center',
   '/review', '/data-entry', '/assistant', '/cost-engineering', '/notifications',
   '/budget/comparison/monthly-roll', '/budget/comparison/yearly', '/budget/comparison/versions',
-  '/filing/tasks', '/filing/department', '/filing/records', '/filing/activities',
+  '/filing/budget', '/filing/tasks', '/filing/department', '/filing/records', '/filing/activities',
   '/settings/identity/members', '/settings/identity/directory', '/settings/identity/employment', '/settings/identity/permissions',
 ]
 for (const path of paths) {
@@ -37,4 +37,22 @@ for (const kind of ['payment', 'revenue']) {
     assert.equal(pluginLabel(plan, kind), module.exports.financePlanOptionLabel(plan, kind))
   }
 }
-process.stdout.write(`PASS: ${paths.length} 个网页业务目的地、6 组跨端回填文案一致\n`)
+// 直接从权威 Zod 定义提取预算行校验，防止两端金额、月份和说明规则漂移。
+const schemaSource = await readFile(resolve(datasource, 'packages/contracts/src/schemas/budget-filing.schema.ts'), 'utf8')
+const ast = ts.createSourceFile('schema.ts', schemaSource, ts.ScriptTarget.Latest, true)
+const statement = ast.statements.find(node => ts.isVariableStatement(node) && node.declarationList.declarations.some(declaration => declaration.name.getText(ast) === 'BudgetRowBodySchema'))
+assert.ok(statement, '未找到预算条目的权威校验')
+const schemaModule = { exports: {} }
+new Function('require', 'exports', ts.transpileModule("import { z } from 'zod';\n" + statement.getText(ast), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(require, schemaModule.exports)
+const rowParser = new Function(await readFile(resolve(root, 'src/views/budget-filing.js'), 'utf8') + '\nreturn financeBudgetRowBody')()
+const base = { costItemId: '11111111-1111-4111-8111-111111111111', month: 1, plannedAmount: 1250.5, description: '预算说明' }
+const cases = [{}, { month: 0 }, { month: 13 }, { month: 1.5 }, { plannedAmount: 0 }, { plannedAmount: -1 }, { plannedAmount: 1.001 }, { plannedAmount: 0.29 }, { plannedAmount: 999999999999.99 }, { plannedAmount: 1000000000000 }, { description: '  ' }, { description: '字'.repeat(501) }]
+for (const patch of cases) {
+  const value = { ...base, ...patch }
+  const expected = schemaModule.exports.BudgetRowBodySchema.safeParse(value)
+  let actual, passed = true
+  try { actual = rowParser(value, [{ id: base.costItemId }]) } catch { passed = false }
+  assert.equal(passed, expected.success, `预算行校验漂移 ${JSON.stringify(patch)}`)
+  if (passed) assert.deepEqual(actual, expected.data)
+}
+process.stdout.write(`PASS: ${paths.length} 个网页业务目的地、6 组回填文案、${cases.length} 组预算行契约一致\n`)

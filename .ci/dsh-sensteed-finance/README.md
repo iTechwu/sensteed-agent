@@ -60,3 +60,5 @@ npm run check:datasource -- /path/to/datasource.dofe.ai
 桌面构建会先重新生成本插件浏览器模块并刷新已安装的 file 依赖。桌面仓库的 `tests/browser/finance.browser.mjs` 使用受控数据覆盖十六页、分析指令、下钻和失败重试；覆盖预算计算结果、来源范围、通知写入、失败保留输入、只读角色、权限撤销等回归；真实财务写入仍应使用测试租户验收。
 
 最新产品统一检查见 [2026-10-16 产品体验审查](docs/product-unification-20261016.md)；历史功能覆盖见 [功能对齐审查](docs/finance-parity.md)。
+
+预算填报与审核：插件与网页 `/filing/budget` 使用同一逐条预算契约，支持本人草稿、两级审核、部门提交与财务确认，以及下一轮复制。审核动作以服务端返回的权限和版本为准。发布前执行 `npm run check:datasource`，检查网页入口、回填文案和权威预算行校验是否一致。详见 [产品统一核查](docs/product-unification-20261016.md)。

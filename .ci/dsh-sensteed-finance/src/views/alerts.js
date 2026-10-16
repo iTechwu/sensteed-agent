@@ -12,7 +12,7 @@ function AlertsView({ ctx, t, onDrill }) {
   const [summary, setSummary] = useState(null)
   const [rules, setRules] = useState(null)
   const [rows, setRows] = useState(null)
-  const [filters, setFilters] = useState({ severity: '', alertType: '', month: '', status: 'OPEN' })
+  const [filters, setFilters] = useState({ severity: ctx.drillParams?.severity || '', alertType: ctx.drillParams?.alertType || '', month: ctx.drillParams?.month || '', status: ctx.drillParams?.status || 'OPEN' })
   const [activeStat, setActiveStat] = useState('')
   const [page, setPage] = useState(1)
   const [busy, setBusy] = useState(false)

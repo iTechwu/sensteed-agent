@@ -80,11 +80,12 @@ function heatLevel(execRate) {
   return 'early'
 }
 
-/** (已打PR+预计PR)/预算，未传预算返回 null */
+/** 执行率 = 已打 PR / 年度预算；预计 PR 单独展示，空值不可视作零。 */
 function execRateOf(prSubmitted, prEstimated, budget) {
   const budgetValue = finite(budget)
-  if (!budgetValue) return null
-  return ((finite(prSubmitted) ?? 0) + (finite(prEstimated) ?? 0)) / budgetValue
+  const submittedValue = finite(prSubmitted)
+  if (budgetValue === null || budgetValue <= 0 || submittedValue === null) return null
+  return submittedValue / budgetValue
 }
 
 /** 审批链状态 → 中文键（调整单/调增单共用） */

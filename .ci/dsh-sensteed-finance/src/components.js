@@ -501,7 +501,7 @@ function Switch({ checked, onChange, label }) {
 }
 
 /** 居中 Dialog：遮罩 + Escape 关闭 + 焦点移入；宽档 sm/md/lg */
-function Dialog({ title, width = 'md', onClose, children, footer }) {
+function Dialog({ title, width = 'md', onClose, children, footer, dismissDisabled = false }) {
   const panelRef = useRef(null)
   useEffect(() => {
     const previous = document.activeElement
@@ -511,7 +511,7 @@ function Dialog({ title, width = 'md', onClose, children, footer }) {
   const handleKeyDown = event => {
     if (event.nativeEvent?.isComposing) return
     if (event.key === 'Escape') {
-      event.preventDefault(); event.stopPropagation(); onClose?.()
+      event.preventDefault(); event.stopPropagation(); if (!dismissDisabled) onClose?.()
     } else if (event.key === 'Tab') {
       const items = Array.from(panelRef.current?.querySelectorAll('button:not(:disabled), input:not(:disabled):not([type="hidden"]), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex="0"]') || [])
         .filter(item => !item.closest('[hidden]') && item.getClientRects().length)
@@ -522,10 +522,10 @@ function Dialog({ title, width = 'md', onClose, children, footer }) {
       else if (!event.shiftKey && (current === last || !items.includes(current))) { event.preventDefault(); first.focus() }
     }
   }
-  return h('div', { className: 'sf-dialog-mask', onMouseDown: event => { if (event.target === event.currentTarget) onClose?.() } },
+  return h('div', { className: 'sf-dialog-mask', onMouseDown: event => { if (!dismissDisabled && event.target === event.currentTarget) onClose?.() } },
     h('div', { className: `sf-dialog sf-dialog-${width}`, role: 'dialog', 'aria-modal': true, 'aria-label': title, ref: panelRef, tabIndex: -1, onKeyDown: handleKeyDown },
       h('header', { className: 'sf-dialog-head' }, h('h3', null, title),
-        h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': '关闭', onClick: onClose }, h(Glyph, { name: 'close', size: 14 }))),
+        h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': '关闭', disabled: dismissDisabled, onClick: onClose }, h(Glyph, { name: 'close', size: 14 }))),
       h('div', { className: 'sf-dialog-body' }, children),
       footer ? h('footer', { className: 'sf-dialog-foot' }, footer) : null))
 }

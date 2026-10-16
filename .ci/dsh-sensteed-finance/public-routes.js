@@ -1,6 +1,12 @@
 // Datasource 公开财务契约白名单；新增接口须对照 packages/contracts/src/api 验证。
 // 明确方法与路径，禁止透传任意 URL、内部接口或客户端身份。
 export const PUBLIC_FINANCE_ROUTES = [
+  ["GET", "/finance/payment-plans/:id/payments"],
+  ["GET", "/finance/budget-filing"],
+  ["POST", "/finance/budget-filing/:id/rows"],
+  ["POST", "/finance/budget-filing/:id/department"],
+  ["POST", "/finance/budget-filing/tasks/:id/copy"],
+  ["GET", "/finance/feishu/organization-directory"],
   ["POST", "/finance/payment-plans/:id/close-remaining"],
   ["GET", "/finance/budget-configuration"],
   [

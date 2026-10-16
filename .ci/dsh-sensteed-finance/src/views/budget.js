@@ -22,7 +22,7 @@ function BudgetView({ ctx, t }) {
   const availableViews = BUDGET_VIEWS.filter(([id]) => ctx.financeWriter || !['adjustments', 'allocations', 'versions'].includes(id))
   useEffect(() => { if (!availableViews.some(([id]) => id === view)) setView('matrix') }, [ctx.financeWriter])
   const [view, setView] = useState(() => BUDGET_VIEWS.map(([id]) => id).includes(ctx.drillParams?.view) ? ctx.drillParams.view : 'matrix')
-  const [filters, setFilters] = useState({ expenseType: '', departmentId: '', versionId: '', month: ctx.drillParams?.month ? String(ctx.drillParams.month) : '', unassigned: false })
+  const [filters, setFilters] = useState({ expenseType: ctx.drillParams?.expenseType || '', departmentId: ctx.drillParams?.departmentId || '', versionId: ctx.drillParams?.versionId || '', recordType: ctx.drillParams?.recordType || '', month: ctx.drillParams?.month ? String(ctx.drillParams.month) : '', unassigned: false })
   const [page, setPage] = useState(1)
   const [budget, setBudget] = useState(null) // { summary, lines }
   const [pr, setPr] = useState(null)
@@ -37,6 +37,7 @@ function BudgetView({ ctx, t }) {
   const query = (extra = {}) => {
     const params = new URLSearchParams({ year })
     if (orgId) params.set('orgId', orgId)
+    if (view === 'ledger' && filters.recordType) params.set('recordType', filters.recordType)
     if (filters.expenseType) params.set('expenseType', filters.expenseType)
     if (filters.departmentId) params.set('departmentId', filters.departmentId)
     if (filters.versionId) params.set('versionId', filters.versionId)
@@ -57,7 +58,7 @@ function BudgetView({ ctx, t }) {
       api(`/pr?${query({ page, limit: PAGE_SIZE })}`).then(value => { if (!cancelled) setPr(value) }).catch(() => { if (!cancelled) setPr({ error: true }) })
     }
     return () => { cancelled = true }
-  }, [view, page, year, orgId, filters.expenseType, filters.departmentId, filters.versionId, filters.month, filters.unassigned, revision, reloadTick])
+  }, [view, page, year, orgId, filters.expenseType, filters.departmentId, filters.versionId, filters.month, filters.recordType, filters.unassigned, revision, reloadTick])
 
   useEffect(() => {
     api(`/budget-versions?year=${year}`).then(value => setVersions(value.data ?? { list: [] })).catch(() => setVersions({ list: [] }))
@@ -75,15 +76,16 @@ function BudgetView({ ctx, t }) {
     } catch (error) { setNotice(`${t('opFailed')}: ${error.message}`); return false } finally { setBusy(false) }
   }
 
-  const activeCount = ['expenseType', 'departmentId', 'versionId', 'month'].filter(key => filters[key]).length + (filters.unassigned ? 1 : 0)
+  const activeCount = ['expenseType', 'departmentId', 'versionId', 'month', 'recordType'].filter(key => filters[key]).length + (filters.unassigned ? 1 : 0)
   const filterBar = h('div', { className: 'sf-filters sf-budget-filters' },
+    view === 'ledger' ? h(Select, { 'aria-label': 'PR 记录类型', value: filters.recordType || '', onChange: value => { setPage(1); setFilters(current => ({ ...current, recordType: value })) }, options: [['SUBMITTED', '已打 PR'], ['ESTIMATED', '预计 PR']], placeholder: '全部 PR 类型' }) : null,
     h(Select, { value: filters.expenseType, onChange: value => { setPage(1); setFilters(f => ({ ...f, expenseType: value })) }, options: EXPENSE_TYPES.map(([id, label]) => [id, t(label)]), placeholder: t('expenseType') }),
     h(SearchSelect, { value: filters.departmentId, onChange: value => { setPage(1); setFilters(f => ({ ...f, departmentId: value })) }, options: (departments || []).map(d => [d.id, d.name]), placeholder: t('department') }),
     h(Select, { value: filters.month, onChange: value => { setPage(1); setFilters(f => ({ ...f, month: value })) }, options: Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1} 月`]), placeholder: t('monthCol') }),
     view === 'matrix' || view === 'lines' ? h(SearchSelect, { value: filters.versionId, onChange: value => { setPage(1); setFilters(f => ({ ...f, versionId: value })) }, options: (versions?.list || []).map(version => [version.id, budgetVersionLabel(version)]), placeholder: t('version') }) : null,
     view === 'matrix' || view === 'lines' ? h('label', { className: 'sf-row', style: { gap: 6, fontSize: 12, color: 'var(--sf-ink2)' } },
       h('input', { type: 'checkbox', checked: filters.unassigned, onChange: event => { setPage(1); setFilters(f => ({ ...f, unassigned: event.target.checked })) } }), t('unassigned')) : null,
-    activeCount > 0 ? h(LinkButton, { onClick: () => { setPage(1); setFilters({ expenseType: '', departmentId: '', versionId: '', month: '', unassigned: false }) } }, `${t('clearFilters')} (${activeCount})`) : null)
+    activeCount > 0 ? h(LinkButton, { onClick: () => { setPage(1); setFilters({ expenseType: '', departmentId: '', versionId: '', recordType: '', month: '', unassigned: false }) } }, `${t('clearFilters')} (${activeCount})`) : null)
 
   const savedViewsBar = h('div', { className: 'sf-row' },
     ...(savedViews?.list || []).map(item => h('span', { key: item.id, className: 'sf-pill sf-pill-muted' },
