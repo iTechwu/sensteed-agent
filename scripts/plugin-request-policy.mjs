@@ -2,6 +2,17 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import vm from 'node:vm'
 
+// Only quoted route values describe calls; prose may mention a route family.
+export function localApiPaths(source) {
+  return new Set([...source.matchAll(/['"`](\/(?:api\/desktop|_dsh)\/[a-z0-9/_-]+)/giu)].map(match => match[1]))
+}
+
+export function boundedFetchCount(source) {
+  // A literal 30-second deadline is equivalent to the shared constant, including
+  // numeric separators and esbuild's exponent form. Other literals fail closed.
+  return (source.match(/signal:\s*AbortSignal\.(?:any\(\[[^\]]*?)?timeout\((?:REQUEST_TIMEOUT_MS\d*|30_?000|3e4)\)/gu) || []).length
+}
+
 // The request-cancellation audit reads each listed plugin's client source.
 // All audited dsh-yootun-* snapshot plugins were removed from .ci/ in
 // 288809e279; the list is empty until a snapshot plugin re-opts in.
