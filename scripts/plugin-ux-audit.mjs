@@ -1,6 +1,6 @@
 import { readdir, readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
-import { auditPluginRequestCancellation } from './plugin-request-policy.mjs'
+import { auditPluginRequestCancellation, boundedFetchCount, localApiPaths } from './plugin-request-policy.mjs'
 import { readCiPackageManifests } from './plugin-ux-audit-packages.mjs'
 
 const ciRoot = new URL('../.ci/', import.meta.url)
@@ -59,8 +59,7 @@ const localRouteSources = await Promise.all([
   readSourceTree(new URL('../dsh-sensteed-product/src/', import.meta.url), ['.ts', '.tsx']),
   readSourceTree(ciRoot, ['.js']),
 ])
-const locallyHostedApiPaths = new Set(localRouteSources.flat(2).flatMap(source =>
-  [...source.matchAll(/['"`](\/(?:api\/desktop|_dsh)\/[a-z0-9/_-]+)/giu)].map(match => match[1])))
+const locallyHostedApiPaths = new Set(localRouteSources.flat(2).flatMap(source => [...localApiPaths(source)]))
 const definedThemeAliases = new Set(themeSource.match(/--dsw-alias-[a-z0-9-]+(?=\s*:)/g) || [])
 
 function findUndefinedThemeAliases(source) {
@@ -396,7 +395,7 @@ for (const name of clientPlugins) {
   if (legacyClientPlugins.has(name)) continue
   const clientPath = clientArtifacts.get(name)
   const source = await readFile(new URL(clientPath, import.meta.url), 'utf8')
-  const localApiPaths = new Set(source.match(/\/(?:api\/desktop|_dsh)\/[a-z0-9/_-]+/giu) || [])
+  const clientApiPaths = localApiPaths(source)
   const sidebarOrder = source.match(/name:\s*['"]sidebar\.footer\.action['"][\s\S]{0,180}?order:\s*(\d+)/u)?.[1]
   const overlayOrder = source.match(/name:\s*['"]shell\.overlay['"][\s\S]{0,180}?order:\s*(\d+)/u)?.[1]
   const manifest = JSON.parse(await readFile(new URL(`../.ci/${name}/package.json`, import.meta.url), 'utf8'))
@@ -421,7 +420,7 @@ for (const name of clientPlugins) {
   // appears on host RPC options, which are not fetches. An AbortSignal.any
   // composition that keeps a caller cancellation signal next to the shared
   // timeout satisfies the same policy.
-  const boundedFetchCount = (source.match(/signal:\s*AbortSignal\.(?:any\(\[[^\]]*?)?timeout\(REQUEST_TIMEOUT_MS\d*\)/g) || []).length
+  const boundedRequests = boundedFetchCount(source)
   const hasDynamicStatus = /aria-live/.test(source) || /role:\s*[^}\n]*['"](?:status|alert)['"]/.test(source)
   const hasAsyncUiState = /set(?:Loading|Busy)\(/.test(source)
   const exposesAsyncUiState = /aria-busy/.test(source)
@@ -445,7 +444,7 @@ for (const name of clientPlugins) {
   if (!hasThemeAliases) failures.push(`${name}: client styles do not use desktop theme aliases`)
   if (sameOriginCount !== fetchCount) failures.push(`${name}: every fetch must use same-origin credentials`)
   if (rejectRedirectCount !== fetchCount) failures.push(`${name}: every fetch must reject redirects`)
-  if (!/(?:const|let|var)\s+REQUEST_TIMEOUT_MS\s*=\s*(?:30000|3e4)\b/.test(source) || boundedFetchCount !== fetchCount) {
+  if (!/(?:const|let|var)\s+REQUEST_TIMEOUT_MS\s*=\s*(?:30000|3e4)\b/.test(source) || boundedRequests !== fetchCount) {
     failures.push(`${name}: every fetch must have the shared bounded timeout policy`)
   }
   if (!hasDynamicStatus) failures.push(`${name}: client has no announced loading, empty, or error state`)
@@ -455,7 +454,7 @@ for (const name of clientPlugins) {
   if (usesRevisionReload && !hasSynchronousReloadLock) failures.push(`${name}: revision-triggered reload has no synchronous request lock`)
   if (hasDirectRevisionHandler) failures.push(`${name}: reload control bypasses its guarded refresh handler`)
   if (newWindowLinkCount !== noreferrerLinkCount) failures.push(`${name}: every new-window link must use noreferrer`)
-  for (const path of localApiPaths) {
+  for (const path of clientApiPaths) {
     if (!capabilityMatrix.includes(`\`${path}\``)) failures.push(`${name}: local API ${path} is missing from the capability matrix`)
   }
   if (sidebarOrder !== undefined && overlayOrder !== undefined && sidebarOrder !== overlayOrder) {
