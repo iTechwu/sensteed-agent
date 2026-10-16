@@ -3,6 +3,13 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { publication } from './resolve-source.mjs'
 
+test('CI installs preserve the committed desktop and sibling dependency graphs', () => {
+  const workflow = readFileSync(new URL('../../.github/workflows/ci.yml', import.meta.url), 'utf8')
+  assert.equal((workflow.match(/run: pnpm install --frozen-lockfile/g) || []).length, 4)
+  assert.equal((workflow.match(/run: pnpm --dir \.\.\/deepseek-harness install --frozen-lockfile/g) || []).length, 4)
+  assert.doesNotMatch(workflow, /--no-frozen-lockfile/)
+})
+
 test('branch pushes and PRs run checks without producing packages', () => {
   for (const ref of ['refs/heads/dev', 'refs/heads/main', 'refs/pull/12/merge']) {
     assert.deepEqual(publication('2.0.11-beta.18', ref, 'candidate'), {
