@@ -32,7 +32,7 @@ export function createPage(skills = [], sharedSkills = [], createSkill = async (
   runInNewContext(readFileSync(new URL('../src/client.js', import.meta.url), 'utf8'), {
     module,
     fetch: overrides.fetch,
-    window: { addEventListener() {}, removeEventListener() {}, open() {} },
+    window: { addEventListener() {}, removeEventListener() {}, open: overrides.open ?? (() => {}) },
     AbortSignal,
     setTimeout,
     clearTimeout,
@@ -221,4 +221,32 @@ test('keeps a retry button instead of sign-in for non-SSO hub failures', async (
   const errorRow = find(page.render(), 'sm-inline-error')
   assert.ok(errorRow, 'plain hub failure renders the error row')
   assert.equal(errorRow.children.find(child => child?.props?.className === 'sm-quiet').children[0], '重试')
+})
+
+test('opens hub entries through the ticket exchange URL and falls back to the plain page', async () => {
+  const hubItem = { slug: 'release-notes', displayName: 'Release notes', description: 'd', stableVersion: 2, kind: 'skill' }
+  let viewUrlBroken = true
+  const opened = []
+  const fetchMock = async (path, init) => {
+    if (path === '/api/desktop/sensteed/skills') {
+      return { ok: true, json: async () => ({ skills: [], sharedSkills: [], hubError: null, hubErrorCode: null, hubSkills: [hubItem], hubPlugins: [] }) }
+    }
+    // view-url:先 500(回退),恢复后给换票地址
+    if (viewUrlBroken) return { ok: false, json: async () => null }
+    return { ok: true, json: async () => ({ url: 'https://ai.hozonauto.com/plugins/api/auth/oidc/exchange?ticket=t' }) }
+  }
+  const page = createPage([], [], async () => {}, {
+    fetch: fetchMock,
+    open: url => { opened.push(url) },
+  })
+  page.render()
+  await new Promise(resolve => setTimeout(resolve, 0))
+  // 服务端未上线:回退直开网页
+  const openButton = () => find(page.render(), 'sm-row').children.find(child => child?.props?.className === 'sm-row-meta').children.at(-1)
+  await openButton().props.onClick()
+  assert.deepEqual(opened, ['https://ai.hozonauto.com/plugins/skills'])
+  // 换票服务可用:打开票据交换地址
+  viewUrlBroken = false
+  await openButton().props.onClick()
+  assert.deepEqual(opened, ['https://ai.hozonauto.com/plugins/skills', 'https://ai.hozonauto.com/plugins/api/auth/oidc/exchange?ticket=t'])
 })

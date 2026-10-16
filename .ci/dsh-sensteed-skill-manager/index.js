@@ -14,6 +14,7 @@ const SHARED_SKILLS_URL = 'https://knowledge.hozonauto.com/api/plugin/v1/shared-
 // 企业技能/插件管理 Hub（skill.dofe.ai）：目录浏览走 /skillhub/v1 契约，
 // 认证复用桌面端 SSO 会话（dofeAuth 注入；Hub 校验同 issuer 的用户 token）。
 const HUB_API_BASE = 'https://ai.hozonauto.com/plugins/api'
+const HUB_WEB_BASE = 'https://ai.hozonauto.com/plugins'
 const MAX_BODY_BYTES = 16 * 1024
 const MAX_ARCHIVE_BYTES = 10 * 1024 * 1024
 const MAX_UNPACKED_BYTES = 25 * 1024 * 1024
@@ -495,6 +496,31 @@ function safeRouteName(path) {
   return match?.[1]
 }
 
+// 「在 Hub 查看」的免登录跳转:用桌面 SSO Bearer 向 Nest 换一次性短票,
+// 浏览器凭票换网页会话,不再要求用户在网页重复登录(一次桌面登录,全部
+// 企业服务无感)。服务端未上线或任何一步失败都回退直开网页,行为与
+// 此前一致;契约见 docs/skillhub-ticket-auth.md。
+async function hubViewUrl(ctx, target, overrides = {}) {
+  const fallback = { url: `${HUB_WEB_BASE}/${target}` }
+  const session = hubSession(ctx)
+  if (!session) return fallback
+  try {
+    const response = await (overrides.fetch || globalThis.fetch)(`${HUB_API_BASE}/auth/ticket`, {
+      method: 'POST',
+      redirect: 'error',
+      signal: AbortSignal.timeout(10_000),
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${session.accessToken}` },
+      body: JSON.stringify({ next: `/${target}` }),
+    })
+    if (!response.ok) return fallback
+    const payload = await response.json().catch(() => null)
+    const ticket = typeof payload?.data?.ticket === 'string' ? payload.data.ticket : undefined
+    if (!ticket || !/^[A-Za-z0-9._-]{16,256}$/u.test(ticket)) return fallback
+    return { url: `${HUB_WEB_BASE}/api/auth/oidc/exchange?ticket=${encodeURIComponent(ticket)}&next=${encodeURIComponent(`/${target}`)}` }
+  }
+  catch { return fallback }
+}
+
 function respond(res, status, value) {
   res.writeHead(status, {
     'Cache-Control': 'no-store',
@@ -567,6 +593,11 @@ export function apply(ctx, overrides = {}) {
       const requestPath = req.url?.split('?', 1)[0]
       const sharedName = safeRouteName(requestPath)
       try {
+        if (req.method === 'POST' && requestPath === `${ROUTE}/hub/view-url`) {
+          const body = await readJsonBody(req)
+          const target = body.kind === 'plugin' ? 'plugins' : 'skills'
+          return respond(res, 200, await hubViewUrl(ctx, target, overrides))
+        }
         if (req.method === 'POST' && requestPath === `${ROUTE}/install`) {
           const body = await readJsonBody(req)
           if (typeof body.repository !== 'string') return respond(res, 400, { error: 'A GitHub repository URL is required.' })
@@ -604,4 +635,4 @@ export function apply(ctx, overrides = {}) {
   return () => route?.()
 }
 
-export const __test = { safeGitHubUrl, skillSource, inspectGitSkill, installSkill, validateSkillTree, validateZipArchive, installArchive, packLocalSkill, SHARED_SKILLS_URL, HUB_API_BASE, callHubCatalog, hubSession }
+export const __test = { safeGitHubUrl, skillSource, inspectGitSkill, installSkill, validateSkillTree, validateZipArchive, installArchive, packLocalSkill, SHARED_SKILLS_URL, HUB_API_BASE, callHubCatalog, hubSession, hubViewUrl }

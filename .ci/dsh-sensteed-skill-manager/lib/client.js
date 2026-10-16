@@ -89,13 +89,28 @@ window.__ModuleLoader__.load({
 
     const HUB_WEB_BASE = 'https://ai.hozonauto.com/plugins'
 
+    // 打开 Hub 网页优先走宿主换票(一次性短票换免登录会话);宿主不可用或
+    // 返回非 https 地址时回退直开,行为与此前一致。
+    async function openHubItem(kind) {
+      const fallback = `${HUB_WEB_BASE}/${kind === 'plugin' ? 'plugins' : 'skills'}`
+      try {
+        const body = await request('/hub/view-url', { method: 'POST', body: JSON.stringify({ kind }) })
+        if (typeof body?.url === 'string' && body.url.startsWith('https://')) {
+          window.open(body.url, '_blank', 'noopener')
+          return
+        }
+      }
+      catch { /* 回退直开 */ }
+      window.open(fallback, '_blank', 'noopener')
+    }
+
     function hubRow(item, t) {
       return h('article', { className: 'sm-row', key: `hub:${item.kind}:${item.name}` },
         h('div', { className: 'sm-glyph', 'aria-hidden': true }, h(IconSkillOutlineRegular, { size: 24 })),
         h('div', { className: 'sm-copy' }, h('strong', null, item.displayName || item.name), h('p', { title: item.description }, item.description)),
         h('div', { className: 'sm-row-meta' },
           item.version ? h('span', { className: 'sm-version' }, `v${item.version}`) : null,
-          h('button', { type: 'button', className: 'sm-row-action', onClick: () => window.open(`${HUB_WEB_BASE}/${item.kind === 'plugin' ? 'plugins' : 'skills'}`, '_blank', 'noopener') }, t('hubOpen'))))
+          h('button', { type: 'button', className: 'sm-row-action', onClick: () => openHubItem(item.kind) }, t('hubOpen'))))
     }
 
     function SkillManagerPage({ view, t, createSkill, panelInfo }) {
