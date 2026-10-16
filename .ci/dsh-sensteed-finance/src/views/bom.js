@@ -50,7 +50,7 @@ function BomView({ ctx, t }) {
           { key: 'name', label: t('bomPackages'), render: row => h(GhostButton, { onClick: () => setSelected(row.id), 'aria-pressed': row.id === selected }, row.name) },
           { key: 'modelCode', label: t('bomModel') },
           { key: 'version', label: t('bomVersion') },
-          { key: 'status', label: t('bomStatus'), render: row => t(`bomStatus${row.status}`) },
+          { key: 'status', label: t('bomStatus'), render: row => financeEnumLabel(row.status, t, { DRAFT: 'bomStatusDRAFT', IN_REVIEW: 'bomStatusIN_REVIEW', APPROVED: 'bomStatusAPPROVED', OBSOLETE: 'bomStatusOBSOLETE' }) },
           { key: 'targetCost', label: `${t('bomTarget')} (${t('unitYuan')})`, render: row => amount(row.targetCost) },
         ] }),
         h(Pager, { page, total: packages.total, limit: PAGE_SIZE, onPage: setPage }))),

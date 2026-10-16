@@ -60,7 +60,7 @@ function budgetVersionLabel(version) {
   const statuses = { DRAFT: '草稿', CONFIRMED: '已确认', PUBLISHED: '已发布', LOCKED: '已锁定' }
   const frozen = version.frozenThroughMonth > 0 ? `（冻结至 ${version.frozenThroughMonth} 月）` : ''
   const name = version.year && version.type
-    ? `${version.year} 年${types[version.type] || ''}预算 · ${statuses[version.status] || version.status}${frozen}`
+    ? `${version.year} 年${types[version.type] || ''}预算 · ${statuses[version.status] || '未知状态'}${frozen}`
     : version.name
   const amount = finite(version.budgetTotal)
   const parts = [name, version.isPrimary ? '主版本' : null,
@@ -80,11 +80,12 @@ function heatLevel(execRate) {
   return 'early'
 }
 
-/** (已打PR+预计PR)/预算，未传预算返回 null */
+/** 执行率 = 已打 PR / 年度预算；预计 PR 单独展示，空值不可视作零。 */
 function execRateOf(prSubmitted, prEstimated, budget) {
   const budgetValue = finite(budget)
-  if (!budgetValue) return null
-  return ((finite(prSubmitted) ?? 0) + (finite(prEstimated) ?? 0)) / budgetValue
+  const submittedValue = finite(prSubmitted)
+  if (budgetValue === null || budgetValue <= 0 || submittedValue === null) return null
+  return submittedValue / budgetValue
 }
 
 /** 审批链状态 → 中文键（调整单/调增单共用） */

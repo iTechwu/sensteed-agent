@@ -4,7 +4,7 @@
 const OP_TOPICS = [
   ['预算执行', '预算执行率 / 支付率', '预算汇总 + 付款台账', true],
   ['资金链', '月度余额 / 缺口月份', '资金汇总', true],
-  ['收入达成', '计划 vs 实际到账', '收入计划', true],
+  ['收入达成', '计划与实际到账', '收入计划', true],
   ['成本结构', '三类费用占比与漂移', '预算汇总（三类费用）', true],
   ['数据质量', '未分配主体 / 缺失金额', '数据质量清单', true],
   ['项目毛利', '项目维度收入-成本', '项目台账（待导入）', false],
@@ -41,7 +41,7 @@ function OperationsView({ brief, t, onDrill }) {
   }
   const shareTones = ['a', 'b', 'c', 'd']
   const shareSegments = Object.entries(byType).map(([key, value], index) => ({
-    label: t(EXPENSE_LABELS[key] ?? key), value, tone: shareTones[index % shareTones.length],
+    label: financeEnumLabel(key, t, EXPENSE_LABELS), value, tone: shareTones[index % shareTones.length],
   }))
 
   const netByMonth = new Map()

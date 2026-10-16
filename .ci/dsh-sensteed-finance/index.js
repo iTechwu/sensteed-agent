@@ -518,7 +518,8 @@ async function financeApiCall(fetchImpl, config, toolName, args, observedAt, log
     }
     if (!response.ok) {
       logger?.info?.(`sensteed finance: ${toolName} upstream http ${response.status}`)
-      return { ok: false, error: `upstream_http_${response.status}` }
+      const payload = await response.json().catch(() => null)
+      return { ok: false, status: response.status, error: financeErrorMessage(payload, response.status) }
     }
     const payload = await response.json()
     if (payload?.code !== undefined && !isSuccessfulDatasourceCode(payload.code)) {
@@ -754,7 +755,7 @@ const FINANCE_GUIDANCE = `你是资深的财务分析师（CFO 视角），可�
 
 【版本与规则纪律（v0.4）】① 预算版本：finance_get_budget_versions 查看主版本与草稿；版本推进链路=审定（confirm）→生效（activate，切主版本）→锁定（lock），用 finance_budget_version_action；对比两版本用 finance_get_budget_version_diff；结转口径用 finance_get_carryover_rules。引用预算数字须说明所属版本与是否主版本。② 预警规则集：finance_get_alert_rules 查看版本与阈值；确认生效用 finance_confirm_alert_rules（仅财务负责人，须复述阈值）。③ 保存视图：finance_save_view / finance_get_saved_views 可沉淀分析口径。
 
-【预算调整与填报】调整审批流与填报是写通道，必须按用户明确指令操作：① 查可用预算用 finance_budget_availability_query（采用服务端 availableAmount，月度累计采用 availableCumulative；不得在客户端再扣减分配或重算），批预算前必查并引用具体 budgetLineId；② 预算新增/调拨/追减用 finance_budget_adjustment_create 建草稿（调拨须调入=调出且调出行带 budgetLineId），复述要素确认后 finance_budget_adjustment_submit 提交；审批（finance_budget_adjustment_review）与过账（finance_budget_adjustment_post）由财务本人执行，Agent 不代批——仅在用户明确指示本人审批时调用；进度用 finance_budget_adjustment_status_query。③ 付款计划调增用 finance_payment_plan_increase_request（创建即提交），审批/过账纪律同上。④ 分配：finance_allocation_pool_query 查待认领池，finance_allocation_confirm 挂账，finance_allocation_remove 撤销。⑤ 填报：finance_filing_task_list/_task_create 管理任务，finance_filing_assignments_query 查部门填报，finance_filing_rows_upsert 代暂存，finance_filing_assignment_action 提交/定稿/重开（重开必须带原因入审计）。
+【预算调整与填报】调整审批流与填报是写通道，必须按用户明确指令操作：① 查可用预算用 finance_budget_availability_query（采用服务端 availableAmount，月度累计采用 availableCumulative；不得在客户端再扣减分配或重算），批预算前必查并引用具体 budgetLineId；② 预算新增/调拨/追减用 finance_budget_adjustment_create 建草稿（调拨须调入=调出且调出行带 budgetLineId），复述要素确认后 finance_budget_adjustment_submit 提交；审批（finance_budget_adjustment_review）与过账（finance_budget_adjustment_post）由财务本人执行，Agent 不代批——仅在用户明确指示本人审批时调用；进度用 finance_budget_adjustment_status_query。③ 付款计划调增或调减用 finance_payment_plan_increase_request（兼容既有工具名，创建即提交；调减不得低于已知实付），审批/过账纪律同上。④ 分配：finance_allocation_pool_query 查待认领池，finance_allocation_confirm 挂账，finance_allocation_remove 撤销。⑤ 填报：finance_filing_task_list/_task_create 管理任务，finance_filing_assignments_query 查部门填报，finance_filing_rows_upsert 代暂存，finance_filing_assignment_action 提交/定稿/重开（重开必须带原因入审计）。
 
 【幂等与身份】所有写工具必须提供独立业务 idempotencyKey，同一操作重试复用该键。操作者使用 bootstrap 返回的 operator；服务端按飞书 token 校验实际用户与租户。
 
@@ -782,7 +783,7 @@ async function dispatchPublicContract(fetchImpl, config, path, req, res, logger)
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     })
     const payload = await response.json().catch(() => null)
-    if (!response.ok) return sendJson(res, response.status, { ok: false, error: payload?.msg || (response.status === 403 ? '当前账号没有此项财务操作权限' : `upstream_http_${response.status}`) })
+    if (!response.ok) return sendJson(res, response.status, { ok: false, error: financeErrorMessage(payload, response.status) })
     if (!payload || payload.data === undefined || (payload.code !== undefined && !isSuccessfulDatasourceCode(payload.code))) {
       return sendJson(res, 502, { ok: false, error: payload?.msg || '财务操作失败' })
     }
@@ -791,4 +792,16 @@ async function dispatchPublicContract(fetchImpl, config, path, req, res, logger)
     logger?.info?.(`sensteed finance: ${req.method} ${path} unavailable`)
     return sendJson(res, 503, { ok: false, error: '财务服务暂不可用，请稍后重试' })
   }
+}
+
+// Preserve actionable business failures (for example, a missing annual primary version).
+// Do not show upstream route diagnostics, stack traces or arbitrary error objects to users.
+function financeErrorMessage(payload, status) {
+  const message = payload?.msg ?? payload?.message
+  const text = Array.isArray(message) ? message.filter(value => typeof value === 'string').join('；') : message
+  if (typeof text === 'string' && text.trim() && !/^(?:Cannot (?:GET|POST|PUT|PATCH|DELETE)|upstream_http_|<)/i.test(text.trim())) return text.slice(0, 500)
+  if (status === 404) return '未找到对应的财务资源，请核对年度预算主版本、主体和科目；若均已配置，请联系管理员检查服务版本。'
+  if (status === 403) return '当前账号没有此项财务操作权限'
+  if (status === 400) return '填报数据校验失败，请检查必填项、金额与期间。'
+  return '财务服务暂不可用，请稍后重试。'
 }

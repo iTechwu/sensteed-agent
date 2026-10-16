@@ -24,7 +24,7 @@ function OverviewView({ brief, t, onDrill, orgId, workQueue }) {
   const openAlerts = (data.openAlerts || alertsSummary.top || []).slice(0, 5)
   const workItems = workQueue?.state === 'loading' ? null : [
     {
-      id: 'filing', icon: 'plan', tone: 'blue', label: t('pendingFiling'), hint: t('pendingFilingHint'), value: (workQueue?.tasks?.list || []).filter(item => item.status !== 'CLOSED').length, target: 'entry',
+      id: 'filing', icon: 'plan', tone: 'blue', label: t('pendingFiling'), hint: t('pendingFilingHint'), value: (workQueue?.tasks?.list || []).filter(item => item.status !== 'CLOSED').length, target: 'filing',
     },
     {
       id: 'quality', icon: 'database', tone: 'amber', label: t('pendingQuality'), hint: t('pendingQualityHint'), value: (workQueue?.quality?.issues || []).reduce((sum, item) => sum + (finite(item.count) ?? 0), 0), target: 'datacenter',
@@ -50,13 +50,13 @@ function OverviewView({ brief, t, onDrill, orgId, workQueue }) {
   return h('div', { className: 'sf-view' },
     h('div', { className: 'sf-scopebar' },
       h('span', null, `${orgId ? t('scopeOrg') : t('scopeAll')} · ${data.year ?? ''} ${t('scopeYear')} · ${t('unitNote')}`),
-      h('span', null, `${t('kpiExecRate')} =（${t('kpiPrSubmitted')}+${t('kpiPrEstimated')}）/${t('kpiBudget')}`)),
+      h('span', null, `${t('kpiExecRate')} = ${t('kpiPrSubmitted')} ÷ ${t('kpiBudget')}`)),
     workbench,
     h('div', { className: 'sf-kpis' },
       h(KpiCard, { icon: 'data', label: t('kpiBudget'), value: yuan(m.budgetAmount), onClick: () => onDrill('budget') }),
-      h(KpiCard, { icon: 'plan', label: t('kpiPrSubmitted'), value: yuan(m.prSubmittedAmount), hint: `${t('kpiExecRate')} ${ratio(exec, 1) ?? '—'}`, onClick: () => onDrill('budget', { view: 'ledger' }) }),
-      h(KpiCard, { icon: 'clock', label: t('kpiPrEstimated'), value: yuan(m.prEstimatedAmount), onClick: () => onDrill('budget', { view: 'ledger' }) }),
-      h(KpiCard, { icon: 'goal', label: t('kpiPaid'), value: yuan(m.paidAmount), hint: `${t('kpiPaid')}/${t('kpiBudget')} ${ratio(m.paidAmount, m.budgetAmount) ?? '—'}`, onClick: () => onDrill('cash') }),
+      h(KpiCard, { icon: 'plan', label: t('kpiPrSubmitted'), value: yuan(m.prSubmittedAmount), hint: `${t('kpiExecRate')} ${ratio(exec, 1) ?? '—'}`, onClick: () => onDrill('budget', { view: 'ledger', recordType: 'SUBMITTED' }) }),
+      h(KpiCard, { icon: 'clock', label: t('kpiPrEstimated'), value: yuan(m.prEstimatedAmount), onClick: () => onDrill('budget', { view: 'ledger', recordType: 'ESTIMATED' }) }),
+      h(KpiCard, { icon: 'goal', label: t('kpiPaid'), value: yuan(m.paidAmount), hint: `${t('kpiPaid')}/${t('kpiPrSubmitted')} ${ratio(m.paidAmount, m.prSubmittedAmount) ?? '—'}`, onClick: () => onDrill('budget', { view: 'lines' }) }),
       h(KpiCard, {
         icon: 'warning', label: t('kpiAlerts'), value: alertsSummary.total ?? 0,
         hint: `${t('sevCritical')} ${alertsSummary.critical ?? 0} · ${t('sevWarn')} ${alertsSummary.warn ?? 0}`,

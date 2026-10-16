@@ -10,13 +10,22 @@ export function createPage(skills = [], sharedSkills = [], createSkill = async (
   const states = [skills, sharedSkills, '', false, [], [], '', false, false, 'ready']
   let cursor = 0
   let refCursor = 0
+  let effectCursor = 0
+  const effects = []
   const refs = []
   let component
   let dictionary
   let css = ''
   const react = {
     createElement: (tag, props, ...children) => ({ tag, props: props || {}, children: children.flat(Infinity).filter(child => child != null && child !== false) }),
-    useEffect(callback) { return callback() },
+    useEffect(callback, deps) {
+      const index = effectCursor++
+      const previous = effects[index]
+      if (!previous || deps.some((value, offset) => value !== previous[offset])) {
+        effects[index] = deps
+        return callback()
+      }
+    },
     useSyncExternalStore(_subscribe, getSnapshot) { return getSnapshot() },
     useRef(value) {
       const index = refCursor++
@@ -34,6 +43,7 @@ export function createPage(skills = [], sharedSkills = [], createSkill = async (
     fetch: overrides.fetch,
     window: { addEventListener() {}, removeEventListener() {}, open: overrides.open ?? (() => {}) },
     AbortSignal,
+    URL,
     setTimeout,
     clearTimeout,
     require: name => name === 'react' ? react : {},
@@ -52,7 +62,7 @@ export function createPage(skills = [], sharedSkills = [], createSkill = async (
     },
     layout: {
       panelInfo: {
-        getSnapshot: () => ({ activePanelId: 'sensteed-skill-manager' }),
+        getSnapshot: () => ({ activePanelId: overrides.fetch ? 'sensteed-skill-manager' : 'other-panel' }),
         subscribe: () => () => {},
       },
     },
@@ -60,7 +70,9 @@ export function createPage(skills = [], sharedSkills = [], createSkill = async (
   return {
     get css() { return css },
     createSkillConversation: module.exports.__test.createSkillConversation,
-    render() { cursor = 0; refCursor = 0; return component({ t: key => dictionary[key], createSkill }) },
+    render() { cursor = 0; refCursor = 0; effectCursor = 0; return component({ t: key => dictionary[key], createSkill, panelInfo: {
+      subscribe: () => () => {}, getSnapshot: () => ({ activePanelId: overrides.fetch ? 'sensteed-skill-manager' : 'other-panel' }),
+    } }) },
   }
 }
 
@@ -191,8 +203,8 @@ test('offers a one-click desktop sign-in when the hub requires SSO', async () =>
   let signedIn = false
   const fetchMock = async (path, init) => {
     calls.push([path, init?.method])
-    if (path === '/api/desktop/sensteed/skills') {
-      return { ok: true, json: async () => ({ skills: [], sharedSkills: [], hubError: signedIn ? null : '请先在桌面端登录企业账号。', hubErrorCode: signedIn ? null : 'HUB_SSO_REQUIRED', hubSkills: [], hubPlugins: [] }) }
+    if (path.startsWith('/api/desktop/sensteed/skills?')) {
+      return { ok: true, json: async () => ({ skills: [], sharedSkills: [], hubWorkspaceError: signedIn ? null : '请先在桌面端登录企业账号。', hubErrorCode: signedIn ? null : 'HUB_SSO_REQUIRED', hubSkills: [], hubPlugins: [] }) }
     }
     if (path === '/api/desktop/auth/feishu/session') { signedIn = true; return { ok: true, json: async () => ({ status: 'pending' }) } }
     return { ok: true, json: async () => ({ status: 'bound' }) }
@@ -214,7 +226,7 @@ test('offers a one-click desktop sign-in when the hub requires SSO', async () =>
 })
 
 test('keeps a retry button instead of sign-in for non-SSO hub failures', async () => {
-  const fetchMock = async () => ({ ok: true, json: async () => ({ skills: [], sharedSkills: [], hubError: 'Hub request failed (502).', hubErrorCode: null, hubSkills: [], hubPlugins: [] }) })
+  const fetchMock = async () => ({ ok: true, json: async () => ({ skills: [], sharedSkills: [], hubWorkspaceError: 'Hub request failed (502).', hubErrorCode: null, hubSkills: [], hubPlugins: [] }) })
   const page = createPage(fixture, [], async () => {}, { fetch: fetchMock })
   page.render()
   await new Promise(resolve => setTimeout(resolve, 0))
@@ -224,11 +236,11 @@ test('keeps a retry button instead of sign-in for non-SSO hub failures', async (
 })
 
 test('opens hub entries through the ticket exchange URL and falls back to the plain page', async () => {
-  const hubItem = { slug: 'release-notes', displayName: 'Release notes', description: 'd', stableVersion: 2, kind: 'skill' }
+  const hubItem = { skillId: 'c78ad665-640e-4053-9791-336cd7b1199d', slug: 'release-notes', displayName: 'Release notes', description: 'd', stableVersion: 2, kind: 'skill' }
   let viewUrlBroken = true
   const opened = []
   const fetchMock = async (path, init) => {
-    if (path === '/api/desktop/sensteed/skills') {
+    if (path.startsWith('/api/desktop/sensteed/skills?')) {
       return { ok: true, json: async () => ({ skills: [], sharedSkills: [], hubError: null, hubErrorCode: null, hubSkills: [hubItem], hubPlugins: [] }) }
     }
     // view-url:先 500(回退),恢复后给换票地址
@@ -242,11 +254,58 @@ test('opens hub entries through the ticket exchange URL and falls back to the pl
   page.render()
   await new Promise(resolve => setTimeout(resolve, 0))
   // 服务端未上线:回退直开网页
-  const openButton = () => find(page.render(), 'sm-row').children.find(child => child?.props?.className === 'sm-row-meta').children.at(-1)
+  const openButton = () => find(page.render(), 'sm-row').children.find(child => child?.props?.className === 'sm-row-meta').children.find(child => child?.tag === 'button' && child.children[0] === '在 Hub 查看')
   await openButton().props.onClick()
-  assert.deepEqual(opened, ['https://ai.hozonauto.com/plugins/skills'])
+  assert.deepEqual(opened, [`https://ai.hozonauto.com/plugins/skills/${hubItem.skillId}`])
   // 换票服务可用:打开票据交换地址
   viewUrlBroken = false
   await openButton().props.onClick()
-  assert.deepEqual(opened, ['https://ai.hozonauto.com/plugins/skills', 'https://ai.hozonauto.com/plugins/api/auth/oidc/exchange?ticket=t'])
+  assert.deepEqual(opened, [`https://ai.hozonauto.com/plugins/skills/${hubItem.skillId}`, 'https://ai.hozonauto.com/plugins/api/auth/oidc/exchange?ticket=t'])
+})
+
+test('renders local skills before stalled remote sources and preserves a healthy Hub domain', async () => {
+  let finishHub
+  const hub = new Promise(resolve => { finishHub = resolve })
+  const page = createPage([], [], async () => {}, { fetch: async path => {
+    if (path.endsWith('source=local')) return { ok: true, json: async () => ({ skills: fixture }) }
+    if (path.endsWith('source=hub')) return hub
+    return new Promise(() => {})
+  } })
+  page.render()
+  await new Promise(resolve => setTimeout(resolve, 0))
+  assert.ok(find(page.render(), 'sm-installed'))
+  assert.equal(find(find(page.render(), 'sm-installed'), 'sm-row').children[1].children[0].children[0], 'release-notes')
+  finishHub({ ok: true, json: async () => ({ hubSkills: [], hubSkillsError: 'Skills unavailable', hubPlugins: [{ pluginId: '10000000-0000-4000-8000-000000000001', displayName: 'Healthy plugin' }] }) })
+  await new Promise(resolve => setTimeout(resolve, 0))
+  const hubSection = find(page.render(), 'sm-hub')
+  assert.ok(find(hubSection, 'sm-row'))
+  assert.equal(find(hubSection, 'sm-inline-error').children[0], 'Skills unavailable')
+})
+
+test('shows a review and explicit confirm/cancel before enterprise execution; plugins remain unsupported',async () => {
+  const id='c78ad665-640e-4053-9791-336cd7b1199d',calls=[]
+  const fetchMock=async(path,init)=>{
+    calls.push({path,body:init?.body})
+    if(path.includes('?source=hub'))return {ok:true,json:async()=>({hubSkills:[{skillId:id,slug:'reviewed-skill',displayName:'Reviewed',stableVersion:'1.0.0'}],hubPlugins:[{pluginId:id,displayName:'Plugin',stableVersion:'1.0.0'}]})}
+    if(path.includes('?source='))return {ok:true,json:async()=>({skills:[],sharedSkills:[]})}
+    if(path.endsWith('/operations'))return {ok:true,json:async()=>({installed:[],operations:[]})}
+    if(path.endsWith('/preview'))return {ok:true,json:async()=>({intentId:id,action:'install',installName:'reviewed-skill',version:'1.0.0',existingVersion:null,workspace:{ssoTeam:{name:'企业'}},compatibility:{authorDeclared:'>=0.2.0',tested:false},accessDeclaration:{containsScripts:false,networkHosts:[],fileAccess:'none'},sharedScope:true})}
+    if(path.endsWith('/execute'))return {ok:true,json:async()=>({state:'WRITTEN'})}
+    throw Error('unexpected route')
+  }
+  const page=createPage([],[],async()=>{},{fetch:fetchMock}),all=(node)=>node && typeof node==='object'?[node,...node.children.flatMap(all)]:[]
+  page.render();await new Promise(resolve=>setTimeout(resolve,0))
+  let nodes=all(page.render()),install=nodes.find(node=>node.tag==='button' && node.children[0]==='安装')
+  assert.ok(nodes.some(node=>node.children[0]==='插件尚不支持安装'))
+  await install.props.onClick()
+  assert.equal(calls.filter(call=>call.path.endsWith('/execute')).length,0)
+  let dialog=all(page.render()).find(node=>node.props.role==='dialog')
+  assert.ok(dialog);assert.ok(all(dialog).some(node=>node.children[0]==='此操作影响本机所有 Profile 的共享技能。'))
+  all(dialog).find(node=>node.tag==='button'&&node.children[0]==='取消').props.onClick()
+  assert.equal(all(page.render()).some(node=>node.props.role==='dialog'),false)
+  nodes=all(page.render());await nodes.find(node=>node.tag==='button'&&node.children[0]==='安装').props.onClick()
+  dialog=all(page.render()).find(node=>node.props.role==='dialog')
+  await all(dialog).find(node=>node.tag==='button'&&node.children[0]==='确认安装').props.onClick()
+  assert.equal(calls.filter(call=>call.path.endsWith('/execute')).length,1)
+  assert.deepEqual(JSON.parse(calls.find(call=>call.path.endsWith('/execute')).body),{intentId:id})
 })

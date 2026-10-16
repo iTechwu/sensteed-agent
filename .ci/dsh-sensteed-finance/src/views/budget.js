@@ -22,7 +22,7 @@ function BudgetView({ ctx, t }) {
   const availableViews = BUDGET_VIEWS.filter(([id]) => ctx.financeWriter || !['adjustments', 'allocations', 'versions'].includes(id))
   useEffect(() => { if (!availableViews.some(([id]) => id === view)) setView('matrix') }, [ctx.financeWriter])
   const [view, setView] = useState(() => BUDGET_VIEWS.map(([id]) => id).includes(ctx.drillParams?.view) ? ctx.drillParams.view : 'matrix')
-  const [filters, setFilters] = useState({ expenseType: '', departmentId: '', versionId: '', month: ctx.drillParams?.month ? String(ctx.drillParams.month) : '', unassigned: false })
+  const [filters, setFilters] = useState({ expenseType: ctx.drillParams?.expenseType || '', departmentId: ctx.drillParams?.departmentId || '', versionId: ctx.drillParams?.versionId || '', recordType: ctx.drillParams?.recordType || '', month: ctx.drillParams?.month ? String(ctx.drillParams.month) : '', unassigned: false })
   const [page, setPage] = useState(1)
   const [budget, setBudget] = useState(null) // { summary, lines }
   const [pr, setPr] = useState(null)
@@ -37,6 +37,7 @@ function BudgetView({ ctx, t }) {
   const query = (extra = {}) => {
     const params = new URLSearchParams({ year })
     if (orgId) params.set('orgId', orgId)
+    if (view === 'ledger' && filters.recordType) params.set('recordType', filters.recordType)
     if (filters.expenseType) params.set('expenseType', filters.expenseType)
     if (filters.departmentId) params.set('departmentId', filters.departmentId)
     if (filters.versionId) params.set('versionId', filters.versionId)
@@ -57,7 +58,7 @@ function BudgetView({ ctx, t }) {
       api(`/pr?${query({ page, limit: PAGE_SIZE })}`).then(value => { if (!cancelled) setPr(value) }).catch(() => { if (!cancelled) setPr({ error: true }) })
     }
     return () => { cancelled = true }
-  }, [view, page, year, orgId, filters.expenseType, filters.departmentId, filters.versionId, filters.month, filters.unassigned, revision, reloadTick])
+  }, [view, page, year, orgId, filters.expenseType, filters.departmentId, filters.versionId, filters.month, filters.recordType, filters.unassigned, revision, reloadTick])
 
   useEffect(() => {
     api(`/budget-versions?year=${year}`).then(value => setVersions(value.data ?? { list: [] })).catch(() => setVersions({ list: [] }))
@@ -75,15 +76,16 @@ function BudgetView({ ctx, t }) {
     } catch (error) { setNotice(`${t('opFailed')}: ${error.message}`); return false } finally { setBusy(false) }
   }
 
-  const activeCount = ['expenseType', 'departmentId', 'versionId', 'month'].filter(key => filters[key]).length + (filters.unassigned ? 1 : 0)
+  const activeCount = ['expenseType', 'departmentId', 'versionId', 'month', 'recordType'].filter(key => filters[key]).length + (filters.unassigned ? 1 : 0)
   const filterBar = h('div', { className: 'sf-filters sf-budget-filters' },
+    view === 'ledger' ? h(Select, { 'aria-label': 'PR 记录类型', value: filters.recordType || '', onChange: value => { setPage(1); setFilters(current => ({ ...current, recordType: value })) }, options: [['SUBMITTED', '已打 PR'], ['ESTIMATED', '预计 PR']], placeholder: '全部 PR 类型' }) : null,
     h(Select, { value: filters.expenseType, onChange: value => { setPage(1); setFilters(f => ({ ...f, expenseType: value })) }, options: EXPENSE_TYPES.map(([id, label]) => [id, t(label)]), placeholder: t('expenseType') }),
     h(SearchSelect, { value: filters.departmentId, onChange: value => { setPage(1); setFilters(f => ({ ...f, departmentId: value })) }, options: (departments || []).map(d => [d.id, d.name]), placeholder: t('department') }),
     h(Select, { value: filters.month, onChange: value => { setPage(1); setFilters(f => ({ ...f, month: value })) }, options: Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1} 月`]), placeholder: t('monthCol') }),
     view === 'matrix' || view === 'lines' ? h(SearchSelect, { value: filters.versionId, onChange: value => { setPage(1); setFilters(f => ({ ...f, versionId: value })) }, options: (versions?.list || []).map(version => [version.id, budgetVersionLabel(version)]), placeholder: t('version') }) : null,
     view === 'matrix' || view === 'lines' ? h('label', { className: 'sf-row', style: { gap: 6, fontSize: 12, color: 'var(--sf-ink2)' } },
       h('input', { type: 'checkbox', checked: filters.unassigned, onChange: event => { setPage(1); setFilters(f => ({ ...f, unassigned: event.target.checked })) } }), t('unassigned')) : null,
-    activeCount > 0 ? h(LinkButton, { onClick: () => { setPage(1); setFilters({ expenseType: '', departmentId: '', versionId: '', month: '', unassigned: false }) } }, `${t('clearFilters')} (${activeCount})`) : null)
+    activeCount > 0 ? h(LinkButton, { onClick: () => { setPage(1); setFilters({ expenseType: '', departmentId: '', versionId: '', recordType: '', month: '', unassigned: false }) } }, `${t('clearFilters')} (${activeCount})`) : null)
 
   const savedViewsBar = h('div', { className: 'sf-row' },
     ...(savedViews?.list || []).map(item => h('span', { key: item.id, className: 'sf-pill sf-pill-muted' },
@@ -132,7 +134,7 @@ function MatrixView({ budget, t, onCell }) {
   const groups = new Map()
   for (const row of rows) {
     const key = `${row.orgName ?? t('unassigned')}|${row.expenseType ?? ''}|${row.departmentName ?? ''}`
-    if (!groups.has(key)) groups.set(key, { label: [row.orgName ?? t('unassigned'), row.expenseType ? t(EXPENSE_LABELS[row.expenseType] ?? row.expenseType) : '', row.departmentName].filter(Boolean).join(' / '), months: {}, total: { budget: 0, pr: 0, paid: 0, prEstimated: 0 } })
+    if (!groups.has(key)) groups.set(key, { label: [row.orgName ?? t('unassigned'), row.expenseType ? financeEnumLabel(row.expenseType, t, EXPENSE_LABELS) : '', row.departmentName].filter(Boolean).join(' / '), months: {}, total: { budget: 0, pr: 0, paid: 0, prEstimated: 0 } })
     const group = groups.get(key)
     const month = row.month ?? 0
     group.months[month] = {
@@ -204,7 +206,7 @@ function MonthView({ budget, t }) {
     h(Card, { title: `${month} ${t('monthCol')} · ${t('orgSummaryFull')}`, unit: t('unitNote') }, h(Table, { tableId: 'finance-MonthView-1',
       columns: [
         { label: t('org'), key: 'orgName', render: row => row.orgName ?? t('unassigned'), stickyLeft: true },
-        { label: t('expenseType'), key: 'expenseType', render: row => row.expenseType ? t(EXPENSE_LABELS[row.expenseType] ?? row.expenseType) : '—' },
+        { label: t('expenseType'), key: 'expenseType', render: row => row.expenseType ? financeEnumLabel(row.expenseType, t, EXPENSE_LABELS) : '—' },
         { label: t('kpiBudget'), key: 'budgetAmount', render: row => wan(row.budgetAmount) ?? '—', num: true },
         { label: t('kpiPrSubmitted'), key: 'prSubmittedAmount', render: row => wan(row.prSubmittedAmount) ?? '—', num: true },
         { label: t('kpiPaid'), key: 'paidAmount', render: row => wan(row.paidAmount) ?? '—', num: true },
@@ -224,7 +226,7 @@ function LinesView({ budget, page, onPage, t, onDetail }) {
         { label: t('org'), key: 'orgName', render: row => row.orgName ?? h(Badge, { tone: 'amber' }, t('unassigned')), stickyLeft: true },
         { label: t('department'), key: 'departmentName' },
         { label: t('costItem'), key: 'costItemName' },
-        { label: t('expenseType'), key: 'expenseType', render: row => row.expenseType ? t(EXPENSE_LABELS[row.expenseType] ?? row.expenseType) : '—' },
+        { label: t('expenseType'), key: 'expenseType', render: row => row.expenseType ? financeEnumLabel(row.expenseType, t, EXPENSE_LABELS) : '—' },
         { label: t('monthCol'), key: 'month', sortValue: row => row.month, render: row => mm(row.month), num: true },
         { label: t('kpiBudget'), key: 'budgetAmount', render: row => wan(row.budgetAmount) ?? '—', num: true },
         { label: t('kpiPrSubmitted'), key: 'prSubmittedAmount', render: row => wan(row.prSubmittedAmount) ?? '—', num: true },
@@ -239,7 +241,7 @@ function LineDetailDialog({ line, t, onClose }) {
   const occupied = (finite(line.prSubmittedAmount) ?? 0) + (finite(line.paidAmount) ?? 0) + (finite(line.allocatedAmount) ?? 0)
   return h(Dialog, { title: t('budgetLinesTitle'), onClose },
     h('dl', { className: 'sf-evidence' },
-      ...[['org', line.orgName ?? t('unassigned')], ['department', line.departmentName ?? '—'], ['costItem', line.costItemName ?? '—'], ['month', mm(line.month)], ['expenseType', line.expenseType ? t(EXPENSE_LABELS[line.expenseType] ?? line.expenseType) : '—']].map(([key, value]) =>
+      ...[['org', line.orgName ?? t('unassigned')], ['department', line.departmentName ?? '—'], ['costItem', line.costItemName ?? '—'], ['month', mm(line.month)], ['expenseType', line.expenseType ? financeEnumLabel(line.expenseType, t, EXPENSE_LABELS) : '—']].map(([key, value]) =>
         h('div', { key, className: 'sf-evidence-item' }, h('small', null, t(key)), h('strong', null, value))),
       ...[[t('kpiBudget'), line.budgetAmount], [t('kpiPrSubmitted'), line.prSubmittedAmount], [t('kpiPrEstimated'), line.prEstimatedAmount], [t('kpiPaid'), line.paidAmount], [t('available'), line.availableAmount]].map(([label, value]) =>
         h('div', { key: label, className: 'sf-evidence-item' }, h('small', null, label), h('strong', null, wan(value) ?? '—')))))
@@ -258,7 +260,7 @@ function LedgerView({ pr, page, onPage, t }) {
       { label: t('department'), key: 'departmentName' },
       { label: t('monthCol'), key: 'month', sortValue: row => row.month, render: row => mm(row.month), num: true },
       { label: t('amount'), key: 'budgetAmount', render: row => wan(row.budgetAmount) ?? '—', num: true },
-      { label: t('statusCol'), key: 'status', render: row => row.status ? h(Pill, { tone: /完成|已批|通过|已发布|已生效/.test(financeLabel(row.status)) ? 'green' : /审批|待|处理/.test(financeLabel(row.status)) ? 'blue' : 'muted' }, financeLabel(row.status)) : '—' },
+      { label: t('statusCol'), key: 'status', render: row => row.status ? h(Pill, { tone: /完成|已批|通过|已发布|已生效/.test(financeDisplayValue(row.status, 'status')) ? 'green' : /审批|待|处理/.test(financeDisplayValue(row.status, 'status')) ? 'blue' : 'muted' }, financeDisplayValue(row.status, 'status')) : '—' },
     ],
     rows, empty: t('empty'),
   }), h(Pager, { page, total: pr?.data?.total ?? pr?.total, limit: PAGE_SIZE, onPage }))
@@ -332,7 +334,7 @@ function AdjustmentsView({ page, onPage, t, busy, revision, reloadTick, act, onD
   }, [status, page, revision, reloadTick])
   const rows = data?.adjustments || []
   const toneOf = state => ADJ_STATUS_TONES[state] ?? 'muted'
-  const labelOf = state => t(ADJ_STATUS_KEYS[state] ?? state)
+  const labelOf = state => financeEnumLabel(state, t, ADJ_STATUS_KEYS)
   return h('div', { className: 'sf-stack' },
     h('div', { className: 'sf-row-between' },
       h(PillTabs, { tabs: ADJ_STATUSES, value: status, onChange: value => { setStatus(value); onPage(1) }, t }),
@@ -341,7 +343,7 @@ function AdjustmentsView({ page, onPage, t, busy, revision, reloadTick, act, onD
       h(Table, { tableId: 'finance-AdjustmentsView-1',
         columns: [
           { label: t('adjustmentOf'), key: 'code', render: row => `${row.code ?? ''}` },
-          { label: t('adjType'), key: 'type', render: row => t(ADJ_TYPES.find(([id]) => id === row.type)?.[1] ?? row.type) },
+          { label: t('adjType'), key: 'type', render: row => financeEnumLabel(row.type, t, Object.fromEntries(ADJ_TYPES)) },
           { label: t('amount'), key: 'totalAmount', render: row => wan(row.totalAmount) ?? '—', num: true },
           { label: t('statusCol'), key: 'status', render: row => h(Pill, { tone: toneOf(row.status) }, labelOf(row.status)) },
           { label: t('lastSeen'), key: 'submittedAt', render: row => shortDate(row.submittedAt) ?? '—', num: true },
@@ -430,7 +432,7 @@ function AdjustDetailDialog({ id, t, onClose }) {
   const flow = detail?.flows || detail?.statusLogs || []
   return h(Dialog, { title: `${t('adjustmentOf')} ${detail?.code ?? ''}`, onClose },
     h('div', { className: 'sf-stack' },
-      detail ? h('div', { className: 'sf-row' }, h(Pill, { tone: ADJ_STATUS_TONES[detail.status] ?? 'muted' }, t(ADJ_STATUS_KEYS[detail.status] ?? detail.status)), h('span', { className: 'sf-note' }, `${t('adjType')}：${t(ADJ_TYPES.find(([tid]) => tid === detail.type)?.[1] ?? detail.type)}`)) : null,
+      detail ? h('div', { className: 'sf-row' }, h(Pill, { tone: ADJ_STATUS_TONES[detail.status] ?? 'muted' }, financeEnumLabel(detail.status, t, ADJ_STATUS_KEYS)), h('span', { className: 'sf-note' }, `${t('adjType')}：${financeEnumLabel(detail.type, t, Object.fromEntries(ADJ_TYPES))}`)) : null,
       h(Table, { tableId: 'finance-AdjustDetailDialog-1',
         columns: [
           { label: t('inOut'), key: 'side', render: row => h(Badge, { tone: row.side === 'IN' ? 'green' : 'rose' }, row.side === 'IN' ? t('lineIn') : t('lineOut')) },
@@ -443,7 +445,7 @@ function AdjustDetailDialog({ id, t, onClose }) {
       flow.length ? h('div', null, h('strong', null, t('flow')), h('div', { className: 'sf-timeline' }, ...flow.map((item, index) =>
         h('div', { key: index, className: 'sf-timeline-row' },
           h('span', { className: 'sf-timeline-dot' }),
-          h('div', { className: 'sf-timeline-main' }, h('span', null, `${financeLabel(item.action ?? item.toStatus)} · ${item.operatorName ?? item.operator ?? '—'}`), h('small', null, shortDate(item.at ?? item.createdAt) ?? '')),
+          h('div', { className: 'sf-timeline-main' }, h('span', null, `${financeDisplayValue(item.action ?? item.toStatus, item.action ? 'action' : 'toStatus')} · ${item.operatorName ?? item.operator ?? '—'}`), h('small', null, shortDate(item.at ?? item.createdAt) ?? '')),
           h('span', { className: 'sf-note' }, item.note ?? ''))))) : null))
 }
 
@@ -487,7 +489,7 @@ function AllocationsView({ query, page, onPage, t, revision, reloadTick, act, on
     h(Card, { title: t('allocRecent'), unit: t('unitNote') },
       h(Table, { tableId: 'finance-AllocationsView-2',
         columns: [
-          { label: t('dataset'), key: 'sourceType' },
+          { label: t('dataset'), key: 'sourceType', render: row => financeDisplayValue(row.sourceType, 'sourceType') },
           { label: t('adjLineBudget'), key: 'budgetLine', sortValue: row => row.budgetLine ? lineLabel(row.budgetLine) : row.budgetLineName ?? row.budgetLineId, render: row => row.budgetLineName ?? row.budgetLineId ?? '—' },
           { label: t('amount'), key: 'amount', render: row => wan(row.amount) ?? '—', num: true },
           { label: t('actions'), key: 'actions', sortable: false, render: row => h(LinkButton, { onClick: () => act(`/allocations/${row.id}/remove`, {}) }, t('allocRemove')) },
@@ -523,8 +525,8 @@ function VersionsView({ versions, year, t, revision, reloadTick, act, onDialog }
     h(Card, { title: t('viewVersions'), actions: [h(LinkButton, { key: 'diff', onClick: () => onDialog({ kind: 'versionDiff' }) }, t('verDiff'))] }, h(Table, { tableId: 'finance-VersionsView-1',
       columns: [
         { label: t('verName'), render: row => h('span', null, row.name, ' ', row.isPrimary ? h(Badge, { key: 'p', tone: 'blue' }, t('primaryTag')) : null), stickyLeft: true },
-        { label: t('verType'), key: 'type' },
-        { label: t('verStatus'), key: 'status', render: row => h(Pill, { tone: VERSION_STATUS_TONES[row.status] ?? 'muted' }, t(VERSION_STATUS_KEYS[row.status] ?? row.status)) },
+        { label: t('verType'), key: 'type', render: row => financeDisplayValue(row.type, 'type') },
+        { label: t('verStatus'), key: 'status', render: row => h(Pill, { tone: VERSION_STATUS_TONES[row.status] ?? 'muted' }, financeEnumLabel(row.status, t, VERSION_STATUS_KEYS)) },
         { label: t('verLines'), key: 'lineCount', num: true },
         { label: t('kpiBudget'), key: 'budgetTotal', render: row => wan(row.budgetTotal) ?? '—', num: true },
         { label: t('kpiPrSubmitted'), key: 'prSubmittedTotal', render: row => wan(row.prSubmittedTotal) ?? '—', num: true },
@@ -553,7 +555,7 @@ function CarryoverCard({ t, revision, reloadTick, act, onDialog }) {
   }, [revision, reloadTick])
   return h(Card, { title: t('carryoverRules'), actions: [h(LinkButton, { key: 'add', onClick: () => onDialog({ kind: 'carryover' }) }, h(Glyph, { name: 'plus', size: 12 }), t('ruleAdd'))] }, h(Table, { tableId: 'finance-CarryoverCard-1',
     columns: [
-      { label: t('expenseType'), key: 'expenseType', render: row => row.expenseType ? t(EXPENSE_LABELS[row.expenseType] ?? row.expenseType) : t('all') },
+      { label: t('expenseType'), key: 'expenseType', render: row => row.expenseType ? financeEnumLabel(row.expenseType, t, EXPENSE_LABELS) : t('all') },
       { label: t('carryoverMode'), key: 'mode', render: row => row.mode === 'FULL' ? t('modeFull') : row.mode === 'PERCENT' ? `${t('modePercent')} ${row.percent ?? 100}%` : `${t('modeExpire')} ${t('expireMonth')} ${row.expireMonth ?? '—'}` },
       { label: t('statusCol'), key: 'enabled', render: row => h(Pill, { tone: row.enabled ? 'green' : 'muted' }, row.enabled ? t('ruleEnabled') : t('ruleDisabled')) },
       { label: t('actions'), key: 'actions', sortable: false, render: row => h('div', { className: 'sf-row', style: { justifyContent: 'flex-end', flexWrap: 'nowrap' } },
@@ -583,7 +585,7 @@ function CarryoverDialog({ t, onClose, act }) {
     h(PrimaryButton, { key: 'ok', onClick: submit }, t('submit')),
   ] },
     h('div', { className: 'sf-stack' },
-      h(FormRow, { label: t('carryoverMode') }, h(Select, { value: mode, onChange: setMode, options: [['FULL', 'modeFull'], ['PERCENT', 'modePercent'], ['EXPIRE', 'modeExpire']] })),
+      h(FormRow, { label: t('carryoverMode') }, h(Select, { value: mode, onChange: setMode, options: [['FULL', t('modeFull')], ['PERCENT', t('modePercent')], ['EXPIRE', t('modeExpire')]] })),
       h(FormRow, { label: t('expenseType') }, h(Select, { value: expenseType, onChange: setExpenseType, options: EXPENSE_TYPES.map(([id, label]) => [id, t(label)]), placeholder: t('all') })),
       mode === 'PERCENT' ? h(FormRow, { label: t('percent') }, h(Field, { type: 'number', min: 1, max: 100, value: percent, onChange: setPercent })) : null,
       mode === 'EXPIRE' ? h(FormRow, { label: t('expireMonth') }, h(Field, { type: 'number', min: 1, max: 12, value: expireMonth, onChange: setExpireMonth })) : null))
@@ -610,7 +612,7 @@ function VersionDiffDialog({ versions, year, t, onClose }) {
       h(Table, { tableId: 'finance-VersionDiffDialog-1',
         columns: [
           { label: t('org'), key: 'orgName', render: row => row.orgName ?? '—', stickyLeft: true },
-          { label: t('expenseType'), key: 'expenseType', render: row => row.expenseType ? t(EXPENSE_LABELS[row.expenseType] ?? row.expenseType) : '—' },
+          { label: t('expenseType'), key: 'expenseType', render: row => row.expenseType ? financeEnumLabel(row.expenseType, t, EXPENSE_LABELS) : '—' },
           { label: t('diffAmount'), key: 'diffAmount', render: row => { const value = finite(row.diffAmount); return h('span', { className: value < 0 ? 'sf-neg' : 'sf-pos' }, wan(value) ?? '—') }, num: true },
         ],
         rows, empty: t('empty'),

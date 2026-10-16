@@ -127,7 +127,7 @@ test('rejects traversal and symbolic-link entries in shared skill archives', () 
     'SKILL.md': new TextEncoder().encode('---\nname: unsafe\ndescription: Unsafe\n---\n'),
     '../escape.txt': new TextEncoder().encode('outside'),
   }))
-  assert.throws(() => __test.validateZipArchive(traversal), /unsafe/u)
+  assert.throws(() => __test.validateZipArchive(traversal), { code: 'HUB_UNSAFE_ARCHIVE' })
 })
 
 test('rejects archive path collisions and the install marker filename', () => {
@@ -196,4 +196,18 @@ test('hubViewUrl exchanges a one-time ticket and falls back to the plain page', 
   // 票据格式不符(过短/含特殊字符):回退直开
   assert.deepEqual(await __test.hubViewUrl(session, 'skills', { fetch: async () => ({ ok: true, json: async () => ({ code: 200, data: { ticket: 'bad ticket!' } }) }) }),
     { url: 'https://ai.hozonauto.com/plugins/skills' })
+})
+
+test('Hub detail links preserve the verified workspace in ticket and fallback paths', async () => {
+  const workspaceId = '10000000-0000-4000-8000-000000000001'
+  const resourceId = '20000000-0000-4000-8000-000000000001'
+  const next = `/skills/${resourceId}?workspace=${workspaceId}`
+  const ctx = { dofeAuth: { getDatasourceSession: () => ({ accessToken: 'test-placeholder' }) } }
+  const result = await __test.hubViewUrl(ctx, `skills/${resourceId}`, { workspaceId, fetch: async (_url, init) => {
+    assert.deepEqual(JSON.parse(init.body), { next })
+    return { ok: true, json: async () => ({ code: 200, data: { ticket: 'x'.repeat(32) } }) }
+  } })
+  assert.equal(new URL(result.url).searchParams.get('next'), next)
+  assert.deepEqual(await __test.hubViewUrl({}, `skills/${resourceId}`, { workspaceId }), { url: `https://ai.hozonauto.com/plugins${next}` })
+  await assert.rejects(__test.hubViewUrl(ctx, 'skills/../../elsewhere'), /Invalid Hub target/u)
 })

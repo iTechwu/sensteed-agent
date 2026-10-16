@@ -32,9 +32,9 @@ function EngineView({ ctx }) {
   const resultTable = (resource, title, columns) => h(Card, { title, unit: '元' }, h(FinanceResource, { resource }, h(Table, { tableId: `engine-${title}`, rows: financeRows(resource.data), empty: validId ? '暂无记录' : '请选择预算版本', columns: financeColumns(columns) })))
   const run = async (target, body, method) => { const result = await action.run(target, body, method); setReceipt(result); return result }
   return h('div', { className: 'sf-stack' },
-    h(FinanceResource, { resource: versions }, h(FormRow, { label: '预算版本' }, h(Select, { 'aria-label': '编制预算版本', value: validId || '', options: rows.map(row => [row.id, `${row.name} · ${financeLabel(row.status)}${row.isPrimary ? ' · 主版本' : ''}`]), placeholder: '选择预算版本', onChange: selectVersion }))),
+    h(FinanceResource, { resource: versions }, h(FormRow, { label: '预算版本' }, h(Select, { 'aria-label': '编制预算版本', value: validId || '', options: rows.map(row => [row.id, `${row.name} · ${financeDisplayValue(row.status, 'status')}${row.isPrimary ? ' · 主版本' : ''}`]), placeholder: '选择预算版本', onChange: selectVersion }))),
     h(Notice, null, action.notice),
-    version ? h('p', { className: 'sf-note' }, `${financeLabel(version.status)} · ${version.lineCount ?? 0} 行。草稿可编辑；确认、发布和锁定以服务端状态与发布检查为准。`) : null,
+    version ? h('p', { className: 'sf-note' }, `${financeDisplayValue(version.status, 'status')} · ${version.lineCount ?? 0} 行。草稿可编辑；确认、发布和锁定以服务端状态与发布检查为准。`) : null,
     validId && (canEdit || canPublish) ? h('div', { className: 'sf-row' },
       canEdit ? h(GhostButton, { disabled: action.busy, onClick: () => setDialog({ kind: 'roll', title: '创建滚动预测草稿' }) }, '创建滚动草稿') : null,
       draft && canEdit ? h(GhostButton, { disabled: action.busy, onClick: () => setDialog({ kind: 'params', title: '新建/更新预算参数' }) }, '维护预算参数') : null,
@@ -51,7 +51,7 @@ function EngineView({ ctx }) {
       { key: 'actions', label: '操作', sortable: false, render: row => canEdit && draft && canEdit ? h(GhostButton, { disabled: action.busy, onClick: () => setDialog({ kind: 'remove', title: '移除草稿销量输入', row }) }, '移除输入') : null },
     ] }))),
     resultTable(runs, '计算批次历史', [['formulaVersion', '公式版本'], ['status', '状态'], ['paramVersionId', '参数版本'], ['startedAt', '计算时间'], ['errorSummary', '失败原因']]),
-    h('div', { className: 'sf-row' }, h(Select, { 'aria-label': '计算结果批次', value: validRun, onChange: setRunId, options: runRows.map(row => [row.id, `${row.formulaVersion} ${row.startedAt} ${financeLabel(row.status)}`]), placeholder: '选择计算结果' }), h(Select, { 'aria-label': '差异基准批次', value: validBase, onChange: setBaseRunId, options: runRows.map(row => [row.id, `${row.formulaVersion} ${row.startedAt}`]), placeholder: '选择差异基准' })),
+    h('div', { className: 'sf-row' }, h(Select, { 'aria-label': '计算结果批次', value: validRun, onChange: setRunId, options: runRows.map(row => [row.id, `${financeDisplayValue(row.formulaVersion, 'formulaVersion')} ${row.startedAt} ${financeDisplayValue(row.status, 'status')}`]), placeholder: '选择计算结果' }), h(Select, { 'aria-label': '差异基准批次', value: validBase, onChange: setBaseRunId, options: runRows.map(row => [row.id, `${financeDisplayValue(row.formulaVersion, 'formulaVersion')} ${row.startedAt}`]), placeholder: '选择差异基准' })),
     resultTable(outputs, '计算结果', [['kind', '指标'], ['year', '年度'], ['month', '月份'], ['amount', '金额']]),
     resultTable(diff, '计算批次差异', [['kind', '指标'], ['year', '年度'], ['month', '月份'], ['before', '基准'], ['after', '对比'], ['delta', '差额']]),
     h(FinanceResource, { resource: statements }, ...[['income', '管理利润表', [['revenue', '收入'], ['expense', '费用'], ['tax', '税费'], ['profit', '利润']]], ['cashflow', '管理现金流量表', [['inflow', '流入'], ['outflow', '流出'], ['endingBalance', '月末余额']]], ['balance', '简化资产负债表', [['cash', '现金'], ['receivable', '应收'], ['payable', '应付'], ['inventory', '存货'], ['equity', '权益']]]].map(([key, title, columns]) => h(Card, { key, title, unit: '元' }, h(Table, { tableId: `engine-${key}`, rows: statements.data?.[key] || [], columns: financeColumns([['year', '年度'], ['month', '月份'], ...columns]), empty: '请选择计算结果批次' })))),

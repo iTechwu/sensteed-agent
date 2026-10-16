@@ -1,4 +1,11 @@
-// 片段 5/7 视图：资金（四子视图：资金汇总/排款工作台/调增审批/收入计划；排款/调增/详情 Dialog）
+// 片段 5/7 视图：资金（四子视图：资金汇总/排款工作台/调整审批/收入计划；排款/调整/详情 Dialog）
+
+// 实付日期按财务业务时区展示，避免中国本地零点保存为 UTC 后退一天。
+function actualPaymentDate(value) {
+  if (!value) return null
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString('sv-SE', { timeZone: 'Asia/Shanghai' })
+}
 
 const PRIORITIES = [['HIGH', 'priHigh'], ['MEDIUM', 'priMid'], ['LOW', 'priLow']]
 
@@ -11,7 +18,7 @@ function CashView({ ctx, t, onDrill }) {
   const [cash, setCash] = useState(null)
   const [plans, setPlans] = useState(null)
   const [revenues, setRevenues] = useState(null)
-  const [filters, setFilters] = useState({ planType: '', departmentId: '', month: ctx.drillParams?.month ? String(ctx.drillParams.month) : '', unassigned: false })
+  const [filters, setFilters] = useState({ planType: ctx.drillParams?.planType || '', departmentId: ctx.drillParams?.departmentId || '', month: ctx.drillParams?.month ? String(ctx.drillParams.month) : '', unassigned: false })
   const [page, setPage] = useState(1)
   const [revenuePage, setRevenuePage] = useState(1)
   const [busy, setBusy] = useState(false)
@@ -70,11 +77,12 @@ function CashView({ ctx, t, onDrill }) {
       notice ? h(Notice, null, notice) : null),
     filterBar ? h('div', { className: 'sf-row-between' }, filterBar) : null,
 
-    tab === 'summary' ? h(SummaryTab, { cash, t }) : null,
+    tab === 'summary' ? h(SummaryTab, { cash, t, year }) : null,
     tab === 'plans' ? h(PlansTab, { rows: planRows, total: plans?.data?.total ?? plans?.total, page, onPage: setPage, t, busy, act, canWrite, onDialog: setDialog }) : null,
     tab === 'adjustments' ? h(PlanAdjustmentsTab, { t, revision, reloadTick, busy, act, canWrite, canVerify, onDialog: setDialog }) : null,
     tab === 'revenue' ? h(RevenueTab, { revenues, page: revenuePage, onPage: setRevenuePage, t, canWrite, onBackfill: row => setDialog({ kind: 'backfill', row }) }) : null,
 
+    dialog?.kind === 'closeRemaining' && canWrite ? h(CloseRemainingDialog, { plan: dialog.plan, t, busy, onClose: () => setDialog(null), act }) : null,
     dialog?.kind === 'schedule' ? h(ScheduleDialog, { plan: dialog.plan, t, onClose: () => setDialog(null), act }) : null,
     dialog?.kind === 'increase' ? h(IncreaseDialog, { plan: dialog.plan, t, onClose: () => setDialog(null), act }) : null,
     dialog?.kind === 'planDetail' ? h(PlanDetailDialog, { plan: dialog.plan, t, onClose: () => setDialog(null) }) : null,
@@ -91,73 +99,59 @@ function PlanAdjustDetailDialog({ id, t, onClose }) {
     api(`/plan-adjustments/${id}`).then(value => { if (!cancelled) setDetail(value.data) }).catch(() => { if (!cancelled) setDetail({ error: true }) })
     return () => { cancelled = true }
   }, [id])
-  const flow = detail?.flows || detail?.statusLogs || []
+  const flow = detail?.logs || detail?.flows || detail?.statusLogs || []
   const adjustment = detail?.adjustment ?? detail
   return h(Dialog, { title: `${t('adjustmentOf')} ${adjustment?.code ?? ''}`, onClose },
     h('div', { className: 'sf-stack' },
       adjustment ? h('div', { className: 'sf-row' },
-        h(Pill, { tone: ADJ_STATUS_TONES[adjustment.status] ?? 'muted' }, t(ADJ_STATUS_KEYS[adjustment.status] ?? adjustment.status)),
+        h(Pill, { tone: ADJ_STATUS_TONES[adjustment.status] ?? 'muted' }, financeEnumLabel(adjustment.status, t, ADJ_STATUS_KEYS)),
         h('span', { className: 'sf-note' }, `${wan(adjustment.oldAmount) ?? '—'} → ${wan(adjustment.newAmount) ?? '—'} ${t('unitYuan')}`)) : null,
       adjustment?.reason ? h('p', { className: 'sf-note' }, `${t('increaseReason')}：${adjustment.reason}`) : null,
       flow.length ? h('div', null, h('strong', null, t('flow')), h('div', { className: 'sf-timeline' }, ...flow.map((item, index) =>
         h('div', { key: index, className: 'sf-timeline-row' },
           h('span', { className: 'sf-timeline-dot' }),
-          h('div', { className: 'sf-timeline-main' }, h('span', null, `${financeLabel(item.action ?? item.toStatus)} · ${item.operatorName ?? item.operator ?? '—'}`), h('small', null, shortDate(item.at ?? item.createdAt) ?? '')),
+          h('div', { className: 'sf-timeline-main' }, h('span', null, `${financeDisplayValue(item.action ?? item.toStatus, item.action ? 'action' : 'toStatus')} · ${item.operatorName ?? item.operator ?? '—'}`), h('small', null, shortDate(item.at ?? item.createdAt) ?? '')),
           h('span', { className: 'sf-note' }, item.note ?? ''))))) : null))
 }
 
-// ---- 汇总：KPI + 矩阵（sticky 首列）+ 平铺表 ----
+// ---- 汇总：当月执行 + 主体/月明细；空值保留未知，余额不跨月相加 ----
 
-function SummaryTab({ cash, t }) {
-  if (cash?.error) return h(EmptyState, null, t('loadError'))
-  const rows = cash?.data?.list || cash?.list || []
-  const totals = rows.reduce((acc, row) => {
-    acc.plannedIncome += finite(row.plannedIncome) ?? 0
-    acc.actualIncome += finite(row.actualIncome) ?? 0
-    acc.plannedExpense += finite(row.plannedExpense) ?? 0
-    acc.actualExpense += finite(row.actualExpense) ?? 0
-    return acc
-  }, { plannedIncome: 0, actualIncome: 0, plannedExpense: 0, actualExpense: 0 })
-  return h('div', { className: 'sf-stack' },
-    h('div', { className: 'sf-kpis' },
-      h(KpiCard, { icon: 'sparkle', label: t('kpiRevenueAch'), value: ratio(totals.actualIncome, totals.plannedIncome) ?? '—', hint: `${wan(totals.actualIncome) ?? '—'} / ${wan(totals.plannedIncome) ?? '—'}` }),
-      h(KpiCard, { icon: 'goal', label: t('kpiSpendExec'), value: ratio(totals.actualExpense, totals.plannedExpense) ?? '—', hint: `${wan(totals.actualExpense) ?? '—'} / ${wan(totals.plannedExpense) ?? '—'}` }),
-      h(KpiCard, { icon: 'data', label: t('kpiNetInflow'), value: wan(totals.actualIncome - totals.actualExpense), negative: totals.actualIncome - totals.actualExpense < 0 })),
-    h(Card, { title: t('cashMatrix'), unit: t('unitNote') }, h(CashMatrix, { rows, t })))
+function cashSummaryModel(rows, selectedYear, now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Shanghai', year: 'numeric', month: 'numeric' }).formatToParts(now)
+  const year = Number(parts.find(part => part.type === 'year').value)
+  const month = Number(parts.find(part => part.type === 'month').value)
+  const isCurrentYear = Number(selectedYear) === year
+  const current = isCurrentYear ? rows.filter(row => row.year === year && row.month === month) : []
+  const totals = Object.fromEntries(['actualBalance', 'plannedIncome', 'plannedExpense', 'actualIncome', 'actualExpense', 'remainingPayment'].map(key => {
+    const values = current.map(row => finite(row[key]))
+    return [key, values.length && values.every(value => value !== null) ? values.reduce((sum, value) => sum + value, 0) : null]
+  }))
+  return { year, month, isCurrentYear, rows: current, totals }
 }
 
-function CashMatrix({ rows, t }) {
-  if (!rows.length) return h(EmptyState, null, t('empty'))
-  const groups = new Map()
-  for (const row of rows) {
-    const key = row.orgName ?? t('unassigned')
-    if (!groups.has(key)) groups.set(key, {})
-    groups.get(key)[row.month] = row
-  }
-  return h(Table, { tableId: 'finance-CashMatrix-1',
-    minColumns: 1080,
+function SummaryTab({ cash, t, year, now }) {
+  if (cash?.error) return h(EmptyState, null, t('loadError'))
+  const rows = cash?.data?.list || cash?.list || []
+  const model = cashSummaryModel(rows, year, now)
+  return h('div', { className: 'sf-stack' },
+    model.isCurrentYear ? h(Card, { title: `${model.year}-${String(model.month).padStart(2, '0')} · ${t('cashMonthlyExecution')}`, unit: t('unitNote') },
+      h('div', { className: 'sf-kpis' },
+        ...[['actualBalance', 'cashBalance'], ['plannedIncome', 'plannedIncome'], ['plannedExpense', 'plannedExpense'], ['actualIncome', 'actualIncome'], ['actualExpense', 'actualExpense'], ['remainingPayment', 'remainingUnpaid']].map(([key, label]) =>
+          h(KpiCard, { key, icon: 'data', label: t(label), value: yuan(model.totals[key]) ?? '—', negative: model.totals[key] !== null && model.totals[key] < 0 }))),
+      h('p', { className: 'sf-note' }, t('cashMissingMetrics'))) : null,
+    h(Card, { title: t('cashSummaryTable'), unit: t('unitNote') }, h(CashSummaryTable, { rows, t })))
+}
+
+function CashSummaryTable({ rows, t }) {
+  return h(Table, { tableId: 'finance-CashSummaryTable-1',
     columns: [
-      { label: t('org'), key: 'org', stickyLeft: true },
-      ...Array.from({ length: 12 }, (_, index) => ({
-        label: `${index + 1}`,
-        key: 'month-' + (index + 1),
-        sortLabel: (index + 1) + '月余额',
-        sortValue: row => finite(row[index + 1]?.projectedBalance) ?? finite(row[index + 1]?.actualBalance),
-        num: true,
-        render: row => {
-          const cell = row[index + 1]
-          if (!cell) return h('span', { style: { color: 'var(--sf-ink3)' } }, '·')
-          const balance = finite(cell.projectedBalance) ?? finite(cell.actualBalance)
-          return h('div', { style: { display: 'grid', gap: 1, textAlign: 'right' } },
-            h('span', null, `收 ${wan(cell.actualIncome ?? cell.plannedIncome) ?? '—'}`),
-            h('span', null, `支 ${wan(cell.actualExpense ?? cell.plannedExpense) ?? '—'}`),
-            h('span', { className: balance != null && balance < 0 ? 'sf-neg' : '' }, `余 ${wan(balance) ?? '—'}`))
-        },
+      { label: t('org'), key: 'orgName', stickyLeft: true },
+      { label: t('year'), key: 'year', num: true },
+      { label: t('monthCol'), key: 'month', num: true },
+      ...[['prevMonthEndBalance', 'prevEndBalance'], ['plannedIncome', 'plannedIncome'], ['plannedExpense', 'plannedExpense'], ['projectedBalance', 'projectedBalance'], ['actualIncome', 'actualIncome'], ['actualExpense', 'actualExpense'], ['actualBalance', 'actualBalance'], ['remainingPayment', 'remainingUnpaid']].map(([key, label]) => ({
+        label: t(label), key, sortValue: row => finite(row[key]), num: true, render: row => wan(row[key]) ?? '—',
       })),
-    ],
-    rows: [...groups.entries()].map(([org, months]) => ({ org, ...months })),
-    rowKey: 'org',
-    empty: t('empty'),
+    ], rows, rowKey: 'id', empty: t('empty'),
   })
 }
 
@@ -168,18 +162,21 @@ function PlansTab({ rows, total, page, onPage, t, busy, act, canWrite = true, on
     h(Table, { tableId: 'finance-PlansTab-1',
       columns: [
         { label: t('org'), key: 'orgName', stickyLeft: true },
-        { label: t('planType'), key: 'planType', render: row => t(PLAN_LABELS[row.planType] ?? row.planType) },
+        { label: t('planType'), key: 'planType', render: row => financeEnumLabel(row.planType, t, PLAN_LABELS) },
         { label: t('description'), key: 'description' },
         { label: t('planMonth'), key: 'planMonth', sortValue: row => row.planMonth ?? row.month, render: row => mm(row.planMonth ?? row.month), num: true },
         { label: t('planned'), key: 'plannedAmount', render: row => wan(row.plannedAmount) ?? '—', num: true },
         { label: t('actual'), key: 'actualAmount', render: row => { const over = finite(row.actualAmount) !== null && finite(row.plannedAmount) !== null && row.actualAmount > row.plannedAmount; return h('span', { className: over ? 'sf-neg' : '' }, wan(row.actualAmount) ?? '—') }, num: true },
         { label: t('remaining'), key: 'remainingAmount', render: row => wan(row.remainingAmount) ?? '—', num: true },
+        { label: t('actualPaidDate'), key: 'actualPaidAt', render: row => actualPaymentDate(row.actualPaidAt) ?? '—', num: true },
+        { label: t('statusCol'), key: 'status', render: row => financeDisplayValue(row.status, 'status') },
         { label: t('scheduleDate'), key: 'scheduleDate', render: row => shortDate(row.scheduleDate) ?? '—', num: true },
-        { label: t('priority'), key: 'priority', render: row => row.priority ? h(Pill, { tone: row.priority === 'HIGH' ? 'rose' : row.priority === 'MEDIUM' ? 'amber' : 'muted' }, t(PRIORITIES.find(([id]) => id === row.priority)?.[1] ?? row.priority)) : '—' },
+        { label: t('priority'), key: 'priority', render: row => row.priority ? h(Pill, { tone: row.priority === 'HIGH' ? 'rose' : row.priority === 'MEDIUM' ? 'amber' : 'muted' }, financeEnumLabel(row.priority, t, Object.fromEntries(PRIORITIES))) : '—' },
         {
           label: t('actions'), key: 'actions', sortable: false,
           render: row => h('div', { className: 'sf-row', style: { flexWrap: 'nowrap', justifyContent: 'flex-end' } },
             h(LinkButton, { onClick: () => onDialog({ kind: 'planDetail', plan: row }) }, t('actDetail')),
+            canWrite && finite(row.remainingAmount) > 0 && row.status !== '剩余不再执行' ? h(LinkButton, { disabled: busy, onClick: () => onDialog({ kind: 'closeRemaining', plan: row }) }, t('closeRemaining')) : null,
             canWrite ? h(LinkButton, { disabled: busy, onClick: () => onDialog({ kind: 'schedule', plan: row }) }, t('schedule')) : null,
             canWrite ? h(LinkButton, { disabled: busy, onClick: () => onDialog({ kind: 'increase', plan: row }) }, t('increase')) : null),
         },
@@ -187,6 +184,23 @@ function PlansTab({ rows, total, page, onPage, t, busy, act, canWrite = true, on
       rows, empty: t('empty'),
     }),
     h(Pager, { page, total, limit: PAGE_SIZE, onPage }))
+}
+
+function CloseRemainingDialog({ plan, t, onClose, act, busy }) {
+  const [reason, setReason] = useState('')
+  const invalid = busy || !reason.trim()
+  const submit = async () => {
+    if (invalid) return
+    const saved = await act(`/rest/finance/payment-plans/${plan.id}/close-remaining`, { reason: reason.trim() })
+    if (saved !== false) onClose()
+  }
+  return h(Dialog, { title: t('closeRemaining'), onClose: busy ? () => {} : onClose, footer: [
+    h(GhostButton, { key: 'cancel', disabled: busy, onClick: onClose }, t('cancel')),
+    h(PrimaryButton, { key: 'ok', disabled: invalid, onClick: submit }, t('closeRemainingConfirm')),
+  ] }, h('div', { className: 'sf-stack' },
+    h('p', { className: 'sf-note' }, `${plan.description ?? ''} · ${t('remaining')}：${wan(plan.remainingAmount) ?? '—'}`),
+    h('p', { className: 'sf-note' }, t('closeRemainingHint')),
+    h(FormRow, { label: t('closeRemainingReason') }, h(Textarea, { value: reason, onChange: setReason, maxLength: 500, disabled: busy }))))
 }
 
 function ScheduleDialog({ plan, t, onClose, act }) {
@@ -211,42 +225,99 @@ function ScheduleDialog({ plan, t, onClose, act }) {
   ] },
     h('div', { className: 'sf-stack' },
       h(FormRow, { label: t('scheduleDate') }, h(Field, { type: 'date', value: scheduleDate, onChange: setScheduleDate })),
-      h(FormRow, { label: t('priority') }, h(Select, { value: priority, onChange: setPriority, options: PRIORITIES, placeholder: '—' })),
+      h(FormRow, { label: t('priority') }, h(Select, { value: priority, onChange: setPriority, options: PRIORITIES.map(([id, label]) => [id, t(label)]), placeholder: '—' })),
       h(FormRow, { label: t('acceptAcceptance') }, h(Switch, { checked: accepts, onChange: setAccepts, label: t('acceptAcceptance') })),
       accepts ? h(FormRow, { label: t('cashAmount') }, h(Field, { type: 'number', min: '0', step: '0.01', value: cashAmount, onChange: setCashAmount })) : null,
       accepts ? h(FormRow, { label: t('acceptanceAmount') }, h(Field, { type: 'number', min: '0', step: '0.01', value: acceptanceAmount, onChange: setAcceptanceAmount })) : null))
 }
 
+function validPlanAdjustment(plan, value, reason) {
+  const before = finite(plan.plannedAmount), after = finite(value), actual = finite(plan.actualAmount)
+  return before !== null && after !== null && after >= 0 && after !== before
+    && /^\d+(\.\d{1,2})?$/.test(String(value).trim()) && Boolean(reason.trim())
+    && (after > before || actual !== null && after >= actual)
+}
+
 function IncreaseDialog({ plan, t, onClose, act }) {
   const [newAmount, setNewAmount] = useState('')
   const [reason, setReason] = useState('')
-  const invalid = finite(newAmount) === null || Number(newAmount) <= Number(plan.plannedAmount ?? 0) || !reason.trim()
-  const submit = async () => { if (invalid) return; const saved = await act('/plan-adjustments', { planId: plan.id, newAmount: Number(newAmount), reason: reason.trim() }); if (saved !== false) onClose() }
-  return h(Dialog, { title: `${t('increase')} · ${plan.description ?? ''}`, onClose, footer: [
-    h(GhostButton, { key: 'cancel', onClick: onClose }, t('cancel')),
-    h(PrimaryButton, { key: 'ok', disabled: invalid, onClick: submit }, t('submit')),
+  const [draftId, setDraftId] = useState(null)
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState(null)
+  const lock = useRef(false), draftRef = useRef(null)
+  const invalid = !validPlanAdjustment(plan, newAmount, reason)
+  const close = () => { if (!lock.current) onClose() }
+  const submit = async () => {
+    if (invalid || lock.current) return
+    lock.current = true; setPending(true); setError(null)
+    try {
+      if (!draftRef.current) {
+        const result = await post(`/rest/finance/payment-plans/${plan.id}/adjustments`, { newAmount: Number(newAmount), reason: reason.trim() })
+        const id = result.data?.id || result.data?.adjustment?.id
+        if (!id) throw new Error(t('opFailed'))
+        draftRef.current = id; setDraftId(id)
+      }
+      const saved = await act(`/rest/finance/payment-plan-adjustments/${draftRef.current}/submit`, {})
+      if (saved !== false) onClose()
+    } catch (err) { setError(err.message) } finally { lock.current = false; setPending(false) }
+  }
+  return h(Dialog, { title: `${t('increase')} · ${plan.description ?? ''}`, onClose: close, footer: [
+    h(GhostButton, { key: 'cancel', disabled: pending, onClick: close }, t('cancel')),
+    h(PrimaryButton, { key: 'ok', disabled: invalid || pending, onClick: submit }, t('submit')),
   ] },
     h('div', { className: 'sf-stack' },
+      error ? h('p', { role: 'alert' }, error) : null,
+      draftId ? h('p', { className: 'sf-note' }, t('adjustmentDraftSaved')) : null,
       h('p', { className: 'sf-note' }, `${t('planned')}：${wan(plan.plannedAmount) ?? '—'} ${t('unitYuan')} · ${t('increaseHint')}`),
-      h(FormRow, { label: t('newAmount') }, h(Field, { type: 'number', min: '0.01', step: '0.01', value: newAmount, onChange: setNewAmount })),
-      h(FormRow, { label: t('increaseReason'), wide: true }, h(Textarea, { value: reason, onChange: setReason, maxLength: 500 }))))
+      h(FormRow, { label: t('newAmount') }, h(Field, { type: 'number', min: '0', step: '0.01', disabled: pending || Boolean(draftId), value: newAmount, onChange: setNewAmount })),
+      h(FormRow, { label: t('increaseReason'), wide: true }, h(Textarea, { disabled: pending || Boolean(draftId), value: reason, onChange: setReason, maxLength: 500 }))))
+}
+
+function PlanPayments({ planId, t }) {
+  const [page, setPage] = useState(1), [data, setData] = useState(null), [retry, setRetry] = useState(0)
+  useEffect(() => {
+    let cancelled = false; setData(null)
+    api(`/rest/finance/payment-plans/${planId}/payments?page=${page}&limit=20`)
+      .then(value => { if (!cancelled) setData(value.data) })
+      .catch(() => { if (!cancelled) setData({ error: true }) })
+    return () => { cancelled = true }
+  }, [planId, page, retry])
+  if (!data) return h('p', { role: 'status' }, t('loading'))
+  if (data.error) return h('div', { role: 'alert' }, t('paymentReadFailed'), h(LinkButton, { onClick: () => setRetry(value => value + 1) }, t('retry')))
+  const evidence = { CONFIRMED: 'paymentConfirmed', RETURNED: 'paymentReturned', PENDING: 'paymentPending', UNKNOWN: 'paymentUnknown' }
+  return h('div', { className: 'sf-stack' },
+    h('strong', null, t('paymentTransactions')),
+    data.message ? h('p', { className: 'sf-note' }, data.message) : null,
+    h('p', { className: 'sf-note' }, t('paymentCoverageUnknown')),
+    h(Table, { tableId: 'finance-plan-payments', rows: data.list || [], empty: t('paymentNone'), columns: [
+      { key: 'paymentNo', label: t('paymentNumber') },
+      { key: 'processNo', label: t('paymentProcess') },
+      { key: 'paidAt', label: t('actualPaidDate'), render: row => actualPaymentDate(row.paidAt) ?? '—' },
+      { key: 'status', label: t('statusCol'), render: row => `${row.status ?? '—'} · ${t(evidence[row.evidence] || 'paymentUnknown')}` },
+      { key: 'currency', label: t('paymentCurrency') },
+      { key: 'amount', label: t('amount'), num: true, render: row => wan(row.amount) ?? '—' },
+      { key: 'cashAmount', label: t('cashAmount'), num: true, render: row => wan(row.cashAmount) ?? '—' },
+      { key: 'acceptanceAmount', label: t('acceptanceAmount'), num: true, render: row => wan(row.acceptanceAmount) ?? '—' },
+    ] }),
+    h(Pager, { page, total: data.total, limit: 20, onPage: setPage }))
 }
 
 function PlanDetailDialog({ plan, t, onClose }) {
   const fields = [
-    [t('org'), plan.orgName], [t('planType'), t(PLAN_LABELS[plan.planType] ?? plan.planType)], [t('description'), plan.description],
+    [t('org'), plan.orgName], [t('planType'), financeEnumLabel(plan.planType, t, PLAN_LABELS)], [t('description'), plan.description],
     [t('department'), plan.departmentName], [t('costItem'), plan.costItemName], [t('planMonth'), plan.planMonth ? `${plan.planMonth} 月` : '—'],
     [t('planned'), wan(plan.plannedAmount)], [t('actual'), wan(plan.actualAmount)], [t('variance'), wan(plan.varianceAmount)],
-    [t('remaining'), wan(plan.remainingAmount)], [t('scheduleDate'), shortDate(plan.scheduleDate)], [t('priority'), plan.priority ? t(PRIORITIES.find(([id]) => id === plan.priority)?.[1] ?? plan.priority) : '—'],
+    [t('remaining'), wan(plan.remainingAmount)], [t('actualPaidDate'), actualPaymentDate(plan.actualPaidAt)], [t('scheduleDate'), shortDate(plan.scheduleDate)], [t('priority'), plan.priority ? financeEnumLabel(plan.priority, t, Object.fromEntries(PRIORITIES)) : '—'],
     [t('acceptAcceptance'), plan.acceptsAcceptance ? '✓' : '—'], [t('cashAmount'), wan(plan.plannedCashAmount)], [t('acceptanceAmount'), wan(plan.plannedAcceptanceAmount)],
-    [t('payee'), plan.payeeName], [t('statusCol'), financeLabel(plan.status)],
+    [t('payee'), plan.payeeName], [t('statusCol'), financeDisplayValue(plan.status, 'status')],
   ]
   return h(Dialog, { title: t('planDetail'), onClose },
     h('dl', { className: 'sf-evidence' }, ...fields.map(([label, value], index) =>
-      h('div', { key: index, className: 'sf-evidence-item' }, h('small', null, label), h('strong', null, value ?? '—')))))
+      h('div', { key: index, className: 'sf-evidence-item' }, h('small', null, label), h('strong', null, value ?? '—')))),
+    h(PlanPayments, { key: plan.id, planId: plan.id, t }))
 }
 
-// ---- 调增审批台 ----
+// ---- 调整审批台 ----
 
 function PlanAdjustmentsTab({ t, revision, reloadTick, busy, act, canWrite = true, canVerify = true, onDialog }) {
   const [status, setStatus] = useState('SUBMITTED')
@@ -268,7 +339,7 @@ function PlanAdjustmentsTab({ t, revision, reloadTick, busy, act, canWrite = tru
         columns: [
           { label: t('adjustmentOf'), key: 'code' },
           { label: t('amount'), key: 'amount', sortValue: row => row.newAmount - row.oldAmount, render: row => h('span', null, `${wan(row.oldAmount) ?? '—'} → ${wan(row.newAmount) ?? '—'} `, h('span', { className: 'sf-pos' }, `（${deltaOf(row)}）`)), num: true },
-          { label: t('statusCol'), key: 'status', render: row => h(Pill, { tone: ADJ_STATUS_TONES[row.status] ?? 'muted' }, t(ADJ_STATUS_KEYS[row.status] ?? row.status)) },
+          { label: t('statusCol'), key: 'status', render: row => h(Pill, { tone: ADJ_STATUS_TONES[row.status] ?? 'muted' }, financeEnumLabel(row.status, t, ADJ_STATUS_KEYS)) },
           { label: t('lastSeen'), key: 'submittedAt', render: row => shortDate(row.submittedAt) ?? '—', num: true },
           {
             label: t('actions'), key: 'actions', sortable: false,
@@ -282,7 +353,7 @@ function PlanAdjustmentsTab({ t, revision, reloadTick, busy, act, canWrite = tru
         ],
         rows, empty: t('empty'),
       }),
-      h(Pager, { page, total: data?.total, limit: PAGE_SIZE, onPage })),
+      h(Pager, { page, total: data?.total, limit: PAGE_SIZE, onPage: setPage })),
     // 驳回理由 Dialog 与详情 Dialog 由外壳层渲染——这里通过 onDialog 请求，但 Dialog 需要在 CashView 层挂载
     null)
 }

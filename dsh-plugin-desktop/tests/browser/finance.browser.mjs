@@ -19,6 +19,12 @@ const requests = []
 const mutations = []
 let financeRole = 'FINANCE_OWNER'
 let failCreate = false
+let failBudgetEntry = true
+let failCostCatalog = false
+let emptyCostCatalog = false
+let failPlanHistory = false
+let failPlanSave = false
+const paymentHistory = [], revenueHistory = []
 const deniedPermissions = new Set()
 const permissionCodes = ['budget.activity.read', 'budget.activity.manage', 'budget.activity.reopen', 'budget.submission.read', 'budget.submission.edit', 'budget.submission.verify', 'budget.adjustment.approve', 'budget.version.manage', 'budget.version.publish', 'budget.compare.read', 'budget.execution.read', 'cash.plan.read', 'cash.plan.write', 'cash.plan.verify', 'finance.source.review', 'finance.assistant.read', 'finance.permission.manage']
 page.on('pageerror', e => errors.push(e.message))
@@ -41,7 +47,7 @@ try {
     const url = new URL(route.request().url()); requests.push(url.pathname + url.search)
     const method = route.request().method()
     const pathname = url.pathname.replace('/api/desktop/sensteed/finance/rest', '')
-    if (['POST', 'PUT', 'PATCH'].includes(method) && url.pathname.includes('/rest/')) mutations.push({ path: pathname, method, body: route.request().postDataJSON() })
+    if (['POST', 'PUT', 'PATCH'].includes(method) && (url.pathname.includes('/rest/') || /\/(budget-lines|payment-plans|revenue-plans)$/.test(url.pathname))) mutations.push({ path: pathname, method, body: route.request().postDataJSON() })
     let body = { ok: true, data: { list: [], total: 0 } }
     const bomAccess = url.searchParams.get('permission') === 'cost.engineering.read'
     let status = url.pathname.endsWith('/access') ? bomAccess ? bomAccessStatus : accessStatus : url.pathname.endsWith('/rollup') ? bomRollupStatus : failBrief && url.pathname.endsWith('/brief') ? 502 : 200
@@ -77,6 +83,30 @@ try {
     if (url.pathname.endsWith('/budget')) body = { ok: true, summary: { list: [], totals: {} }, lines: { list: [], total: 0 } }
     if (url.pathname.endsWith('/quality')) body = { ok: true, quality: { issues: [] }, batches: { list: [], total: 0 } }
     if (url.pathname.endsWith('/data-source-metrics')) body = { ok: true, data: [] }
+    if (url.pathname.endsWith('/cost-items')) {
+      status = failCostCatalog ? 503 : 200
+      body = failCostCatalog ? { ok: false, error: '科目暂不可用' } : { ok: true, data: { list: emptyCostCatalog ? [] : [{ id: 'cost-travel', name: '差旅费', active: true }, { id: 'inactive', name: '停用科目', active: false }] } }
+    }
+    if (/\/(payment-plans|revenue-plans)$/.test(url.pathname)) {
+      const rows = url.pathname.endsWith('/payment-plans') ? paymentHistory : revenueHistory
+      if (method === 'GET') {
+        status = failPlanHistory ? 503 : 200
+        const list = rows.filter(row => row.year === Number(url.searchParams.get('year')))
+        body = failPlanHistory ? { ok: false, error: '历史暂不可用' } : { ok: true, data: { list, total: list.length } }
+      } else if (method === 'POST') {
+        status = failPlanSave ? 503 : 200
+        const { idempotencyKey, ...fields } = route.request().postDataJSON()
+        assert.equal(typeof idempotencyKey, 'string')
+        const created = { ...fields, id: 'plan-' + (rows.length + 1) }
+        if (!failPlanSave) rows.push(created)
+        body = failPlanSave ? { ok: false, error: '保存暂不可用' } : { ok: true, data: created }
+      }
+    }
+    if (url.pathname.endsWith('/budget-versions')) body.data = { list: Number(url.searchParams.get('year')) === year ? [{ id: 'primary', name: '年度正式预算', year, isPrimary: true, status: 'PUBLISHED' }] : [] }
+    if (url.pathname.endsWith('/budget-lines') && method === 'POST') {
+      status = failBudgetEntry ? 404 : 200
+      body = failBudgetEntry ? { ok: false, error: `年度 ${year} 暂无已发布预算版本，请先导入数据` } : { ok: true, data: { id: 'budget-line-1' } }
+    }
     await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
   })
   const pageUrl = `http://127.0.0.1:${vite.httpServer.address().port}`
@@ -147,6 +177,144 @@ try {
     await page.locator('.sf-tabs').getByRole('button', { name: tab, exact: true }).click()
     await page.screenshot({ path: resolve(evidence, `tab-${tab}.png`) })
   }
+  // Budget entry: translated categories, authoritative cost IDs, annual preflight and failed-save retry.
+  await page.locator('.sf-tabs').getByRole('button', { name: '录入', exact: true }).click()
+  const entry = page.locator('form.sf-card')
+  await entry.getByRole('tab', { name: '预算行', exact: true }).click()
+  const submitBudget = entry.getByRole('button', { name: '保存并生效（财务代录）', exact: true })
+  await page.waitForFunction(() => !document.querySelector('form.sf-card button[type="submit"]')?.disabled)
+  assert.equal(await entry.locator('[name="year"]').inputValue(), String(year))
+  assert.deepEqual(await entry.locator('[name="expenseType"] option').allTextContents(), ['项目运营成本', '固定运营成本', '车型专属成本', '非项目类'])
+  await entry.getByRole('button', { name: '主体', exact: true }).click()
+  await entry.getByRole('option', { name: '测试主体', exact: true }).click()
+  await entry.getByRole('button', { name: '费用科目', exact: true }).click()
+  await entry.locator('input[aria-label="搜索费用科目"]').fill('差旅')
+  await entry.getByRole('option', { name: '差旅费', exact: true }).click()
+  assert.equal(await entry.locator('[name="costItemId"]').inputValue(), 'cost-travel')
+  assert.equal(await entry.getByRole('option', { name: '停用科目', exact: true }).count(), 0)
+  await entry.locator('[name="month"]').selectOption('2')
+  await entry.locator('[name="budgetAmount"]').fill('300000')
+  await entry.locator('[name="note"]').fill('包含海外3人次差旅')
+  await submitBudget.click()
+  await entry.getByText(`操作失败: 年度 ${year} 暂无已发布预算版本，请先导入数据`, { exact: true }).waitFor()
+  assert.equal(await entry.locator('[name="budgetAmount"]').inputValue(), '300000')
+  assert.equal(await entry.locator('[name="note"]').inputValue(), '包含海外3人次差旅')
+  assert.equal(mutations.at(-1).body.costItemId, 'cost-travel')
+  assert.equal(mutations.at(-1).body.costItemName, undefined)
+  await page.screenshot({ path: resolve(evidence, 'entry-budget-error.png') })
+  await entry.locator('[name="year"]').selectOption(String(year + 1))
+  await entry.getByText('该年度暂无已发布预算主版本，请先完成预算编制并发布，或选择已有主版本的年度。', { exact: true }).waitFor()
+  assert.equal(await submitBudget.isDisabled(), true)
+  await page.screenshot({ path: resolve(evidence, 'entry-budget-no-primary.png') })
+  await entry.locator('[name="year"]').selectOption(String(year))
+  await page.waitForFunction(() => !document.querySelector('form.sf-card button[type="submit"]')?.disabled)
+  failBudgetEntry = false
+  await submitBudget.click()
+  await entry.getByText('预算行已入库', { exact: true }).waitFor()
+  assert.equal(await entry.locator('[name="budgetAmount"]').inputValue(), '')
+  assert.equal(await entry.locator('[name="costItemId"]').inputValue(), '')
+  assert.equal(await entry.locator('input[aria-label="搜索费用科目"]').inputValue(), '')
+  // Directory outages are visible and retryable, and cannot be mistaken for empty payment history.
+  await entry.getByRole('tab', { name: '付款计划', exact: true }).click()
+  failCostCatalog = true
+  await entry.getByRole('tab', { name: '预算行', exact: true }).click()
+  await entry.getByText('费用科目加载失败，可留空录入或重试。', { exact: true }).waitFor()
+  assert.equal(await submitBudget.isDisabled(), false)
+  failCostCatalog = false
+  await entry.getByRole('button', { name: '重新加载', exact: true }).click()
+  await page.waitForFunction(() => !document.querySelector('form.sf-card button[type="submit"]')?.disabled)
+  await page.screenshot({ path: resolve(evidence, 'entry-budget-ready.png') })
+  // Cold start: no historical plans, Enter/click creation, pending drafts, failures, refresh and year preservation.
+  await entry.getByRole('tab', { name: '收入计划', exact: true }).click()
+  await entry.locator('[name="year"]').selectOption(String(year + 1))
+  const item = entry.locator('input[aria-label="搜索收入项目"]')
+  await entry.getByRole('button', { name: '收入项目', exact: true }).click()
+  await entry.getByRole('listbox', { name: '收入项目', exact: true }).getByText('暂无历史选项，输入名称即可新增本次值。', { exact: true }).waitFor()
+  await item.fill('新年度产品收入')
+  await entry.locator('[name="plannedAmount"]').fill('50000')
+  assert.equal(await item.inputValue(), '新年度产品收入')
+  assert.equal(await entry.locator('[name="itemNameChoiceDraft"]').inputValue(), '新年度产品收入')
+  const writesBefore = mutations.length
+  await entry.getByRole('button', { name: '保存并生效（财务代录）', exact: true }).click()
+  assert.equal(mutations.length, writesBefore)
+  await item.press('Enter')
+  assert.equal(await entry.locator('[name="itemNameChoice"]').inputValue(), '新年度产品收入')
+  const incomeType = entry.locator('input[aria-label="搜索收入类型"]')
+  await entry.getByRole('button', { name: '收入类型', exact: true }).click()
+  await incomeType.fill('销售收入')
+  await entry.getByRole('option', { name: '使用本次自定义值：“销售收入”', exact: true }).click()
+  const payer = entry.locator('input[aria-label="搜索付款方"]')
+  await entry.getByRole('button', { name: '付款方', exact: true }).click()
+  await payer.fill('新客户')
+  await payer.press('Enter')
+  await entry.getByRole('button', { name: '主体', exact: true }).click()
+  await entry.getByRole('option', { name: '测试主体', exact: true }).click()
+  await entry.locator('[name="month"]').selectOption('6')
+  assert.equal(await entry.getByText('请先确认已输入的自定义值：选择匹配项，或点击“使用本次自定义值”。', { exact: true }).count(), 0)
+  await entry.screenshot({ path: resolve(evidence, 'entry-revenue-ready.png') })
+  failPlanSave = true
+  await entry.getByRole('button', { name: '保存并生效（财务代录）', exact: true }).click()
+  await entry.getByText('操作失败: 保存暂不可用', { exact: true }).waitFor()
+  assert.equal(await entry.locator('[name="itemNameChoice"]').inputValue(), '新年度产品收入')
+  assert.equal(await entry.locator('[name="incomeTypeNameChoice"]').inputValue(), '销售收入')
+  await page.screenshot({ path: resolve(evidence, 'entry-revenue-cold-start.png') })
+  failPlanSave = false
+  await entry.getByRole('button', { name: '保存并生效（财务代录）', exact: true }).click()
+  await entry.getByText('收入计划已入库', { exact: true }).waitFor()
+  assert.equal(await entry.locator('[name="year"]').inputValue(), String(year + 1))
+  assert.equal(await item.inputValue(), '')
+  assert.deepEqual(revenueHistory[0], { id: 'plan-1', orgId: 'org-1', year: year + 1, month: 6, itemName: '新年度产品收入', incomeTypeName: '销售收入', payerName: '新客户', plannedAmount: 50000 })
+  await entry.getByRole('button', { name: '收入项目', exact: true }).click()
+  await entry.getByRole('option', { name: '新年度产品收入', exact: true }).waitFor()
+  await item.press('Escape')
+  await entry.getByRole('tab', { name: '回填实际', exact: true }).click()
+  await entry.getByRole('button', { name: '创建付款计划', exact: true }).click()
+  assert.equal(await entry.getByRole('tab', { name: '付款计划', exact: true }).getAttribute('aria-selected'), 'true')
+  assert.deepEqual(await entry.locator('[name="planType"] option').allTextContents(), ['采购付款', '其他类付款', '新零售', 'PR 付款', '直采零部件'])
+  failPlanHistory = true
+  await entry.locator('[name="year"]').selectOption(String(year))
+  await entry.getByText('历史选项加载失败，仍可输入并确认本次自定义值。', { exact: true }).waitFor()
+  await entry.getByRole('button', { name: '主体', exact: true }).click()
+  await entry.getByRole('option', { name: '测试主体', exact: true }).click()
+  await entry.locator('[name="description"]').fill('首次采购付款')
+  await entry.locator('[name="planMonth"]').selectOption('10')
+  await entry.locator('[name="plannedAmount"]').fill('123.45')
+  await entry.getByRole('button', { name: '收款方', exact: true }).click()
+  await entry.locator('input[aria-label="搜索收款方"]').fill('新供应商')
+  await entry.getByRole('option', { name: '使用本次自定义值：“新供应商”', exact: true }).click()
+  const cost = entry.locator('input[aria-label="搜索费用科目"]')
+  await entry.getByRole('button', { name: '费用科目', exact: true }).click()
+  await cost.fill('临时费用')
+  await cost.press('Enter')
+  assert.equal(await cost.getAttribute('maxlength'), '100')
+  await entry.getByRole('button', { name: '保存并生效（财务代录）', exact: true }).click()
+  await entry.getByText('付款计划已入库', { exact: true }).waitFor()
+  assert.deepEqual(paymentHistory[0], { id: 'plan-1', orgId: 'org-1', year, planType: 'PURCHASE', description: '首次采购付款', plannedAmount: 123.45, planMonth: 10, payeeName: '新供应商', costItemName: '临时费用' })
+  failPlanHistory = false
+  // Optional master data can be absent; published-version and org requirements still apply.
+  emptyCostCatalog = true
+  await entry.getByRole('tab', { name: '预算行', exact: true }).click()
+  await entry.getByText('暂无启用费用科目，可留空录入；需要分类时请联系财务负责人维护科目主数据。', { exact: true }).waitFor()
+  await entry.getByRole('button', { name: '主体', exact: true }).click()
+  await entry.getByRole('option', { name: '测试主体', exact: true }).click()
+  await entry.locator('[name="budgetAmount"]').fill('100')
+  await submitBudget.click()
+  await entry.getByText('预算行已入库', { exact: true }).waitFor()
+  assert.equal(Object.hasOwn(mutations.at(-1).body, 'costItemId'), false)
+  await entry.getByRole('tab', { name: '收入计划', exact: true }).click()
+  await page.setViewportSize({ width: 390, height: 844 })
+  await entry.getByRole('button', { name: '收入项目', exact: true }).click()
+  await item.fill('窄屏新收入')
+  await page.screenshot({ path: resolve(evidence, 'entry-revenue-mobile.png') })
+  assert.ok(await entry.getByRole('option', { name: '使用本次自定义值：“窄屏新收入”', exact: true }).isVisible())
+  await page.setViewportSize({ width: 1360, height: 920 })
+  financeRole = 'BOSS'
+  await recheckAccess()
+  await page.locator('form.sf-card').waitFor({ state: 'hidden' })
+  assert.equal(await page.locator('form.sf-card').count(), 0)
+  financeRole = 'FINANCE_OWNER'
+  await recheckAccess()
+  await page.locator('form.sf-card').waitFor()
   await page.locator('.sf-tabs').getByRole('button', { name: '预算编制', exact: true }).click()
   await page.getByLabel('编制预算版本', { exact: true }).selectOption('version-1')
   await page.getByLabel('预算参数版本', { exact: true }).selectOption('param-1')
@@ -179,9 +347,11 @@ try {
     if (i + 1 < count) await page.locator('.sf-tabs').getByRole('button', { name: '深度分析', exact: true }).click()
   }
   assert.equal(await page.evaluate(() => window.analysisPrompts.length), count)
-  assert((await page.evaluate(() => window.analysisPrompts)).every(p => typeof p === 'string' && p.length > 40))
+  const prompts = await page.evaluate(() => window.analysisPrompts)
+  assert(prompts.every(prompt => typeof prompt === 'string' && /^\/finance-[a-z-]+\n[^\n]+/.test(prompt)))
+  assert(prompts.filter(prompt => !/^\/finance-(?:data-quality|alert-rules-audit)\n/.test(prompt)).every(prompt => prompt.includes(String(year))))
   await page.locator('.sf-tabs').getByRole('button', { name: '预算执行', exact: true }).click()
-  for (const button of await page.locator('.sf-pilltabs button').all()) await button.click()
+  for (const button of await page.locator('.sf-pilltabs [role="tab"]').all()) await button.click()
   await page.locator('.sf-tabs').getByRole('button', { name: '经营总览', exact: true }).click()
   await page.locator('.sf-kpis').getByText('已打 PR', { exact: true }).click()
   await page.waitForFunction(() => document.querySelector('.sf-pilltabs button[aria-selected="true"]')?.textContent?.includes('台账'))
@@ -210,5 +380,5 @@ try {
   await page.screenshot({ path: resolve(evidence, 'recovered.png') })
   assert.equal(await page.locator('vite-error-overlay').count(), 0)
   assert.deepEqual(errors, [])
-  console.log(JSON.stringify({ passed: true, sections: 16, workflows: 'planning, source scope, notification read, failed creation retry, read-only role, permission revocation', bom: 'permission, pagination, detail, partial failure, retry, revocation', analyses: count, requests: requests.length, evidence }))
+  console.log(JSON.stringify({ passed: true, sections: 16, workflows: 'cold-start revenue/payment creation, pending-draft validation, failed-save retry, history refresh, year preservation, optional empty cost catalog, backfill creation, desktop/mobile; budget preflight, role guard, planning, source scope, notifications and permission revocation', bom: 'permission, pagination, detail, partial failure, retry, revocation', analyses: count, requests: requests.length, evidence }))
 } finally { await browser.close(); await vite.close() }

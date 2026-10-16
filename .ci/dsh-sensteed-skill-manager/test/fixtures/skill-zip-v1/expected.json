@@ -1,0 +1,23 @@
+{
+  "formatVersion": "skill-zip-v1",
+  "installName": "reviewed-skill",
+  "artifact": {
+    "sha256": "718055c7b0faf046defee8fbdd788f4be8c038f8df9ec8e3e21f85bc036f5a23",
+    "bytes": 311,
+    "format": "zip"
+  },
+  "files": [
+    {
+      "path": "SKILL.md",
+      "bytes": 85,
+      "sha256": "65d587c79e5b71c89da7d63585aeca7494b00e7c5e64336a3ac7d7685189a789"
+    },
+    {
+      "path": "notes.txt",
+      "bytes": 18,
+      "sha256": "ea4fe9203c480c0c0e5ad5552cafdf866473b173665c5ef7647655367eb12f8e"
+    }
+  ],
+  "canonicalFiles": "[{\"bytes\":85,\"path\":\"SKILL.md\",\"sha256\":\"65d587c79e5b71c89da7d63585aeca7494b00e7c5e64336a3ac7d7685189a789\"},{\"bytes\":18,\"path\":\"notes.txt\",\"sha256\":\"ea4fe9203c480c0c0e5ad5552cafdf866473b173665c5ef7647655367eb12f8e\"}]",
+  "fileManifestDigest": "a863118f05a76c1c33895c99dd7c129a3a5c4ea98acf44f4b0b55ee11eef8569"
+}
