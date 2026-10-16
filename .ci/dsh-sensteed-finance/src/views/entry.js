@@ -81,7 +81,7 @@ function EntryView({ ctx, t, directoryOnly }) {
       h(MembersCard, { members, busy, t, act, onDialog: setDialog, onRetry: retryLists })) : null,
 
     // 录入面板常开内嵌（对齐前端 FinanceEntryPanel）
-    !directoryOnly ? h(EntryPanel, { year, orgs, departments, t, act }) : null,
+    !directoryOnly && ctx.financeWriter ? h(EntryPanel, { key: year, year, orgs, departments, t, onSaved: () => window.dispatchEvent(new Event('sf:refresh')) }) : !directoryOnly ? h('p', { className: 'sf-note' }, t('entryFinanceOnly')) : null,
 
     dialog?.kind === 'createTask' ? h(CreateTaskDialog, { year, departments, members, busy, t, onClose: () => setDialog(null), act }) : null,
     dialog?.kind === 'assignment' ? h(AssignmentDialog, { assignment: dialog.assignment, busy, t, onClose: () => setDialog(null), act }) : null,
@@ -458,14 +458,22 @@ function MembersCard({ members, busy, t, act, onDialog, onRetry }) {
 
 // ---- 录入面板（4 类型；排款月份必填对齐后端校验） ----
 
-function EntryPanel({ year, orgs, departments, t, act }) {
+function EntryPanel({ year, orgs, departments, t, onSaved }) {
   const [kind, setKind] = useState('payment')
+  const [entryYear, setEntryYear] = useState(String(year))
+  const [backfillKind, setBackfillKind] = useState('payment')
+  const [costItems, setCostItems] = useState(null)
+  const [costError, setCostError] = useState(false)
+  const [versions, setVersions] = useState(null)
+  const [versionError, setVersionError] = useState(false)
+  const [retry, setRetry] = useState(0)
+  const savingRef = useRef(false)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState(null)
-  const [history, setHistory] = useState({ paymentPlans: [], payees: [], costItems: [], items: [], payers: [], incomeTypes: [] })
+  const [history, setHistory] = useState({ paymentPlans: [], revenuePlans: [], payees: [], costItems: [], items: [], payers: [], incomeTypes: [] })
   const [historyLoaded, setHistoryLoaded] = useState(false)
-  const [historyError, setHistoryError] = useState(false)
-  const orgOptions = (orgs || []).map(org => [org.id, org.name])
+  const [historyError, setHistoryError] = useState({})
+  const orgOptions = (orgs || []).filter(org => org.type !== 'GROUP').map(org => [org.id, org.name])
   const departmentOptions = (departments || []).map(department => [department.id, department.name])
   const years = yearOptions(year)
   const months = Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1}月`])
@@ -473,19 +481,22 @@ function EntryPanel({ year, orgs, departments, t, act }) {
   useEffect(() => {
     let cancelled = false
     setHistoryLoaded(false)
-    setHistoryError(false)
-    Promise.all([
-      api(`/payment-plans?year=${year}&limit=100`),
-      api(`/revenue-plans?year=${year}&limit=100`),
+    setHistoryError({})
+    Promise.allSettled([
+      api(`/payment-plans?year=${entryYear}&limit=100`),
+      api(`/revenue-plans?year=${entryYear}&limit=100`),
     ]).then(([payments, revenues]) => {
       if (cancelled) return
-      const paymentRows = payments?.data?.list || []
-      const revenueRows = revenues?.data?.list || []
+      const paymentRows = payments.status === 'fulfilled' ? payments.value?.data?.list || [] : []
+      const revenueRows = revenues.status === 'fulfilled' ? revenues.value?.data?.list || [] : []
+      setHistoryError({ payment: payments.status === 'rejected', revenue: revenues.status === 'rejected' })
       const unique = values => [...new Set(values.filter(value => typeof value === 'string' && value.trim()))].sort((a, b) => a.localeCompare(b, 'zh-CN'))
       setHistory({
+        year: entryYear,
         paymentPlans: paymentRows
           .filter(row => row.id)
           .map(row => [row.id, [row.description || row.planType || '付款计划', row.orgName, row.planMonth ? `${row.planMonth}月` : null, row.id.slice(0, 8)].filter(Boolean).join(' · ')]),
+        revenuePlans: revenueRows.filter(row => row.id).map(row => [row.id, [row.itemName || '收入计划', row.orgName, row.month ? `${row.month}月` : null, row.id.slice(0, 8)].filter(Boolean).join(' · ')]),
         payees: unique(paymentRows.map(row => row.payeeName)),
         costItems: unique(paymentRows.map(row => row.costItemName)),
         items: unique(revenueRows.map(row => row.itemName)),
@@ -493,18 +504,55 @@ function EntryPanel({ year, orgs, departments, t, act }) {
         incomeTypes: unique(revenueRows.map(row => row.incomeTypeName)),
       })
       setHistoryLoaded(true)
-    }).catch(() => { if (!cancelled) setHistoryError(true) })
+    })
     return () => { cancelled = true }
-  }, [year])
+  }, [entryYear, retry])
+
+  useEffect(() => {
+    if (kind !== 'budget') return
+    let cancelled = false
+    setCostItems(null); setCostError(false)
+    api('/cost-items').then(value => {
+      if (!cancelled) setCostItems((value.data?.list || []).filter(item => item.active))
+    }).catch(() => { if (!cancelled) setCostError(true) })
+    return () => { cancelled = true }
+  }, [kind, retry])
+
+  useEffect(() => {
+    if (kind !== 'budget') return
+    let cancelled = false
+    setVersions(null); setVersionError(false)
+    api(`/budget-versions?year=${entryYear}`).then(value => {
+      if (!cancelled) setVersions(value.data?.list || [])
+    }).catch(() => { if (!cancelled) setVersionError(true) })
+    return () => { cancelled = true }
+  }, [kind, entryYear, retry])
+
+  const primaryVersion = versions?.find(version => version.isPrimary && Number(version.year) === Number(entryYear))
+  const budgetReady = !costError && Boolean(costItems?.length) && !versionError && Boolean(primaryVersion)
+  const backfillPlans = backfillKind === 'payment' ? history.paymentPlans : history.revenuePlans
+  const backfillReady = historyLoaded && history.year === entryYear && !historyError[backfillKind] && Boolean(backfillPlans.length)
 
   const submit = async event => {
     event.preventDefault()
-    if (busy) return
+    if (savingRef.current) return
     const formElement = event.currentTarget
     const form = new FormData(formElement)
     const num = key => Number(form.get(key))
     const text = key => { const value = String(form.get(key) || '').trim(); return value || undefined }
     const textChoice = key => text(key + 'Choice')
+    const amountKey = kind === 'budget' ? 'budgetAmount' : kind === 'backfill' ? 'actualAmount' : 'plannedAmount'
+    const amount = num(amountKey)
+    const monthKey = kind === 'payment' ? 'planMonth' : 'month'
+    const validMonth = !text(monthKey) || (Number.isInteger(num(monthKey)) && num(monthKey) >= 1 && num(monthKey) <= 12)
+    if (!text(amountKey) || !Number.isFinite(amount) || amount < 0 || (kind !== 'backfill' && amount === 0) ||
+      (kind !== 'backfill' && (!orgOptions.some(([id]) => id === text('orgId')) || num('year') !== Number(entryYear) || num('year') < 2000 || num('year') > 2100 || !Number.isInteger(num('year')) || !validMonth))) {
+      setNotice(t('entryInvalid')); return
+    }
+    if (kind === 'budget' && !budgetReady) { setNotice(t('versionMissing')); return }
+    if (kind === 'budget' && !costItems.some(item => item.id === text('costItemId'))) { setNotice(t('costRequired')); return }
+    if (kind === 'backfill' && (!backfillReady || !backfillPlans.some(([id]) => id === text('planId')))) { setNotice(t('selectPlan')); return }
+    savingRef.current = true
     setBusy(true); setNotice(null)
     try {
       let path, payload
@@ -527,32 +575,36 @@ function EntryPanel({ year, orgs, departments, t, act }) {
         payload = { orgId: text('orgId'), year: num('year'), expenseType: text('expenseType'), budgetAmount: num('budgetAmount') }
         if (text('month')) payload.month = num('month')
         if (text('departmentId')) payload.departmentId = text('departmentId')
-        if (textChoice('costItemName')) payload.costItemName = textChoice('costItemName')
+        payload.costItemId = text('costItemId')
         if (text('note')) payload.note = text('note')
       } else {
-        path = `/payment-plans/${text('planId')}/actuals`
+        path = `/${backfillKind === 'payment' ? 'payment-plans' : 'revenue-plans'}/${text('planId')}/actuals`
         payload = { actualAmount: num('actualAmount') }
         if (text('actualPaidAt')) payload.actualPaidAt = new Date(`${text('actualPaidAt')}T00:00:00`).toISOString()
       }
       await post(path, payload)
       setNotice(t('submitted'))
       formElement.reset()
-    } catch (error) { setNotice(`${t('opFailed')}: ${error.message}`) } finally { setBusy(false) }
+      onSaved?.()
+    } catch (error) { setNotice(`${t('opFailed')}: ${error.message}`) } finally { savingRef.current = false; setBusy(false) }
   }
 
   return h('form', { className: 'sf-card', key: kind, onSubmit: submit },
     h('div', { className: 'sf-card-head' }, h('h2', null, t('entryTitle')), h('span', { className: 'sf-card-unit' }, t('unitYuan'))),
     h('div', { className: 'sf-card-body' }, h('div', { className: 'sf-stack' },
       h('p', { className: 'sf-note' }, t('entryHint')),
-      h(PillTabs, { tabs: [['payment', 'entryPaymentPlan'], ['revenue', 'entryRevenuePlan'], ['budget', 'entryBudgetLine'], ['backfill', 'entryBackfill']], value: kind, onChange: setKind, t }),
+      h('fieldset', { className: 'sf-fieldset sf-stack', disabled: busy, 'aria-busy': busy },
+      h(PillTabs, { tabs: [['payment', 'entryPaymentPlan'], ['revenue', 'entryRevenuePlan'], ['budget', 'entryBudgetLine'], ['backfill', 'entryBackfill']], value: kind, onChange: value => { setKind(value); setNotice(null) }, t }),
       h('div', { className: 'sf-form' },
         kind !== 'backfill' ? [
           h(FormRow, { key: 'org', label: t('org') }, h(SearchSelect, { name: 'orgId', required: true, options: orgOptions, placeholder: t('org') })),
-          h(FormRow, { key: 'year', label: t('year') }, h(Select, { name: 'year', required: true, options: years, placeholder: t('year') })),
+          h(FormRow, { key: 'year', label: t('year') }, h(Select, { name: 'year', value: entryYear, onChange: value => { setEntryYear(value); setNotice(null) }, required: true, options: years, placeholder: t('year') })),
         ] : [
-          h(FormRow, { key: 'plan', label: t('selectPlan') }, h(SearchSelect, { name: 'planId', required: true, options: history.paymentPlans, placeholder: t('selectPlan') })),
-          historyError ? h('p', { key: 'plan-error', className: 'sf-note sf-neg' }, `${t('opFailed')}: ${t('selectPlan')}`) : null,
-          historyLoaded && !history.paymentPlans.length ? h('p', { key: 'plan-empty', className: 'sf-note' }, `${t('empty')} · ${t('entryPaymentPlan')}`) : null,
+          h(FormRow, { key: 'backfill-year', label: t('year') }, h(Select, { value: entryYear, onChange: setEntryYear, options: years })),
+          h(FormRow, { key: 'backfill-kind', label: t('backfillKind') }, h(Select, { value: backfillKind, onChange: setBackfillKind, options: [['payment', t('entryPaymentPlan')], ['revenue', t('entryRevenuePlan')]] })),
+          h(FormRow, { key: 'plan', label: t('selectPlan') }, h(SearchSelect, { key: `${backfillKind}-${entryYear}`, name: 'planId', required: true, disabled: !backfillReady, options: backfillPlans, placeholder: t('selectPlan') })),
+          historyError[backfillKind] ? h('div', { key: 'plan-error', role: 'alert' }, `${t('opFailed')}: ${t('selectPlan')}`, h(LinkButton, { onClick: () => setRetry(value => value + 1) }, t('retry'))) : null,
+          historyLoaded && !backfillPlans.length ? h('p', { key: 'plan-empty', className: 'sf-note' }, `${t('empty')} · ${t(backfillKind === 'payment' ? 'entryPaymentPlan' : 'entryRevenuePlan')}`) : null,
         ],
         kind === 'payment' ? [
           h(FormRow, { key: 'pt', label: t('planType') }, h(Select, { name: 'planType', required: true, options: PLAN_TYPES.map(([id, label]) => [id, t(label)]) })),
@@ -571,14 +623,19 @@ function EntryPanel({ year, orgs, departments, t, act }) {
           h(FormRow, { key: 'be', label: t('expenseType') }, h(Select, { name: 'expenseType', required: true, options: EXPENSE_TYPES.map(([id, label]) => [id, t(label)]) })),
           h(FormRow, { key: 'bm', label: t('month') }, h(Select, { name: 'month', options: months, placeholder: t('month') })),
           h(FormRow, { key: 'bd', label: t('department') }, h(SearchSelect, { name: 'departmentId', options: departmentOptions, placeholder: t('department') })),
-          h(FormRow, { key: 'bc', label: t('costItem') }, h(CustomizableTextSelect, { name: 'costItemName', options: history.costItems, placeholder: t('costItem') })),
-          h(FormRow, { key: 'ba', label: `${t('kpiBudget')}（${t('unitYuan')}）` }, h(Field, { name: 'budgetAmount', type: 'number', min: 0.01, step: '0.01', required: true })),
+          h(FormRow, { key: 'bc', label: t('costItem') }, h(SearchSelect, { name: 'costItemId', required: true, disabled: costError || !costItems?.length, options: (costItems || []).map(item => [item.id, item.name]), placeholder: t('costItem') })),
+          h('div', { key: 'budget-check', className: 'sf-stack', role: 'status' },
+            h('p', { className: 'sf-note' }, t('budgetEntryHint')),
+            h('p', { className: 'sf-note' }, versionError ? t('versionLoadFailed') : versions === null ? t('versionLoading') : !primaryVersion ? t('versionMissing') : budgetVersionLabel(primaryVersion)),
+            costError || costItems === null || !costItems.length ? h('p', { className: 'sf-note' }, t(costError ? 'costLoadFailed' : costItems === null ? 'costLoading' : 'costEmpty')) : null,
+            costError || versionError || (versions && !primaryVersion) || (costItems && !costItems.length) ? h(LinkButton, { onClick: () => setRetry(value => value + 1) }, t('retry')) : null),
+          h(FormRow, { key: 'ba', label: `${t('budgetEntryAmount')}（${t('unitYuan')}）` }, h(Field, { name: 'budgetAmount', type: 'number', min: 0.01, step: '0.01', required: true })),
           h(FormRow, { key: 'bn', label: t('note') }, h(Field, { name: 'note', maxLength: 500 })),
         ] : [
           h(FormRow, { key: 'aa', label: t('actualAmountL') }, h(Field, { name: 'actualAmount', type: 'number', min: 0, step: '0.01', required: true })),
           h(FormRow, { key: 'ad', label: t('actualDateL') }, h(Field, { name: 'actualPaidAt', type: 'date' })),
         ],
         h('div', { className: 'sf-form-actions' },
-          h(PrimaryButton, { type: 'submit', busy }, busy ? t('running') : t('submit')),
-          notice ? h(Notice, null, notice) : null)))))
+          h(PrimaryButton, { type: 'submit', busy, disabled: (kind === 'budget' && !budgetReady) || (kind === 'backfill' && !backfillReady) }, busy ? t('running') : t('submit')),
+          notice ? h('div', { role: 'status', 'aria-live': 'polite' }, h(Notice, null, notice)) : null))))))
 }

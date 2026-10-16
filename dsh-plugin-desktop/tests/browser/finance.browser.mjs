@@ -19,6 +19,8 @@ const requests = []
 const mutations = []
 let financeRole = 'FINANCE_OWNER'
 let failCreate = false
+let failBudgetEntry = true
+let failCostCatalog = false
 const deniedPermissions = new Set()
 const permissionCodes = ['budget.activity.read', 'budget.activity.manage', 'budget.activity.reopen', 'budget.submission.read', 'budget.submission.edit', 'budget.submission.verify', 'budget.adjustment.approve', 'budget.version.manage', 'budget.version.publish', 'budget.compare.read', 'budget.execution.read', 'cash.plan.read', 'cash.plan.write', 'cash.plan.verify', 'finance.source.review', 'finance.assistant.read', 'finance.permission.manage']
 page.on('pageerror', e => errors.push(e.message))
@@ -41,7 +43,7 @@ try {
     const url = new URL(route.request().url()); requests.push(url.pathname + url.search)
     const method = route.request().method()
     const pathname = url.pathname.replace('/api/desktop/sensteed/finance/rest', '')
-    if (['POST', 'PUT', 'PATCH'].includes(method) && url.pathname.includes('/rest/')) mutations.push({ path: pathname, method, body: route.request().postDataJSON() })
+    if (['POST', 'PUT', 'PATCH'].includes(method) && (url.pathname.includes('/rest/') || url.pathname.endsWith('/budget-lines'))) mutations.push({ path: pathname, method, body: route.request().postDataJSON() })
     let body = { ok: true, data: { list: [], total: 0 } }
     const bomAccess = url.searchParams.get('permission') === 'cost.engineering.read'
     let status = url.pathname.endsWith('/access') ? bomAccess ? bomAccessStatus : accessStatus : url.pathname.endsWith('/rollup') ? bomRollupStatus : failBrief && url.pathname.endsWith('/brief') ? 502 : 200
@@ -77,6 +79,15 @@ try {
     if (url.pathname.endsWith('/budget')) body = { ok: true, summary: { list: [], totals: {} }, lines: { list: [], total: 0 } }
     if (url.pathname.endsWith('/quality')) body = { ok: true, quality: { issues: [] }, batches: { list: [], total: 0 } }
     if (url.pathname.endsWith('/data-source-metrics')) body = { ok: true, data: [] }
+    if (url.pathname.endsWith('/cost-items')) {
+      status = failCostCatalog ? 503 : 200
+      body = failCostCatalog ? { ok: false, error: '科目暂不可用' } : { ok: true, data: { list: [{ id: 'cost-travel', name: '差旅费', active: true }, { id: 'inactive', name: '停用科目', active: false }] } }
+    }
+    if (url.pathname.endsWith('/budget-versions')) body.data = { list: Number(url.searchParams.get('year')) === year ? [{ id: 'primary', name: '年度正式预算', year, isPrimary: true, status: 'PUBLISHED' }] : [] }
+    if (url.pathname.endsWith('/budget-lines') && method === 'POST') {
+      status = failBudgetEntry ? 404 : 200
+      body = failBudgetEntry ? { ok: false, error: `年度 ${year} 暂无已发布预算版本，请先导入数据` } : { ok: true, data: { id: 'budget-line-1' } }
+    }
     await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
   })
   const pageUrl = `http://127.0.0.1:${vite.httpServer.address().port}`
@@ -147,6 +158,59 @@ try {
     await page.locator('.sf-tabs').getByRole('button', { name: tab, exact: true }).click()
     await page.screenshot({ path: resolve(evidence, `tab-${tab}.png`) })
   }
+  // Budget entry: translated categories, authoritative cost IDs, annual preflight and failed-save retry.
+  await page.locator('.sf-tabs').getByRole('button', { name: '录入', exact: true }).click()
+  const entry = page.locator('form.sf-card')
+  await entry.getByRole('tab', { name: '预算行', exact: true }).click()
+  const submitBudget = entry.getByRole('button', { name: '提交', exact: true })
+  await page.waitForFunction(() => !document.querySelector('form.sf-card button[type="submit"]')?.disabled)
+  assert.equal(await entry.locator('[name="year"]').inputValue(), String(year))
+  assert.deepEqual(await entry.locator('[name="expenseType"] option').allTextContents(), ['项目运营成本', '固定运营成本', '车型专属成本', '非项目类'])
+  await entry.getByRole('combobox', { name: '搜索主体', exact: true }).click()
+  await entry.getByRole('option', { name: '测试主体', exact: true }).click()
+  await entry.getByRole('combobox', { name: '搜索费用科目', exact: true }).fill('差旅')
+  await entry.getByRole('option', { name: '差旅费', exact: true }).click()
+  assert.equal(await entry.locator('[name="costItemId"]').inputValue(), 'cost-travel')
+  assert.equal(await entry.getByRole('option', { name: '停用科目', exact: true }).count(), 0)
+  await entry.locator('[name="month"]').selectOption('2')
+  await entry.locator('[name="budgetAmount"]').fill('300000')
+  await entry.locator('[name="note"]').fill('包含海外3人次差旅')
+  await submitBudget.click()
+  await entry.getByText(`操作失败: 年度 ${year} 暂无已发布预算版本，请先导入数据`, { exact: true }).waitFor()
+  assert.equal(await entry.locator('[name="budgetAmount"]').inputValue(), '300000')
+  assert.equal(await entry.locator('[name="note"]').inputValue(), '包含海外3人次差旅')
+  assert.equal(mutations.at(-1).body.costItemId, 'cost-travel')
+  assert.equal(mutations.at(-1).body.costItemName, undefined)
+  await page.screenshot({ path: resolve(evidence, 'entry-budget-error.png') })
+  await entry.locator('[name="year"]').selectOption(String(year + 1))
+  await entry.getByText('该年度暂无已发布预算主版本，请先完成预算编制并发布，或选择已有主版本的年度。', { exact: true }).waitFor()
+  assert.equal(await submitBudget.isDisabled(), true)
+  await page.screenshot({ path: resolve(evidence, 'entry-budget-no-primary.png') })
+  await entry.locator('[name="year"]').selectOption(String(year))
+  await page.waitForFunction(() => !document.querySelector('form.sf-card button[type="submit"]')?.disabled)
+  failBudgetEntry = false
+  await submitBudget.click()
+  await entry.getByText('已提交', { exact: true }).waitFor()
+  assert.equal(await entry.locator('[name="budgetAmount"]').inputValue(), '')
+  assert.equal(await entry.locator('[name="costItemId"]').inputValue(), '')
+  assert.equal(await entry.getByRole('combobox', { name: '搜索费用科目', exact: true }).inputValue(), '')
+  // Directory outages are visible and retryable, and cannot be mistaken for empty payment history.
+  await entry.getByRole('tab', { name: '付款计划', exact: true }).click()
+  failCostCatalog = true
+  await entry.getByRole('tab', { name: '预算行', exact: true }).click()
+  await entry.getByText('费用科目加载失败，请重试。', { exact: true }).waitFor()
+  assert.equal(await submitBudget.isDisabled(), true)
+  failCostCatalog = false
+  await entry.getByRole('button', { name: '重新加载', exact: true }).click()
+  await page.waitForFunction(() => !document.querySelector('form.sf-card button[type="submit"]')?.disabled)
+  await page.screenshot({ path: resolve(evidence, 'entry-budget-ready.png') })
+  financeRole = 'BOSS'
+  await recheckAccess()
+  await page.locator('form.sf-card').waitFor({ state: 'hidden' })
+  assert.equal(await page.locator('form.sf-card').count(), 0)
+  financeRole = 'FINANCE_OWNER'
+  await recheckAccess()
+  await page.locator('form.sf-card').waitFor()
   await page.locator('.sf-tabs').getByRole('button', { name: '预算编制', exact: true }).click()
   await page.getByLabel('编制预算版本', { exact: true }).selectOption('version-1')
   await page.getByLabel('预算参数版本', { exact: true }).selectOption('param-1')
@@ -179,9 +243,11 @@ try {
     if (i + 1 < count) await page.locator('.sf-tabs').getByRole('button', { name: '深度分析', exact: true }).click()
   }
   assert.equal(await page.evaluate(() => window.analysisPrompts.length), count)
-  assert((await page.evaluate(() => window.analysisPrompts)).every(p => typeof p === 'string' && p.length > 40))
+  const prompts = await page.evaluate(() => window.analysisPrompts)
+  assert(prompts.every(prompt => typeof prompt === 'string' && /^\/finance-[a-z-]+\n[^\n]+/.test(prompt)))
+  assert(prompts.filter(prompt => !/^\/finance-(?:data-quality|alert-rules-audit)\n/.test(prompt)).every(prompt => prompt.includes(String(year))))
   await page.locator('.sf-tabs').getByRole('button', { name: '预算执行', exact: true }).click()
-  for (const button of await page.locator('.sf-pilltabs button').all()) await button.click()
+  for (const button of await page.locator('.sf-pilltabs [role="tab"]').all()) await button.click()
   await page.locator('.sf-tabs').getByRole('button', { name: '经营总览', exact: true }).click()
   await page.locator('.sf-kpis').getByText('已打 PR', { exact: true }).click()
   await page.waitForFunction(() => document.querySelector('.sf-pilltabs button[aria-selected="true"]')?.textContent?.includes('台账'))
@@ -210,5 +276,5 @@ try {
   await page.screenshot({ path: resolve(evidence, 'recovered.png') })
   assert.equal(await page.locator('vite-error-overlay').count(), 0)
   assert.deepEqual(errors, [])
-  console.log(JSON.stringify({ passed: true, sections: 16, workflows: 'planning, source scope, notification read, failed creation retry, read-only role, permission revocation', bom: 'permission, pagination, detail, partial failure, retry, revocation', analyses: count, requests: requests.length, evidence }))
+  console.log(JSON.stringify({ passed: true, sections: 16, workflows: 'budget entry: labels, master-data IDs, missing-year preflight, 404 preservation, retry and role guard; planning, source scope, notification read, permission revocation', bom: 'permission, pagination, detail, partial failure, retry, revocation', analyses: count, requests: requests.length, evidence }))
 } finally { await browser.close(); await vite.close() }

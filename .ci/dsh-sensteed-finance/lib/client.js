@@ -76,6 +76,14 @@ window.__ModuleLoader__.load({
 
     const copy = {
       zh: {
+        expenseProject: '项目运营成本', expenseFixed: '固定运营成本', expenseModel: '车型专属成本', expenseNonProject: '非项目类',
+        planPurchase: '采购付款', planOther: '其他类付款', planNewRetail: '新零售', planPrPayment: 'PR 付款', planDirectParts: '直采零部件',
+        budgetEntryAmount: '本行预算金额', budgetEntryHint: '预算行直接计入所选年度已发布主版本；新年度预算请先完成编制与发布。',
+        costLoading: '正在加载费用科目…', costLoadFailed: '费用科目加载失败，请重试。', costEmpty: '暂无启用费用科目，请联系财务负责人维护科目主数据。', costRequired: '请从费用科目目录选择有效科目。',
+        versionLoading: '正在检查年度预算主版本…', versionLoadFailed: '预算版本检查失败，请重试。', versionMissing: '该年度暂无已发布预算主版本，请先完成预算编制并发布，或选择已有主版本的年度。',
+        entryInvalid: '请核对主体、年度、月份及金额。', entryFinanceOnly: '直接录入仅对财务岗位开放，部门请通过填报任务提交。',
+        backfillKind: '回填类型',
+
         tabEngine: '预算编制', tabComparisons: '预算比较', tabReview: '复核中心', tabSources: '来源记录', tabFacts: '已发布事实', tabNotifications: '通知中心', tabPermissions: '权限中心', descEngine: '业务假设、销量输入、预算计算与滚动预测', descComparisons: '月结滚动、跨年与版本明细比较', descReview: '填报、事实批次与调整单集中复核', descSources: '来源暂存明细与财务归类追溯', descFacts: '审核发布口径与草稿分列', descNotifications: '待我处理、与我相关与系统通知', descPermissions: '生效权限、数据范围与授权管理',
         bomStatus: '状态', tabBom: '成本 BOM', descBom: '按成本包查看物料明细、估算与成本汇总', bomPackages: '成本包', bomVersion: '版本', bomModel: '车型 / 项目', bomTarget: '目标成本', bomTotal: '估算总成本', bomPart: '零件号', bomName: '物料名称', bomQty: '数量', bomLevel: '层级', bomUnit: '单位成本', bomExtended: '展开成本', bomSelect: '请选择成本包查看物料明细', bomScope: '成本包按项目与版本管理，不受年度和主体筛选影响。', bomDetail: '物料明细', bomRollupError: '成本汇总加载失败，物料明细仍可查看。', bomNodeCount: '节点数', bomLeafCount: '叶子节点数', bomStatusDRAFT: '草稿', bomStatusIN_REVIEW: '评审中', bomStatusAPPROVED: '已审定', bomStatusOBSOLETE: '已作废',
         copyFailed: '无法复制分析指令，请重试。',
@@ -133,6 +141,14 @@ window.__ModuleLoader__.load({
         submit: '提交', cancel: '取消', submitted: '已提交', saved: '已保存', deleted: '已删除', confirm: '确认', close: '关闭', actions: '操作', runEngine: '触发预警引擎', running: '执行中', runDone: '已触发：新建 {created} · 更新 {updated} · 关闭 {resolved}', backfill: '回填', backfillActual: '回填实际值', submitConfirm: '确认提交？', opFailed: '操作失败', refreshed: '已刷新', required: '必填', invalidJson: '表映射必须是合法 JSON。',
       },
       en: {
+        expenseProject: 'Project operating costs', expenseFixed: 'Fixed operating costs', expenseModel: 'Model-specific costs', expenseNonProject: 'Non-project costs',
+        planPurchase: 'Purchase payment', planOther: 'Other payment', planNewRetail: 'New retail payment', planPrPayment: 'PR payment', planDirectParts: 'Direct parts purchase',
+        budgetEntryAmount: 'Budget amount for this line', budgetEntryHint: 'Budget lines write directly to the published primary version. Prepare and publish a budget before entering a new year.',
+        costLoading: 'Loading cost items…', costLoadFailed: 'Cost items failed to load. Please retry.', costEmpty: 'No active cost items. Ask the finance owner to maintain the catalog.', costRequired: 'Select a valid cost item from the catalog.',
+        versionLoading: 'Checking the primary budget version…', versionLoadFailed: 'Could not check budget versions. Please retry.', versionMissing: 'No published primary budget exists for this year. Prepare and publish a budget first, or select another year.',
+        entryInvalid: 'Check the organization, year, month and amount.', entryFinanceOnly: 'Direct entry is for finance roles. Departments should submit filing tasks.',
+        backfillKind: 'Backfill type',
+
         tabEngine: 'Budget planning', tabComparisons: 'Budget comparisons', tabReview: 'Review center', tabSources: 'Source records', tabFacts: 'Published facts', tabNotifications: 'Notifications', tabPermissions: 'Permissions', descEngine: 'Assumptions, sales inputs, calculation and rolling forecasts', descComparisons: 'Monthly, yearly and version comparisons', descReview: 'Review submissions, batches and adjustments', descSources: 'Source data and classification traceability', descFacts: 'Published facts and draft data shown separately', descNotifications: 'Action required, related and system messages', descPermissions: 'Effective permissions, scopes and grants',
         bomStatus: 'Status', tabBom: 'Cost BOM', descBom: 'Material details, estimates and cost rollups by cost package', bomPackages: 'Cost packages', bomVersion: 'Version', bomModel: 'Model / project', bomTarget: 'Target cost', bomTotal: 'Estimated total cost', bomPart: 'Part number', bomName: 'Material', bomQty: 'Quantity', bomLevel: 'Level', bomUnit: 'Unit cost', bomExtended: 'Extended cost', bomSelect: 'Select a cost package to view its materials', bomScope: 'Cost packages are scoped by project and version; year and organization filters do not apply.', bomDetail: 'Material details', bomRollupError: 'Cost rollup failed to load; material details remain available.', bomNodeCount: 'Nodes', bomLeafCount: 'Leaf nodes', bomStatusDRAFT: 'Draft', bomStatusIN_REVIEW: 'In review', bomStatusAPPROVED: 'Approved', bomStatusOBSOLETE: 'Obsolete',
         copyFailed: 'Could not copy the analysis prompt. Please retry.',
@@ -2828,7 +2844,7 @@ window.__ModuleLoader__.load({
           h(MembersCard, { members, busy, t, act, onDialog: setDialog, onRetry: retryLists })) : null,
 
         // 录入面板常开内嵌（对齐前端 FinanceEntryPanel）
-        !directoryOnly ? h(EntryPanel, { year, orgs, departments, t, act }) : null,
+        !directoryOnly && ctx.financeWriter ? h(EntryPanel, { key: year, year, orgs, departments, t, onSaved: () => window.dispatchEvent(new Event('sf:refresh')) }) : !directoryOnly ? h('p', { className: 'sf-note' }, t('entryFinanceOnly')) : null,
 
         dialog?.kind === 'createTask' ? h(CreateTaskDialog, { year, departments, members, busy, t, onClose: () => setDialog(null), act }) : null,
         dialog?.kind === 'assignment' ? h(AssignmentDialog, { assignment: dialog.assignment, busy, t, onClose: () => setDialog(null), act }) : null,
@@ -3205,14 +3221,22 @@ window.__ModuleLoader__.load({
 
     // ---- 录入面板（4 类型；排款月份必填对齐后端校验） ----
 
-    function EntryPanel({ year, orgs, departments, t, act }) {
+    function EntryPanel({ year, orgs, departments, t, onSaved }) {
       const [kind, setKind] = useState('payment')
+      const [entryYear, setEntryYear] = useState(String(year))
+      const [backfillKind, setBackfillKind] = useState('payment')
+      const [costItems, setCostItems] = useState(null)
+      const [costError, setCostError] = useState(false)
+      const [versions, setVersions] = useState(null)
+      const [versionError, setVersionError] = useState(false)
+      const [retry, setRetry] = useState(0)
+      const savingRef = useRef(false)
       const [busy, setBusy] = useState(false)
       const [notice, setNotice] = useState(null)
-      const [history, setHistory] = useState({ paymentPlans: [], payees: [], costItems: [], items: [], payers: [], incomeTypes: [] })
+      const [history, setHistory] = useState({ paymentPlans: [], revenuePlans: [], payees: [], costItems: [], items: [], payers: [], incomeTypes: [] })
       const [historyLoaded, setHistoryLoaded] = useState(false)
-      const [historyError, setHistoryError] = useState(false)
-      const orgOptions = (orgs || []).map(org => [org.id, org.name])
+      const [historyError, setHistoryError] = useState({})
+      const orgOptions = (orgs || []).filter(org => org.type !== 'GROUP').map(org => [org.id, org.name])
       const departmentOptions = (departments || []).map(department => [department.id, department.name])
       const years = yearOptions(year)
       const months = Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1}月`])
@@ -3220,19 +3244,22 @@ window.__ModuleLoader__.load({
       useEffect(() => {
         let cancelled = false
         setHistoryLoaded(false)
-        setHistoryError(false)
-        Promise.all([
-          api(`/payment-plans?year=${year}&limit=100`),
-          api(`/revenue-plans?year=${year}&limit=100`),
+        setHistoryError({})
+        Promise.allSettled([
+          api(`/payment-plans?year=${entryYear}&limit=100`),
+          api(`/revenue-plans?year=${entryYear}&limit=100`),
         ]).then(([payments, revenues]) => {
           if (cancelled) return
-          const paymentRows = payments?.data?.list || []
-          const revenueRows = revenues?.data?.list || []
+          const paymentRows = payments.status === 'fulfilled' ? payments.value?.data?.list || [] : []
+          const revenueRows = revenues.status === 'fulfilled' ? revenues.value?.data?.list || [] : []
+          setHistoryError({ payment: payments.status === 'rejected', revenue: revenues.status === 'rejected' })
           const unique = values => [...new Set(values.filter(value => typeof value === 'string' && value.trim()))].sort((a, b) => a.localeCompare(b, 'zh-CN'))
           setHistory({
+            year: entryYear,
             paymentPlans: paymentRows
               .filter(row => row.id)
               .map(row => [row.id, [row.description || row.planType || '付款计划', row.orgName, row.planMonth ? `${row.planMonth}月` : null, row.id.slice(0, 8)].filter(Boolean).join(' · ')]),
+            revenuePlans: revenueRows.filter(row => row.id).map(row => [row.id, [row.itemName || '收入计划', row.orgName, row.month ? `${row.month}月` : null, row.id.slice(0, 8)].filter(Boolean).join(' · ')]),
             payees: unique(paymentRows.map(row => row.payeeName)),
             costItems: unique(paymentRows.map(row => row.costItemName)),
             items: unique(revenueRows.map(row => row.itemName)),
@@ -3240,18 +3267,55 @@ window.__ModuleLoader__.load({
             incomeTypes: unique(revenueRows.map(row => row.incomeTypeName)),
           })
           setHistoryLoaded(true)
-        }).catch(() => { if (!cancelled) setHistoryError(true) })
+        })
         return () => { cancelled = true }
-      }, [year])
+      }, [entryYear, retry])
+
+      useEffect(() => {
+        if (kind !== 'budget') return
+        let cancelled = false
+        setCostItems(null); setCostError(false)
+        api('/cost-items').then(value => {
+          if (!cancelled) setCostItems((value.data?.list || []).filter(item => item.active))
+        }).catch(() => { if (!cancelled) setCostError(true) })
+        return () => { cancelled = true }
+      }, [kind, retry])
+
+      useEffect(() => {
+        if (kind !== 'budget') return
+        let cancelled = false
+        setVersions(null); setVersionError(false)
+        api(`/budget-versions?year=${entryYear}`).then(value => {
+          if (!cancelled) setVersions(value.data?.list || [])
+        }).catch(() => { if (!cancelled) setVersionError(true) })
+        return () => { cancelled = true }
+      }, [kind, entryYear, retry])
+
+      const primaryVersion = versions?.find(version => version.isPrimary && Number(version.year) === Number(entryYear))
+      const budgetReady = !costError && Boolean(costItems?.length) && !versionError && Boolean(primaryVersion)
+      const backfillPlans = backfillKind === 'payment' ? history.paymentPlans : history.revenuePlans
+      const backfillReady = historyLoaded && history.year === entryYear && !historyError[backfillKind] && Boolean(backfillPlans.length)
 
       const submit = async event => {
         event.preventDefault()
-        if (busy) return
+        if (savingRef.current) return
         const formElement = event.currentTarget
         const form = new FormData(formElement)
         const num = key => Number(form.get(key))
         const text = key => { const value = String(form.get(key) || '').trim(); return value || undefined }
         const textChoice = key => text(key + 'Choice')
+        const amountKey = kind === 'budget' ? 'budgetAmount' : kind === 'backfill' ? 'actualAmount' : 'plannedAmount'
+        const amount = num(amountKey)
+        const monthKey = kind === 'payment' ? 'planMonth' : 'month'
+        const validMonth = !text(monthKey) || (Number.isInteger(num(monthKey)) && num(monthKey) >= 1 && num(monthKey) <= 12)
+        if (!text(amountKey) || !Number.isFinite(amount) || amount < 0 || (kind !== 'backfill' && amount === 0) ||
+          (kind !== 'backfill' && (!orgOptions.some(([id]) => id === text('orgId')) || num('year') !== Number(entryYear) || num('year') < 2000 || num('year') > 2100 || !Number.isInteger(num('year')) || !validMonth))) {
+          setNotice(t('entryInvalid')); return
+        }
+        if (kind === 'budget' && !budgetReady) { setNotice(t('versionMissing')); return }
+        if (kind === 'budget' && !costItems.some(item => item.id === text('costItemId'))) { setNotice(t('costRequired')); return }
+        if (kind === 'backfill' && (!backfillReady || !backfillPlans.some(([id]) => id === text('planId')))) { setNotice(t('selectPlan')); return }
+        savingRef.current = true
         setBusy(true); setNotice(null)
         try {
           let path, payload
@@ -3274,32 +3338,36 @@ window.__ModuleLoader__.load({
             payload = { orgId: text('orgId'), year: num('year'), expenseType: text('expenseType'), budgetAmount: num('budgetAmount') }
             if (text('month')) payload.month = num('month')
             if (text('departmentId')) payload.departmentId = text('departmentId')
-            if (textChoice('costItemName')) payload.costItemName = textChoice('costItemName')
+            payload.costItemId = text('costItemId')
             if (text('note')) payload.note = text('note')
           } else {
-            path = `/payment-plans/${text('planId')}/actuals`
+            path = `/${backfillKind === 'payment' ? 'payment-plans' : 'revenue-plans'}/${text('planId')}/actuals`
             payload = { actualAmount: num('actualAmount') }
             if (text('actualPaidAt')) payload.actualPaidAt = new Date(`${text('actualPaidAt')}T00:00:00`).toISOString()
           }
           await post(path, payload)
           setNotice(t('submitted'))
           formElement.reset()
-        } catch (error) { setNotice(`${t('opFailed')}: ${error.message}`) } finally { setBusy(false) }
+          onSaved?.()
+        } catch (error) { setNotice(`${t('opFailed')}: ${error.message}`) } finally { savingRef.current = false; setBusy(false) }
       }
 
       return h('form', { className: 'sf-card', key: kind, onSubmit: submit },
         h('div', { className: 'sf-card-head' }, h('h2', null, t('entryTitle')), h('span', { className: 'sf-card-unit' }, t('unitYuan'))),
         h('div', { className: 'sf-card-body' }, h('div', { className: 'sf-stack' },
           h('p', { className: 'sf-note' }, t('entryHint')),
-          h(PillTabs, { tabs: [['payment', 'entryPaymentPlan'], ['revenue', 'entryRevenuePlan'], ['budget', 'entryBudgetLine'], ['backfill', 'entryBackfill']], value: kind, onChange: setKind, t }),
+          h('fieldset', { className: 'sf-fieldset sf-stack', disabled: busy, 'aria-busy': busy },
+          h(PillTabs, { tabs: [['payment', 'entryPaymentPlan'], ['revenue', 'entryRevenuePlan'], ['budget', 'entryBudgetLine'], ['backfill', 'entryBackfill']], value: kind, onChange: value => { setKind(value); setNotice(null) }, t }),
           h('div', { className: 'sf-form' },
             kind !== 'backfill' ? [
               h(FormRow, { key: 'org', label: t('org') }, h(SearchSelect, { name: 'orgId', required: true, options: orgOptions, placeholder: t('org') })),
-              h(FormRow, { key: 'year', label: t('year') }, h(Select, { name: 'year', required: true, options: years, placeholder: t('year') })),
+              h(FormRow, { key: 'year', label: t('year') }, h(Select, { name: 'year', value: entryYear, onChange: value => { setEntryYear(value); setNotice(null) }, required: true, options: years, placeholder: t('year') })),
             ] : [
-              h(FormRow, { key: 'plan', label: t('selectPlan') }, h(SearchSelect, { name: 'planId', required: true, options: history.paymentPlans, placeholder: t('selectPlan') })),
-              historyError ? h('p', { key: 'plan-error', className: 'sf-note sf-neg' }, `${t('opFailed')}: ${t('selectPlan')}`) : null,
-              historyLoaded && !history.paymentPlans.length ? h('p', { key: 'plan-empty', className: 'sf-note' }, `${t('empty')} · ${t('entryPaymentPlan')}`) : null,
+              h(FormRow, { key: 'backfill-year', label: t('year') }, h(Select, { value: entryYear, onChange: setEntryYear, options: years })),
+              h(FormRow, { key: 'backfill-kind', label: t('backfillKind') }, h(Select, { value: backfillKind, onChange: setBackfillKind, options: [['payment', t('entryPaymentPlan')], ['revenue', t('entryRevenuePlan')]] })),
+              h(FormRow, { key: 'plan', label: t('selectPlan') }, h(SearchSelect, { key: `${backfillKind}-${entryYear}`, name: 'planId', required: true, disabled: !backfillReady, options: backfillPlans, placeholder: t('selectPlan') })),
+              historyError[backfillKind] ? h('div', { key: 'plan-error', role: 'alert' }, `${t('opFailed')}: ${t('selectPlan')}`, h(LinkButton, { onClick: () => setRetry(value => value + 1) }, t('retry'))) : null,
+              historyLoaded && !backfillPlans.length ? h('p', { key: 'plan-empty', className: 'sf-note' }, `${t('empty')} · ${t(backfillKind === 'payment' ? 'entryPaymentPlan' : 'entryRevenuePlan')}`) : null,
             ],
             kind === 'payment' ? [
               h(FormRow, { key: 'pt', label: t('planType') }, h(Select, { name: 'planType', required: true, options: PLAN_TYPES.map(([id, label]) => [id, t(label)]) })),
@@ -3318,16 +3386,21 @@ window.__ModuleLoader__.load({
               h(FormRow, { key: 'be', label: t('expenseType') }, h(Select, { name: 'expenseType', required: true, options: EXPENSE_TYPES.map(([id, label]) => [id, t(label)]) })),
               h(FormRow, { key: 'bm', label: t('month') }, h(Select, { name: 'month', options: months, placeholder: t('month') })),
               h(FormRow, { key: 'bd', label: t('department') }, h(SearchSelect, { name: 'departmentId', options: departmentOptions, placeholder: t('department') })),
-              h(FormRow, { key: 'bc', label: t('costItem') }, h(CustomizableTextSelect, { name: 'costItemName', options: history.costItems, placeholder: t('costItem') })),
-              h(FormRow, { key: 'ba', label: `${t('kpiBudget')}（${t('unitYuan')}）` }, h(Field, { name: 'budgetAmount', type: 'number', min: 0.01, step: '0.01', required: true })),
+              h(FormRow, { key: 'bc', label: t('costItem') }, h(SearchSelect, { name: 'costItemId', required: true, disabled: costError || !costItems?.length, options: (costItems || []).map(item => [item.id, item.name]), placeholder: t('costItem') })),
+              h('div', { key: 'budget-check', className: 'sf-stack', role: 'status' },
+                h('p', { className: 'sf-note' }, t('budgetEntryHint')),
+                h('p', { className: 'sf-note' }, versionError ? t('versionLoadFailed') : versions === null ? t('versionLoading') : !primaryVersion ? t('versionMissing') : budgetVersionLabel(primaryVersion)),
+                costError || costItems === null || !costItems.length ? h('p', { className: 'sf-note' }, t(costError ? 'costLoadFailed' : costItems === null ? 'costLoading' : 'costEmpty')) : null,
+                costError || versionError || (versions && !primaryVersion) || (costItems && !costItems.length) ? h(LinkButton, { onClick: () => setRetry(value => value + 1) }, t('retry')) : null),
+              h(FormRow, { key: 'ba', label: `${t('budgetEntryAmount')}（${t('unitYuan')}）` }, h(Field, { name: 'budgetAmount', type: 'number', min: 0.01, step: '0.01', required: true })),
               h(FormRow, { key: 'bn', label: t('note') }, h(Field, { name: 'note', maxLength: 500 })),
             ] : [
               h(FormRow, { key: 'aa', label: t('actualAmountL') }, h(Field, { name: 'actualAmount', type: 'number', min: 0, step: '0.01', required: true })),
               h(FormRow, { key: 'ad', label: t('actualDateL') }, h(Field, { name: 'actualPaidAt', type: 'date' })),
             ],
             h('div', { className: 'sf-form-actions' },
-              h(PrimaryButton, { type: 'submit', busy }, busy ? t('running') : t('submit')),
-              notice ? h(Notice, null, notice) : null)))))
+              h(PrimaryButton, { type: 'submit', busy, disabled: (kind === 'budget' && !budgetReady) || (kind === 'backfill' && !backfillReady) }, busy ? t('running') : t('submit')),
+              notice ? h('div', { role: 'status', 'aria-live': 'polite' }, h(Notice, null, notice)) : null))))))
     }
 
     // 片段 5/7 视图：深度分析入口（预制指令投递当前会话，Agent 调 mcp__finance__* 完成分析）
@@ -3903,7 +3976,7 @@ window.__ModuleLoader__.load({
                 verify && row.status === 'CONFIRMED' ? h(GhostButton, { onClick: () => setDialog({ kind: 'lock', title: '锁定已确认填报', row }) }, '锁定填报') : null,
                 verify && ['PENDING', 'DRAFT', 'SUBMITTED', 'REJECTED'].includes(row.status) ? h(GhostButton, { onClick: () => setDialog({ kind: 'void', title: '作废未确认填报', row }) }, '作废填报') : null)) },
         ] })), h(Pager, { page, total: resource.data?.total, limit: 20, onPage: setPage })),
-        ctx.financeWriter && ctx.permissions.includes('budget.submission.edit') ? h(EntryPanel, { year: ctx.year, orgs: ctx.orgs, departments: ctx.departments, t, act }) : null,
+        ctx.financeWriter && ctx.permissions.includes('budget.submission.edit') ? h(EntryPanel, { key: ctx.year, year: ctx.year, orgs: ctx.orgs, departments: ctx.departments, t, onSaved: () => { action.invalidate(); window.dispatchEvent(new Event('sf:refresh')) } }) : null,
         showDirectory ? h(EntryView, { ctx, t, directoryOnly: true }) : null,
         dialog?.kind === 'create' ? h(CreateTaskDialog, { year: ctx.year, departments: ctx.departments, members: members.data, busy: action.busy, t, act, onClose: () => { setDialog(null); tasks.retry() } }) : null,
         dialog?.kind === 'assignment' ? detail.error || detail.loading ? h(Dialog, { title: '填报详情', onClose: () => setDialog(null) }, h(FinanceResource, { resource: detail })) : detail.data ? h(AssignmentDialog, { key: detail.data.id, assignment: detail.data, canEdit: ctx.permissions.includes('budget.submission.edit'), canVerify: verify, busy: action.busy, t, act, onClose: () => { setDialog(null); assignments.retry() } }) : null : null,

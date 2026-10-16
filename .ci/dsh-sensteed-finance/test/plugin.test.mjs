@@ -554,31 +554,87 @@ test('department multi-select adds filtered results without losing previous choi
   assert.equal(clientNodes(tree).some(node => node.props.role === 'listbox'), false)
 })
 
-test('budget entry submits custom cost item and resets captured form after async save', async () => {
-  const components = await readFile(new URL('src/components.js', root), 'utf8')
-  const entry = await readFile(new URL('src/views/entry.js', root), 'utf8')
-  let payload
+async function budgetEntryHarness(overrides = {}) {
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8')
+  const values = { orgId: 'org-1', year: '2026', expenseType: 'FIXED_OPERATION', departmentId: 'dept-1', costItemId: 'travel', budgetAmount: '1250.50', ...overrides.values }
+  const writes = [], reads = []
   let resetCount = 0
   const formElement = { reset() { resetCount++ } }
-  const values = { orgId: 'org-1', year: '2026', expenseType: 'FIXED_OPERATION', departmentId: 'dept-1', costItemNameChoice: '新费用项', budgetAmount: '1250.50' }
-  const harness = clientHarness(components + '\n' + entry, 'EntryPanel', {
+  const props = { year: 2026, orgs: [{ id: 'org-1', name: '有谦' }, { id: 'group', type: 'GROUP', name: '集团' }], departments: [{ id: 'dept-1', name: '产品工程' }], t: key => key }
+  const harness = clientHarness(source, 'EntryPanel', {
     FormData: class { constructor(form) { assert.equal(form, formElement) } get(key) { return values[key] } },
-    post: async (path, body) => { assert.equal(path, '/budget-lines'); payload = body },
+    api: async path => {
+      reads.push(path)
+      if (overrides.api) return overrides.api(path)
+      return { data: { list: path === '/cost-items' ? [{ id: 'travel', name: '差旅费', active: true }, { id: 'old', name: '已停用', active: false }] : path.startsWith('/budget-versions') ? [{ id: 'version-1', year: Number(values.year), isPrimary: true, name: '已发布主版本' }] : [] } }
+    },
+    post: async (path, body) => { writes.push({ path, body }); if (overrides.post) await overrides.post(path, body) },
   })
-  const props = { year: 2026, orgs: [], departments: [], t: key => key }
-  let tree = harness.render(props)
-  clientNodes(tree).find(node => node.type?.name === 'PillTabs').props.onChange('budget')
-  tree = harness.render(props)
-  const event = { currentTarget: formElement, preventDefault() {} }
-  const saving = tree.props.onSubmit(event)
-  event.currentTarget = null
+  const render = () => harness.render(props)
+  const settle = async () => { harness.flushEffects(); await new Promise(resolve => setImmediate(resolve)); return render() }
+  const switchKind = kind => { clientNodes(render()).find(node => node.type?.name === 'PillTabs').props.onChange(kind); return render() }
+  const submit = () => render().props.onSubmit({ currentTarget: formElement, preventDefault() {} })
+  render(); await settle(); switchKind('budget'); await settle()
+  return { render, settle, switchKind, submit, values, reads, writes, get resetCount() { return resetCount } }
+}
+
+test('budget entry uses active master-data IDs instead of payment history or custom text', async () => {
+  const harness = await budgetEntryHarness()
+  const tree = harness.render()
+  const nodes = clientNodes(tree)
+  const picker = nodes.find(node => node.props.name === 'costItemId')
+  assert.equal(picker.type.name, 'SearchSelect')
+  assert.deepEqual(picker.props.options, [['travel', '差旅费']])
+  assert.ok(!picker.props.allowCustom)
+  assert.equal(picker.props.required, true)
+  assert.deepEqual(nodes.find(node => node.props.name === 'orgId').props.options, [['org-1', '有谦']])
+  assert.equal(nodes.find(node => node.props.name === 'year').props.value, '2026')
+  await harness.submit()
+  assert.deepEqual(harness.writes, [{ path: '/budget-lines', body: { orgId: 'org-1', year: 2026, expenseType: 'FIXED_OPERATION', budgetAmount: 1250.5, departmentId: 'dept-1', costItemId: 'travel' } }])
+  assert.equal(harness.resetCount, 1)
+})
+
+test('budget preflight blocks empty, failed and inactive catalogs and unpublished or missing years', async () => {
+  for (const failure of ['empty-costs', 'inactive-costs', 'cost-error', 'version-error', 'no-primary', 'draft']) {
+    const harness = await budgetEntryHarness({ api: async path => {
+      if ((failure === 'cost-error' && path === '/cost-items') || (failure === 'version-error' && path.startsWith('/budget-versions'))) throw new Error('offline')
+      return { data: { list: path === '/cost-items'
+        ? failure === 'empty-costs' ? [] : [{ id: 'travel', name: '差旅费', active: failure !== 'inactive-costs' }]
+        : path.startsWith('/budget-versions') ? failure === 'no-primary' ? [] : [{ year: 2026, isPrimary: failure !== 'draft' }] : [] } }
+    } })
+    assert.equal(clientNodes(harness.render()).find(node => node.type?.name === 'PrimaryButton').props.disabled, true, failure)
+    await harness.submit()
+    assert.equal(harness.writes.length, 0, failure)
+    assert.equal(harness.resetCount, 0, failure)
+  }
+})
+
+test('budget rejects unknown cost IDs and invalid amounts without losing input', async () => {
+  for (const values of [{ costItemId: 'unknown' }, { costItemId: '' }, { budgetAmount: 'NaN' }, { budgetAmount: '' }, { budgetAmount: '-1' }, { budgetAmount: '0' }, { month: '13' }]) {
+    const harness = await budgetEntryHarness({ values })
+    await harness.submit()
+    assert.equal(harness.writes.length, 0)
+    assert.equal(harness.resetCount, 0)
+  }
+})
+
+test('budget submission locks immediately, keeps failed input and retries the selected year', async () => {
+  let rejectWrite
+  const harness = await budgetEntryHarness({ post: () => new Promise((resolve, reject) => { rejectWrite = reject }) })
+  const saving = harness.submit()
+  await harness.submit()
+  assert.equal(harness.writes.length, 1)
+  assert.equal(clientNodes(harness.render()).find(node => node.type === 'fieldset').props.disabled, true)
+  rejectWrite(new Error('年度 2026 暂无已发布预算版本，请先导入数据'))
   await saving
-  assert.equal(payload.costItemName, '新费用项')
-  assert.equal(payload.departmentId, 'dept-1')
-  assert.equal(payload.budgetAmount, 1250.5)
-  assert.equal(resetCount, 1)
-  tree = harness.render(props)
-  assert.ok(clientNodes(tree).some(node => node.type?.name === 'Notice' && node.children.includes('submitted')))
+  assert.equal(harness.resetCount, 0)
+  assert.ok(clientNodes(harness.render()).some(node => node.type?.name === 'Notice' && node.children[0].includes('年度 2026')))
+  clientNodes(harness.render()).find(node => node.props.name === 'year').props.onChange('2027')
+  harness.values.year = '2027'
+  // The previous year's version must not enable a write while the new check is pending.
+  assert.equal(clientNodes(harness.render()).find(node => node.type?.name === 'PrimaryButton').props.disabled, true)
+  await harness.settle()
+  assert.ok(harness.reads.includes('/budget-versions?year=2027'))
 })
 
 test('table settings stay isolated across lists and numeric sorts keep missing values last', async () => {
@@ -1463,5 +1519,72 @@ test('cash viewers cannot schedule, increase or backfill plans', async () => {
     const table = clientNodes(tree).find(node => node.type?.name === 'Table')
     const actions = table.props.columns.find(column => column.key === 'actions').render(table.props.rows[0])
     assert(!clientNodes(actions).some(node => node.children.some(child => forbidden.includes(child))))
+  }
+})
+
+
+test('expense and payment type options have translated labels in both locales', async () => {
+  const head = await readFile(new URL('src/head.js', root), 'utf8')
+  const constants = head.slice(head.indexOf('const EXPENSE_TYPES'), head.indexOf('const LEDGER_LIMIT'))
+  const dictionary = head.slice(head.indexOf('const copy ='), head.indexOf('\n// ---- 打开/关闭状态'))
+  const { expenses, plans, copy } = new Function(constants + '\n' + dictionary + '\nreturn { expenses: EXPENSE_TYPES, plans: PLAN_TYPES, copy }')()
+  for (const locale of ['zh', 'en']) {
+    for (const [, key] of [...expenses, ...plans]) assert.ok(copy[locale][key], `${locale}: ${key}`)
+  }
+})
+
+test('budget entry preserves the upstream missing published version message', async () => {
+  const message = '年度 2027 暂无已发布预算版本，请先导入数据'
+  const calls = []
+  const { routes } = await loadHost({ fetch: async (url, init) => {
+    calls.push({ url: String(url), method: init.method })
+    return jsonResponse({ statusCode: 404, message, error: 'Not Found' }, 404)
+  } })
+  const result = await invokeRoute(routes.get(BASE), 'POST', BASE + '/budget-lines', { year: 2027, budgetAmount: 300000 })
+  assert.match(calls.at(-1).url, /\/api\/finance\/budget\/lines$/)
+  assert.equal(result.status, 404)
+  assert.equal(result.body.error, message)
+})
+
+
+test('both REST adapters retain actionable 400/404 errors without showing route diagnostics', async () => {
+  for (const path of ['/budget-lines', '/rest/finance/budget/lines']) {
+    for (const [status, body, expected] of [
+      [400, { message: ['请选择主体', '预算金额必须大于 0'] }, '请选择主体；预算金额必须大于 0'],
+      [404, { msg: '主体不存在' }, '主体不存在'],
+      [404, { message: 'Cannot POST /api/finance/budget/lines' }, '未找到对应的财务资源'],
+      [503, null, '财务服务暂不可用'],
+    ]) {
+      const { routes } = await loadHost({ fetch: async () => jsonResponse(body, status) })
+      const result = await invokeRoute(routes.get(BASE), 'POST', BASE + path, {})
+      assert.equal(result.status, status)
+      assert.ok(result.body.error.includes(expected))
+      assert.doesNotMatch(result.body.error, /upstream_http_|Cannot POST/)
+    }
+  }
+})
+
+test('backfill supports revenue and payment independently when the other history fails', async () => {
+  for (const kind of ['payment', 'revenue']) {
+    const harness = await budgetEntryHarness({ values: { planId: 'plan-1', actualAmount: '0' }, api: async path => {
+      const resource = kind === 'payment' ? '/payment-plans' : '/revenue-plans'
+      if (path.startsWith(resource)) return { data: { list: [{ id: 'plan-1', description: '实际回填', itemName: '收入回填' }] } }
+      throw new Error('unavailable')
+    } })
+    harness.switchKind('backfill')
+    const selector = clientNodes(harness.render()).find(node => node.type?.name === 'Select' && node.props.value === 'payment')
+    selector.props.onChange(kind)
+    await harness.submit()
+    assert.deepEqual(harness.writes, [{ path: `/${kind === 'payment' ? 'payment-plans' : 'revenue-plans'}/plan-1/actuals`, body: { actualAmount: 0 } }])
+    assert.equal(harness.resetCount, 1)
+  }
+})
+
+test('department roles cannot see direct financial entry while finance staff can', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8')
+  for (const financeWriter of [false, true]) {
+    const harness = clientHarness(source, 'EntryView')
+    const tree = harness.render({ ctx: { year: 2026, orgs: [], departments: [], financeWriter }, t: key => key })
+    assert.equal(clientNodes(tree).some(node => node.type?.name === 'EntryPanel'), financeWriter)
   }
 })

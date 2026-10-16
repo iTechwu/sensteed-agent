@@ -58,7 +58,7 @@ function FilingParityView({ ctx, t }) {
             verify && row.status === 'CONFIRMED' ? h(GhostButton, { onClick: () => setDialog({ kind: 'lock', title: '锁定已确认填报', row }) }, '锁定填报') : null,
             verify && ['PENDING', 'DRAFT', 'SUBMITTED', 'REJECTED'].includes(row.status) ? h(GhostButton, { onClick: () => setDialog({ kind: 'void', title: '作废未确认填报', row }) }, '作废填报') : null)) },
     ] })), h(Pager, { page, total: resource.data?.total, limit: 20, onPage: setPage })),
-    ctx.financeWriter && ctx.permissions.includes('budget.submission.edit') ? h(EntryPanel, { year: ctx.year, orgs: ctx.orgs, departments: ctx.departments, t, act }) : null,
+    ctx.financeWriter && ctx.permissions.includes('budget.submission.edit') ? h(EntryPanel, { key: ctx.year, year: ctx.year, orgs: ctx.orgs, departments: ctx.departments, t, onSaved: () => { action.invalidate(); window.dispatchEvent(new Event('sf:refresh')) } }) : null,
     showDirectory ? h(EntryView, { ctx, t, directoryOnly: true }) : null,
     dialog?.kind === 'create' ? h(CreateTaskDialog, { year: ctx.year, departments: ctx.departments, members: members.data, busy: action.busy, t, act, onClose: () => { setDialog(null); tasks.retry() } }) : null,
     dialog?.kind === 'assignment' ? detail.error || detail.loading ? h(Dialog, { title: '填报详情', onClose: () => setDialog(null) }, h(FinanceResource, { resource: detail })) : detail.data ? h(AssignmentDialog, { key: detail.data.id, assignment: detail.data, canEdit: ctx.permissions.includes('budget.submission.edit'), canVerify: verify, busy: action.busy, t, act, onClose: () => { setDialog(null); assignments.retry() } }) : null : null,
