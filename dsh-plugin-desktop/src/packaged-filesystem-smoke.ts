@@ -22,8 +22,14 @@ export async function verifyBundledSkills(applicationRoot: string, bundledSkillR
       const target = await ctx.fs.resolve(path)
       const first = await ctx.fs.stat(target)
       const second = await ctx.fs.stat(target)
-      if (first?.type !== 'directory' || first.version !== second?.version) {
+      if (first?.type !== 'directory') {
         throw new Error(`packaged directory has invalid or unstable metadata: ${path}`)
+      }
+      // Electron 的 asar shim 每次合成的元数据(时间戳)跨调用不稳定,只读归档内
+      // 不存在可断言的版本稳定性;真实文件系统的路径仍保持稳定性契约。
+      const insideAsar = /(?:^|[\\/])app\.asar(?:[\\/]|$)/u.test(path)
+      if (!insideAsar && first.version !== second?.version) {
+        throw new Error(`packaged directory metadata changed between stats: ${path}`)
       }
       if ((await ctx.fs.lstat(path))?.type !== 'directory') {
         throw new Error(`packaged directory lstat failed: ${path}`)

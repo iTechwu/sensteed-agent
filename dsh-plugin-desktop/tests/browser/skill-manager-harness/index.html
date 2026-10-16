@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>技能管理交互验证</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body, #root { width: 100%; height: 100%; margin: 0; }
+      body { font: 14px system-ui; }
+      .shell { display: flex; width: 100%; height: 100%; color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-base); }
+      aside { flex: 0 0 248px; padding: 48px 16px; background: var(--dsw-alias-bg-layer-2); }
+      aside strong { display: block; margin-bottom: 32px; font-size: 20px; }
+      aside p { padding: 12px; margin: 4px 0; }
+      aside .active { border-radius: 8px; background: var(--dsw-alias-bg-layer-3); }
+      .conversation { flex: 1; padding: 48px; }
+      @media (max-width: 760px) { aside { display: none; } }
+    </style>
+  </head>
+  <body><div id="root"></div><script type="module" src="/main.jsx"></script></body>
+</html>

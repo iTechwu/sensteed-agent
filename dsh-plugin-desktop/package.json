@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-desktop",
-  "version": "0.2.1-alpha.3-beta.202610150942",
+  "version": "0.2.1-alpha.3-beta.202610162249",
   "description": "Yootun-Agent: an Electron shell composed as a DeepSeek Harness Cordis plugin",
   "license": "MIT",
   "publishConfig": {
@@ -125,7 +125,7 @@
     }
   },
   "scripts": {
-    "build": "corepack pnpm run generate:brand && node ../scripts/build-finance-ui.mjs && node scripts/clean.mjs && tsdown && vite build --config vite.client.config.ts && vite build --config vite.native-ui.config.ts && tsc -p tsconfig.json --emitDeclarationOnly && tsc -p tsconfig.client.json --emitDeclarationOnly && node scripts/generate-profile-closure.mjs",
+    "build": "corepack pnpm run generate:brand && node ../scripts/build-dofe-ui.mjs && node scripts/clean.mjs && tsdown && vite build --config vite.client.config.ts && vite build --config vite.native-ui.config.ts && tsc -p tsconfig.json --emitDeclarationOnly && tsc -p tsconfig.client.json --emitDeclarationOnly && node scripts/generate-profile-closure.mjs",
     "generate:brand": "node scripts/generate-brand-assets.mjs && node scripts/generate-lockup.ts && node scripts/generate-client-brand-module.mjs && node scripts/generate-product-identity.mjs && node scripts/generate-mac-app-icon.mjs && node scripts/generate-tray-icons.mjs && node scripts/generate-windows-app-icon.mjs",
     "verify:brand": "node scripts/verify-brand-sync.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit && tsc -p tsconfig.native-ui.json --noEmit && tsc -p tsconfig.tests.json --noEmit && tsc -p tsconfig.tests.client.json --noEmit",
@@ -134,6 +134,7 @@
     "test:access-ui": "node tests/browser/yootun-access.browser.mjs",
     "test:deliverables-ui": "node tests/browser/deliverables.visual.mjs",
     "test:plugin-console-ui": "node tests/browser/plugin-console.visual.mjs && node tests/browser/plugin-console-modal.browser.mjs && node tests/browser/plugin-console-management.browser.mjs",
+    "test:skill-manager-ui": "node ../scripts/build-dofe-ui.mjs && node tests/browser/skill-manager.browser.mjs",
     "test:plugin-surfaces-ui": "node tests/browser/yootun-access.browser.mjs && node tests/browser/deliverables.visual.mjs && node tests/browser/plugin-console.visual.mjs && node tests/browser/plugin-console-modal.browser.mjs && node tests/browser/plugin-console-management.browser.mjs",
     "test:search-locks-ui": "node tests/browser/yootun-search-locks.visual.mjs",
     "test:theme-actions-ui": "node tests/browser/yootun-theme-actions.visual.mjs",
