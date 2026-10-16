@@ -173,6 +173,16 @@ test('consume uncertainty and post-ack identity switches never start target muta
   }
 })
 
+test('switching actor after durable CONSUMING aborts before sending consume',async t => {
+  const f=await fixture(t)
+  f.installer.options.afterPhase=async phase=>{if(phase==='CONSUMING')f.switchActor()}
+  const result=await f.installer.execute({intentId:(await f.installer.preview({action:'install',skillId})).intentId})
+  assert.equal(result.status,'ABORTED')
+  assert.equal(f.calls.some(call=>call.path.endsWith('/consume')),false)
+  assert.deepEqual(await readdir(join(f.home,'skills')),[])
+  assert.equal((await f.installer.store.operations())[0].phase,'ABORTED')
+})
+
 test('stale registry bodies cannot claim discovery and offline receipts replay byte-identically only under the original actor',async t => {
   const f=await fixture(t); f.ctx.skills.get=async()=>({content:'stale'});f.offline=true
   const result=await f.installer.execute({intentId:(await f.installer.preview({action:'install',skillId})).intentId})
@@ -244,7 +254,7 @@ test('journal boundary faults preserve zero pre-consume changes and recover publ
       assert.equal((await f.installer.store.operations())[0].events[0].state,'WRITTEN')
     }else{
       assert.deepEqual(await readdir(join(f.home,'skills')),[])
-      assert.equal(result.status,phase==='PREPARED'?'ABORTED':phase==='CONSUMING'?'CONSUME_UNKNOWN':'NEEDS_ATTENTION')
+      assert.equal(result.status,['PREPARED','CONSUMING'].includes(phase)?'ABORTED':'NEEDS_ATTENTION')
     }
     const restarted=new HubSkillInstaller(f.ctx,f.hub,{...f.installer.options,afterPhase:undefined});await restarted.initialize()
     assert.equal((await restarted.store.operations())[0].phase,result.status)

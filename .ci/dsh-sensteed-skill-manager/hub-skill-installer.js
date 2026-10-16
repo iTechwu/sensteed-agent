@@ -180,6 +180,7 @@ export class HubSkillInstaller {
       operation.nextReceipt = plan.action === 'uninstall' ? null : {schemaVersion:1,source:'hub',identity:ownIdentity(identity),operationId,skillId:plan.skillId,releaseId:plan.releaseId,
         installName:plan.installName,version:plan.version,artifactDigest:plan.artifactDigest,fileManifestDigest:manifest.fileManifestDigest,treeDigest:staged.treeDigest,signed}
       this.active.add(operationId)
+      let consumeStarted = false
       try {
         // Durable reservation precedes authorize/consume; grants and bearer never enter the journal.
         await this.phase(operation,'PREPARED')
@@ -188,6 +189,9 @@ export class HubSkillInstaller {
         this.hub.assertCurrent(context.snapshot)
         requireValue((await this.localState(plan.installName,identity,plan.action)).digest === intent.localDigest,'HUB_STATE_CHANGED')
         await this.phase(operation,'CONSUMING')
+        // Phase persistence yields: identity must still match immediately before the request begins.
+        this.hub.assertCurrent(context.snapshot)
+        consumeStarted = true
         let ack
         try { ack = await callHubCatalog(this.ctx,`${PREFIX}/skills/install-plans/${plan.planId}/consume`,{...context.options,signal:AbortSignal.timeout(15_000),method:'POST',body:{deviceId:identity.deviceId,planDigest:plan.planDigest,executionGrant:grant.executionGrant,operationId}}) }
         catch { await this.phase(operation,'CONSUME_UNKNOWN'); return this.summary(operation) }
@@ -215,7 +219,7 @@ export class HubSkillInstaller {
         return this.summary((await this.store.operations()).find(value => value.operationId === operationId))
       } catch (error) {
         if (['PREPARED'].includes(operation.phase)) await this.phase(operation,'ABORTED')
-        else if (operation.phase === 'CONSUMING') await this.phase(operation,'CONSUME_UNKNOWN')
+        else if (operation.phase === 'CONSUMING') await this.phase(operation,consumeStarted ? 'CONSUME_UNKNOWN' : 'ABORTED')
         else if (!['DONE','CONSUME_UNKNOWN'].includes(operation.phase)) {
           operation.errorCode = error.code || 'HUB_LOCAL_FAILURE'
           await this.recoverOperation(operation)

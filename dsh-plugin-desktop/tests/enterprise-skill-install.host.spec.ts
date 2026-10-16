@@ -13,7 +13,7 @@ import * as SkillFilesystem from '@deepseek-ai/dsh-skill-filesystem'
 import { expect, it } from 'vitest'
 import { zipSync } from 'fflate'
 const packageRoot=dirname(createRequire(import.meta.url).resolve('@dofe/dsh-sensteed-skill-manager/package.json'))
-const {apply}=await import(pathToFileURL(join(packageRoot,'index.js')).href)
+const skillManager=await import(pathToFileURL(join(packageRoot,'index.js')).href)
 const {jcs,sha256,fileManifestDigest}=await import(pathToFileURL(join(packageRoot,'skill-archive.js')).href)
 const {planDigest}=await import(pathToFileURL(join(packageRoot,'hub-release-verifier.js')).href)
 
@@ -33,7 +33,6 @@ function request(path:string,body?:unknown,cookie?:string) {
 
 it('requires real Connection owner authentication and observes the installed ZIP through the real filesystem watcher and registry',async () => {
   const home=await realpath(await mkdtemp(join(tmpdir(),'sensteed-hub-discovery-'))),ctx=new Context()
-  let dispose:undefined | (()=>void)
   try {
     const routes:any[]=[]
     ctx.provide('webServer',{host:'127.0.0.1',protocol:'http:',port:3112,register:(route:any)=>{routes.push(route);return()=>{}},registerUpgrade:()=>()=>{},tapIndex:()=>()=>{}} as never)
@@ -71,7 +70,7 @@ it('requires real Connection owner authentication and observes the installed ZIP
       if(path==='/skills/installation-reports'){reports.push(body);return json({ack:true})}
       throw Error('unexpected Hub test route')
     }
-    dispose=apply(ctx,{fetch:fetcher,hubInstallOptions:{home,hostVersion:'0.2.1-alpha.3-beta.202610150942',bundledRoots:[],discoveryAttempts:30,discoveryDelay:100,
+    await ctx.plugin(skillManager,{fetch:fetcher,hubInstallOptions:{home,bundledRoots:[],discoveryAttempts:30,discoveryDelay:100,
       trust:()=>({schemaVersion:1,keys:{fixture:publicKey.export({format:'der',type:'spki'}).toString('base64')},revokedKeyIds:[]})}})
     const route=routes.find(row=>row.path===ROUTE)
     const rejected=response();await route.handler(request(`${ROUTE}/hub/skills/preview`,{action:'install',skillId}),rejected.value)
@@ -82,6 +81,12 @@ it('requires real Connection owner authentication and observes the installed ZIP
     const exchange=response();connection.authorizeIndex(request(`${url.pathname}${url.search}`) as never,exchange.value as never)
     const cookie=exchange.state.headers?.['set-cookie']?.split(';')[0]
     expect(cookie).toBeTruthy()
+    const unavailable=response();await route.handler(request(`${ROUTE}/hub/skills/preview`,{action:'install',skillId},cookie),unavailable.value)
+    expect(unavailable.state.status).toBe(400)
+    expect(JSON.parse(unavailable.state.body!)).toMatchObject({code:'HUB_INCOMPATIBLE_HOST'})
+    expect(await ctx.skills.snapshot({})).toMatchObject({complete:true,skills:[]})
+    // Exercise the production root-provided service, including late availability, without a version override.
+    ctx.provide('desktopRuntime',{updates:{currentVersion:'0.2.1-alpha.3-beta.202610150942'}} as never)
     const preview=response();await route.handler(request(`${ROUTE}/hub/skills/preview`,{action:'install',skillId},cookie),preview.value)
     expect(preview.state.status).toBe(200)
     const intent=JSON.parse(preview.state.body!)
@@ -95,5 +100,5 @@ it('requires real Connection owner authentication and observes the installed ZIP
     expect(skill?.content).toBe('Actual watched content')
     expect(await readFile(join(home,'skills','enterprise-review','SKILL.md'),'utf8')).toBe(files['SKILL.md'].toString())
     expect(JSON.stringify(intent)).not.toContain(home);expect(JSON.stringify(intent)).not.toContain('host-test-placeholder')
-  } finally {dispose?.();await ctx.fiber.dispose();await rm(home,{recursive:true,force:true})}
+  } finally {await ctx.fiber.dispose();await rm(home,{recursive:true,force:true})}
 },15000)
