@@ -315,13 +315,15 @@ export class HubSkillInstaller {
       errorCode:operation.errorCode || (operation.phase === 'CONSUME_UNKNOWN' ? 'HUB_CONSUME_UNKNOWN' : null)}
   }
   async flush(context) {
-    // Bound one cooperative lock turn; durable ACK saves still finish before yielding.
+    // Bound dispatch work; ledger reads and durable ACK saves must finish safely.
     const maximum = this.options.outboxMaxEvents ?? OUTBOX_MAX_EVENTS, budget = this.options.outboxBudgetMs ?? OUTBOX_BUDGET_MS
     requireValue(Number.isInteger(maximum) && maximum >= 1 && maximum <= OUTBOX_MAX_EVENTS
       && Number.isFinite(budget) && budget >= 1 && budget <= OUTBOX_BUDGET_MS,'HUB_INVALID_REQUEST')
+    const operations = await this.store.operations()
+    // A slow ledger scan must not exhaust every fresh batch before its first request.
     const now = this.options.outboxNow || (() => performance.now()), deadline = now() + budget
     let sent = 0
-    for (const operation of await this.store.operations()) {
+    for (const operation of operations) {
       if (!sameOwner(operation.identity,context.identity) || !['DONE','NEEDS_ATTENTION'].includes(operation.phase) || (operation.retryAt || 0) > Date.now()) continue
       for (const event of operation.events) {
         if (operation.acked.includes(event.seq)) continue

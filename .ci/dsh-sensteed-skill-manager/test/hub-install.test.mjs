@@ -262,6 +262,18 @@ test('stops an outbox batch at its elapsed budget and continues byte-identically
   assert.deepEqual(f.reports,original)
 })
 
+test('slow ledger reads cannot starve pending outbox events across successive batches',async t => {
+  let now=0
+  const f=await pendingOutbox(t,{outboxMaxEvents:1,outboxBudgetMs:20,outboxNow:()=>now}),context=await f.installer.current()
+  const original=(await f.installer.store.operations())[0].events
+  const operations=f.installer.store.operations.bind(f.installer.store)
+  f.installer.store.operations=async()=>{const result=await operations();now+=20;return result}
+  await f.installer.store.lock('hub-outbox',()=>f.installer.flush(context))
+  assert.deepEqual(f.reports,original.slice(0,1))
+  await f.installer.store.lock('hub-outbox',()=>f.installer.flush(context))
+  assert.deepEqual(f.reports,original)
+})
+
 test('uses the remaining outbox budget to abort a stalled report and preserves pending events without ACK',async t => {
   const f=await pendingOutbox(t,{outboxBudgetMs:25}),original=(await f.installer.store.operations())[0].events
   const fetch=f.hub.fetch;let aborted=false,attempts=0
