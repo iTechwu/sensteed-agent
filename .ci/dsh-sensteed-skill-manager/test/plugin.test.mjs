@@ -192,7 +192,7 @@ test('hubViewUrl exchanges a one-time ticket and falls back to the plain page', 
   assert.equal(requests[0][1], 'POST')
   assert.deepEqual(requests[0][2], { next: '/plugins' })
   assert.equal(requests[0][3], 'Bearer tok')
-  assert.equal(viewUrl.url, 'https://ai.hozonauto.com/plugins/api/auth/oidc/exchange?ticket=Abc123-._x9zqqqqqqqqqq&next=%2Fplugins')
+  assert.equal(viewUrl.url, 'https://ai.hozonauto.com/plugins?tt=Abc123-._x9zqqqqqqqqqq&next=%2Fplugins')
   // 票据格式不符(过短/含特殊字符):回退直开
   assert.deepEqual(await __test.hubViewUrl(session, 'skills', { fetch: async () => ({ ok: true, json: async () => ({ code: 200, data: { ticket: 'bad ticket!' } }) }) }),
     { url: 'https://ai.hozonauto.com/plugins/skills' })
