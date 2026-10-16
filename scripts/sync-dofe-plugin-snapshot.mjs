@@ -13,10 +13,11 @@
  *   node scripts/sync-dofe-plugin-snapshot.mjs --write          # sync source -> snapshot (all)
  *   node scripts/sync-dofe-plugin-snapshot.mjs --write <name>   # sync one plugin
  */
-import { readdir, readFile, writeFile, mkdir, rm } from 'node:fs/promises'
+import { readdir, readFile, mkdir, rm } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { cp } from 'node:fs/promises'
-import { basename, join, resolve } from 'node:path'
+import { join, resolve } from 'node:path'
+import { diffSnapshotTrees, includeSnapshotPath } from './snapshot-tree.mjs'
 
 const root = resolve(import.meta.dirname, '..')
 const write = process.argv.includes('--write')
@@ -26,19 +27,6 @@ const specialSnapshots = new Map([
 
 function snapshotPath(name) {
   return resolve(root, specialSnapshots.get(name) ?? `.ci/${name}`)
-}
-
-/** Snapshot is a plain copy; verify everything that exists in the snapshot. */
-async function collect(dir, base = dir) {
-  const files = []
-  if (!existsSync(dir)) return files
-  for (const entry of await readdir(dir, { withFileTypes: true })) {
-    if (entry.name === 'node_modules') continue
-    const full = join(base, entry.name)
-    if (entry.isDirectory()) files.push(...await collect(join(dir, entry.name), full))
-    else files.push(full)
-  }
-  return files
 }
 
 async function diffSnapshot(name) {
@@ -62,19 +50,7 @@ async function diffSnapshot(name) {
   if (sourceManifest.main !== snapshotManifest.main) {
     problems.push(`main mismatch: source ${sourceManifest.main} vs snapshot ${snapshotManifest.main}`)
   }
-  for (const file of await collect(snapshot)) {
-    const relative = file.slice(snapshot.length + 1)
-    const sourceFile = join(source, relative)
-    if (!existsSync(sourceFile)) {
-      problems.push(`snapshot-only file: ${relative}`)
-      continue
-    }
-    const sourceText = await readFile(sourceFile)
-    const snapshotText = await readFile(file)
-    if (!sourceText.equals(snapshotText)) {
-      problems.push(`content differs: ${relative}`)
-    }
-  }
+  problems.push(...await diffSnapshotTrees(source, snapshot))
   return problems
 }
 
@@ -91,7 +67,7 @@ if (requested.some(name => !snapshotPlugins.includes(name))) {
   console.error(`dofe-snapshot: unknown snapshot name(s): ${requested.filter(name => !snapshotPlugins.includes(name)).join(', ')}`)
   process.exit(1)
 }
-const targets = requested.length > 0 ? requested : snapshotPlugins
+const targets = [...new Set(requested.length > 0 ? requested : snapshotPlugins)]
 
 let failed = false
 for (const name of targets) {
@@ -100,27 +76,21 @@ for (const name of targets) {
     console.log(`dofe-snapshot: ${name} matches source`)
     continue
   }
-  failed = true
   for (const problem of problems) console.error(`dofe-snapshot: ${name}: ${problem}`)
   if (write) {
     const source = resolve(root, `../docker-helm.dofe.ai/plugins/${name}`)
     const snapshot = snapshotPath(name)
     await rm(snapshot, { recursive: true, force: true })
     await mkdir(snapshot, { recursive: true })
-    // 快照必须是不带依赖的纯源拷贝：`collect()` 校验时本就跳过 node_modules，
-    // 但 `cp` 会把 sibling 源目录里 `pnpm run build` 产生的 node_modules 一并复制，
-    // 于是校验"通过"而快照里其实多出一棵树——`package.spec.ts` /
-    // `douyin-operation-integration.spec.ts` 明确断言快照不得含 node_modules。
-    // 因此拷贝与校验必须用同一条忽略规则。
+    // Copy and comparison share the same dependency/Git exclusion rule.
     await cp(source, snapshot, {
       recursive: true,
-      filter: source => basename(source) !== 'node_modules',
+      filter: includeSnapshotPath,
     })
     const remaining = await diffSnapshot(name)
     if (remaining.length > 0) throw new Error(`sync failed for ${name}: ${remaining.join('; ')}`)
     console.log(`dofe-snapshot: ${name} re-synced from source`)
-    failed = false
-  }
+  } else failed = true
 }
 
 if (failed) {

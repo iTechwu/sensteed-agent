@@ -12,7 +12,7 @@
       "inject": ["@deepseek-ai/dsh-client-locale", "@deepseek-ai/dsh-client-ui-primitives", "@deepseek-ai/dsh-client-ui-sidebar", "@deepseek-ai/dsh-client-ui-layout", "@deepseek-ai/dsh-client-ui-workspace", "@deepseek-ai/dsh-api-session-controller", "@deepseek-ai/dsh-api-workspace-controller"]
     }
   },
-  "files": ["cordis.patch.yml", "index.js", "lib"],
+  "files": ["cordis.patch.yml", "index.js", "hub-client.js", "lib"],
   "scripts": { "build": "node scripts/build.mjs", "test": "node --test test/*.test.mjs", "check": "npm run build && node --check src/client.js && node --check lib/client.js && npm test" },
   "dependencies": { "fflate": "^0.8.2", "yaml": "^2.9.0" },
   "license": "MIT",

@@ -7,14 +7,13 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'nod
 import { promisify } from 'node:util'
 import { parse as parseYaml } from 'yaml'
 import { unzipSync, zipSync } from 'fflate'
+import { HUB_API_BASE, HUB_WEB_BASE, HubCatalogClient, callHubCatalog, hubSession } from './hub-client.js'
 
 const execFileAsync = promisify(execFile)
 const ROUTE = '/api/desktop/sensteed/skills'
 const SHARED_SKILLS_URL = 'https://knowledge.hozonauto.com/api/plugin/v1/shared-agent-skills'
 // 企业技能/插件管理 Hub（skill.dofe.ai）：目录浏览走 /skillhub/v1 契约，
 // 认证复用桌面端 SSO 会话（dofeAuth 注入；Hub 校验同 issuer 的用户 token）。
-const HUB_API_BASE = 'https://ai.hozonauto.com/plugins/api'
-const HUB_WEB_BASE = 'https://ai.hozonauto.com/plugins'
 const MAX_BODY_BYTES = 16 * 1024
 const MAX_ARCHIVE_BYTES = 10 * 1024 * 1024
 const MAX_UNPACKED_BYTES = 25 * 1024 * 1024
@@ -468,29 +467,6 @@ async function callSharedSkills(ctx, path = '', options = {}) {
   return envelope.data
 }
 
-function hubSession(ctx) {
-  const session = ctx.dofeAuth?.getDatasourceSession?.()
-  return typeof session?.accessToken === 'string' && session.accessToken ? session : undefined
-}
-
-async function callHubCatalog(ctx, path, options = {}) {
-  const session = hubSession(ctx)
-  if (!session) throw Object.assign(new Error('请先在桌面端登录企业账号。'), { code: 'HUB_SSO_REQUIRED' })
-  const response = await (options.fetch || globalThis.fetch)(`${HUB_API_BASE}${path}`, {
-    redirect: 'error',
-    signal: AbortSignal.timeout(30_000),
-    headers: { Accept: 'application/json', Authorization: `Bearer ${session.accessToken}` },
-  })
-  const envelope = await response.json().catch(() => null)
-  if (!response.ok || envelope?.code !== 200 || !envelope?.data) {
-    const message = typeof envelope?.msg === 'string' && envelope.msg !== 'ok'
-      ? envelope.msg
-      : `Hub request failed (${response.status}).`
-    throw Object.assign(new Error(message.slice(0, 300)), { code: response.status === 401 ? 'HUB_SSO_REQUIRED' : 'HUB_UNAVAILABLE' })
-  }
-  return envelope.data
-}
-
 function safeRouteName(path) {
   const match = /^\/api\/desktop\/sensteed\/skills\/shared\/([a-z0-9]+(?:-[a-z0-9]+)*)$/u.exec(path || '')
   return match?.[1]
@@ -501,7 +477,11 @@ function safeRouteName(path) {
 // 全部企业服务无感)。服务端未上线或任何一步失败都回退直开网页,行为与
 // 此前一致;契约见 docs/skillhub-ticket-auth.md。
 async function hubViewUrl(ctx, target, overrides = {}) {
-  const fallback = { url: `${HUB_WEB_BASE}/${target}` }
+  if (!/^(skills|plugins)(\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})?$/iu.test(target)) throw new Error('Invalid Hub target.')
+  const workspaceId = overrides.workspaceId
+  if (workspaceId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(workspaceId)) throw new Error('Invalid Hub workspace.')
+  const next = `/${target}${workspaceId ? `?workspace=${workspaceId}` : ''}`
+  const fallback = { url: `${HUB_WEB_BASE}${next}` }
   const session = hubSession(ctx)
   if (!session) return fallback
   try {
@@ -510,13 +490,13 @@ async function hubViewUrl(ctx, target, overrides = {}) {
       redirect: 'error',
       signal: AbortSignal.timeout(10_000),
       headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${session.accessToken}` },
-      body: JSON.stringify({ next: `/${target}` }),
+      body: JSON.stringify({ next }),
     })
     if (!response.ok) return fallback
     const payload = await response.json().catch(() => null)
     const ticket = typeof payload?.data?.ticket === 'string' ? payload.data.ticket : undefined
     if (!ticket || !/^[A-Za-z0-9._-]{16,256}$/u.test(ticket)) return fallback
-    return { url: `${HUB_WEB_BASE}?tt=${encodeURIComponent(ticket)}&next=${encodeURIComponent(`/${target}`)}` }
+    return { url: `${HUB_WEB_BASE}?tt=${encodeURIComponent(ticket)}&next=${encodeURIComponent(next)}` }
   }
   catch { return fallback }
 }
@@ -560,6 +540,7 @@ export async function listSkills(ctx) {
 
 export function apply(ctx, overrides = {}) {
   if (overrides.registerHostRoute === false) return undefined
+  const hub = new HubCatalogClient(ctx, { fetch: overrides.fetch })
   const route = ctx.webServer.register({
     kind: 'prefix',
     path: ROUTE,
@@ -567,25 +548,39 @@ export function apply(ctx, overrides = {}) {
       if (!isSameOrigin(req, ctx.webServer.port)) return respond(res, 403, { error: 'Local same-origin access is required.' })
       if (req.method === 'GET' && req.url?.split('?', 1)[0] === ROUTE) {
         try {
-          const [skills, shared, hubSkills, hubPlugins] = await Promise.all([
+          const source = new URL(req.url, 'http://localhost').searchParams.get('source')
+          if (source === 'local') return respond(res, 200, { skills: await listSkills(ctx) })
+          if (source === 'shared') {
+            const result = await callSharedSkills(ctx, '?page=1&limit=200', { fetch: overrides.fetch })
+              .catch(error => ({ unavailable: error instanceof Error ? error.message : 'Company skills are unavailable.', list: [] }))
+            return respond(res, 200, { sharedSkills: result.list || [], sharedTotal: result.total || 0, sharedError: result.unavailable || null })
+          }
+          const hubView = async () => {
+            const result = await hub.catalog()
+            return {
+              hubSkills: result.skills.list, hubSkillsTotal: result.skills.total,
+              hubPlugins: result.plugins.list, hubPluginsTotal: result.plugins.total,
+              hubSkillsError: result.skills.error || null, hubPluginsError: result.plugins.error || null,
+              hubSkillsErrorCode: result.skills.code || null, hubPluginsErrorCode: result.plugins.code || null,
+              hubWorkspace: result.workspace, hubWorkspaceId: result.workspaceId || null,
+              hubWorkspaces: result.workspaces, hubWorkspaceError: result.workspaceError || null,
+              hubPermissions: result.permissions || [],
+              hubError: result.workspaceError || result.skills.error || result.plugins.error || null,
+              hubErrorCode: [result.workspaceErrorCode, result.skills.code, result.plugins.code].includes('HUB_SSO_REQUIRED') ? 'HUB_SSO_REQUIRED' : null,
+            }
+          }
+          if (source === 'hub') return respond(res, 200, await hubView())
+          const [skills, shared, hubSkills] = await Promise.all([
             listSkills(ctx),
-            callSharedSkills(ctx, '?page=1&limit=200').catch(error => ({ unavailable: error instanceof Error ? error.message : 'Company skills are unavailable.', list: [] })),
-            callHubCatalog(ctx, '/skillhub/v1/skills?page=1&limit=100').catch(error => ({ unavailable: error instanceof Error ? error.message : 'Hub is unavailable.', code: error?.code, list: [] })),
-            callHubCatalog(ctx, '/skillhub/v1/plugins?page=1&limit=100').catch(error => ({ unavailable: error instanceof Error ? error.message : 'Hub is unavailable.', code: error?.code, list: [] })),
+            callSharedSkills(ctx, '?page=1&limit=200', { fetch: overrides.fetch }).catch(error => ({ unavailable: error instanceof Error ? error.message : 'Company skills are unavailable.', list: [] })),
+            hubView(),
           ])
           return respond(res, 200, {
             skills,
             sharedSkills: shared.list || [],
             sharedTotal: shared.total || 0,
             sharedError: shared.unavailable || null,
-            hubSkills: hubSkills.list || [],
-            hubSkillsTotal: hubSkills.total || 0,
-            hubPlugins: hubPlugins.list || [],
-            hubPluginsTotal: hubPlugins.total || 0,
-            hubError: hubSkills.unavailable || hubPlugins.unavailable || null,
-            // HUB_SSO_REQUIRED lets the client offer a one-click desktop SSO
-            // sign-in instead of a dead-end error row.
-            hubErrorCode: hubSkills.code === 'HUB_SSO_REQUIRED' || hubPlugins.code === 'HUB_SSO_REQUIRED' ? 'HUB_SSO_REQUIRED' : null,
+            ...hubSkills,
           })
         }
         catch { return respond(res, 503, { error: 'Skills are temporarily unavailable.' }) }
@@ -595,8 +590,15 @@ export function apply(ctx, overrides = {}) {
       try {
         if (req.method === 'POST' && requestPath === `${ROUTE}/hub/view-url`) {
           const body = await readJsonBody(req)
-          const target = body.kind === 'plugin' ? 'plugins' : 'skills'
-          return respond(res, 200, await hubViewUrl(ctx, target, overrides))
+          const id = body.id
+          if (id !== undefined && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(id)) return respond(res, 400, { error: 'Invalid Hub resource.' })
+          const target = `${body.kind === 'plugin' ? 'plugins' : 'skills'}${id ? `/${id}` : ''}`
+          const context = await hub.context()
+          return respond(res, 200, await hubViewUrl(ctx, target, { ...overrides, workspaceId: context.me.workspace.ssoTeam.id }))
+        }
+        if (req.method === 'POST' && requestPath === `${ROUTE}/hub/workspace`) {
+          const body = await readJsonBody(req)
+          return respond(res, 200, await hub.select(body.workspaceId))
         }
         if (req.method === 'POST' && requestPath === `${ROUTE}/install`) {
           const body = await readJsonBody(req)
