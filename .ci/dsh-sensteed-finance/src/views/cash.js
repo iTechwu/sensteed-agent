@@ -70,7 +70,7 @@ function CashView({ ctx, t, onDrill }) {
       notice ? h(Notice, null, notice) : null),
     filterBar ? h('div', { className: 'sf-row-between' }, filterBar) : null,
 
-    tab === 'summary' ? h(SummaryTab, { cash, t }) : null,
+    tab === 'summary' ? h(SummaryTab, { cash, t, year }) : null,
     tab === 'plans' ? h(PlansTab, { rows: planRows, total: plans?.data?.total ?? plans?.total, page, onPage: setPage, t, busy, act, canWrite, onDialog: setDialog }) : null,
     tab === 'adjustments' ? h(PlanAdjustmentsTab, { t, revision, reloadTick, busy, act, canWrite, canVerify, onDialog: setDialog }) : null,
     tab === 'revenue' ? h(RevenueTab, { revenues, page: revenuePage, onPage: setRevenuePage, t, canWrite, onBackfill: row => setDialog({ kind: 'backfill', row }) }) : null,
@@ -106,58 +106,44 @@ function PlanAdjustDetailDialog({ id, t, onClose }) {
           h('span', { className: 'sf-note' }, item.note ?? ''))))) : null))
 }
 
-// ---- 汇总：KPI + 矩阵（sticky 首列）+ 平铺表 ----
+// ---- 汇总：当月执行 + 主体/月明细；空值保留未知，余额不跨月相加 ----
 
-function SummaryTab({ cash, t }) {
-  if (cash?.error) return h(EmptyState, null, t('loadError'))
-  const rows = cash?.data?.list || cash?.list || []
-  const totals = rows.reduce((acc, row) => {
-    acc.plannedIncome += finite(row.plannedIncome) ?? 0
-    acc.actualIncome += finite(row.actualIncome) ?? 0
-    acc.plannedExpense += finite(row.plannedExpense) ?? 0
-    acc.actualExpense += finite(row.actualExpense) ?? 0
-    return acc
-  }, { plannedIncome: 0, actualIncome: 0, plannedExpense: 0, actualExpense: 0 })
-  return h('div', { className: 'sf-stack' },
-    h('div', { className: 'sf-kpis' },
-      h(KpiCard, { icon: 'sparkle', label: t('kpiRevenueAch'), value: ratio(totals.actualIncome, totals.plannedIncome) ?? '—', hint: `${wan(totals.actualIncome) ?? '—'} / ${wan(totals.plannedIncome) ?? '—'}` }),
-      h(KpiCard, { icon: 'goal', label: t('kpiSpendExec'), value: ratio(totals.actualExpense, totals.plannedExpense) ?? '—', hint: `${wan(totals.actualExpense) ?? '—'} / ${wan(totals.plannedExpense) ?? '—'}` }),
-      h(KpiCard, { icon: 'data', label: t('kpiNetInflow'), value: wan(totals.actualIncome - totals.actualExpense), negative: totals.actualIncome - totals.actualExpense < 0 })),
-    h(Card, { title: t('cashMatrix'), unit: t('unitNote') }, h(CashMatrix, { rows, t })))
+function cashSummaryModel(rows, selectedYear, now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Shanghai', year: 'numeric', month: 'numeric' }).formatToParts(now)
+  const year = Number(parts.find(part => part.type === 'year').value)
+  const month = Number(parts.find(part => part.type === 'month').value)
+  const isCurrentYear = Number(selectedYear) === year
+  const current = isCurrentYear ? rows.filter(row => row.year === year && row.month === month) : []
+  const totals = Object.fromEntries(['actualBalance', 'plannedIncome', 'plannedExpense', 'actualIncome', 'actualExpense', 'remainingPayment'].map(key => {
+    const values = current.map(row => finite(row[key]))
+    return [key, values.length && values.every(value => value !== null) ? values.reduce((sum, value) => sum + value, 0) : null]
+  }))
+  return { year, month, isCurrentYear, rows: current, totals }
 }
 
-function CashMatrix({ rows, t }) {
-  if (!rows.length) return h(EmptyState, null, t('empty'))
-  const groups = new Map()
-  for (const row of rows) {
-    const key = row.orgName ?? t('unassigned')
-    if (!groups.has(key)) groups.set(key, {})
-    groups.get(key)[row.month] = row
-  }
-  return h(Table, { tableId: 'finance-CashMatrix-1',
-    minColumns: 1080,
+function SummaryTab({ cash, t, year, now }) {
+  if (cash?.error) return h(EmptyState, null, t('loadError'))
+  const rows = cash?.data?.list || cash?.list || []
+  const model = cashSummaryModel(rows, year, now)
+  return h('div', { className: 'sf-stack' },
+    model.isCurrentYear ? h(Card, { title: `${model.year}-${String(model.month).padStart(2, '0')} · ${t('cashMonthlyExecution')}`, unit: t('unitNote') },
+      h('div', { className: 'sf-kpis' },
+        ...[['actualBalance', 'cashBalance'], ['plannedIncome', 'plannedIncome'], ['plannedExpense', 'plannedExpense'], ['actualIncome', 'actualIncome'], ['actualExpense', 'actualExpense'], ['remainingPayment', 'remainingUnpaid']].map(([key, label]) =>
+          h(KpiCard, { key, icon: 'data', label: t(label), value: yuan(model.totals[key]) ?? '—', negative: model.totals[key] !== null && model.totals[key] < 0 }))),
+      h('p', { className: 'sf-note' }, t('cashMissingMetrics'))) : null,
+    h(Card, { title: t('cashSummaryTable'), unit: t('unitNote') }, h(CashSummaryTable, { rows, t })))
+}
+
+function CashSummaryTable({ rows, t }) {
+  return h(Table, { tableId: 'finance-CashSummaryTable-1',
     columns: [
-      { label: t('org'), key: 'org', stickyLeft: true },
-      ...Array.from({ length: 12 }, (_, index) => ({
-        label: `${index + 1}`,
-        key: 'month-' + (index + 1),
-        sortLabel: (index + 1) + '月余额',
-        sortValue: row => finite(row[index + 1]?.projectedBalance) ?? finite(row[index + 1]?.actualBalance),
-        num: true,
-        render: row => {
-          const cell = row[index + 1]
-          if (!cell) return h('span', { style: { color: 'var(--sf-ink3)' } }, '·')
-          const balance = finite(cell.projectedBalance) ?? finite(cell.actualBalance)
-          return h('div', { style: { display: 'grid', gap: 1, textAlign: 'right' } },
-            h('span', null, `收 ${wan(cell.actualIncome ?? cell.plannedIncome) ?? '—'}`),
-            h('span', null, `支 ${wan(cell.actualExpense ?? cell.plannedExpense) ?? '—'}`),
-            h('span', { className: balance != null && balance < 0 ? 'sf-neg' : '' }, `余 ${wan(balance) ?? '—'}`))
-        },
+      { label: t('org'), key: 'orgName', stickyLeft: true },
+      { label: t('year'), key: 'year', num: true },
+      { label: t('monthCol'), key: 'month', num: true },
+      ...[['prevMonthEndBalance', 'prevEndBalance'], ['plannedIncome', 'plannedIncome'], ['plannedExpense', 'plannedExpense'], ['projectedBalance', 'projectedBalance'], ['actualIncome', 'actualIncome'], ['actualExpense', 'actualExpense'], ['actualBalance', 'actualBalance'], ['remainingPayment', 'remainingUnpaid']].map(([key, label]) => ({
+        label: t(label), key, sortValue: row => finite(row[key]), num: true, render: row => wan(row[key]) ?? '—',
       })),
-    ],
-    rows: [...groups.entries()].map(([org, months]) => ({ org, ...months })),
-    rowKey: 'org',
-    empty: t('empty'),
+    ], rows, rowKey: 'id', empty: t('empty'),
   })
 }
 

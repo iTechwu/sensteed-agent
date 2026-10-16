@@ -2,7 +2,7 @@
 
 const FINANCE_ROLES = ['DEPT_FILLER', 'DEPT_LEADER', 'DEPT_COLLABORATOR', 'BOSS', 'FINANCE_STAFF', 'FINANCE_OWNER', 'MANAGEMENT']
 
-function EntryView({ ctx, t, directoryOnly }) {
+function EntryView({ ctx, t, directoryOnly, directorySection }) {
   const { year, orgs, departments, revision } = ctx
   const [section, setSection] = useState(directoryOnly ? 'org' : 'filing')
   const [tasks, setTasks] = useState(null)
@@ -76,9 +76,9 @@ function EntryView({ ctx, t, directoryOnly }) {
     section === 'filing' ? h(FilingSection, { tasks, busy, t, act, onDialog: setDialog, onRetry: retryLists }) : null,
     section === 'my' ? h(MyFilingSection, { assignments, busy, t, act, onDialog: setDialog, onRetry: retryLists, onReopen: assignment => { setDialog({ kind: 'reason', title: t('reopenFiling'), required: true, run: reason => act(`/filing-assignments/${assignment.id}/reopen`, { reason }) }) } }) : null,
     section === 'org' ? h('div', { className: 'sf-stack' },
-      h(DirectoryCard, { contacts, keyword, setKeyword, onlyUnmapped, setOnlyUnmapped, busy, t, act, onDialog: setDialog, onRetry: () => setReloadTick(value => value + 1) }),
-      h(EmploymentCard, { employments, busy, t, onDialog: setDialog, onRetry: () => setReloadTick(value => value + 1) }),
-      h(MembersCard, { members, busy, t, act, onDialog: setDialog, onRetry: retryLists })) : null,
+      !directorySection || directorySection === 'directory' ? h(DirectoryCard, { contacts, keyword, setKeyword, onlyUnmapped, setOnlyUnmapped, busy, t, act, onDialog: setDialog, onRetry: () => setReloadTick(value => value + 1) }) : null,
+      !directorySection || directorySection === 'employment' ? h(EmploymentCard, { employments, busy, t, onDialog: setDialog, onRetry: () => setReloadTick(value => value + 1) }) : null,
+      !directorySection || directorySection === 'members' ? h(MembersCard, { members, busy, t, act, onDialog: setDialog, onRetry: retryLists }) : null) : null,
 
     // 录入面板常开内嵌（对齐前端 FinanceEntryPanel）
     !directoryOnly && ctx.financeWriter ? h(EntryPanel, { key: year, year, orgs, departments, t, onSaved: () => window.dispatchEvent(new Event('sf:refresh')) }) : !directoryOnly ? h('p', { className: 'sf-note' }, t('entryFinanceOnly')) : null,
@@ -458,7 +458,52 @@ function MembersCard({ members, busy, t, act, onDialog, onRetry }) {
 
 // ---- 录入面板（4 类型；排款月份必填对齐后端校验） ----
 
-function EntryPanel({ year, orgs, departments, t, onSaved }) {
+function CostItemCreator({ t, onCreated, onCancel, onBusyChange }) {
+  const [code, setCode] = useState('')
+  const [name, setName] = useState('')
+  const [failure, setFailure] = useState('')
+  const [saving, setSaving] = useState(false)
+  const inFlight = useRef(false)
+  const valid = /^[A-Za-z0-9_-]{1,50}$/.test(code.trim()) && name.trim().length >= 1 && name.trim().length <= 100
+  const save = async () => {
+    if (!valid || inFlight.current) return
+    inFlight.current = true
+    onBusyChange?.(true)
+    setSaving(true); setFailure('')
+    try {
+      const result = await financeRest('/finance/cost-items', 'POST', { code: code.trim(), name: name.trim() })
+      const item = result?.data
+      if (!item?.id) throw new Error('费用类别创建结果无效，请重试')
+      onCreated(item)
+    } catch (error) {
+      setFailure(error.message || '新增费用类别失败，请检查编号和名称后重试')
+    } finally { inFlight.current = false; setSaving(false); onBusyChange?.(false) }
+  }
+  return h('div', { className: 'sf-stack sf-cost-item-creator', role: 'group', 'aria-label': '新增费用类别', 'aria-busy': saving, onKeyDown: event => {
+    if (event.key === 'Enter' && event.target?.tagName === 'INPUT') {
+      event.preventDefault()
+      if (!event.nativeEvent?.isComposing && !event.isComposing) void save()
+    }
+  } },
+    h(FormRow, { label: '费用类别编号' }, h(Field, { value: code, onChange: setCode, maxLength: 50, placeholder: '如 TRAVEL', disabled: saving })),
+    h(FormRow, { label: '费用类别名称' }, h(Field, { value: name, onChange: setName, maxLength: 100, placeholder: '如 差旅费', disabled: saving })),
+    h('p', { className: 'sf-note' }, '编号使用字母、数字、下划线或连字符；新增后会自动选中。'),
+    failure ? h('p', { role: 'alert', className: 'sf-neg' }, failure) : null,
+    h('div', { className: 'sf-row' },
+      h(PrimaryButton, { type: 'button', busy: saving, disabled: !valid, onClick: save }, saving ? '正在新增…' : '新增并选用'),
+      h(GhostButton, { disabled: saving, onClick: onCancel }, t('cancel'))))
+}
+
+function financePlanOptionLabel(plan, kind) {
+  const title = (kind === 'payment' ? plan.description : plan.itemName)?.trim()
+  const month = kind === 'payment' ? plan.planMonth : plan.month
+  const period = `${plan.year ? `${plan.year}年` : ''}${month ? `${month}月` : kind === 'payment' ? '（月份未指定）' : ' 年度（不分月）'}`.trim()
+  const amount = plan.plannedAmount !== null && plan.plannedAmount !== undefined && Number.isFinite(plan.plannedAmount)
+    ? `计划 ¥${plan.plannedAmount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '计划金额未提供'
+  return [title || (kind === 'payment' ? '付款计划' : '收入计划'), plan.orgName?.trim() || '未分配主体', period, amount, `#${plan.id.slice(0, 8)}`].join(' · ')
+}
+
+function EntryPanel({ year, orgId, orgs, departments, role, t, onSaved, onYearChange, onNavigate }) {
   const [kind, setKind] = useState('payment')
   const [entryYear, setEntryYear] = useState(String(year))
   const [backfillKind, setBackfillKind] = useState('payment')
@@ -471,12 +516,19 @@ function EntryPanel({ year, orgs, departments, t, onSaved }) {
   const [formRevision, setFormRevision] = useState(0)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState(null)
+  const [receipt, setReceipt] = useState(null)
   const [history, setHistory] = useState({ paymentPlans: [], revenuePlans: [], payees: [], costItems: [], items: [], payers: [], incomeTypes: [] })
   const [historyLoaded, setHistoryLoaded] = useState(false)
   const [historyError, setHistoryError] = useState({})
+  const [createdCostItems, setCreatedCostItems] = useState([])
+  const [creatingCostItem, setCreatingCostItem] = useState(false)
+  const [creatingCostItemBusy, setCreatingCostItemBusy] = useState(false)
+  const [budgetCostItemId, setBudgetCostItemId] = useState('')
   const orgOptions = (orgs || []).filter(org => org.type !== 'GROUP').map(org => [org.id, org.name])
   const departmentOptions = (departments || []).map(department => [department.id, department.name])
+  const canCreateCostItems = role === 'FINANCE_OWNER'
   const years = yearOptions(year)
+  const changeEntryYear = value => { setEntryYear(value); setFormRevision(current => current + 1); setBudgetCostItemId(''); setCreatingCostItem(false); setNotice(null); onYearChange?.(value) }
   const months = Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1}月`])
 
   useEffect(() => {
@@ -496,8 +548,8 @@ function EntryPanel({ year, orgs, departments, t, onSaved }) {
         year: entryYear,
         paymentPlans: paymentRows
           .filter(row => row.id)
-          .map(row => [row.id, [row.description || financeEnumLabel(row.planType, t, PLAN_LABELS) || '付款计划', row.orgName, row.planMonth ? `${row.planMonth}月` : null, row.id.slice(0, 8)].filter(Boolean).join(' · ')]),
-        revenuePlans: revenueRows.filter(row => row.id).map(row => [row.id, [row.itemName || '收入计划', row.orgName, row.month ? `${row.month}月` : null, row.id.slice(0, 8)].filter(Boolean).join(' · ')]),
+          .map(row => [row.id, financePlanOptionLabel(row, 'payment')]),
+        revenuePlans: revenueRows.filter(row => row.id).map(row => [row.id, financePlanOptionLabel(row, 'revenue')]),
         payees: unique(paymentRows.map(row => row.payeeName)),
         costItems: unique(paymentRows.map(row => row.costItemName)),
         items: unique(revenueRows.map(row => row.itemName)),
@@ -531,12 +583,16 @@ function EntryPanel({ year, orgs, departments, t, onSaved }) {
 
   const primaryVersion = versions?.find(version => version.isPrimary && Number(version.year) === Number(entryYear))
   const budgetReady = !versionError && Boolean(primaryVersion)
+  const availableCostItems = [
+    ...(costItems || []),
+    ...createdCostItems.filter(created => !(costItems || []).some(item => item.id === created.id)),
+  ].filter(item => item.active)
   const backfillPlans = backfillKind === 'payment' ? history.paymentPlans : history.revenuePlans
   const backfillReady = historyLoaded && history.year === entryYear && !historyError[backfillKind] && Boolean(backfillPlans.length)
 
   const submit = async event => {
     event.preventDefault()
-    if (savingRef.current) return
+    if (savingRef.current || creatingCostItem) return
     const formElement = event.currentTarget
     const form = new FormData(formElement)
     const num = key => Number(form.get(key))
@@ -553,13 +609,14 @@ function EntryPanel({ year, orgs, departments, t, onSaved }) {
     const amount = num(amountKey)
     const monthKey = kind === 'payment' ? 'planMonth' : 'month'
     const validMonth = !text(monthKey) || (Number.isInteger(num(monthKey)) && num(monthKey) >= 1 && num(monthKey) <= 12)
+    const activeYear = Number(entryYear)
     if (!text(amountKey) || !Number.isFinite(amount) || amount < 0 || (kind !== 'backfill' && amount === 0) ||
-      (kind !== 'backfill' && (!orgOptions.some(([id]) => id === text('orgId')) || num('year') !== Number(entryYear) || num('year') < 2000 || num('year') > 2100 || !Number.isInteger(num('year')) || !validMonth))) {
+      (kind !== 'backfill' && (!orgOptions.some(([id]) => id === text('orgId')) || activeYear < 2000 || activeYear > 2100 || !Number.isInteger(activeYear) || !validMonth))) {
       setNotice(t('entryInvalid')); return
     }
     if (kind === 'revenue' && !textChoice('itemName')) { setNotice(t('entryIncomeRequired')); return }
     if (kind === 'budget' && !budgetReady) { setNotice(t('versionMissing')); return }
-    if (kind === 'budget' && text('costItemId') && (costError || !costItems?.some(item => item.id === text('costItemId')))) { setNotice(t('costRequired')); return }
+    if (kind === 'budget' && text('costItemId') && !availableCostItems.some(item => item.id === text('costItemId'))) { setNotice(t('costRequired')); return }
     if (kind === 'backfill' && (!backfillReady || !backfillPlans.some(([id]) => id === text('planId')))) { setNotice(t('selectPlan')); return }
     savingRef.current = true
     setBusy(true); setNotice(null)
@@ -567,7 +624,7 @@ function EntryPanel({ year, orgs, departments, t, onSaved }) {
       let path, payload
       if (kind === 'payment') {
         path = '/payment-plans'
-        payload = { orgId: text('orgId'), planType: text('planType'), year: num('year'), description: text('description'), plannedAmount: num('plannedAmount') }
+        payload = { orgId: text('orgId'), planType: text('planType'), year: activeYear, description: text('description'), plannedAmount: num('plannedAmount') }
         const planMonth = text('planMonth')
         if (!planMonth) { setNotice(`${t('opFailed')}: ${t('planMonthRequired')}`); setBusy(false); return }
         payload.planMonth = num('planMonth')
@@ -577,13 +634,13 @@ function EntryPanel({ year, orgs, departments, t, onSaved }) {
         if (text('expenseType')) payload.expenseType = text('expenseType')
       } else if (kind === 'revenue') {
         path = '/revenue-plans'
-        payload = { orgId: text('orgId'), year: num('year'), itemName: textChoice('itemName'), plannedAmount: num('plannedAmount') }
+        payload = { orgId: text('orgId'), year: activeYear, itemName: textChoice('itemName'), plannedAmount: num('plannedAmount') }
         if (text('month')) payload.month = num('month')
         if (textChoice('payerName')) payload.payerName = textChoice('payerName')
         if (textChoice('incomeTypeName')) payload.incomeTypeName = textChoice('incomeTypeName')
       } else if (kind === 'budget') {
         path = '/budget-lines'
-        payload = { orgId: text('orgId'), year: num('year'), expenseType: text('expenseType'), budgetAmount: num('budgetAmount') }
+        payload = { orgId: text('orgId'), year: activeYear, expenseType: text('expenseType'), budgetAmount: num('budgetAmount') }
         if (text('month')) payload.month = num('month')
         if (text('departmentId')) payload.departmentId = text('departmentId')
         if (text('costItemId')) payload.costItemId = text('costItemId')
@@ -593,29 +650,40 @@ function EntryPanel({ year, orgs, departments, t, onSaved }) {
         payload = { actualAmount: num('actualAmount') }
         if (text('actualPaidAt')) payload.actualPaidAt = new Date(`${text('actualPaidAt')}T00:00:00`).toISOString()
       }
-      await post(path, payload)
+      const result = await post(path, payload)
+      if (kind === 'budget') setReceipt(result?.data?.id ? result.data : null)
       setNotice(t(kind === 'backfill' ? 'entryActualsSaved' : kind === 'budget' ? 'entryBudgetSaved' : kind === 'payment' ? 'entryPaymentSaved' : 'entryRevenueSaved'))
       formElement.reset()
       setFormRevision(value => value + 1)
       setRetry(value => value + 1)
+      setBudgetCostItemId('')
       onSaved?.()
     } catch (error) { setNotice(`${t('opFailed')}: ${error.message}`) } finally { savingRef.current = false; setBusy(false) }
   }
 
+  if (kind === 'budget' && Number(entryYear) === 2027) return h('div', { className: 'sf-card' },
+    h('div', { className: 'sf-card-head' }, h('h2', null, t('entryTitle'))),
+    h('div', { className: 'sf-card-body sf-stack' },
+      h('fieldset', { className: 'sf-fieldset sf-stack', disabled: creatingCostItemBusy },
+        h(PillTabs, { tabs: [['payment', 'entryPaymentPlan'], ['revenue', 'entryRevenuePlan'], ['budget', 'entryBudgetLine'], ['backfill', 'entryBackfill']], value: kind, onChange: setKind, t }),
+        h(FormRow, { label: t('year') }, h(Select, { name: 'year', value: entryYear, onChange: changeEntryYear, options: years }))),
+      h(ConfiguredBudgetEntry, { key: entryYear, year: entryYear, orgId, orgs: (orgs || []).filter(org => org.type !== 'GROUP'), t, onSaved, onNavigate, onBusyChange: setCreatingCostItemBusy })))
+
   return h('form', { className: 'sf-card', key: `${kind}-${formRevision}`, onSubmit: submit },
     h('div', { className: 'sf-card-head' }, h('h2', null, t('entryTitle')), h('span', { className: 'sf-card-unit' }, t('unitYuan'))),
     h('div', { className: 'sf-card-body' }, h('div', { className: 'sf-stack' },
+      receipt ? h(BudgetSaveReceipt, { line: receipt, onNavigate }) : null,
       h('p', { className: 'sf-note' }, t('entryHint')),
-      h('fieldset', { className: 'sf-fieldset sf-stack', disabled: busy, 'aria-busy': busy },
-      h(PillTabs, { tabs: [['payment', 'entryPaymentPlan'], ['revenue', 'entryRevenuePlan'], ['budget', 'entryBudgetLine'], ['backfill', 'entryBackfill']], value: kind, onChange: value => { setKind(value); setNotice(null) }, t }),
+      h('fieldset', { className: 'sf-fieldset sf-stack', disabled: busy || creatingCostItemBusy, 'aria-busy': busy || creatingCostItemBusy },
+      h(PillTabs, { tabs: [['payment', 'entryPaymentPlan'], ['revenue', 'entryRevenuePlan'], ['budget', 'entryBudgetLine'], ['backfill', 'entryBackfill']], value: kind, onChange: value => { setKind(value); setNotice(null); setCreatingCostItem(false) }, t }),
       h('div', { className: 'sf-form sf-entry-form' },
         kind !== 'backfill' ? [
-          h(FormRow, { key: 'org', label: t('org') }, h(SearchSelect, { buttonTrigger: true, name: 'orgId', required: true, disabled: !orgOptions.length, options: orgOptions, placeholder: t('org') })),
+          h(FormRow, { key: 'org', label: `${t('org')} *` }, h(SearchSelect, { buttonTrigger: true, name: 'orgId', defaultValue: orgId || orgs?.find(org => org.type === 'COMPANY')?.id || orgOptions[0]?.[0] || '', required: true, disabled: !orgOptions.length, options: orgOptions, placeholder: t('org') })),
+          h(FormRow, { key: 'year', label: t('year') }, h(Select, { name: 'year', value: entryYear, onChange: changeEntryYear, options: years })),
           !orgOptions.length ? h('p', { key: 'org-empty', className: 'sf-note', role: 'status' }, t('entryOrgEmpty')) : null,
-          h(FormRow, { key: 'year', label: t('year') }, h(Select, { name: 'year', value: entryYear, onChange: value => { setEntryYear(value); setNotice(null) }, required: true, options: years, placeholder: t('year') })),
         ] : [
-          h(FormRow, { key: 'backfill-year', label: t('year') }, h(Select, { value: entryYear, onChange: setEntryYear, options: years })),
-          h(FormRow, { key: 'backfill-kind', label: t('backfillKind') }, h(Select, { value: backfillKind, onChange: setBackfillKind, options: [['payment', t('entryPaymentPlan')], ['revenue', t('entryRevenuePlan')]] })),
+          h(FormRow, { key: 'backfill-year', label: t('year') }, h(Select, { value: entryYear, onChange: changeEntryYear, options: years })),
+          h(FormRow, { key: 'backfill-kind', label: t('backfillKind') }, h(Select, { value: backfillKind, onChange: value => { setBackfillKind(value); setFormRevision(current => current + 1); setNotice(null) }, options: [['payment', t('entryPaymentPlan')], ['revenue', t('entryRevenuePlan')]] })),
           h(FormRow, { key: 'plan', label: t('selectPlan') }, h(SearchSelect, { buttonTrigger: true, key: `${backfillKind}-${entryYear}`, name: 'planId', required: true, disabled: !backfillReady, options: backfillPlans, placeholder: t('selectPlan') })),
           historyError[backfillKind] ? h('div', { key: 'plan-error', role: 'alert' }, `${t('opFailed')}: ${t('selectPlan')}`, h(LinkButton, { onClick: () => setRetry(value => value + 1) }, t('retry'))) : null,
           historyLoaded && history.year === entryYear && !historyError[backfillKind] && !backfillPlans.length ? h('div', { key: 'plan-empty', className: 'sf-stack' },
@@ -623,29 +691,35 @@ function EntryPanel({ year, orgs, departments, t, onSaved }) {
             h(LinkButton, { onClick: () => { setKind(backfillKind); setNotice(null) } }, t(backfillKind === 'payment' ? 'createPaymentPlan' : 'createRevenuePlan'))) : null,
         ],
         kind === 'payment' ? [
-          h(FormRow, { key: 'pt', label: t('planType') }, h(Select, { name: 'planType', required: true, options: PLAN_TYPES.map(([id, label]) => [id, t(label)]) })),
-          h(FormRow, { key: 'pd', label: t('description') }, h(Field, { name: 'description', required: true, maxLength: 500 })),
-          h(FormRow, { key: 'pm', label: `${t('planMonth')} *` }, h(Select, { name: 'planMonth', required: true, options: months, placeholder: t('planMonth') })),
+          h('div', { key: 'p-summary', className: 'sf-form-grid sf-entry-wide' },
+            h(FormRow, { label: t('planType') }, h(Select, { name: 'planType', required: true, options: PLAN_TYPES.map(([id, label]) => [id, t(label)]) })),
+            h(FormRow, { label: `${t('planMonth')} *` }, h(Select, { name: 'planMonth', defaultValue: String(new Date().getMonth() + 1), required: true, options: months, placeholder: t('planMonth') })),
+            h(FormRow, { label: `${t('planned')}（${t('unitYuan')}）` }, h(Field, { name: 'plannedAmount', type: 'number', min: 0.01, step: '0.01', required: true }))),
+          h(FormRow, { key: 'pd', wide: true, label: `${t('description')} *` }, h(Field, { name: 'description', required: true, maxLength: 500 })),
           h(FormRow, { key: 'py', label: t('payee') }, h(CustomizableTextSelect, { buttonTrigger: true, onChange: () => setNotice(null), name: 'payeeName', options: history.payees, placeholder: t('payee') })),
-          h(FormRow, { key: 'pc', label: t('costItem') }, h(CustomizableTextSelect, { buttonTrigger: true, onChange: () => setNotice(null), name: 'costItemName', options: [...new Set([...(costItems || []).map(item => item.name), ...history.costItems])], placeholder: t('costItem'), maxLength: 100 })),
           h(FormRow, { key: 'pdept', label: t('department') }, h(SearchSelect, { buttonTrigger: true, name: 'departmentId', options: departmentOptions, placeholder: t('department') })),
+          h(FormRow, { key: 'pc', label: t('costItem') }, h(CustomizableTextSelect, { buttonTrigger: true, onChange: () => setNotice(null), name: 'costItemName', options: [...new Set([...(costItems || []).map(item => item.name), ...history.costItems])], placeholder: t('costItem'), maxLength: 100 })),
           h(FormRow, { key: 'pexpense', label: t('expenseType') }, h(Select, { name: 'expenseType', options: [['', t('entryOptional')], ...EXPENSE_TYPES.map(([id, label]) => [id, t(label)])] })),
-          h(FormRow, { key: 'pa', label: `${t('planned')}（${t('unitYuan')}）` }, h(Field, { name: 'plannedAmount', type: 'number', min: 0.01, step: '0.01', required: true })),
         ] : kind === 'revenue' ? [
-          h(FormRow, { key: 'ri', label: t('itemName') }, h(CustomizableTextSelect, { buttonTrigger: true, onChange: () => setNotice(null), name: 'itemName', options: history.items, placeholder: t('itemName'), required: true })),
-          h(FormRow, { key: 'rm', label: t('month') }, h(Select, { name: 'month', options: [['', t('entryAnnual')], ...months], placeholder: t('month') })),
-          h(FormRow, { key: 'rp', label: t('payer') }, h(CustomizableTextSelect, { buttonTrigger: true, onChange: () => setNotice(null), name: 'payerName', options: history.payers, placeholder: t('payer') })),
+          h('div', { key: 'r-summary', className: 'sf-form-grid sf-entry-wide' },
+            h(FormRow, { label: t('month') }, h(Select, { name: 'month', options: [['', t('entryAnnual')], ...months] })),
+            h(FormRow, { label: `${t('planned')}（${t('unitYuan')}）` }, h(Field, { name: 'plannedAmount', type: 'number', min: 0.01, step: '0.01', required: true }))),
+          h(FormRow, { key: 'ri', wide: true, label: `${t('itemName')} *` }, h(CustomizableTextSelect, { buttonTrigger: true, onChange: () => setNotice(null), name: 'itemName', options: history.items, placeholder: t('itemName'), required: true })),
           h(FormRow, { key: 'rt', label: t('incomeType') }, h(CustomizableTextSelect, { buttonTrigger: true, onChange: () => setNotice(null), name: 'incomeTypeName', options: history.incomeTypes, placeholder: t('incomeType'), maxLength: 100 })),
-          h(FormRow, { key: 'ra', label: `${t('planned')}（${t('unitYuan')}）` }, h(Field, { name: 'plannedAmount', type: 'number', min: 0.01, step: '0.01', required: true })),
+          h(FormRow, { key: 'rp', label: t('payer') }, h(CustomizableTextSelect, { buttonTrigger: true, onChange: () => setNotice(null), name: 'payerName', options: history.payers, placeholder: t('payer') })),
         ] : kind === 'budget' ? [
           h(FormRow, { key: 'be', label: t('expenseType') }, h(Select, { name: 'expenseType', required: true, options: EXPENSE_TYPES.map(([id, label]) => [id, t(label)]) })),
-          h(FormRow, { key: 'bm', label: t('month') }, h(Select, { name: 'month', options: [['', t('entryAnnual')], ...months], placeholder: t('month') })),
+          h(FormRow, { key: 'bm', label: t('month') }, h(Select, { name: 'month', options: [['', t('entryAnnual')], ...months] })),
           h(FormRow, { key: 'bd', label: t('department') }, h(SearchSelect, { buttonTrigger: true, name: 'departmentId', options: departmentOptions, placeholder: t('department') })),
-          h(FormRow, { key: 'bc', label: t('costItem') }, h(SearchSelect, { buttonTrigger: true, name: 'costItemId', disabled: costError || !costItems?.length, options: (costItems || []).map(item => [item.id, item.name]), placeholder: t('costItem') })),
+          h('div', { key: 'bc', className: 'sf-stack' },
+            h(FormRow, { label: t('costItem') }, h(SearchSelect, { buttonTrigger: true, name: 'costItemId', value: budgetCostItemId, onChange: setBudgetCostItemId, disabled: !availableCostItems.length, options: availableCostItems.map(item => [item.id, item.name]), placeholder: t('costItem') })),
+            canCreateCostItems ? (creatingCostItem
+              ? h(CostItemCreator, { t, onBusyChange: setCreatingCostItemBusy, onCancel: () => setCreatingCostItem(false), onCreated: item => { setCreatedCostItems(current => [...current, { ...item, active: true }]); setBudgetCostItemId(item.id); setCreatingCostItem(false) } })
+              : h(LinkButton, { onClick: () => setCreatingCostItem(true) }, '新增费用类别')) : null),
           h('div', { key: 'budget-check', className: 'sf-stack sf-entry-wide', role: 'status' },
             h('p', { className: 'sf-note' }, t('budgetEntryHint')),
             h('p', { className: 'sf-note' }, versionError ? t('versionLoadFailed') : versions === null ? t('versionLoading') : !primaryVersion ? t('versionMissing') : budgetVersionLabel(primaryVersion)),
-            costError || costItems === null || !costItems.length ? h('p', { className: 'sf-note' }, t(costError ? 'costLoadFailed' : costItems === null ? 'costLoading' : 'costEmpty')) : null,
+            costError || costItems === null || !costItems.length ? h('p', { className: 'sf-note' }, costError ? t('costLoadFailed') : costItems === null ? t('costLoading') : canCreateCostItems ? '暂无启用费用科目，可在此新增费用类别并选用，也可留空录入。' : t('costEmpty')) : null,
             costError || versionError || (versions && !primaryVersion) || (costItems && !costItems.length) ? h(LinkButton, { onClick: () => setRetry(value => value + 1) }, t('retry')) : null),
           h(FormRow, { key: 'ba', label: `${t('budgetEntryAmount')}（${t('unitYuan')}）` }, h(Field, { name: 'budgetAmount', type: 'number', min: 0.01, step: '0.01', required: true })),
           h(FormRow, { key: 'bn', wide: true, label: t('note') }, h(Field, { name: 'note', maxLength: 500 })),
@@ -657,6 +731,6 @@ function EntryPanel({ year, orgs, departments, t, onSaved }) {
           h('p', { className: 'sf-note' }, t('entryHistoryFailed')),
           h(LinkButton, { onClick: () => setRetry(value => value + 1) }, t('retry'))) : null,
         h('div', { className: 'sf-form-actions sf-entry-wide' },
-          h(PrimaryButton, { type: 'submit', busy, disabled: (kind !== 'backfill' && !orgOptions.length) || (kind === 'budget' && !budgetReady) || (kind === 'backfill' && !backfillReady) }, busy ? t('running') : t(kind === 'backfill' ? 'entryBackfillAction' : 'entrySaveAction')),
+          h(PrimaryButton, { type: 'submit', busy, disabled: creatingCostItem || (kind !== 'backfill' && !orgOptions.length) || (kind === 'budget' && !budgetReady) || (kind === 'backfill' && !backfillReady) }, busy ? t('running') : t(kind === 'backfill' ? 'entryBackfillAction' : 'entrySaveAction')),
           notice ? h('div', { role: 'status', 'aria-live': 'polite' }, h(Notice, null, notice)) : null))))))
 }

@@ -17,18 +17,7 @@ function NotificationsView({ ctx, onDrill }) {
       { key: 'readAt', label: '阅读状态', render: row => row.readAt ? '已读' : '未读' },
       { key: 'actions', label: '操作', sortable: false, render: row => h('div', { className: 'sf-row' },
         !row.readAt ? h(GhostButton, { disabled: action.busy, onClick: () => { void action.run(`/finance/notifications/${row.id}/read`).catch(() => {}) } }, '标为已读') : null,
-        row.linkPath ? h(GhostButton, { onClick: () => onDrill(financeNotificationTarget(row.linkPath), { sourcePath: row.linkPath }) }, '查看业务') : null) },
+        financeBusinessDestination(row.linkPath) ? h(GhostButton, { onClick: () => { const destination = financeBusinessDestination(row.linkPath); onDrill(destination.tab, destination.params) } }, '查看业务') : row.linkPath ? h('span', { className: 'sf-note' }, '此业务入口暂不可用') : null) },
     ] })), h(Pager, { page, total: list.data?.total, limit: 20, onPage: setPage })),
     h('p', { className: 'sf-note' }, '标记已读只改变阅读状态，不会确认、发布或完成对应业务。'))
-}
-function financeNotificationTarget(path) {
-  if (path.startsWith('/review')) return 'review'
-  if (path.startsWith('/budget-engine')) return 'engine'
-  if (path.startsWith('/budget')) return 'budget'
-  if (path.startsWith('/cash')) return 'cash'
-  if (path.startsWith('/cost-engineering')) return 'bom'
-  if (path.startsWith('/settings/finance-permissions')) return 'permissions'
-  if (path.startsWith('/data-entry')) return 'entry'
-  if (path.startsWith('/alerts')) return 'alerts'
-  return 'overview'
 }

@@ -1,12 +1,17 @@
 // Datasource 公开财务契约白名单；新增接口须对照 packages/contracts/src/api 验证。
 // 明确方法与路径，禁止透传任意 URL、内部接口或客户端身份。
 export const PUBLIC_FINANCE_ROUTES = [
+  ["GET", "/finance/budget-configuration"],
   [
     "GET",
     "/finance/orgs"
   ],
   [
     "GET",
+    "/finance/cost-items"
+  ],
+  [
+    "POST",
     "/finance/cost-items"
   ],
   [
@@ -583,4 +588,4 @@ export const PUBLIC_FINANCE_ROUTES = [
   ]
 ]
 
-export const PUBLIC_QUERY_KEYS = new Set(["year", "month", "page", "limit", "orgId", "departmentId", "expenseType", "project", "sortBy", "sortDirection", "versionId", "unassigned", "recordType", "planType", "severity", "status", "alertType", "days", "baseVersionId", "targetVersionId", "snapshotAId", "snapshotBId", "baseRunId", "targetRunId", "scope", "kind", "bizSystem", "transport", "runId", "search", "category", "unread", "userId", "permission", "activeOnly", "keyword", "onlyUnmapped", "systemUserId", "type", "taskId", "submittedByMe", "planId", "active"])
+export const PUBLIC_QUERY_KEYS = new Set(["lineId", "year", "month", "page", "limit", "orgId", "departmentId", "expenseType", "project", "sortBy", "sortDirection", "versionId", "unassigned", "recordType", "planType", "severity", "status", "alertType", "days", "baseVersionId", "targetVersionId", "snapshotAId", "snapshotBId", "baseRunId", "targetRunId", "scope", "kind", "bizSystem", "transport", "runId", "search", "category", "unread", "userId", "permission", "activeOnly", "keyword", "onlyUnmapped", "systemUserId", "type", "taskId", "submittedByMe", "planId", "active"])

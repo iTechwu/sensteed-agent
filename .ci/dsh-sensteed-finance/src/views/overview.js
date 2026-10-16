@@ -24,7 +24,7 @@ function OverviewView({ brief, t, onDrill, orgId, workQueue }) {
   const openAlerts = (data.openAlerts || alertsSummary.top || []).slice(0, 5)
   const workItems = workQueue?.state === 'loading' ? null : [
     {
-      id: 'filing', icon: 'plan', tone: 'blue', label: t('pendingFiling'), hint: t('pendingFilingHint'), value: (workQueue?.tasks?.list || []).filter(item => item.status !== 'CLOSED').length, target: 'entry',
+      id: 'filing', icon: 'plan', tone: 'blue', label: t('pendingFiling'), hint: t('pendingFilingHint'), value: (workQueue?.tasks?.list || []).filter(item => item.status !== 'CLOSED').length, target: 'filing',
     },
     {
       id: 'quality', icon: 'database', tone: 'amber', label: t('pendingQuality'), hint: t('pendingQualityHint'), value: (workQueue?.quality?.issues || []).reduce((sum, item) => sum + (finite(item.count) ?? 0), 0), target: 'datacenter',

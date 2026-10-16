@@ -37,12 +37,6 @@ const OVERLAY_ID = '@dofe/dsh-sensteed-finance'
 const OVERLAY_EVENT = 'dofe:sensteed-overlay:open'
 const BASE = '/api/desktop/sensteed/finance'
 
-// 版块（tab）结构对齐 datasource 前端财务工作台 sections
-const TABS = [
-  ['overview', 'tabOverview'], ['budget', 'tabBudget'], ['operations', 'tabOperations'],
-  ['cash', 'tabCash'], ['alerts', 'tabAlerts'], ['datacenter', 'tabDatacenter'],
-  ['entry', 'tabEntry'], ['engine', 'tabEngine'], ['comparisons', 'tabComparisons'], ['review', 'tabReview'], ['sources', 'tabSources'], ['facts', 'tabFacts'], ['bom', 'tabBom'], ['analyze', 'tabAnalyze'], ['notifications', 'tabNotifications'], ['permissions', 'tabPermissions'],
-]
 const EXPENSE_TYPES = [
   ['PROJECT_OPERATION', 'expenseProject'], ['FIXED_OPERATION', 'expenseFixed'],
   ['MODEL_SPECIFIC', 'expenseModel'], ['NON_PROJECT', 'expenseNonProject'],
@@ -91,7 +85,7 @@ const copy = {
     bomStatus: '状态', tabBom: '成本 BOM', descBom: '按成本包查看物料明细、估算与成本汇总', bomPackages: '成本包', bomVersion: '版本', bomModel: '车型 / 项目', bomTarget: '目标成本', bomTotal: '估算总成本', bomPart: '零件号', bomName: '物料名称', bomQty: '数量', bomLevel: '层级', bomUnit: '单位成本', bomExtended: '展开成本', bomSelect: '请选择成本包查看物料明细', bomScope: '成本包按项目与版本管理，不受年度和主体筛选影响。', bomDetail: '物料明细', bomRollupError: '成本汇总加载失败，物料明细仍可查看。', bomNodeCount: '节点数', bomLeafCount: '叶子节点数', bomStatusDRAFT: '草稿', bomStatusIN_REVIEW: '评审中', bomStatusAPPROVED: '已审定', bomStatusOBSOLETE: '已作废',
     copyFailed: '无法复制分析指令，请重试。',
     open: '财务管理', title: '财务管理', eyebrow: '财务数据中心',
-    descOverview: '集团核心财务指标、预算进度与异常事项', scopeAll: '集团合并口径', scopeOrg: '当前主体口径', scopeYear: '年', planCol: '计划', achieve: '达成', severity: '级别', typeOverrun: '预算超支', typeSlow: '执行偏慢', typeCashGap: '资金缺口', typeQuality: '数据质量', descBudget: '查看已发布预算、实际付款与责任中心差异', descOperations: '预算执行、费用构成与计划实际收支对比', descCash: '资金余额、收支计划与流动性风险', descAlerts: '集中处理预算、资金与数据质量异常', descDatacenter: '财务数据源、质量规则与主数据覆盖', descEntry: '财务数据录入、回填与复核', descAnalyze: '基于财务数据中心 MCP 的可信深度分析', close: '关闭财务管理', refresh: '刷新数据', operatorAs: '当前操作者',
+    descOverview: '集团核心财务指标、预算进度与异常事项', scopeAll: '集团合并口径', scopeOrg: '当前主体口径', scopeYear: '年', planCol: '计划', achieve: '达成', severity: '级别', typeOverrun: '预算超支', typeSlow: '执行偏慢', typeCashGap: '资金缺口', typeQuality: '数据质量', descBudget: '查看已发布预算、实际付款与责任中心差异', descOperations: '预算执行、费用构成与计划实际收支对比', descCash: '资金余额、收支计划与流动性风险', descAlerts: '集中处理预算、资金与数据质量异常', descDatacenter: '财务数据源、质量规则与主数据覆盖', descEntry: '财务直接录入预算与收支、回填实际；保存后即生效', descAnalyze: '基于财务数据中心 MCP 的可信深度分析', close: '关闭财务管理', refresh: '刷新数据', operatorAs: '当前操作者',
     tabOverview: '经营总览', tabBudget: '预算执行', tabOperations: '经营分析', tabCash: '资金分析', tabAlerts: '预警中心', tabDatacenter: '数据中心', tabEntry: '录入', tabAnalyze: '深度分析',
     year: '年度', org: '主体', allOrgs: '全部主体（集团）', loading: '正在加载财务数据...', retry: '重新加载', loadError: '数据加载失败', refreshedAt: '更新于', unitWan: '万元', unitYuan: '元', unitNote: '单位：万元', total: '合计',
     kpiBudget: '年度预算', kpiPrSubmitted: '已打 PR', kpiPrEstimated: '预计 PR', kpiPaid: '实际付款', kpiAlerts: '未处理预警', kpiExecRate: '预算执行率', kpiPayRate: 'PR 付款率', kpiNetInflow: '实际净流入', kpiRevenueAch: '收入达成', kpiSpendExec: '支出执行', kpiHealth: '预算健康度',
@@ -116,7 +110,7 @@ const copy = {
     // 经营
     opTheme: '经营分析主题框架', theme: '主题', metric: '指标', dataSource: '数据源', readiness: '就绪度', ready: '就绪', pending: '待接入', costMix: '费用构成', share: '占比', netFlowTitle: '收支净额（按月）', netInflow: '净流入', netOutflow: '净流出',
     // 资金
-    cashSummaryV: '资金汇总', cashPlans: '排款工作台', cashAdjustments: '调增审批', cashRevenue: '收入计划', cashMatrix: '资金矩阵（主体 × 月）', prevEndBalance: '上月末余额', plannedIncome: '预计收入', plannedExpense: '预计支出', projectedBalance: '预计余额', actualIncome: '实际收入', actualExpense: '实际支出', actualBalance: '实际余额',
+    cashSummaryV: '资金汇总', cashPlans: '排款工作台', cashAdjustments: '调增审批', cashRevenue: '收入计划', cashMatrix: '资金矩阵（主体 × 月）', cashMonthlyExecution: '当月执行', cashBalance: '资金余额', cashSummaryTable: '主体与月份资金汇总', remainingUnpaid: '剩余未付款', cashMissingMetrics: '差额调整与剩余未到账金额待来源数据补齐；缺失金额显示 —。', prevEndBalance: '上月末余额', plannedIncome: '计划收入', plannedExpense: '计划支出', projectedBalance: '预计余额', actualIncome: '实际收入', actualExpense: '实际支出', actualBalance: '实际余额',
     schedule: '排款', scheduleDate: '排款日期', priority: '优先级', priHigh: '高', priMid: '中', priLow: '低', acceptAcceptance: '接受承兑', cashAmount: '现汇金额（元）', acceptanceAmount: '承兑金额（元）', planDetail: '计划详情', increase: '申请调增', newAmount: '调增后金额（元）', increaseReason: '调增理由（必填）', increaseHint: '调增后金额必须大于当前计划金额', payee: '收款方', planMonth: '排款月份', planMonthRequired: '排款月份必填', statusCol: '状态',
     revenueVs: '计划与实际到账',
     // 预警
@@ -181,7 +175,7 @@ const copy = {
     verName: 'Name', verType: 'Type', verStatus: 'Status', verLines: 'Lines', isPrimary: 'Primary', primaryTag: 'P', verConfirm: 'Confirm', verActivate: 'Activate', verLock: 'Lock', verClone: 'Clone as draft', verDiff: 'Compare', diffBase: 'Base', diffTarget: 'Target', diffAmount: 'Budget diff', vstDraft: 'Draft', vstConfirmed: 'Confirmed', vstPublished: 'Active', vstLocked: 'Locked', verActions: 'Actions',
     carryoverRules: 'Carryover rules', carryoverMode: 'Mode', modeFull: 'Full carry', modePercent: 'Percent', modeExpire: 'Expire', percent: 'Percent (%)', expireMonth: 'Expire month', ruleEnabled: 'Enabled', ruleDisabled: 'Disabled', ruleAdd: 'Add rule', ruleToggle: 'Toggle', ruleRemove: 'Remove',
     opTheme: 'Operations topic framework', theme: 'Topic', metric: 'Metric', dataSource: 'Source', readiness: 'Readiness', ready: 'Ready', pending: 'Pending', costMix: 'Cost mix', share: 'Share', netFlowTitle: 'Net flow (monthly)', netInflow: 'Inflow', netOutflow: 'Outflow',
-    cashSummaryV: 'Cash summary', cashPlans: 'Payment plans', cashAdjustments: 'Increase approvals', cashRevenue: 'Revenue plans', cashMatrix: 'Cash matrix (org × month)', prevEndBalance: 'Prev end balance', plannedIncome: 'Planned income', plannedExpense: 'Planned expense', projectedBalance: 'Projected balance', actualIncome: 'Actual income', actualExpense: 'Actual expense', actualBalance: 'Actual balance',
+    cashSummaryV: 'Cash summary', cashPlans: 'Payment plans', cashAdjustments: 'Increase approvals', cashRevenue: 'Revenue plans', cashMatrix: 'Cash matrix (org × month)', cashMonthlyExecution: 'Current month execution', cashBalance: 'Cash balance', cashSummaryTable: 'Cash summary by org and month', remainingUnpaid: 'Remaining unpaid', cashMissingMetrics: 'Approved adjustments and outstanding receipts await source data. Missing amounts display —.', prevEndBalance: 'Prev end balance', plannedIncome: 'Planned income', plannedExpense: 'Planned expense', projectedBalance: 'Projected balance', actualIncome: 'Actual income', actualExpense: 'Actual expense', actualBalance: 'Actual balance',
     schedule: 'Schedule', scheduleDate: 'Schedule date', priority: 'Priority', priHigh: 'High', priMid: 'Mid', priLow: 'Low', acceptAcceptance: 'Accept acceptance', cashAmount: 'Cash amount (CNY)', acceptanceAmount: 'Acceptance amount (CNY)', planDetail: 'Plan detail', increase: 'Request increase', newAmount: 'New amount (CNY)', increaseReason: 'Reason (required)', increaseHint: 'New amount must exceed the current planned amount', payee: 'Payee', planMonth: 'Plan month', planMonthRequired: 'Plan month is required', statusCol: 'Status',
     revenueVs: 'Planned vs actual',
     alertsTitle: 'Alerts', sevCritical: 'Critical', sevWarn: 'Warn', sevInfo: 'Info', sevResolved: 'Resolved', stPending: 'Open', stConfirmed: 'Confirmed', stResolved: 'Resolved', stIgnored: 'Ignored', alertType: 'Type', alertTitleCol: 'Title', detail: 'Detail', firstSeen: 'First seen', lastSeen: 'Last seen', alertMonth: 'Month',

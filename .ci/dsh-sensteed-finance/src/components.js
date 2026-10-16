@@ -246,7 +246,7 @@ function Select({ value, onChange, options, placeholder, disabled, ...rest }) {
   const props = { ...rest, disabled, onChange: event => onChange?.(event.target.value) }
   if (value !== undefined) props.value = value
   return h('select', props,
-    placeholder ? h('option', { value: '' }, placeholder) : null,
+    placeholder && !options.some(([id]) => id === '') ? h('option', { value: '' }, placeholder) : null,
     ...options.map(([id, label]) => h('option', { key: id, value: id }, label)))
 }
 
@@ -273,10 +273,10 @@ function useFinancePopupPosition(open, anchorRef) {
   return style
 }
 
-function SearchSelect({ value, onChange, options = [], placeholder, disabled, required, buttonTrigger = false, allowCustom = false, preserveDraft = false, customLabel = '使用当前输入值', ...rest }) {
+function SearchSelect({ value, defaultValue = '', onChange, options = [], placeholder, disabled, required, buttonTrigger = false, allowCustom = false, preserveDraft = false, customLabel = '使用当前输入值', ...rest }) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
-  const [selection, setSelection] = useState('')
+  const [selection, setSelection] = useState(defaultValue)
   const rootRef = useRef(null)
   const inputRef = useRef(null)
   const triggerRef = useRef(null)
@@ -304,7 +304,7 @@ function SearchSelect({ value, onChange, options = [], placeholder, disabled, re
     }
     document.addEventListener('pointerdown', handleOutsidePointerDown)
     const form = inputRef.current?.form
-    const reset = () => { setSelection(''); closeMenu(true) }
+    const reset = () => { setSelection(defaultValue); closeMenu(true) }
     form?.addEventListener('reset', reset)
     return () => {
       document.removeEventListener('pointerdown', handleOutsidePointerDown)

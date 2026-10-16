@@ -1,5 +1,5 @@
 function ComparisonsView({ ctx }) {
-  const [mode, setMode] = useState('monthly')
+  const [mode, setMode] = useState(ctx.drillParams?.mode || 'monthly')
   const [targetYear, setTargetYear] = useState(String(Number(ctx.year) + 1))
   const [a, setA] = useState('')
   const [b, setB] = useState('')
@@ -23,7 +23,6 @@ function ComparisonsView({ ctx }) {
   const comparable = mode === 'yearly' ? rows.filter(row => row.baseBudget !== 0 && row.targetBudget !== 0) : rows
   const oneSided = mode === 'yearly' ? rows.filter(row => row.baseBudget === 0 || row.targetBudget === 0) : []
   return h('div', { className: 'sf-stack' },
-    h(Select, { 'aria-label': '预算比较类型', value: mode, options: [['monthly', '月结滚动比较'], ['yearly', '年度比较'], ['versions', '版本明细比较']], onChange: setMode }),
     mode === 'yearly' ? h(FormRow, { label: '对比年度' }, h(Select, { 'aria-label': '对比年度', value: targetYear, onChange: setTargetYear, options: yearOptions(targetYear) })) : null,
     h('div', { className: 'sf-row' },
       h(Select, { 'aria-label': '基准快照或版本', value: validA, onChange: setA, options: baseRows.map(row => [row.id, versionLabel(row)]), placeholder: '选择基准' }),

@@ -1,5 +1,7 @@
 # 财务插件功能对齐审查
 
+2026-10-16 的产品导航、录入及跨端验证更新见 [产品体验审查](product-unification-20261016.md)。以下保留 10-14 的功能覆盖记录，不代表最新生产验收。
+
 对齐日期：2026-10-14。生产目标：https://ds.hozonauto.com。参考源码为 sibling `datasource.dofe.ai` 的 `1719c02`，以 `apps/web/components/finance/finance-workspace.tsx`、网页各工作台和 `packages/contracts/src/api/*.contract.ts` 为依据。插件唯一源为本仓库 `plugins/dsh-sensteed-finance`；桌面仓 `.ci` 仅由快照同步脚本生成。
 
 ## 本次修正
