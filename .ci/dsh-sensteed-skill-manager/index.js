@@ -544,8 +544,8 @@ export function apply(ctx, overrides = {}) {
           const [skills, shared, hubSkills, hubPlugins] = await Promise.all([
             listSkills(ctx),
             callSharedSkills(ctx, '?page=1&limit=200').catch(error => ({ unavailable: error instanceof Error ? error.message : 'Company skills are unavailable.', list: [] })),
-            callHubCatalog(ctx, '/skillhub/v1/skills?page=1&limit=100').catch(error => ({ unavailable: error instanceof Error ? error.message : 'Hub is unavailable.', list: [] })),
-            callHubCatalog(ctx, '/skillhub/v1/plugins?page=1&limit=100').catch(error => ({ unavailable: error instanceof Error ? error.message : 'Hub is unavailable.', list: [] })),
+            callHubCatalog(ctx, '/skillhub/v1/skills?page=1&limit=100').catch(error => ({ unavailable: error instanceof Error ? error.message : 'Hub is unavailable.', code: error?.code, list: [] })),
+            callHubCatalog(ctx, '/skillhub/v1/plugins?page=1&limit=100').catch(error => ({ unavailable: error instanceof Error ? error.message : 'Hub is unavailable.', code: error?.code, list: [] })),
           ])
           return respond(res, 200, {
             skills,
@@ -557,6 +557,9 @@ export function apply(ctx, overrides = {}) {
             hubPlugins: hubPlugins.list || [],
             hubPluginsTotal: hubPlugins.total || 0,
             hubError: hubSkills.unavailable || hubPlugins.unavailable || null,
+            // HUB_SSO_REQUIRED lets the client offer a one-click desktop SSO
+            // sign-in instead of a dead-end error row.
+            hubErrorCode: hubSkills.code === 'HUB_SSO_REQUIRED' || hubPlugins.code === 'HUB_SSO_REQUIRED' ? 'HUB_SSO_REQUIRED' : null,
           })
         }
         catch { return respond(res, 503, { error: 'Skills are temporarily unavailable.' }) }

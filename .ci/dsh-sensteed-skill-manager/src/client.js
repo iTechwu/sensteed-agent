@@ -16,7 +16,7 @@ const COPY = {
     installAction: '安装', cancel: '取消', installing: '正在安装…', installed: '已安装',
     publish: '上传到公司', publishing: '正在上传…', publishSuccess: '已发布到公司技能库', publishError: '发布失败，请稍后重试。',
     shared: '公司共享', sharedEmpty: '公司技能库还没有技能', sharedUnavailable: '暂时无法读取公司技能库', sharedInstall: '安装', sharedUpdate: '更新', sharedInstalled: '已安装', sharedLoading: '正在读取公司技能库…',
-    hub: '企业 Hub', hubEmpty: '企业 Hub 目录还没有内容', hubUnavailable: '暂时无法读取企业 Hub（需桌面端登录企业账号）', hubOpen: '在 Hub 查看', hubSkillsTitle: 'Hub 技能', hubPluginsTitle: 'Hub 插件', hubHint: '发布、审核与安装计划在 Hub 工作台完成。',
+    hub: '企业 Hub', hubEmpty: '企业 Hub 目录还没有内容', hubUnavailable: '暂时无法读取企业 Hub（需桌面端登录企业账号）', hubOpen: '在 Hub 查看', hubSkillsTitle: 'Hub 技能', hubPluginsTitle: 'Hub 插件', hubHint: '发布、审核与安装计划在 Hub 工作台完成。', hubSignIn: '登录企业账号', hubSigningIn: '正在打开登录…',
     withdraw: '撤回', withdrawing: '正在撤回…', withdrawSuccess: '已从公司技能库撤回',
     installHint: '可粘贴单技能仓库，或合集仓库中某个技能的 /tree/ 分支目录链接。来源可信后再安装。Skill 会在本机加载。',
     installError: '安装失败，请检查仓库地址和技能结构。', installSuccess: '已安装 {name}', bundled: '内置', local: '本机',
@@ -32,7 +32,7 @@ const COPY = {
     installAction: 'Install', cancel: 'Cancel', installing: 'Installing…', installed: 'Installed',
     publish: 'Share with company', publishing: 'Publishing…', publishSuccess: 'Published to company skills', publishError: 'Could not publish this skill. Try again.',
     shared: 'Company shared', sharedEmpty: 'No company skills yet', sharedUnavailable: 'Company skills are temporarily unavailable', sharedInstall: 'Install', sharedUpdate: 'Update', sharedInstalled: 'Installed', sharedLoading: 'Loading company skills…',
-    hub: 'Company hub', hubEmpty: 'The company hub catalog is empty', hubUnavailable: 'The company hub is temporarily unavailable (desktop enterprise sign-in required)', hubOpen: 'Open in hub', hubSkillsTitle: 'Hub skills', hubPluginsTitle: 'Hub plugins', hubHint: 'Publishing, review, and install plans happen in the hub workspace.',
+    hub: 'Company hub', hubEmpty: 'The company hub catalog is empty', hubUnavailable: 'The company hub is temporarily unavailable (desktop enterprise sign-in required)', hubOpen: 'Open in hub', hubSkillsTitle: 'Hub skills', hubPluginsTitle: 'Hub plugins', hubHint: 'Publishing, review, and install plans happen in the hub workspace.', hubSignIn: 'Sign in to company', hubSigningIn: 'Opening sign-in…',
     withdraw: 'Withdraw', withdrawing: 'Withdrawing…', withdrawSuccess: 'Removed from company skills',
     installHint: 'Paste a single-skill repository or a /tree/ link to one skill in a collection. Install trusted sources only.',
     installError: 'Installation failed. Check the repository URL and skill structure.', installSuccess: 'Installed {name}', bundled: 'Built in', local: 'Local',
@@ -101,6 +101,8 @@ function SkillManagerPage({ view, t, createSkill, panelInfo }) {
   const [hubSkills, setHubSkills] = useState([])
   const [hubPlugins, setHubPlugins] = useState([])
   const [hubError, setHubError] = useState('')
+  const [hubSsoRequired, setHubSsoRequired] = useState(false)
+  const [hubSigningIn, setHubSigningIn] = useState(false)
   const [state, setState] = useState('loading')
   const [formOpen, setFormOpen] = useState(false)
   const [addMenuOpen, setAddMenuOpen] = useState(false)
@@ -152,12 +154,41 @@ function SkillManagerPage({ view, t, createSkill, panelInfo }) {
       setHubSkills((body.hubSkills || []).map(item => ({ name: item.slug, displayName: item.displayName, description: item.description, version: item.stableVersion, kind: 'skill' })))
       setHubPlugins((body.hubPlugins || []).map(item => ({ name: item.npmPackageName || item.pluginId, displayName: item.displayName, description: item.description, version: item.stableVersion, kind: 'plugin' })))
       setHubError(body.hubError || '')
+      setHubSsoRequired(body.hubErrorCode === 'HUB_SSO_REQUIRED')
       setState('ready')
     } catch (cause) {
       setSharedLoading(false)
       setState(state === 'ready' || skills.length > 0 || sharedSkills.length > 0 ? 'ready' : 'error')
       setRefreshError(cause?.statusCode >= 500 ? t('serviceUnavailable') : t('refreshFailed'))
     }
+  }
+  // 一次桌面登录,全部企业服务无感:Hub 目录 401/未绑定时直接触发桌面端
+  // SSO(产品层 /api/desktop/auth/feishu 路由),绑定成功后自动刷新目录,
+  // 不需要用户去 Hub 网页单独登录。
+  const postDesktopAuth = async path => {
+    const response = await fetch(path, {
+      method: 'POST',
+      credentials: 'same-origin',
+      redirect: 'error',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+      signal: AbortSignal.timeout(30_000),
+    })
+    return response.json().catch(() => null)
+  }
+  const signInToHub = async () => {
+    if (hubSigningIn) return
+    setHubSigningIn(true)
+    try {
+      await postDesktopAuth('/api/desktop/auth/feishu/session')
+      for (let attempt = 0; attempt < 40; attempt += 1) {
+        await new Promise(resolve => setTimeout(resolve, 3000))
+        const status = await postDesktopAuth('/api/desktop/auth/feishu/status')
+        if (status?.status === 'bound') { await refresh(); return }
+        if (status?.status === 'idle' || status?.status === 'cancelled' || status?.status === 'error') break
+      }
+    } catch { /* 保持错误态,登录按钮保持可重试 */ }
+    finally { setHubSigningIn(false) }
   }
   useEffect(() => { if (isActive) void refresh() }, [isActive])
   if (view === 'summary') return t('description')
@@ -305,7 +336,10 @@ function SkillManagerPage({ view, t, createSkill, panelInfo }) {
     sourceFilter === 'all' || sourceFilter === 'hub' ? h('section', { className: 'sm-hub', 'aria-labelledby': 'sm-hub-title' },
       h('div', { className: 'sm-section-heading' }, h('h3', { id: 'sm-hub-title' }, t('hub')), h('span', null, String(visibleHubSkills.length + visibleHubPlugins.length))),
       h('p', { className: 'sm-hub-hint' }, t('hubHint')),
-      hubError ? h('div', { className: 'sm-inline-error', role: 'status' }, t('hubUnavailable'), h('button', { type: 'button', className: 'sm-quiet', disabled: state === 'loading' || state === 'refreshing', onClick: () => void refresh() }, t('retry')))
+      hubError ? h('div', { className: 'sm-inline-error', role: 'status' }, t('hubUnavailable'),
+        hubSsoRequired
+          ? h('button', { type: 'button', className: 'sm-quiet', disabled: hubSigningIn, onClick: signInToHub }, hubSigningIn ? t('hubSigningIn') : t('hubSignIn'))
+          : h('button', { type: 'button', className: 'sm-quiet', disabled: state === 'loading' || state === 'refreshing', onClick: () => void refresh() }, t('retry')))
         : (hubSkills.length === 0 && hubPlugins.length === 0) ? h('p', { className: 'sm-state' }, t('hubEmpty'))
         : h('div', { className: 'sm-list' },
             visibleHubSkills.length > 0 ? h('h4', { className: 'sm-hub-group' }, t('hubSkillsTitle')) : null,

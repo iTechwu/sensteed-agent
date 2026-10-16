@@ -6,18 +6,22 @@ import { runInNewContext } from 'node:vm'
 // Exercise the shipped element tree, including state changes, without a host
 // session or network. This catches valid-JS nesting mistakes that syntax checks
 // cannot detect (for example, putting the entire page inside its flex header).
-export function createPage(skills = [], sharedSkills = [], createSkill = async () => {}) {
-  const states = [skills, sharedSkills, '', false, [], [], '', 'ready']
+export function createPage(skills = [], sharedSkills = [], createSkill = async () => {}, overrides = {}) {
+  const states = [skills, sharedSkills, '', false, [], [], '', false, false, 'ready']
   let cursor = 0
-  let reference
+  let refCursor = 0
+  const refs = []
   let component
   let dictionary
   let css = ''
   const react = {
     createElement: (tag, props, ...children) => ({ tag, props: props || {}, children: children.flat(Infinity).filter(child => child != null && child !== false) }),
-    useEffect() {},
+    useEffect(callback) { return callback() },
     useSyncExternalStore(_subscribe, getSnapshot) { return getSnapshot() },
-    useRef(value) { return reference ??= { current: value } },
+    useRef(value) {
+      const index = refCursor++
+      return refs[index] ??= { current: value }
+    },
     useState(initial) {
       const index = cursor++
       if (!(index in states)) states[index] = initial
@@ -27,6 +31,11 @@ export function createPage(skills = [], sharedSkills = [], createSkill = async (
   const module = { exports: {} }
   runInNewContext(readFileSync(new URL('../src/client.js', import.meta.url), 'utf8'), {
     module,
+    fetch: overrides.fetch,
+    window: { addEventListener() {}, removeEventListener() {}, open() {} },
+    AbortSignal,
+    setTimeout,
+    clearTimeout,
     require: name => name === 'react' ? react : {},
     document: {
       createElement: () => ({ dataset: {}, remove() {} }),
@@ -51,7 +60,7 @@ export function createPage(skills = [], sharedSkills = [], createSkill = async (
   return {
     get css() { return css },
     createSkillConversation: module.exports.__test.createSkillConversation,
-    render() { cursor = 0; return component({ t: key => dictionary[key], createSkill }) },
+    render() { cursor = 0; refCursor = 0; return component({ t: key => dictionary[key], createSkill }) },
   }
 }
 
@@ -175,4 +184,41 @@ test('refreshes when the skill panel becomes active again', () => {
   const page = createPage(fixture)
   const root = page.render()
   assert.equal(root.children[0].children[0].children[0].children[0].children[0], '技能')
+})
+
+test('offers a one-click desktop sign-in when the hub requires SSO', async () => {
+  const calls = []
+  let signedIn = false
+  const fetchMock = async (path, init) => {
+    calls.push([path, init?.method])
+    if (path === '/api/desktop/sensteed/skills') {
+      return { ok: true, json: async () => ({ skills: [], sharedSkills: [], hubError: signedIn ? null : '请先在桌面端登录企业账号。', hubErrorCode: signedIn ? null : 'HUB_SSO_REQUIRED', hubSkills: [], hubPlugins: [] }) }
+    }
+    if (path === '/api/desktop/auth/feishu/session') { signedIn = true; return { ok: true, json: async () => ({ status: 'pending' }) } }
+    return { ok: true, json: async () => ({ status: 'bound' }) }
+  }
+  const page = createPage(fixture, [], async () => {}, { fetch: fetchMock })
+  // 挂载即触发 refresh(异步),等微任务落地后进入 SSO 引导态
+  page.render()
+  await new Promise(resolve => setTimeout(resolve, 0))
+  const errorRow = find(page.render(), 'sm-inline-error')
+  assert.ok(errorRow, 'SSO error row renders')
+  const signIn = errorRow.children.find(child => child?.props?.className === 'sm-quiet')
+  assert.equal(signIn.children[0], '登录企业账号')
+  // 点击登录:触发桌面端 SSO,轮询绑定成功后自动刷新目录
+  await signIn.props.onClick()
+  await new Promise(resolve => setTimeout(resolve, 0))
+  assert.equal(find(page.render(), 'sm-inline-error'), undefined, 'hub recovers after desktop sign-in')
+  assert.ok(calls.some(([path, method]) => path === '/api/desktop/auth/feishu/session' && method === 'POST'))
+  assert.ok(calls.some(([path, method]) => path === '/api/desktop/auth/feishu/status' && method === 'POST'))
+})
+
+test('keeps a retry button instead of sign-in for non-SSO hub failures', async () => {
+  const fetchMock = async () => ({ ok: true, json: async () => ({ skills: [], sharedSkills: [], hubError: 'Hub request failed (502).', hubErrorCode: null, hubSkills: [], hubPlugins: [] }) })
+  const page = createPage(fixture, [], async () => {}, { fetch: fetchMock })
+  page.render()
+  await new Promise(resolve => setTimeout(resolve, 0))
+  const errorRow = find(page.render(), 'sm-inline-error')
+  assert.ok(errorRow, 'plain hub failure renders the error row')
+  assert.equal(errorRow.children.find(child => child?.props?.className === 'sm-quiet').children[0], '重试')
 })
