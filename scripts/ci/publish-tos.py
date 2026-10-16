@@ -1,5 +1,6 @@
 """Publish validated desktop artifacts; write the channel pointer only after all uploads succeed."""
 import argparse
+from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 import os
@@ -77,6 +78,15 @@ def settings(env, check_signing=False):
     return result
 
 
+def upload_stamp(version):
+    """yymmddhh 目录层:优先版本号自带时间戳(-beta.YYYYMMDDHHmm,与 tag 一致
+    且重跑稳定),否则回退 run 时刻(团队时区 UTC+8)。"""
+    timestamped = re.search(r'-beta\.(\d{12})$', version or '')
+    if timestamped:
+        return timestamped.group(1)[2:10]
+    return datetime.now(timezone(timedelta(hours=8))).strftime('%y%m%d%H')
+
+
 def release_context(env):
     version = env['DESKTOP_VERSION']
     version_key(version)
@@ -89,10 +99,11 @@ def release_context(env):
         raise ValueError('Invalid workflow run identity')
     release = env.get('RELEASE') == 'true'
     channel = 'beta' if '-beta.' in version else 'stable'
-    base = f'sensteed-agent/releases/{channel}/{version}' if release else f'sensteed-agent/candidates/{sha}'
+    # 上传目录按时间组织(sensteed-agent/yymmddhh/...)以便浏览;第二层保留
+    # 版本与 run 标识,避免同小时多次发布互相覆盖。
     return dict(version=version, channel=channel, release=release, commit=sha,
                 upstreamCommit=upstream_sha, runId=run_id, runAttempt=attempt,
-                prefix=f'{base}/{run_id}-{attempt}')
+                prefix=f"sensteed-agent/{upload_stamp(version)}/{version}-{run_id}-{attempt}")
 
 
 def inventory(directory, context, public_url):
@@ -171,7 +182,7 @@ def probe(client, config, env):
     run_id, attempt = env['GITHUB_RUN_ID'], env['GITHUB_RUN_ATTEMPT']
     if not all(re.fullmatch(r'[1-9]\d*', value) for value in [run_id, attempt]):
         raise ValueError('Invalid workflow run identity')
-    key = f'sensteed-agent/diagnostics/{run_id}-{attempt}/probe.txt'
+    key = f"sensteed-agent/{upload_stamp(env.get('DESKTOP_VERSION'))}/diagnostics/{run_id}-{attempt}/probe.txt"
     payload = b'Sensteed CI TOS multipart probe\n'
     checksum = hashlib.sha256(payload).hexdigest()
     with TemporaryDirectory() as directory:
