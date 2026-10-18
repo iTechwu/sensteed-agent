@@ -11,6 +11,7 @@ import type { HubReleaseTrust } from './hub-sync-verifier.ts'
 import { hubSyncDigest } from './hub-sync-verifier.ts'
 import { verifyHubGenerationDownloads } from './hub-generation-downloads.ts'
 import { readHubPluginArchive } from './hub-plugin-archive.ts'
+import { HUB_RELEASE_EVIDENCE_FILE,verifyHubGenerationContent } from './hub-generation-content.ts'
 import { unpackSkillArchive, fileManifestDigest } from './hub-skill-archive.mjs'
 import type { HubHostClient, HubHostContext } from './hub-host-client.ts'
 const sha=(b:Uint8Array)=>createHash('sha256').update(b).digest('hex')
@@ -106,6 +107,9 @@ export async function materializeHubGeneration(options:{
   }
  }
  mkdirSync(join(root,'skills'),{recursive:true,mode:0o700});mkdirSync(join(root,'profile'),{recursive:true,mode:0o700})
+ put(HUB_RELEASE_EVIDENCE_FILE,Buffer.from(JSON.stringify({manifests:downloads.manifests})))
  hubGenerationConsumptionData(proof)
- return {schemaVersion:2,identity:store.identity,generationId:options.generationId,packages,skillsRoot:'skills',files,verifiedComposition:{entries,skills}}
+ const descriptor:HubGenerationDescriptor={schemaVersion:2,identity:store.identity,generationId:options.generationId,packages,skillsRoot:'skills',files,verifiedComposition:{entries,skills}}
+ verifyHubGenerationContent(store,plan,options.trust,descriptor)
+ return descriptor
 }
