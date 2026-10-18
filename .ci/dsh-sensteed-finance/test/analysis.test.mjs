@@ -9,13 +9,17 @@ const shell = await readFile(new URL('src/shell.js', root), 'utf8')
 const entries = new Function(head.slice(head.indexOf('const ANALYSIS_ENTRIES'), head.indexOf('\nconst copy =')) + '\nreturn ANALYSIS_ENTRIES')()
 const expected = ['finance-monthly-risk', 'finance-cost-structure', 'finance-cash-pressure', 'finance-budget-review', 'finance-revenue-attainment', 'finance-data-quality', 'finance-cost-cash-forecast', 'finance-budget-version-health', 'finance-alert-rules-audit']
 
-function bridge(sessions, globals = {}) {
+function bridge(sessions, globals = {}, catalog = async () => ({ ok: true, value: { skills: expected.map(name => ({ name })) } })) {
+  const inheritedUsing = sessions.using
+  sessions.using = async (id, options, callback) => inheritedUsing
+    ? inheritedUsing.call(sessions, id, options, callback)
+    : callback({ ready: Promise.resolve() })
   const opened = []
   const effects = new Map()
-  const apply = new Function('globalThis', 'closeOverlay', 'NS', `${shell}\nreturn apply`)(globals, () => {}, 'dofe.sensteed-finance')
+  const apply = new Function('globalThis', 'closeOverlay', 'NS', 'REQUEST_TIMEOUT_MS', `${shell}\nreturn apply`)(globals, () => {}, 'dofe.sensteed-finance', 30000)
   apply({
     effect: (callback, label) => effects.set(label, callback),
-    get: name => name === 'sessions' ? sessions : { openSession: id => opened.push(id) },
+    get: name => name === 'sessions' ? sessions : name === 'remote.skills' ? { list: catalog } : { openSession: id => opened.push(id) },
     locale: { bind: () => key => key }, slots: { inject() {} },
   })
   effects.get('dofe-sensteed-finance: scoped conversation')()
@@ -142,4 +146,47 @@ test('unresolved selected org keeps its identifier and never widens analysis to 
     assert.match(prompt, /名称：待核实/)
     assert.doesNotMatch(prompt, /请(?:对|分析|复盘|为)全部主体/)
   }
+})
+
+
+test('missing or failed session skill catalog blocks submission and keeps the prompt for retry', async () => {
+  for (const catalog of [
+    async () => ({ ok: true, value: { skills: [] } }),
+    async () => ({ ok: false, error: { code: 'UNAVAILABLE' } }),
+    async () => { throw new Error('catalog failure') },
+  ]) {
+    const sent = [], copied = []
+    const { globals, opened } = bridge({ create: async () => 'new-missing', scope: () => ({ get: () => ({ send: async prompt => sent.push(prompt) }) }) }, {}, catalog)
+    let closed = false
+    globals.__sensteed_finance_close = () => { closed = true }
+    const ui = analysis(globals, { clipboard: { writeText: async prompt => copied.push(prompt) } })
+    await ui.render()[0].props.onClick()
+    assert.deepEqual(opened, ['new-missing'])
+    assert.deepEqual(sent, [])
+    assert.equal(closed, false)
+    assert.equal(copied.length, 1)
+    assert.match(copied[0], /^\/finance-monthly-risk\n/)
+    assert.equal(ui.notice(), 'sendFailReason')
+    assert.ok(ui.render().every(button => !button.props.disabled))
+  }
+})
+
+test('catalog is checked for the new session after readiness and ownership lasts through send', async () => {
+  const order = []
+  const { globals } = bridge({
+    create: async () => 'new-owned',
+    scope: () => ({ get: () => ({ send: async () => { order.push('send') } }) }),
+    async using(id, options, callback) {
+      order.push('retain')
+      try { await callback({ ready: Promise.resolve().then(() => { order.push('ready') }) }) }
+      finally { order.push('release') }
+    },
+  }, {}, async ({ sessionId }, signal) => {
+    assert.equal(sessionId, 'new-owned')
+    assert.ok(signal instanceof AbortSignal)
+    order.push('catalog')
+    return { ok: true, value: { skills: [{ name: 'finance-monthly-risk' }] } }
+  })
+  await analysis(globals).render()[0].props.onClick()
+  assert.deepEqual(order, ['retain', 'ready', 'catalog', 'send', 'release'])
 })

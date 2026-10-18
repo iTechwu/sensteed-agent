@@ -2,7 +2,7 @@
 
 function sendErrorReason(error) {
   const message = error instanceof Error ? error.message : String(error)
-  const reasons = { conversation_unavailable: '会话服务暂不可用', conversation_service_unavailable: '会话服务暂不可用', session_unavailable: '未找到可用会话' }
+  const reasons = { conversation_unavailable: '会话服务暂不可用', conversation_service_unavailable: '会话服务暂不可用', session_unavailable: '未找到可用会话', analysis_skill_invalid: '分析技能指令无效', analysis_catalog_unavailable: '无法核验分析技能，请稍后重试', analysis_skill_unavailable: '当前会话缺少对应分析技能，请更新默认技能后重试' }
   return Object.hasOwn(reasons, message) ? reasons[message] : financeErrorText(message)
 }
 

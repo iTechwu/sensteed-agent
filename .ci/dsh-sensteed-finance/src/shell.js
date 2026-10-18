@@ -197,17 +197,18 @@ function apply(ctx) {
       // 每次深度分析都从独立会话开始，避免把上一次分析的上下文带入本次结论。
       const id = await sessions.create()
       navigation.openSession(id)
-      const scoped = sessions.scope(id)
-      if (scoped) {
-        const conversation = scoped.get('conversation')
-        if (!conversation) throw new Error('conversation_service_unavailable')
-        await conversation.send(prompt)
-        return
-      }
+      // Retain until ready, catalog check and submission finish; an unknown /skill is plain prose to the Host.
       await sessions.using(id, { source: 'controllerOperation' }, async reference => {
         await reference.ready
         const scoped = sessions.scope(id)
         if (!scoped) throw new Error('session_unavailable')
+        const skillName = /^\/(finance-[a-z0-9-]+)(?:\s|$)/.exec(prompt)?.[1]
+        if (!skillName) throw new Error('analysis_skill_invalid')
+        const skills = ctx.get?.('remote.skills')
+        if (!skills?.list) throw new Error('analysis_catalog_unavailable')
+        const catalog = await skills.list({ sessionId: id }, AbortSignal.timeout(REQUEST_TIMEOUT_MS))
+        if (!catalog?.ok || !Array.isArray(catalog.value?.skills)) throw new Error('analysis_catalog_unavailable')
+        if (!catalog.value.skills.some(skill => skill.name === skillName)) throw new Error('analysis_skill_unavailable')
         const conversation = scoped.get('conversation')
         if (!conversation) throw new Error('conversation_service_unavailable')
         await conversation.send(prompt)

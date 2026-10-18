@@ -4,17 +4,13 @@ function OverviewView({ brief, t, onDrill, orgId, workQueue }) {
   if (!brief) return h(EmptyState, null, t('empty'))
   const data = brief.data || brief
   const overview = data.overview || {}
-  const m = overview.metrics || {}
-  const trend = overview.trend || []
+  const m = data.budget?.totals || {}
+  const trend = financeBudgetTrend(data.budget?.list || [])
   const alertsSummary = data.alertsSummary || {}
   const cashList = data.cash?.list || []
-  const cashTotals = cashList.reduce((acc, row) => {
-    acc.plannedIncome += finite(row.plannedIncome) ?? 0
-    acc.actualIncome += finite(row.actualIncome) ?? 0
-    acc.plannedExpense += finite(row.plannedExpense) ?? 0
-    acc.actualExpense += finite(row.actualExpense) ?? 0
-    return acc
-  }, { plannedIncome: 0, actualIncome: 0, plannedExpense: 0, actualExpense: 0 })
+  const cashTotals = Object.fromEntries(['plannedIncome', 'actualIncome', 'plannedExpense', 'actualExpense'].map(key => [key,
+    cashList.length && cashList.every(row => finite(row[key]) !== null) ? cashList.reduce((sum, row) => sum + finite(row[key]), 0) : null,
+  ]))
   const exec = execRateOf(m.prSubmittedAmount, m.prEstimatedAmount, m.budgetAmount)
   const trendData = trend.map(point => ({
     label: String(point.month).padStart(2, '0'),
@@ -52,6 +48,7 @@ function OverviewView({ brief, t, onDrill, orgId, workQueue }) {
       h('span', null, `${orgId ? t('scopeOrg') : t('scopeAll')} · ${data.year ?? ''} ${t('scopeYear')} · ${t('unitNote')}`),
       h('span', null, `${t('kpiExecRate')} = ${t('kpiPrSubmitted')} ÷ ${t('kpiBudget')}`)),
     workbench,
+    data.budget?.budgetVersionId == null ? h('p', { role: 'status', className: 'sf-banner sf-banner-amber' }, '当前年度尚未发布预算，空汇总不代表已批准零预算。') : null,
     h('div', { className: 'sf-kpis' },
       h(KpiCard, { icon: 'data', label: t('kpiBudget'), value: yuan(m.budgetAmount), onClick: () => onDrill('budget') }),
       h(KpiCard, { icon: 'plan', label: t('kpiPrSubmitted'), value: yuan(m.prSubmittedAmount), hint: `${t('kpiExecRate')} ${ratio(exec, 1) ?? '—'}`, onClick: () => onDrill('budget', { view: 'ledger', recordType: 'SUBMITTED' }) }),
@@ -97,7 +94,7 @@ function OverviewView({ brief, t, onDrill, orgId, workQueue }) {
             },
           },
         ],
-        rows: overview.byOrg || [], empty: t('empty'),
+        rows: overview.byOrg || [], empty: t('empty'), onRowClick: row => onDrill('budget', { view: 'lines', orgId: row.orgId || '', unassigned: !row.orgId }),
       })),
       h('div', { className: 'sf-two-col' },
         h(Card, { title: t('incomeAch'), unit: t('unitNote') },
