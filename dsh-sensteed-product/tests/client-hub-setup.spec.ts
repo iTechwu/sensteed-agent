@@ -17,7 +17,7 @@ it('shows required blocked evidence and prevents preview without claiming instal
  expect([...container.querySelectorAll('button')].find(b=>b.textContent===DOFE_ACCESS_COPY.zh.hubPreview)?.disabled).toBe(true)
 })
 it('sends complete selection, displays unknown permissions and consumes execute nonce once even on lost response',async()=>{
- const fetcher=vi.fn(async(path:string,options:RequestInit)=>{if(path.endsWith('/check'))return Response.json(check);if(path.endsWith('/preview'))return Response.json(plan);if(path.endsWith('/execute'))throw Error('connection lost');return Response.json({})});vi.stubGlobal('fetch',fetcher)
+ const fetcher=vi.fn(async(path:string,_options:RequestInit)=>{if(path.endsWith('/check'))return Response.json(check);if(path.endsWith('/preview'))return Response.json(plan);if(path.endsWith('/execute'))throw Error('connection lost');return Response.json({})});vi.stubGlobal('fetch',fetcher)
  await mount();await click(DOFE_ACCESS_COPY.zh.hubPreview)
  const request=fetcher.mock.calls.find(([path])=>path.endsWith('/preview'))!;expect(JSON.parse(request[1].body as string)).toEqual({channel:'stable',requested:[{kind:'skill',itemId:item.itemId,action:'install',enabled:true}]})
  expect(container.textContent).toContain(DOFE_ACCESS_COPY.zh.hubPermissions)

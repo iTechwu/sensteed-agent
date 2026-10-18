@@ -1,7 +1,7 @@
 // Only complete catalog/evidence reads; caller-requested pages remain single-page.
 export function needsCompleteList(path, query = {}) {
   if (query.page !== undefined || query.limit !== undefined) return false
-  return /^\/finance\/(orgs|departments|budget\/versions|budget-snapshots|members|alert-rules|saved-views|carryover-rules)$/.test(path)
+  return /^\/finance\/(orgs|departments|budget\/versions|budget-snapshots|members|alert-rules|saved-views|carryover-rules|access-roles|permission-policies)$/.test(path)
     || /^\/budget-engine\/versions\/[^/]+\/(params|sales-inputs|runs)$/.test(path)
     || /^\/budget-engine\/runs\/[^/]+\/outputs$/.test(path)
     || /^\/ce\/packages\/[^/]+\/(changes|quotes|param-versions|approvals)$/.test(path)

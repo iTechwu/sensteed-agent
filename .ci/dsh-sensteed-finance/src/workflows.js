@@ -208,7 +208,7 @@ function financeFormBody(fields, values) {
     return financeSetField(body, field.key, converted)
   }, {})
 }
-function FinanceFormDialog({ title, fields, initial = {}, onSubmit, onClose }) {
+function FinanceFormDialog({ title, description, fields, initial = {}, onSubmit, onClose }) {
   const [values, setValues] = useState(initial)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
@@ -223,8 +223,10 @@ function FinanceFormDialog({ title, fields, initial = {}, onSubmit, onClose }) {
   }
   return h(Dialog, { title, onClose: busy ? undefined : onClose },
     h('form', { onSubmit: submit, className: 'sf-stack' },
+      description ? h('p', { className: 'sf-note' }, description) : null,
       ...fields.filter(field => !field.when || field.when(values)).map(field => h(FormRow, { key: field.key, label: field.label },
-        field.options ? h(Select, { 'aria-label': field.label, value: financeFieldValue(values, field.key) ?? '', onChange: value => setValues(current => financeSetField(current, field.key, value)), options: field.options, placeholder: '请选择', required: field.required, disabled: busy })
+        field.multi ? h(MultiSearchSelect, { value: financeFieldValue(values, field.key) || [], options: field.options || [], placeholder: field.label, disabled: busy, onChange: value => setValues(current => financeSetField(current, field.key, value)) })
+          : field.options ? h(field.searchable ? SearchSelect : Select, { ...(field.searchable ? { buttonTrigger: true } : {}), 'aria-label': field.label, value: financeFieldValue(values, field.key) ?? '', onChange: value => setValues(current => financeSetField(current, field.key, value)), options: field.options, placeholder: '请选择', required: field.required, disabled: busy })
           : h(field.type === 'textarea' ? Textarea : Field, { 'aria-label': field.label, value: financeFieldValue(values, field.key) ?? '', onChange: value => setValues(current => financeSetField(current, field.key, value)), type: field.type || 'text', required: field.required, min: field.min, max: field.max, maxLength: field.maxLength || 500, step: field.type === 'number' ? 'any' : undefined, disabled: busy }))),
       error ? h('p', { role: 'alert', className: 'sf-neg' }, error) : null,
       h('div', { className: 'sf-row' }, h(PrimaryButton, { type: 'submit', busy }, '确认'), h(GhostButton, { disabled: busy, onClick: onClose }, '取消'))))

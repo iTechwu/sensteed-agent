@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 const root = new URL('../', import.meta.url)
+const planMonths = new Function(await readFile(new URL('src/navigation.js', root), 'utf8') + '\nreturn financePlanMonths')()
 
 function clientHarness(source, componentName, overrides = {}) {
   const state = []
@@ -17,7 +18,7 @@ function clientHarness(source, componentName, overrides = {}) {
   }
   const h = (type, props, ...children) => ({ type, props: props || {}, children: children.flat(Infinity).filter(Boolean) })
   const dependencies = {
-    h, useState,
+    h, useState, useCallback: callback => callback,
     useRef: initial => useState(() => ({ current: initial }))[0],
     useId: () => useState(() => 'selector-' + Math.random())[0],
     useMemo: compute => compute(),
@@ -33,6 +34,7 @@ function clientHarness(source, componentName, overrides = {}) {
     document: { addEventListener() {}, removeEventListener() {} },
     window: { innerWidth: 1024, innerHeight: 768, addEventListener() {}, removeEventListener() {} },
     requestAnimationFrame: callback => callback(),
+    financePlanMonths: planMonths,
     yearOptions: () => [['2026', '2026']],
     budgetVersionLabel: version => version.name,
     PLAN_TYPES: [], EXPENSE_TYPES: [], ConfiguredBudgetEntry() {}, BudgetSaveReceipt() {},
@@ -130,7 +132,7 @@ test('finance enum codes are translated at every user-facing selector and data-c
 
 test('filing saves selected cost IDs before submission and preserves rows on failure', async () => {
   const components = await readFile(new URL('src/components.js', root), 'utf8')
-  const entry = await readFile(new URL('src/views/entry.js', root), 'utf8')
+  const entry = await readFile(new URL('src/views/entry.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/members.js', root), 'utf8')
   const assignment = {
     id: 'assignment-1', status: 'PENDING', task: { status: 'OPEN', month: 10 },
     rows: [{ costItemId: 'cost-1', month: 10, plannedAmount: 123.45, description: '十月费用' }],
@@ -156,7 +158,7 @@ test('filing saves selected cost IDs before submission and preserves rows on fai
 
 test('filing validates missing dimensions and keeps locked or closed assignments read-only', async () => {
   const components = await readFile(new URL('src/components.js', root), 'utf8')
-  const entry = await readFile(new URL('src/views/entry.js', root), 'utf8')
+  const entry = await readFile(new URL('src/views/entry.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/members.js', root), 'utf8')
   let writes = 0
   const props = {
     assignment: { id: 'assignment-1', status: 'DRAFT', task: { status: 'OPEN' }, rows: [{ month: 10, plannedAmount: 123 }] },
@@ -309,7 +311,7 @@ test('custom text and one matching directory option require an explicit choice o
 
 test('directory searches are isolated and sync refreshes data with an explicit result', async () => {
   const components = await readFile(new URL('src/components.js', root), 'utf8')
-  const entry = await readFile(new URL('src/views/entry.js', root), 'utf8')
+  const entry = await readFile(new URL('src/views/entry.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/members.js', root), 'utf8')
   const requests = []
   let failContacts = true
   let write
@@ -347,7 +349,7 @@ test('directory searches are isolated and sync refreshes data with an explicit r
 })
 
 test('employment registration resets person dimensions, blocks duplicate writes, and retains failed input', async () => {
-  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8')
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/members.js', root), 'utf8')
   let finish
   const writes = []
   const closed = []
@@ -399,7 +401,7 @@ test('employment registration resets person dimensions, blocks duplicate writes,
 })
 
 test('employment picker loads an independent directory and failed records are retryable', async () => {
-  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8')
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/members.js', root), 'utf8')
   const requests = []
   const harness = clientHarness(source, 'EntryView', {
     api: async path => {
@@ -440,7 +442,7 @@ test('employment picker loads an independent directory and failed records are re
 })
 
 test('employment columns use local dates, raw chronological sorts, ongoing labels and readable sources', async () => {
-  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8')
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/members.js', root), 'utf8')
   const start = new Date(2026, 9, 10).toISOString()
   const rows = [
     { id: 'old', departmentId: 'dept-1', startDate: '2025-01-01T00:00:00Z', endDate: start, sourceRef: 'manual' },
@@ -462,7 +464,7 @@ test('employment columns use local dates, raw chronological sorts, ongoing label
 })
 
 test('entry lists distinguish loading, empty, and failed requests with retry actions', async () => {
-  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8')
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/members.js', root), 'utf8')
   let retries = 0
   const props = { busy: false, t: key => key, act() {}, onDialog() {}, onRetry: () => { retries += 1 } }
   const sectionHarness = clientHarness(source, 'FilingSection')
@@ -502,7 +504,7 @@ test('client preserves HTTP status so member permission failures are distinguish
   const unavailable = read(async () => response(503), { timeout: () => undefined }, '/finance', 30000, financeErrorText)
   await assert.rejects(unavailable('/members'), error => error.status === 503)
 
-  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8')
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/members.js', root), 'utf8')
   const harness = clientHarness(source, 'EntryView', { api: path => path === '/members' ? denied(path) : Promise.resolve({ data: { list: [] } }) })
   const props = { ctx: { year: 2026, orgs: [], departments: [], revision: 1 }, t: key => key }
   let tree = harness.render(props)
@@ -511,13 +513,11 @@ test('client preserves HTTP status so member permission failures are distinguish
   tree = harness.render(props)
   clientNodes(tree).find(node => node.type?.name === 'PillTabs').props.onChange('org')
   tree = harness.render(props)
-  const card = clientNodes(tree).find(node => node.type?.name === 'MembersCard')
-  assert.equal(card.props.members.forbidden, true)
-  assert.equal(card.props.members.error, undefined)
+  assert.ok(clientNodes(tree).some(node => node.type?.name === 'FinanceMembersView'))
 })
 
 test('member field settings remain available without rows and all writes lock while busy', async () => {
-  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8')
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/members.js', root), 'utf8')
   const harness = clientHarness(source, 'MembersCard')
   const props = { t: key => ({ roleNameDEPT_COLLABORATOR: '信息协同人' }[key] || key), act() {} }
   for (const members of [null, { list: [] }, { error: true }, { forbidden: true }]) {
@@ -529,13 +529,13 @@ test('member field settings remain available without rows and all writes lock wh
   const table = clientNodes(tree).find(node => node.type?.name === 'Table')
   const roleColumn = table.props.columns.find(column => column.key === 'role')
   assert.equal(roleColumn.sortValue(row), '信息协同人')
-  assert.equal(roleColumn.render(row).props.disabled, true)
-  assert.equal(table.props.columns.find(column => column.key === 'actions').render(row).props.disabled, true)
+  assert.equal(roleColumn.render(row), '信息协同人')
+  assert.ok(clientNodes(table.props.columns.find(column => column.key === 'actions').render(row)).filter(node => node.type?.name === 'GhostButton').every(node => node.props.disabled))
 })
 
 test('task form and all custom selectors are locked while submitting', async () => {
   const components = await readFile(new URL('src/components.js', root), 'utf8')
-  const entry = await readFile(new URL('src/views/entry.js', root), 'utf8')
+  const entry = await readFile(new URL('src/views/entry.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/members.js', root), 'utf8')
   const harness = clientHarness(components + '\n' + entry, 'CreateTaskDialog')
   const tree = harness.render({ year: 2026, departments: [{ id: 'dept-1', name: '财务部' }], members: { list: [] }, busy: true, t: key => key, onClose() {}, act() {} })
   assert.equal(clientNodes(tree).find(node => node.type === 'fieldset').props.disabled, true)
@@ -581,12 +581,12 @@ test('department multi-select adds filtered results without losing previous choi
 })
 
 async function budgetEntryHarness(overrides = {}) {
-  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8')
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/members.js', root), 'utf8')
   const values = { orgId: 'org-1', year: '2026', expenseType: 'FIXED_OPERATION', departmentId: 'dept-1', costItemId: 'travel', budgetAmount: '1250.50', ...overrides.values }
   const writes = [], reads = []
   let resetCount = 0
   const formElement = { reset() { resetCount++ } }
-  const props = { year: 2026, orgs: [{ id: 'org-1', name: '有谦' }, { id: 'group', type: 'GROUP', name: '集团' }], departments: [{ id: 'dept-1', name: '产品工程' }], role: overrides.role, t: key => key }
+  const props = { year: 2026, orgs: [{ id: 'org-1', name: '有谦' }, { id: 'group', type: 'GROUP', name: '集团' }], departments: [{ id: 'dept-1', name: '产品工程' }], ...overrides.props, role: overrides.role, t: key => key }
   const harness = clientHarness(source, 'EntryPanel', {
     FormData: class { constructor(form) { assert.equal(form, formElement) } get(key) { return values[key] } },
     api: async path => {
@@ -603,65 +603,6 @@ async function budgetEntryHarness(overrides = {}) {
   render(); await settle(); switchKind('budget'); await settle()
   return { render, settle, switchKind, submit, values, reads, writes, get resetCount() { return resetCount } }
 }
-
-test('budget entry uses active master-data IDs instead of payment history or custom text', async () => {
-  const harness = await budgetEntryHarness()
-  const tree = harness.render()
-  const nodes = clientNodes(tree)
-  const picker = nodes.find(node => node.props.name === 'costItemId')
-  assert.equal(picker.type.name, 'SearchSelect')
-  assert.deepEqual(picker.props.options, [['travel', '差旅费']])
-  assert.ok(!picker.props.allowCustom)
-  assert.ok(!picker.props.required)
-  assert.deepEqual(nodes.find(node => node.props.name === 'orgId').props.options, [['org-1', '有谦']])
-  assert.equal(nodes.find(node => node.props.name === 'year').props.value, '2026')
-  await harness.submit()
-  assert.deepEqual(harness.writes, [{ path: '/budget-lines', body: { orgId: 'org-1', year: 2026, expenseType: 'FIXED_OPERATION', budgetAmount: 1250.5, departmentId: 'dept-1', costItemId: 'travel' } }])
-  assert.equal(harness.resetCount, 1)
-})
-
-test('budget preflight blocks unpublished or missing years', async () => {
-  for (const failure of ['version-error', 'no-primary', 'draft']) {
-    const harness = await budgetEntryHarness({ api: async path => {
-      if ((failure === 'cost-error' && path === '/cost-items') || (failure === 'version-error' && path.startsWith('/budget-versions'))) throw new Error('offline')
-      return { data: { list: path === '/cost-items'
-        ? failure === 'empty-costs' ? [] : [{ id: 'travel', name: '差旅费', active: failure !== 'inactive-costs' }]
-        : path.startsWith('/budget-versions') ? failure === 'no-primary' ? [] : [{ year: 2026, isPrimary: failure !== 'draft' }] : [] } }
-    } })
-    assert.equal(clientNodes(harness.render()).find(node => node.type?.name === 'PrimaryButton').props.disabled, true, failure)
-    await harness.submit()
-    assert.equal(harness.writes.length, 0, failure)
-    assert.equal(harness.resetCount, 0, failure)
-  }
-})
-
-test('budget rejects unknown cost IDs and invalid amounts without losing input', async () => {
-  for (const values of [{ costItemId: 'unknown' }, { budgetAmount: 'NaN' }, { budgetAmount: '' }, { budgetAmount: '-1' }, { budgetAmount: '0' }, { month: '13' }]) {
-    const harness = await budgetEntryHarness({ values })
-    await harness.submit()
-    assert.equal(harness.writes.length, 0)
-    assert.equal(harness.resetCount, 0)
-  }
-})
-
-test('budget submission locks immediately, keeps failed input and retries the selected year', async () => {
-  let rejectWrite
-  const harness = await budgetEntryHarness({ post: () => new Promise((resolve, reject) => { rejectWrite = reject }) })
-  const saving = harness.submit()
-  await harness.submit()
-  assert.equal(harness.writes.length, 1)
-  assert.equal(clientNodes(harness.render()).find(node => node.type === 'fieldset').props.disabled, true)
-  rejectWrite(new Error('年度 2026 暂无已发布预算版本，请先导入数据'))
-  await saving
-  assert.equal(harness.resetCount, 0)
-  assert.ok(clientNodes(harness.render()).some(node => node.type?.name === 'Notice' && node.children[0].includes('年度 2026')))
-  clientNodes(harness.render()).find(node => node.props.name === 'year').props.onChange('2028')
-  harness.values.year = '2028'
-  // The previous year's version must not enable a write while the new check is pending.
-  assert.equal(clientNodes(harness.render()).find(node => node.type?.name === 'PrimaryButton').props.disabled, true)
-  await harness.settle()
-  assert.ok(harness.reads.includes('/budget-versions?year=2028'))
-})
 
 test('table settings stay isolated across lists and numeric sorts keep missing values last', async () => {
   const source = await readFile(new URL('src/components.js', root), 'utf8')
@@ -721,6 +662,7 @@ async function loadHost(overrides = {}) {
     DATASOURCE_OPERATOR_ID: 'op-1',
   }))
   apply({
+    hubMcp: { register() { return { async dispose() {} } } },
     credentials: { async resolve(name) { return credentialRefs.has(name) ? { value: credentialRefs.get(name), source: 'file' } : undefined } },
     effect(factory) { return factory() },
     logger: { warn() {} },
@@ -761,10 +703,10 @@ async function invokeRoute(route, method, url, body, headers = {}) {
 
 // 客户端片段清单（与 scripts/build.mjs 的 FILES 保持一致；顺序即依赖顺序）
 const CLIENT_FILES = [
-  'src/head.js', 'src/format.js', 'src/components.js', 'src/styles.js', 'src/workflows.js', 'src/navigation.js',
+  'src/head.js', 'src/format.js', 'src/components.js', 'src/styles.js', 'src/workflows.js', 'src/navigation.js', 'src/permission-catalog.js',
   'src/views/overview.js', 'src/views/budget.js', 'src/views/operations.js', 'src/views/cash.js',
   'src/views/alerts.js', 'src/views/datacenter.js', 'src/views/entry.js', 'src/views/configured-entry.js', 'src/views/analyze.js',
-  'src/views/bom.js', 'src/views/notifications.js', 'src/views/permissions.js', 'src/views/review.js', 'src/views/sources.js', 'src/views/comparisons.js', 'src/views/facts.js', 'src/views/engine.js', 'src/views/filing.js',
+  'src/views/bom.js', 'src/views/notifications.js', 'src/views/permissions.js', 'src/views/members.js', 'src/views/review.js', 'src/views/sources.js', 'src/views/comparisons.js', 'src/views/facts.js', 'src/views/engine.js', 'src/views/filing.js',
   'src/shell.js',
 ]
 
@@ -1231,7 +1173,7 @@ test('department popup handles arrow navigation and Escape without closing the t
 })
 
 test('task selectors use member names, accept custom names and initialize departments after loading only once', async () => {
-  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8')
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/members.js', root), 'utf8')
   const harness = clientHarness(source, 'CreateTaskDialog', { api: async () => ({ data: { list: [] } }) })
   const props = { year: 2026, departments: [], members: { list: [{ name: '张三' }, { name: '张三' }, { name: '停用', enabled: false }] }, t: key => key, act() {}, onClose() {} }
   let tree = harness.render(props)
@@ -1251,14 +1193,14 @@ test('task selectors use member names, accept custom names and initialize depart
 })
 
 test('task version loading can retry and stale departments cannot be submitted', async () => {
-  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8')
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/members.js', root), 'utf8')
   let requests = 0
   let writes = 0
   const harness = clientHarness(source, 'CreateTaskDialog', { api: async () => {
     if (++requests === 1) throw new Error('offline')
     return { data: { list: [{ id: 'draft', name: '草稿', status: 'DRAFT' }, { id: 'locked', name: '锁定', status: 'LOCKED' }] } }
   } })
-  const props = { year: 2026, departments: [{ id: 'one', name: '甲部门' }], t: key => key, act: async () => { writes++; return true }, onClose() {} }
+  const props = { year: 2026, departments: [{ id: 'one', name: '甲部门' }], orgs: [{ id: 'org-1', name: '测试主体' }], t: key => key, act: async () => { writes++; return true }, onClose() {} }
   let tree = harness.render(props)
   harness.flushEffects()
   await new Promise(resolve => setImmediate(resolve))
@@ -1274,6 +1216,7 @@ test('task version loading can retry and stale departments cannot be submitted',
   const version = clientNodes(tree).find(node => node.type?.name === 'SearchSelect' && node.props.placeholder === 'version')
   assert.deepEqual(version.props.options, [['draft', '草稿']])
   version.props.onChange('draft')
+  clientNodes(tree).find(node => node.type?.name === 'SearchSelect' && node.props.placeholder === 'taskOrg').props.onChange('org-1')
   tree = harness.render(props)
   assert.equal(tree.props.footer[1].props.disabled, false)
   tree = harness.render({ ...props, departments: [] })
@@ -1317,7 +1260,7 @@ test('plugin year and budget version choices match the web labels and preserve a
 
 test('filing task dialog submits the same dimensions and keeps failures open', async () => {
   const components = await readFile(new URL('src/components.js', root), 'utf8')
-  const entry = await readFile(new URL('src/views/entry.js', root), 'utf8')
+  const entry = await readFile(new URL('src/views/entry.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/members.js', root), 'utf8')
   const format = await readFile(new URL('src/format.js', root), 'utf8')
   const element = (type, props, ...children) => ({ type, props: props || {}, children })
   const createDialog = values => {
@@ -1328,23 +1271,24 @@ test('filing task dialog submits the same dimensions and keeps failures open', a
       () => {},
     )
   }
-  const values = ['十月资金填报', 'PAYMENT_PLAN', '10', '', null, ['dept-1'], '2026-10-10T12:00', '填写说明', '负责人', '审核人', true, false, true]
+  const values = ['十月资金填报', 'org-1', 'PAYMENT_PLAN', '10', '', null, ['dept-1'], '2026-10-10T12:00', '填写说明', '负责人', '审核人', true, false, true]
   let closed = false
   let payload
   const dialog = createDialog(values)({
-    year: 2026, departments: [{ id: 'dept-1', name: '部门一' }], busy: false, t: key => key,
+    year: 2026, departments: [{ id: 'dept-1', name: '部门一' }], orgs: [{ id: 'org-1', name: '主体一' }], busy: false, t: key => key,
     onClose: () => { closed = true }, act: async (_path, body) => { payload = body; return false },
   })
   await dialog.props.footer[1].props.onClick()
   assert.equal(closed, false)
   assert.equal(payload.month, 10)
-  assert.deepEqual(payload.departments, [{ departmentId: 'dept-1' }])
+  assert.deepEqual(payload.departments, [{ departmentId: 'dept-1', orgId: 'org-1' }])
+  assert.equal(payload.orgId, undefined)
   assert.equal(payload.instructions, '填写说明')
   assert.equal(payload.freezeCurrentMonth, false)
   assert.equal(payload.startAsDraft, true)
 
-  const budget = createDialog(['年度预算', 'BUDGET', '10', 'version-1', [{ id: 'version-1', name: '预算版本' }], ['dept-1'], '2026-10-10T12:00'])({
-    year: 2026, departments: [{ id: 'dept-1', name: '部门一' }], busy: false, t: key => key,
+  const budget = createDialog(['年度预算', 'org-1', 'BUDGET', '10', 'version-1', [{ id: 'version-1', name: '预算版本' }], ['dept-1'], '2026-10-10T12:00'])({
+    year: 2026, departments: [{ id: 'dept-1', name: '部门一' }], orgs: [{ id: 'org-1', name: '主体一' }], busy: false, t: key => key,
     onClose: () => { closed = true }, act: async (_path, body) => { payload = body; return true },
   })
   await budget.props.footer[1].props.onClick()
@@ -1374,6 +1318,7 @@ test('clicking the sidebar button renders the dashboard without render-time refe
   }
   const reactStub = {
     createElement,
+    useCallback: callback => callback,
     Fragment: 'Fragment',
     useState: initial => [initial === null ? true : (typeof initial === 'function' ? initial() : initial), () => {}],
     useRef: initial => ({ current: initial }),
@@ -1391,6 +1336,7 @@ test('clicking the sidebar button renders the dashboard without render-time refe
 
   const registered = {}
   apply({
+    hubMcp: { register() { return { async dispose() {} } } },
     effect(factory) { return factory() },
     locale: { register() {}, bind: () => key => key },
     slots: { inject(_key, register) { register() }, register(options, component) { registered[options.name] = component; return () => {} } },
@@ -1599,8 +1545,11 @@ test('backfill supports revenue and payment independently when the other history
       throw new Error('unavailable')
     } })
     harness.switchKind('backfill')
+    await harness.settle()
     const selector = clientNodes(harness.render()).find(node => node.type?.name === 'Select' && node.props.value === 'payment')
     selector.props.onChange(kind)
+    await harness.settle()
+    clientNodes(harness.render()).find(node => node.props.name === 'planId').props.onChange('plan-1')
     await harness.submit()
     assert.deepEqual(harness.writes, [{ path: `/${kind === 'payment' ? 'payment-plans' : 'revenue-plans'}/plan-1/actuals`, body: { actualAmount: 0 } }])
     assert.equal(harness.resetCount, 1)
@@ -1608,7 +1557,7 @@ test('backfill supports revenue and payment independently when the other history
 })
 
 test('department roles cannot see direct financial entry while finance staff can', async () => {
-  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8')
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/members.js', root), 'utf8')
   for (const financeWriter of [false, true]) {
     const harness = clientHarness(source, 'EntryView')
     const tree = harness.render({ ctx: { year: 2026, orgs: [], departments: [], financeWriter }, t: key => key })
@@ -1648,19 +1597,6 @@ test('empty custom fields explain creation and keep unconfirmed text visible and
   }
 })
 
-test('budget can omit an optional cost category when the catalog is empty or unavailable', async () => {
-  for (const failure of ['empty', 'inactive', 'offline']) {
-    const harness = await budgetEntryHarness({ values: { costItemId: '' }, api: async path => {
-      if (path === '/cost-items' && failure === 'offline') throw new Error('offline')
-      return { data: { list: path === '/cost-items' ? failure === 'inactive' ? [{ id: 'old', active: false }] : [] : path.startsWith('/budget-versions') ? [{ year: 2026, isPrimary: true }] : [] } }
-    } })
-    assert.equal(clientNodes(harness.render()).find(node => node.type?.name === 'PrimaryButton').props.disabled, false)
-    await harness.submit()
-    assert.equal(harness.writes.length, 1)
-    assert.equal(Object.hasOwn(harness.writes[0].body, 'costItemId'), false)
-  }
-})
-
 test('cold-start revenue accepts confirmed custom values and refreshes history only after saving', async () => {
   let fail = true
   const harness = await budgetEntryHarness({ values: { itemNameChoice: '新项目', payerNameChoice: '新付款方', incomeTypeNameChoice: '销售收入', plannedAmount: '50000', month: '6' }, post: async () => { if (fail) throw new Error('保存失败') } })
@@ -1678,8 +1614,10 @@ test('cold-start revenue accepts confirmed custom values and refreshes history o
 test('empty backfill offers creation for the selected plan type', async () => {
   const harness = await budgetEntryHarness()
   harness.switchKind('backfill')
+  await harness.settle()
   const type = clientNodes(harness.render()).find(node => node.type?.name === 'Select' && node.props.value === 'payment')
   type.props.onChange('revenue')
+  await harness.settle()
   const create = clientNodes(harness.render()).find(node => node.type?.name === 'LinkButton' && node.children.includes('createRevenuePlan'))
   assert.ok(create)
   create.props.onClick()
@@ -1690,8 +1628,8 @@ test('direct-entry amounts render business labels rather than unresolved transla
   const head = await readFile(new URL('src/head.js', root), 'utf8')
   const dictionary = head.slice(head.indexOf('const copy ='), head.indexOf('\n// ---- 打开/关闭状态'))
   const copy = new Function(dictionary + '\nreturn copy')()
-  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8')
-  for (const [locale, expected] of [['zh', '计划金额（元）'], ['en', 'Planned amount（CNY）']]) {
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/members.js', root), 'utf8')
+  for (const [locale, expected] of [['zh', '计划金额（元） *'], ['en', 'Planned amount（CNY） *']]) {
     const harness = clientHarness(source, 'EntryPanel')
     const props = { year: 2026, orgs: [], departments: [], t: key => copy[locale][key] ?? key }
     for (const kind of ['payment', 'revenue']) {
@@ -1725,6 +1663,9 @@ test('button custom picker exposes pending drafts to the form until explicitly c
   tree = harness.render(props)
   clientNodes(tree).find(node => node.props.type === 'search').props.onChange({ target: { value: ' 新付款方 ' } })
   tree = harness.render(props)
+  tree.props.onKeyDown({ key: 'Escape', preventDefault() {}, stopPropagation() {} })
+  tree = harness.render(props)
+  assert.equal(clientNodes(tree).find(node => node.props.name === 'payerNameChoiceDraft').props.value, '新付款方')
   tree.props.onBlur({ currentTarget: { contains: () => false }, relatedTarget: null })
   tree = harness.render(props)
   assert.equal(clientNodes(tree).find(node => node.props.name === 'payerNameChoiceDraft')?.props.value, '新付款方')
@@ -1796,29 +1737,8 @@ test('filing destinations load their own context without mounting direct entry o
   }
 })
 
-test('creating a cost category selects the saved ID while retaining the unfinished budget', async () => {
-  const harness = await budgetEntryHarness({ role: 'FINANCE_OWNER' })
-  clientNodes(harness.render()).find(node => node.type?.name === 'LinkButton' && node.children.includes('新增费用类别')).props.onClick()
-  let creator = clientNodes(harness.render()).find(node => node.type?.name === 'CostItemCreator')
-  await harness.submit()
-  assert.equal(harness.writes.length, 0, 'an unfinished category must not submit the parent budget')
-  creator.props.onBusyChange(true)
-  assert.equal(clientNodes(harness.render()).find(node => node.type === 'fieldset').props.disabled, true)
-  creator.props.onCreated({ id: 'new-cost', name: '差旅费' })
-  creator.props.onBusyChange(false)
-  const picker = clientNodes(harness.render()).find(node => node.props.name === 'costItemId')
-  assert.equal(picker.props.value, 'new-cost')
-  assert.ok(picker.props.options.some(([id]) => id === 'new-cost'))
-  harness.values.costItemId = 'new-cost'
-  await harness.submit()
-  assert.equal(harness.writes[0].body.costItemId, 'new-cost')
-  assert.equal(harness.writes[0].body.budgetAmount, 1250.5)
-  const staff = await budgetEntryHarness({ role: 'FINANCE_STAFF' })
-  assert.ok(!clientNodes(staff.render()).some(node => node.children.includes('新增费用类别')))
-})
-
 test('cost category creation locks duplicate requests, preserves errors and prevents parent submission on Enter', async () => {
-  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8')
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/members.js', root), 'utf8')
   const writes = [], created = []
   let reject
   const harness = clientHarness(source, 'CostItemCreator', { financeRest: (...args) => { writes.push(args); return new Promise((resolve, failure) => { reject = failure }) } })
@@ -1843,58 +1763,19 @@ test('cost category creation locks duplicate requests, preserves errors and prev
 })
 
 test('backfill labels expose the same identifying dimensions as the web', async () => {
-  const source = await readFile(new URL('src/views/entry.js', root), 'utf8')
+  const source = await readFile(new URL('src/views/entry.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/members.js', root), 'utf8')
   const label = new Function(source + '\nreturn financePlanOptionLabel')()
   assert.equal(label({ id: 'abcdef01-1', description: '设备款', orgName: '甲公司', year: 2026, planMonth: 6, plannedAmount: 1250.5 }, 'payment'), '设备款 · 甲公司 · 2026年6月 · 计划 ¥1,250.50 · #abcdef01')
   assert.match(label({ id: 'revenue1', year: 2026, plannedAmount: 0 }, 'revenue'), /年度（不分月） · 计划 ¥0.00/)
 })
 
 
-test('configured budget follows department and expense hierarchy, prevents stale combinations and retains failed input', async () => {
-  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/configured-entry.js', root), 'utf8')
-  const data = { year: 2027, imported: true, departments: [{ id: 'd1', name: '财务部', parentName: '总部' }, { id: 'd2', name: '研发部', parentName: '研发中心' }], mappings: [{ code: 'map1', sourceCode: 'A1', departmentId: 'd1', costItemId: 'c1', level1Name: '管理费用', level2Name: '差旅费', expenseType: 'FIXED_OPERATION' }], issues: [] }
-  let fail = true
-  const writes = []
-  const harness = clientHarness(source, 'ConfiguredBudgetEntry', {
-    useFinanceResource: path => ({ data: path.includes('budget-configuration') ? data : { list: [{ year: 2027, isPrimary: true, name: '主预算' }] }, retry() {} }),
-    financeRows: data => data.list || [], EXPENSE_LABELS: { FIXED_OPERATION: 'expenseFixed' },
-    financeRest: async (...args) => { writes.push(args); if (fail) throw new Error('保存失败') },
-  })
-  const props = { year: '2027', orgs: [{ id: 'org1', type: 'COMPANY', name: '公司' }], t: key => key }
-  const render = () => harness.render(props)
-  const picker = placeholder => clientNodes(render()).find(node => node.props.placeholder === placeholder)
-  const submit = () => render().props.onSubmit({ preventDefault() {} })
-  assert.equal(picker('选择二级部门').props.disabled, true)
-  picker('选择一级部门').props.onChange('总部')
-  picker('选择二级部门').props.onChange('d1')
-  picker('选择一级费用类别').props.onChange('管理费用')
-  picker('选择费用科目').props.onChange('map1')
-  clientNodes(render()).find(node => node.type?.name === 'Field' && node.props.type === 'number').props.onChange('1250.50')
-  await submit()
-  assert.equal(writes.length, 1)
-  assert.equal(writes[0][2].expenseMappingCode, 'map1')
-  assert.equal(writes[0][2].costItemId, 'c1')
-  assert.equal(clientNodes(render()).find(node => node.type?.name === 'Field' && node.props.type === 'number').props.value, '1250.50')
-  assert.ok(clientNodes(render()).some(node => node.props.role === 'alert' && node.children.includes('保存失败')))
-  picker('选择一级部门').props.onChange('研发中心')
-  assert.equal(picker('选择二级部门').props.value, '')
-  assert.equal(picker('选择一级费用类别').props.value, '')
-  assert.equal(picker('选择费用科目').props.value, '')
-  await submit()
-  assert.equal(writes.length, 1)
-  picker('选择一级部门').props.onChange('总部'); picker('选择二级部门').props.onChange('d1'); picker('选择一级费用类别').props.onChange('管理费用'); picker('选择费用科目').props.onChange('map1')
-  fail = false
-  await submit()
-  assert.equal(writes.length, 2)
-  assert.equal(clientNodes(render()).find(node => node.type?.name === 'Field' && node.props.type === 'number').props.value, '')
-})
-
 test('payment plan detail shows the saved actual payment date', async () => {
-  const source = (await Promise.all(['src/components.js', 'src/format.js', 'src/views/cash.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  const source = (await Promise.all(['src/components.js', 'src/format.js', 'src/views/cash.js', 'src/views/cash-evidence.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
   const harness = clientHarness(source, 'PlanDetailDialog', { PLAN_LABELS: {}, financeEnumLabel: value => value, financeDisplayValue: value => value })
-  const tree = harness.render({ plan: { planType: 'OTHER', actualPaidAt: '2026-11-11T16:00:00.000Z' }, t: key => key, onClose() {} })
+  const tree = harness.render({ plan: { planType: 'OTHER', actualPaidAt: '2026-11-11T16:00:00.000Z' }, ctx: { financeWriter: false, permissions: [] }, t: key => key, onClose() {} })
   assert.ok(clientNodes(tree).some(node => node.children.includes('2026-11-12')))
-  const empty = harness.render({ plan: { planType: 'OTHER', actualPaidAt: null }, t: key => key, onClose() {} })
+  const empty = harness.render({ plan: { planType: 'OTHER', actualPaidAt: null }, ctx: { financeWriter: false, permissions: [] }, t: key => key, onClose() {} })
   assert.ok(clientNodes(empty).some(node => node.children.includes('actualPaidDate')))
 })
 
@@ -2075,6 +1956,9 @@ test('business links preserve cash subpages and PR types so the same link opens 
   assert.deepEqual(resolve('/alerts?status=RESOLVED&severity=WARN'), { tab: 'alerts', params: { status: 'RESOLVED', severity: 'WARN' } })
   assert.equal(resolve('/filing/budget?task=broken'), null)
   assert.deepEqual(resolve('/cash?tab=arbitrary&month=99'), { tab: 'cash', params: {} })
+  assert.deepEqual(resolve('/cash?tab=accuracy&year=2027&org=company-1'), { tab: 'cash', params: { view: 'accuracy', year: '2027', orgId: 'company-1' } })
+  // 旧资金审批链接迁移：调整审批入口收敛到审核队列的付款计划调整类别
+  assert.deepEqual(resolve('/cash?tab=adjustments'), { tab: 'review', params: { section: 'plans' } })
 })
 
 test('execution rate follows the web submitted-PR basis and never treats an unknown amount as zero', async () => {
@@ -2127,4 +2011,585 @@ test('public later-page denial never returns partial evidence',async()=>{
   const result=await invokeRoute(routes.get(BASE),'GET',BASE+'/rest/ce/packages/p/quotes')
   assert.equal(result.body.ok,false)
   assert.equal(result.body.data,undefined)
+})
+
+test('every entry year routes budget work into reviewed drafts without requesting published versions or posting formal lines', async () => {
+  const harness = await budgetEntryHarness()
+  let tree = harness.render()
+  assert.equal(tree.type, 'div')
+  assert.ok(!clientNodes(tree).some(node => node.props.name === 'budgetAmount'))
+  assert.equal(harness.reads.some(path => path.startsWith('/budget-versions')), false)
+  clientNodes(tree).find(node => node.props.name === 'year').props.onChange('2027')
+  tree = harness.render()
+  assert.equal(clientNodes(tree).find(node => node.type?.name === 'ConfiguredBudgetEntry').props.year, '2027')
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/configured-entry.js', root), 'utf8')
+  const navigations = []
+  const panel = clientHarness(source, 'ConfiguredBudgetEntry')
+  for (const year of ['2026', '2027', '2028']) {
+    const result = panel.render({ year, onNavigate: (...args) => navigations.push(args) })
+    const links = clientNodes(result).filter(node => node.type?.name === 'LinkButton')
+    links.forEach(link => link.props.onClick())
+    assert.deepEqual(navigations.slice(-2), [['budget-filing', { year, }], ['budget', { year, view: 'adjustments' }]])
+    assert.equal(clientNodes(result).some(node => node.type === 'form'), false)
+  }
+  assert.equal(harness.writes.length, 0)
+})
+
+test('budget notification links retain version and reject invalid scoped identifiers', async () => {
+  const source = await readFile(new URL('src/navigation.js', root), 'utf8')
+  const destination = new Function(source + '\nreturn financeBusinessDestination')()
+  const versionId = '33333333-3333-4333-8333-333333333333'
+  assert.deepEqual(destination(`/filing/budget?year=2027&version=${versionId}`), { tab: 'budget-filing', params: { year: '2027', versionId } })
+  assert.equal(destination('/filing/budget?version=broken'), null)
+  assert.equal(destination('/filing/budget?version='), null)
+  assert.deepEqual(destination('/budget?year=2027&view=adjustments'), { tab: 'budget', params: { year: '2027', view: 'adjustments' } })
+})
+
+test('budget filing queries the accessible versions and preserves linked scope while resolving an older year', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/budget-filing.js', root), 'utf8')
+  const paths = [], navigations = []
+  const versionId = '33333333-3333-4333-8333-333333333333'
+  const harness = clientHarness(source, 'BudgetFilingView', {
+    financeLabel: value => value, financeRows: data => data?.list || [], BudgetFilingCard() {}, FinanceResource() {},
+    useFinanceResource: path => { paths.push(path); return { data: path.includes('/versions?') ? { list: [], total: 0 } : { list: [{ id: 'a1', year: 2026 }], total: 1 }, retry() {} } },
+  })
+  const ctx = { year: '2027', drillParams: { versionId }, onNavigate: (...args) => navigations.push(args) }
+  const tree = harness.render({ ctx })
+  harness.flushEffects()
+  assert.match(paths[0], new RegExp('versionId=' + versionId))
+  assert.ok(paths.every(path => !path.includes('year=')))
+  assert.deepEqual(navigations[0], ['budget-filing', { versionId, year: '2026' }])
+  clientNodes(tree).find(node => node.props['aria-label'] === '预算版本').props.onChange('another')
+  assert.deepEqual(navigations.at(-1), ['budget-filing', { year: '2027', versionId: 'another' }])
+})
+
+test('configured filing uses the card snapshot, resets dependent mappings and retains failed amounts', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/budget-filing.js', root), 'utf8')
+  const writes = []
+  const card = { year: 2027, configurationRequired: true, configurationImported: true, expenseMappings: [{ code: 'mapping-a', costItemId: 'c1', level1Name: '研发', level2Name: '试验材料', expenseType: 'MODEL_SPECIFIC', sourceCode: 'A1' }, { code: 'mapping-b', costItemId: 'c2', level1Name: '管理', level2Name: '差旅', expenseType: 'FIXED_OPERATION', sourceCode: 'B1' }] }
+  const harness = clientHarness(source, 'BudgetFilingRowDialog', { financeLabel: value => value })
+  const props = { card, costItems: [], onSave: async body => { writes.push(body); throw new Error('当前活动已截止') } }
+  const render = () => harness.render(props)
+  const picker = label => clientNodes(render()).find(node => node.props['aria-label'] === label)
+  assert.equal(picker('费用科目与分类').props.disabled, true)
+  picker('一级费用类别').props.onChange('研发')
+  picker('费用科目与分类').props.onChange('mapping-a')
+  picker('金额（元）').props.onChange('1250.50')
+  picker('编制说明').props.onChange('样件试验')
+  await clientNodes(render()).find(node => node.type === 'form').props.onSubmit({ preventDefault() {} })
+  assert.deepEqual(writes[0].row, { costItemId: 'c1', expenseMappingCode: 'mapping-a', month: 1, plannedAmount: 1250.5, description: '样件试验' })
+  assert.equal(picker('金额（元）').props.value, '1250.50')
+  assert.ok(clientNodes(render()).some(node => node.props.role === 'alert' && node.children.includes('当前活动已截止')))
+  picker('一级费用类别').props.onChange('管理')
+  assert.equal(picker('费用科目与分类').props.value, '')
+  await clientNodes(render()).find(node => node.type === 'form').props.onSubmit({ preventDefault() {} })
+  assert.equal(writes.length, 1)
+  const parse = new Function(source + '\nreturn financeBudgetRowBody')()
+  assert.throws(() => parse({ costItemId: 'c1', expenseMappingCode: 'mapping-b' }, [{ id: 'c1' }], card))
+  assert.throws(() => parse({ costItemId: 'c1', expenseMappingCode: 'mapping-a' }, [], { ...card, configurationImported: false }))
+})
+
+test('budget Excel routes preserve preview fingerprints and only expose exact public endpoints', async () => {
+  const calls = []
+  const { routes } = await loadHost({ fetch: async (url, init) => { calls.push({ url: String(url), body: init.body }); return mcpJson({ id: 'a1' }) } })
+  const body = { fileName: '预算.xlsx', contentBase64: 'ZGF0YQ==', previewFingerprint: 'a'.repeat(64) }
+  for (const [method, path] of [['GET', '/finance/budget-filing/versions?year=2027&page=2&limit=100'], ['GET', '/finance/budget-filing/a1/history?page=2&limit=20'], ...['template', 'preview', 'import'].map(action => ['POST', `/finance/budget-filing/a1/excel/${action}`])]) {
+    const result = await invokeRoute(routes.get(BASE), method, BASE + '/rest' + path, method === 'GET' ? null : body, { 'content-type': 'application/json' })
+    assert.equal(result.status, 200)
+    assert.equal(new URL(calls.at(-1).url).pathname, '/api' + path.split('?')[0])
+    if (path.endsWith('/import')) assert.equal(JSON.parse(calls.at(-1).body).previewFingerprint, body.previewFingerprint)
+  }
+  const before = calls.length
+  const denied = await invokeRoute(routes.get(BASE), 'POST', BASE + '/rest/finance/budget-filing/a1/excel/execute', body, { 'content-type': 'application/json' })
+  assert.equal(denied.status, 404)
+  assert.equal(calls.length, before)
+})
+
+test('budget Excel requires whole-file preview, preserves failed import and locks duplicate clicks', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/budget-excel.js', root), 'utf8')
+  const writes = [], notices = []
+  let rejectSave
+  const preview = { fingerprint: 'a'.repeat(64), errors: [], rows: [{ costItemId: 'c1', month: 1, plannedAmount: 20, description: '试验' }], totalAmount: 20 }
+  class Reader { readAsDataURL() { this.result = 'data:application/octet-stream;base64,ZGF0YQ=='; this.onload() } }
+  const harness = clientHarness(source, 'BudgetFilingExcel', { FileReader: Reader, budgetFilingMoney: String, financeRest: async (path, method, body) => { writes.push({ path, method, body }); if (path.endsWith('/preview')) return { data: preview }; return new Promise((resolve, reject) => { rejectSave = reject }) } })
+  const props = { card: { id: 'a1' }, costItems: [{ id: 'c1', name: '试验材料' }], onRefresh: text => notices.push(text) }
+  const render = () => harness.render(props)
+  const upload = async () => clientNodes(render()).find(node => node.type === 'input').props.onChange({ target: { files: [{ name: '预算.xlsx', size: 4 }], value: '' } })
+  await upload(); await new Promise(resolve => setImmediate(resolve))
+  assert.equal(writes.length, 1)
+  assert.ok(writes[0].path.endsWith('/preview'))
+  const button = clientNodes(render()).find(node => node.type?.name === 'PrimaryButton')
+  const pending = button.props.onClick(); await button.props.onClick()
+  assert.equal(writes.length, 2)
+  assert.equal(writes[1].body.previewFingerprint, preview.fingerprint)
+  rejectSave(new Error('活动已截止')); await pending
+  assert.ok(clientNodes(render()).some(node => node.props.role === 'alert' && node.children.includes('活动已截止')))
+  assert.ok(clientNodes(render()).find(node => node.type?.name === 'PrimaryButton'))
+  assert.equal(notices.length, 0)
+  preview.errors = [{ row: 3, message: '部门不匹配' }]
+  await upload(); await new Promise(resolve => setImmediate(resolve))
+  assert.equal(clientNodes(render()).some(node => node.type?.name === 'PrimaryButton'), false)
+  assert.ok(clientNodes(render()).some(node => node.children.includes('第 3 行：部门不匹配')))
+})
+
+test('budget Excel rejects unsupported or oversized files before reading and blocks unconfigured departments', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/budget-excel.js', root), 'utf8')
+  const file = new Function(source + '\nreturn financeBudgetExcelFile')()
+  for (const value of [{ name: '预算.xls', size: 10 }, { name: '预算.xlsx', size: 0 }, { name: '预算.xlsx', size: 524289 }]) assert.throws(() => file(value))
+  const harness = clientHarness(source, 'BudgetFilingExcel')
+  const tree = harness.render({ card: { configurationRequired: true, configurationImported: false }, costItems: [] })
+  assert.equal(clientNodes(tree).find(node => node.type === 'input').props.disabled, true)
+  assert.equal(clientNodes(tree).find(node => node.type?.name === 'GhostButton').props.disabled, true)
+})
+
+test('budget history paginates the authorized contract and separates missing snapshots from empty ones', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/budget-history.js', root), 'utf8')
+  const paths = []
+  const harness = clientHarness(source, 'BudgetFilingHistory', {
+    BUDGET_FILING_STAGES: {}, budgetFilingMoney: String, financeRows: data => data.list, FinanceResource() {},
+    useFinanceResource: path => { paths.push(path); return { data: { total: 25, roundChanges: [], list: [{ id: 'old', actorName: '财务', at: '2026-10-01', action: 'SAVE', snapshotAvailable: false }, { id: 'new', actorName: '财务', at: '2026-10-02', action: 'SUBMIT', snapshotAvailable: true, before: [], after: [] }] } } },
+  })
+  let tree = harness.render({ id: 'a1' })
+  assert.equal(clientNodes(tree).filter(node => node.children.includes('历史记录未保存条目快照，无法还原当时明细。')).length, 1)
+  clientNodes(tree).find(node => node.type?.name === 'Pager').props.onPage(2)
+  tree = harness.render({ id: 'a1' })
+  assert.equal(paths.at(-1), '/finance/budget-filing/a1/history?page=2&limit=20')
+})
+
+const permissionSource = async () => await readFile(new URL('src/permission-catalog.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/permissions.js', root), 'utf8')
+test('complete policies replace permissions, clearing all functions clears scopes and preserves an audit reason', async () => {
+  const parse = new Function(await permissionSource() + '\nreturn financePolicyRequest')()
+  const people = [{ userId: 'u1' }], roles = [{ id: 'FINANCE_OWNER', enabled: true }]
+  const value = { subjectType: 'USER', userIds: ['u1', 'u1'], permissions: [], scopes: [{ scopeType: 'GLOBAL' }], reason: ' 全部关闭 ' }
+  assert.deepEqual(parse(value, people, roles, [], []), { path: '/finance/permission-policies/batch', body: { userIds: ['u1'], permissions: [], scopes: [], reason: '全部关闭' } })
+  assert.throws(() => parse({ ...value, userIds: ['unknown'] }, people, roles, [], []), /可用成员/)
+  assert.throws(() => parse({ ...value, permissions: ['cash.plan.read'], scopes: [{ scopeType: 'ORG', orgId: 'missing' }] }, people, roles, [], []), /主体/)
+  assert.throws(() => parse({ ...value, permissions: ['cash.plan.read'], scopes: [{ scopeType: 'SELF', yearFrom: '2028', yearTo: '2027' }] }, people, roles, [], []), /起始年度/)
+  const role = parse({ ...value, subjectType: 'ROLE', subjectId: 'FINANCE_OWNER', permissions: ['cash.plan.read'], scopes: [{ scopeType: 'SELF', yearFrom: '2027' }] }, people, roles, [], [])
+  assert.equal(role.path, '/finance/permission-policies'); assert.equal(role.body.subjectType, 'ROLE'); assert.equal(role.body.scopes[0].yearFrom, 2027)
+})
+test('department member snapshot includes descendants, deduplicates and excludes disabled or unbound identities without looping on cycles', async () => {
+  const select = new Function(await permissionSource() + '\nreturn financePolicyDepartmentPeople')()
+  const directory = { departments: [{ id: 'a', parentId: 'c' }, { id: 'b', parentId: 'a' }, { id: 'c', parentId: 'b' }], members: [{ userId: 'u1', departmentIds: ['a', 'b'] }, { userId: 'u2', departmentIds: ['c'] }, { userId: 'off', departmentIds: ['b'], identityEnabled: false }, { userId: 'local', departmentIds: ['b'], source: 'LOCAL_MIRROR' }, { departmentIds: ['b'] }] }
+  assert.deepEqual(select(directory, ['a']), ['u1', 'u2'])
+})
+test('permission replacement invalidates confirmation when ranges change and retains failed input while locking double submission', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await permissionSource()
+  let reject, calls = []
+  const harness = clientHarness(source, 'FinancePolicyDialog')
+  const props = { initialTab: 'USER', people: [{ userId: 'u1', name: '测试成员' }], roles: [], directory: { departments: [] }, orgs: [], departments: [], onSave: body => { calls.push(body); return new Promise((resolve, fail) => { reject = fail }) } }
+  const render = () => harness.render(props), nodes = () => clientNodes(render())
+  nodes().find(node => node.props.placeholder === '选择成员').props.onChange(['u1'])
+  nodes().find(node => node.props.placeholder === '选择功能权限').props.onChange(['cash.plan.read'])
+  nodes().find(node => node.props['aria-label'] === '变更原因').props.onChange('复核范围')
+  const confirm = () => nodes().find(node => node.type === 'input' && node.props.type === 'checkbox').props.onChange({ target: { checked: true } })
+  confirm()
+  nodes().find(node => node.props['aria-label'] === '起始年度 1').props.onChange('2027')
+  const submit = () => nodes().find(node => node.type === 'form').props.onSubmit({ preventDefault() {} })
+  await submit(); assert.equal(calls.length, 0)
+  confirm(); const pending = submit(); await submit(); assert.equal(calls.length, 1)
+  reject(new Error('成员状态已变化')); await pending
+  assert.equal(nodes().find(node => node.props['aria-label'] === '变更原因').props.value, '复核范围')
+  assert.ok(nodes().some(node => node.props.role === 'alert' && node.children.includes('成员状态已变化')))
+})
+test('policy management follows effective permission even on custom roles and never offers additive grants', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await permissionSource()
+  const paths = []
+  const harness = clientHarness(source, 'PermissionsView', { useFinanceAction: () => ({ revision: 0 }), useFinanceResource: path => { paths.push(path); return { data: { list: [] } } }, financeRows: data => data?.list || [], FinanceResource() {}, FinanceEvidence() {} })
+  const tree = harness.render({ ctx: { role: 'custom-role', permissions: ['finance.permission.manage'], orgs: [], departments: [] } })
+  assert.ok(paths.includes('/finance/permission-policies'))
+  assert.ok(paths.includes('/finance/permissions/organization-directory'))
+  assert.equal(paths.includes('/finance/permissions'), false)
+  assert.ok(clientNodes(tree).some(node => node.props.title === '功能与数据权限' && node.props.actions?.[0]?.children.includes('配置完整权限')))
+})
+test('policy replacement and role management expose exact public contracts including PUT and retain empty arrays', async () => {
+  const calls = []
+  const { routes } = await loadHost({ fetch: async (url, init) => { calls.push({ url: String(url), init }); return mcpJson({ list: [], total: 0, page: 1, limit: 200 }) } })
+  const body = { userIds: ['u1'], permissions: [], scopes: [], reason: '撤回权限' }
+  for (const [method, path] of [['GET', '/finance/permission-policies'], ['GET', '/finance/access-roles'], ['GET', '/finance/permissions/organization-directory'], ['PUT', '/finance/permission-policies/batch'], ['PUT', '/finance/permission-policies'], ['POST', '/finance/permission-policies/p1/remove'], ['POST', '/finance/access-roles'], ['PUT', '/finance/access-roles/r1'], ['POST', '/finance/access-roles/r1/remove'], ['POST', '/finance/member-roles/batch']]) {
+    const response = await invokeRoute(routes.get(BASE), method, BASE + '/rest' + path, method === 'GET' ? null : body, { 'content-type': 'application/json' })
+    assert.equal(response.status, 200, method + path)
+    assert.equal(new URL(calls.at(-1).url).pathname, '/api' + path)
+    if (method === 'PUT') assert.deepEqual(JSON.parse(calls.at(-1).init.body), body)
+  }
+})
+
+test('512 KB Excel fits the exact upload body limit without expanding ordinary finance write limits', async () => {
+  const calls = []
+  const { routes } = await loadHost({ fetch: async (url, init) => { calls.push(String(url)); return mcpJson({ id: 'preview' }) } })
+  const file = { fileName: '预算.xlsx', contentBase64: Buffer.alloc(512 * 1024).toString('base64') }
+  for (const action of ['preview', 'import']) {
+    const result = await invokeRoute(routes.get(BASE), 'POST', BASE + '/rest/finance/budget-filing/a1/excel/' + action, { ...file, previewFingerprint: 'a'.repeat(64) }, { 'content-type': 'application/json' })
+    assert.equal(result.status, 200)
+  }
+  const before = calls.length
+  for (const [path, body] of [['/finance/payment-plans', file], ['/finance/budget-filing/a1/excel/import', { ...file, contentBase64: 'a'.repeat(800 * 1024) }]]) {
+    const result = await invokeRoute(routes.get(BASE), 'POST', BASE + '/rest' + path, body, { 'content-type': 'application/json' })
+    assert.equal(result.status, 400)
+    assert.equal(result.body.error, 'body too large')
+  }
+  assert.equal(calls.length, before)
+})
+
+test('1 MB cash-evidence JSON fits exact upload routes without relaxing ordinary finance writes', async () => {
+  const calls = []
+  const { routes } = await loadHost({ fetch: async (url, init) => { calls.push(String(url)); return mcpJson({ id: 'ok' }) } })
+  const snapshot = { blob: 'a'.repeat(1100 * 1024) }
+  for (const path of ['/finance/cash-evidence/snapshots', '/finance/cash-evidence/settlements']) {
+    const result = await invokeRoute(routes.get(BASE), 'POST', BASE + '/rest' + path, snapshot, { 'content-type': 'application/json' })
+    assert.equal(result.status, 200)
+  }
+  const ordinary = await invokeRoute(routes.get(BASE), 'POST', BASE + '/rest/finance/payment-plans', snapshot, { 'content-type': 'application/json' })
+  assert.equal(ordinary.status, 400)
+  assert.equal(ordinary.body.error, 'body too large')
+  const capture = await invokeRoute(routes.get(BASE), 'POST', BASE + '/rest/finance/cash-evidence/snapshots/capture', { orgId: 'org-1', year: 2027, month: 1, currency: 'CNY', kind: 'BASELINE', note: 'x' }, { 'content-type': 'application/json' })
+  assert.equal(capture.status, 200)
+  const accuracy = await invokeRoute(routes.get(BASE), 'GET', BASE + '/rest/finance/cash-evidence/accuracy?baselineId=a&executionId=b&page=1&limit=20')
+  assert.equal(accuracy.status, 200)
+})
+
+test('role assignment accepts finance-disabled identities but never disabled SSO identities or local mirrors', async () => {
+  const source = await permissionSource() + '\n' + await readFile(new URL('src/views/members.js', root), 'utf8')
+  const { people, select, body } = new Function(source + '\nreturn { people: financePolicyPeople, select: financePolicyDepartmentPeople, body: financeMemberRoleBody }')()
+  const directory = { departments: [{ id: 'a' }, { id: 'b', parentId: 'a' }], members: [
+    { userId: 'active', enabled: true, identityEnabled: true, departmentIds: ['a'] },
+    { userId: 'reactivate', enabled: false, identityEnabled: true, departmentIds: ['b'] },
+    { userId: 'blocked', enabled: true, identityEnabled: false, departmentIds: ['b'] },
+    { userId: 'mirror', enabled: true, identityEnabled: true, source: 'LOCAL_MIRROR', departmentIds: ['b'] },
+    { userId: null, enabled: true, departmentIds: ['b'] },
+  ] }
+  assert.deepEqual(select(directory, ['a']), ['active'])
+  assert.deepEqual(select(directory, ['a'], 'role'), ['active', 'reactivate'])
+  const eligible = people(directory, 'role'), roles = [{ id: 'custom-role', name: '资金主管', enabled: true }, { id: 'disabled', enabled: false }]
+  const value = { userIds: ['reactivate', 'reactivate'], role: 'custom-role', reason: ' 岗位调整 ' }
+  assert.deepEqual(body(value, eligible, roles), { userIds: ['reactivate'], role: 'custom-role', reason: '岗位调整' })
+  for (const patch of [{ userIds: [] }, { userIds: ['blocked'] }, { reason: '   ' }, { role: 'disabled' }, { role: 'unknown' }, { userIds: Array.from({ length: 501 }, (_, i) => String(i)) }]) assert.throws(() => body({ ...value, ...patch }, eligible, roles))
+})
+
+test('member role confirmation preserves rejected input and prevents immediate duplicate assignment and dismissal', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await permissionSource() + '\n' + await readFile(new URL('src/views/members.js', root), 'utf8')
+  let reject, calls = []
+  const harness = clientHarness(source, 'FinanceMemberRoleDialog')
+  const props = { initial: { userIds: ['u1'], role: 'custom' }, people: [{ userId: 'u1', name: '测试成员' }], roles: [{ id: 'custom', name: '资金主管', enabled: true }], directory: {}, policies: new Set(['u1']), onClose() {}, onSave: body => { calls.push(body); return new Promise((_, fail) => { reject = fail }) } }
+  const nodes = () => clientNodes(harness.render(props))
+  nodes().find(node => node.props['aria-label'] === '变更原因').props.onChange('职责调整')
+  assert.ok(nodes().some(node => node.props.role === 'status' && node.children.join('').includes('1 人保留成员独立权限')))
+  const submit = () => nodes().find(node => node.type === 'form').props.onSubmit({ preventDefault() {} })
+  const pending = submit(); await submit()
+  assert.equal(calls.length, 1)
+  assert.deepEqual(calls[0], { userIds: ['u1'], role: 'custom', reason: '职责调整' })
+  assert.equal(nodes().find(node => node.type?.name === 'Dialog').props.dismissDisabled, true)
+  assert.ok(nodes().filter(node => ['SearchSelect', 'MultiSearchSelect', 'Textarea'].includes(node.type?.name)).every(node => node.props.disabled))
+  reject(new Error('成员身份已停用，整批未保存')); await pending
+  assert.equal(nodes().find(node => node.props['aria-label'] === '变更原因').props.value, '职责调整')
+  assert.ok(nodes().some(node => node.props.role === 'alert' && node.children.includes('成员身份已停用，整批未保存')))
+})
+
+test('members route owns custom roles and removal confirmation without unrelated filing requests', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await permissionSource() + '\n' + await readFile(new URL('src/views/members.js', root), 'utf8')
+  const paths = [], writes = [], row = { id: 'm1', userId: 'u1', name: '测试成员', enabled: true, role: 'FINANCE_STAFF', customRoleId: 'custom' }
+  const data = { '/finance/members': { list: [row] }, '/finance/access-roles': { list: [{ id: 'custom', name: '资金主管', enabled: true }] }, '/finance/permission-policies': { list: [{ subjectType: 'USER', subjectId: 'u1' }] }, '/finance/permissions/organization-directory': { members: [{ userId: 'u1', enabled: true }], departments: [] } }
+  const harness = clientHarness(source, 'FinanceMembersView', { financeRows: data => data?.list || [], useFinanceResource: path => { paths.push(path); return { data: data[path] } }, useFinanceAction: () => ({ revision: 0, run: async (...args) => writes.push(args) }), FinanceResource() {}, FinanceFormDialog() {}, Notice() {} })
+  const props = { ctx: { revision: 1 }, t: key => key }, render = () => harness.render(props)
+  let tree = render()
+  assert.deepEqual([...new Set(paths)], Object.keys(data))
+  assert.ok(clientNodes(tree).some(node => node.type?.name === 'FinanceRoleManager'))
+  const card = clientNodes(tree).find(node => node.type?.name === 'MembersCard')
+  assert.ok(card.props.policies.has('u1'))
+  card.props.onRemove(row)
+  assert.equal(writes.length, 0)
+  tree = render()
+  const confirmation = clientNodes(tree).find(node => node.type?.name === 'FinanceFormDialog')
+  assert.match(confirmation.props.title, /测试成员/)
+  assert.match(confirmation.props.description, /不会删除 SSO/)
+  await confirmation.props.onSubmit()
+  assert.deepEqual(writes, [['/finance/members/m1/remove', {}]])
+  const tableHarness = clientHarness(source, 'MembersCard')
+  const table = clientNodes(tableHarness.render(card.props)).find(node => node.type?.name === 'Table')
+  assert.equal(table.props.columns.find(column => column.key === 'role').render(row), '资金主管')
+  assert.equal(table.props.columns.find(column => column.key === 'policy').render(row), '成员独立配置')
+})
+
+test('identity directory and employment pages only load their task resources', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8')
+  for (const directorySection of ['directory', 'employment']) {
+    const paths = []
+    const harness = clientHarness(source, 'EntryView', { FinanceMembersView() {}, api: async path => { paths.push(path); return { data: { list: [] } } } })
+    harness.render({ ctx: { year: 2026, orgs: [], departments: [], revision: 1 }, t: key => key, directoryOnly: true, directorySection })
+    harness.flushEffects()
+    await new Promise(resolve => setImmediate(resolve))
+    assert.deepEqual(paths, directorySection === 'directory' ? ['/contacts?limit=100&'] : ['/employment-records?limit=50'])
+  }
+})
+
+test('filing sidebar changes preserve the active task and year but clear task scope when leaving the activity', async () => {
+  const source = await readFile(new URL('src/navigation.js', root), 'utf8')
+  const { items, params } = new Function(source + '\nreturn { items: FINANCE_NAVIGATION.flatMap(([,items])=>items), params: financeSidebarParams }')()
+  for (const [id, section] of [['filing-tasks', 'assignments'], ['filing-department', 'department'], ['filing-records', 'mine']]) {
+    const item = items.find(row => row[0] === id)
+    assert.ok(item, id)
+    assert.deepEqual(params(item, 'filing', { section: 'department', taskId: 'task-2025' }, 2025), { section, taskId: 'task-2025', year: '2025' })
+  }
+  for (const id of ['filing-activities', 'identity-members', 'cash']) {
+    const item = items.find(row => row[0] === id)
+    assert.equal(params(item, 'filing', { taskId: 'task-2025' }, 2025).taskId, undefined)
+  }
+  assert.equal(params(items.find(row => row[0] === 'filing-department'), 'cash', { taskId: 'other' }, 2026).taskId, undefined)
+})
+
+test('incomplete organization sync is visible in role and policy selectors without exposing English diagnostics', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await permissionSource()
+  let refreshes = 0
+  const harness = clientHarness(source, 'FinanceOrganizationNotice', { financeErrorText: value => value })
+  const props = { directory: { syncStatus: 'FAILED', syncError: '飞书通讯录范围不足（40004）' }, onRefresh: () => refreshes++ }
+  const tree = harness.render(props)
+  assert.equal(tree.props.role, 'alert')
+  assert.ok(clientNodes(tree).some(node => node.children.includes('飞书通讯录范围不足（40004）')))
+  clientNodes(tree).find(node => node.type?.name === 'GhostButton').props.onClick()
+  assert.equal(refreshes, 1)
+  assert.equal(harness.render({ directory: { syncStatus: 'SUCCESS' } }), null)
+})
+
+test('entry scope changes require explicit discard and cancellation retains the current form', async () => {
+  let registered
+  const harness = await budgetEntryHarness({ props: { onLeaveGuardChange: guard => { registered = guard } } })
+  harness.switchKind('payment'); await harness.settle()
+  const key = harness.render().props.key
+  harness.render().props.onChangeCapture({ target: { name: 'description' } })
+  harness.switchKind('revenue')
+  let dialog = clientNodes(harness.render()).find(node => node.type?.name === 'Dialog')
+  assert.ok(dialog)
+  assert.equal(harness.render().props.key, key)
+  dialog.props.onClose()
+  assert.equal(clientNodes(harness.render()).some(node => node.type?.name === 'Dialog'), false)
+  let navigated = false
+  registered(() => { navigated = true })
+  dialog = clientNodes(harness.render()).find(node => node.type?.name === 'Dialog')
+  assert.equal(navigated, false)
+  clientNodes(dialog.props.footer).find(node => node.type?.name === 'PrimaryButton').props.onClick()
+  assert.equal(navigated, true)
+  harness.switchKind('revenue')
+  assert.match(harness.render().props.key, /^revenue/)
+})
+
+test('entry history follows entity selection and suppresses stale suggestions during scope changes', async () => {
+  const harness = await budgetEntryHarness({ props: { orgs: [{ id: 'org-1', type: 'COMPANY', name: '甲' }, { id: 'org-2', type: 'COMPANY', name: '乙' }] }, api: async path => ({ data: { list: path.startsWith('/payment-plans') ? [{ id: 'p1', payeeName: new URL(path, 'https://example.test').searchParams.get('orgId') + '供应商', costItemName: '已停用历史科目' }] : path === '/cost-items' ? [{ name: '启用科目', active: true }, { name: '停用科目', active: false }] : [] } }) })
+  harness.switchKind('payment'); await harness.settle()
+  let nodes = clientNodes(harness.render())
+  assert.deepEqual(nodes.find(node => node.props.name === 'payeeName').props.options, ['org-1供应商'])
+  assert.deepEqual(nodes.find(node => node.props.name === 'costItemName').props.options, ['启用科目'])
+  nodes.find(node => node.props.name === 'orgId').props.onChange('org-2')
+  assert.deepEqual(clientNodes(harness.render()).find(node => node.props.name === 'payeeName').props.options, [])
+  await harness.settle()
+  assert.ok(harness.reads.includes('/payment-plans?year=2026&orgId=org-2&limit=200'))
+  assert.deepEqual(clientNodes(harness.render()).find(node => node.props.name === 'payeeName').props.options, ['org-2供应商'])
+})
+
+test('entry enforces trimmed text limits without posting invalid payment or revenue facts', async () => {
+  const harness = await budgetEntryHarness({ values: { description: '  ', plannedAmount: '100', planMonth: '10', itemNameChoice: '收入项目', incomeTypeNameChoice: '字'.repeat(101) } })
+  harness.switchKind('payment'); await harness.submit()
+  assert.equal(harness.writes.length, 0)
+  assert.ok(clientNodes(harness.render()).some(node => node.children.includes('entryDescriptionRequired')))
+  harness.values.description = '字'.repeat(501)
+  await harness.submit(); assert.equal(harness.writes.length, 0)
+  harness.values.description = '设备款'; harness.values.payeeNameChoice = '字'.repeat(201)
+  await harness.submit(); assert.equal(harness.writes.length, 0)
+  harness.switchKind('revenue'); await harness.submit(); assert.equal(harness.writes.length, 0)
+  harness.values.incomeTypeNameChoice = '销售'; await harness.submit()
+  assert.equal(harness.writes.length, 1)
+  assert.equal(clientNodes(harness.render()).find(node => node.props.name === 'month').props.defaultValue, String(new Date().getMonth() + 1))
+})
+
+test('payment entry retains canonical field names and submits the required month with trimmed description', async () => {
+  const harness = await budgetEntryHarness({ values: { description: '  设备款  ', plannedAmount: '100', planMonth: '10', planType: 'PURCHASE', payeeNameChoice: '甲供应商' } })
+  harness.switchKind('payment'); await harness.submit()
+  assert.deepEqual(harness.writes, [{ path: '/payment-plans', body: { orgId: 'org-1', year: 2026, description: '设备款', plannedAmount: 100, planMonth: 10, planType: 'PURCHASE', departmentId: 'dept-1', expenseType: 'FIXED_OPERATION', payeeName: '甲供应商' } }])
+})
+
+test('backfill searches and pages the server without replacing the selected plan or pending amount', async () => {
+  let fail = false
+  const harness = await budgetEntryHarness({ values: { planId: 'plan-225', actualAmount: '77' }, api: async path => {
+    if (!path.includes('/payment-plans?')) return { data: { list: [], total: 0 } }
+    const query = new URL(path, 'https://example.test').searchParams
+    if (fail) throw new Error('离线')
+    return { data: { list: [{ id: query.get('keyword') ? 'plan-225' : `page-${query.get('page')}`, description: query.get('keyword') || '当页计划', year: 2026, planMonth: 10, plannedAmount: 100 }], total: query.get('keyword') ? 1 : 225 } }
+  } })
+  harness.switchKind('backfill'); await harness.settle()
+  const picker = () => clientNodes(harness.render()).find(node => node.props.name === 'planId')
+  picker().props.remoteSearch.onChange('计划225')
+  assert.equal(picker().props.options.length, 0, 'unsubmitted keyword must not show old choices')
+  picker().props.remoteSearch.onSubmit(); await harness.settle()
+  assert.match(harness.reads.at(-1), /keyword=.*page=1&limit=20/)
+  picker().props.onChange('plan-225')
+  assert.equal(picker().props.value, 'plan-225')
+  picker().props.remoteSearch.onChange(''); picker().props.remoteSearch.onSubmit(); await harness.settle()
+  clientNodes(picker().props.remoteSearch.content).find(node => node.children.includes('下一页')).props.onClick()
+  await harness.settle()
+  assert.match(harness.reads.at(-1), /page=2&limit=20/)
+  assert.equal(picker().props.value, 'plan-225')
+  assert.match(picker().props.selectedLabel, /计划225/)
+  fail = true
+  picker().props.remoteSearch.onSubmit(); await harness.settle()
+  assert.ok(clientNodes(picker().props.remoteSearch.content).some(node => node.props.role === 'alert'))
+  assert.equal(picker().props.value, 'plan-225', 'search failure cannot silently substitute the selected record')
+  await harness.submit()
+  assert.deepEqual(harness.writes, [{ path: '/payment-plans/plan-225/actuals', body: { actualAmount: 77 } }])
+})
+
+test('backfill suppresses late plan responses and permits changing an empty search scope without discard', async () => {
+  let resolveOld
+  const harness = await budgetEntryHarness({ api: async path => {
+    if (path.includes('page=2')) return new Promise(resolve => { resolveOld = resolve })
+    return { data: { list: [{ id: 'current', description: '当前计划' }], total: 60 } }
+  } })
+  harness.switchKind('backfill'); await harness.settle()
+  const picker = () => clientNodes(harness.render()).find(node => node.props.name === 'planId')
+  clientNodes(picker().props.remoteSearch.content).find(node => node.children.includes('下一页')).props.onClick()
+  await harness.settle()
+  assert.equal(picker().props.options.length, 0)
+  const scope = clientNodes(harness.render()).find(node => node.type?.name === 'SearchSelect' && node.props.placeholder === '主体范围')
+  scope.props.onChange('org-1'); await harness.settle()
+  resolveOld({ data: { list: [{ id: 'stale', description: '旧范围' }], total: 60 } })
+  await harness.settle()
+  assert.equal(picker().props.options[0][0], 'current')
+  assert.equal(picker().props.value, '')
+  assert.equal(clientNodes(harness.render()).some(node => node.type?.name === 'Dialog'), false)
+})
+
+test('plan keyword, entity, year and page cross the host to the public Datasource contract unchanged', async () => {
+  const calls = []
+  const { routes } = await loadHost({ fetch: async (url, init) => { calls.push({ url: String(url), init }); return mcpJson({ list: [], total: 0, page: 12, limit: 20 }) } })
+  for (const kind of ['payment', 'revenue']) {
+    const result = await invokeRoute(routes.get(BASE), 'GET', `${BASE}/${kind}-plans?keyword=${encodeURIComponent('设备 & 回款')}&orgId=org-a&year=2026&page=12&limit=20`)
+    assert.equal(result.status, 200)
+    const target = new URL(calls.at(-1).url)
+    assert.equal(target.pathname, `/api/finance/${kind}-plans`)
+    for (const [key, value] of Object.entries({ keyword: '设备 & 回款', orgId: 'org-a', year: 2026, page: 12, limit: 20 })) {
+      const raw = target.searchParams.get(key)
+      let parsed
+      try { parsed = JSON.parse(raw) } catch { parsed = raw }
+      assert.equal(String(parsed), String(value))
+    }
+    assert.equal(calls.at(-1).init.method, 'GET')
+  }
+})
+
+test('backfill record replacement protects typed actuals, cancellation retains the original and confirmation resets fields', async () => {
+  let guard
+  const harness = await budgetEntryHarness({ props: { onLeaveGuardChange: value => { guard = value } }, api: async () => ({ data: { list: [{ id: 'a', description: '计划甲' }, { id: 'b', description: '计划乙' }], total: 2 } }) })
+  harness.switchKind('backfill'); await harness.settle()
+  const picker = () => clientNodes(harness.render()).find(node => node.props.name === 'planId')
+  picker().props.onChange('a')
+  const before = harness.render()
+  clientNodes(before).find(node => node.props.name === 'actualAmount').props.onChange('9')
+  clientNodes(harness.render()).find(node => node.props.name === 'actualPaidAt').props.onChange('2026-10-18')
+  picker().props.onChange('b')
+  let dialog = clientNodes(harness.render()).find(node => node.type?.name === 'Dialog')
+  assert.ok(dialog)
+  dialog.props.onClose()
+  assert.equal(picker().props.value, 'a')
+  assert.equal(harness.render().props.key, before.props.key)
+  picker().props.onChange('b')
+  dialog = clientNodes(harness.render()).find(node => node.type?.name === 'Dialog')
+  clientNodes(dialog.props.footer).find(node => node.children.includes('entryDiscardContinue')).props.onClick()
+  assert.equal(picker().props.value, 'b')
+  assert.equal(clientNodes(harness.render()).find(node => node.props.name === 'actualAmount').props.value, '')
+  assert.equal(clientNodes(harness.render()).find(node => node.props.name === 'actualPaidAt').props.value, '')
+  assert.equal(clientNodes(harness.render()).find(node => node.type?.name === 'PrimaryButton' && node.props.type === 'submit').props.disabled, true)
+  clientNodes(harness.render()).find(node => node.props.name === 'actualAmount').props.onChange('0')
+  assert.equal(clientNodes(harness.render()).find(node => node.type?.name === 'PrimaryButton' && node.props.type === 'submit').props.disabled, false, 'explicit zero is a valid actual amount')
+  assert.notEqual(harness.render().props.key, before.props.key, 'record change resets the form session')
+  await harness.settle()
+  let left = false
+  guard(() => { left = true })
+  assert.equal(left, false, 'newly selected record remains protected after discard confirmation')
+})
+
+test('cash plan and revenue links retain multi-month, search and pagination context through the real view', async () => {
+  const navigation = await readFile(new URL('src/navigation.js', root), 'utf8')
+  const resolve = new Function(navigation + '\nreturn financeBusinessDestination')()
+  const components = await readFile(new URL('src/components.js', root), 'utf8')
+  const cash = await readFile(new URL('src/views/cash.js', root), 'utf8')
+  const requests = []
+  const destination = resolve('/cash?tab=plans&months=10,1,10&q=设备&expenseType=FIXED_OPERATION&unassigned=1&dept=dept-a&page=12')
+  const harness = clientHarness(components + '\n' + cash, 'CashView', { PAGE_SIZE: 20, PLAN_TYPES: [], EXPENSE_TYPES: [], api: async path => { requests.push(path); return { data: { list: [], total: 0 } } } })
+  const props = { ctx: { year: '2026', orgId: 'org-a', departments: [], permissions: [], drillParams: destination.params }, t: key => key }
+  const render = () => harness.render(props)
+  const settle = async () => { render(); harness.flushEffects(); await new Promise(resolve => setImmediate(resolve)); return render() }
+  await settle()
+  let query = new URL(requests.at(-1), 'https://example.test').searchParams
+  assert.equal(query.get('keyword'), '设备')
+  assert.equal(query.get('months'), '1,10')
+  assert.equal(query.get('expenseType'), 'FIXED_OPERATION')
+  assert.equal(query.get('departmentId'), 'dept-a')
+  assert.equal(query.get('unassigned'), '1')
+  assert.equal(query.has('orgId'), false, 'unassigned and a selected org must not be combined')
+  assert.equal(query.get('page'), '12')
+  const count = requests.length
+  clientNodes(render()).find(node => node.type?.name === 'Field').props.onChange('模具')
+  await settle()
+  assert.equal(requests.length, count, 'typing is not a submitted search')
+  clientNodes(render()).find(node => node.type === 'form').props.onSubmit({ preventDefault() {} })
+  await settle()
+  query = new URL(requests.at(-1), 'https://example.test').searchParams
+  assert.equal(query.get('keyword'), '模具')
+  assert.equal(query.get('page'), '1')
+  clientNodes(render()).find(node => node.type?.name === 'PillTabs').props.onChange('revenue')
+  await settle()
+  const revenue = new URL(requests.at(-1), 'https://example.test')
+  assert.equal(revenue.pathname, '/revenue-plans')
+  assert.equal(revenue.searchParams.get('months'), '1,10')
+  assert.equal(revenue.searchParams.get('keyword'), '模具')
+  assert.equal(revenue.searchParams.get('orgId'), 'org-a')
+  assert.equal(revenue.searchParams.has('expenseType'), false)
+  assert.equal(revenue.searchParams.has('unassigned'), false)
+  assert.equal(resolve('/cash?q=' + 'x'.repeat(201)), null)
+})
+
+test('cash filter loading and failure never expose rows from the old scope and a retry uses the current query', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/cash.js', root), 'utf8')
+  let resolvePending, fail = false
+  const paths = []
+  const harness = clientHarness(source, 'CashView', { PAGE_SIZE: 20, PLAN_TYPES: [], EXPENSE_TYPES: [], api: async path => {
+    paths.push(path)
+    if (path.includes('keyword=')) {
+      if (fail) throw new Error('离线')
+      return new Promise(resolve => { resolvePending = resolve })
+    }
+    return { data: { list: [{ id: 'old' }], total: 1 } }
+  } })
+  const props = { ctx: { year: '2026', permissions: [], drillParams: { view: 'plans' }, departments: [] }, t: key => key }
+  const render = () => harness.render(props)
+  const settle = async () => { render(); harness.flushEffects(); await new Promise(resolve => setImmediate(resolve)); return render() }
+  await settle()
+  assert.equal(clientNodes(render()).find(node => node.type?.name === 'PlansTab').props.rows[0].id, 'old')
+  clientNodes(render()).find(node => node.type?.name === 'Field').props.onChange('新范围')
+  clientNodes(render()).find(node => node.type === 'form').props.onSubmit({ preventDefault() {} })
+  assert.equal(clientNodes(render()).some(node => node.type?.name === 'PlansTab'), false)
+  await settle()
+  assert.equal(clientNodes(render()).some(node => node.props.role === 'status'), true)
+  fail = true
+  // 改条件触发一个失败的新查询；旧查询随后返回也不能覆盖新状态。
+  clientNodes(render()).find(node => node.type?.name === 'MultiSearchSelect').props.onChange(['10'])
+  await settle()
+  resolvePending({ data: { list: [{ id: 'late' }], total: 1 } }); await settle()
+  assert.equal(clientNodes(render()).some(node => node.type?.name === 'PlansTab'), false)
+  const error = clientNodes(render()).find(node => node.type?.name === 'CashPlanListError')
+  assert.ok(error)
+  error.props.onRetry(); await settle()
+  assert.match(paths.at(-1), /months=10/)
+  assert.match(paths.at(-1), /keyword=/)
+})
+
+test('cash legacy host forwards multi-month and expense filters instead of silently widening results', async () => {
+  const calls = []
+  const { routes } = await loadHost({ fetch: async (url, init) => { calls.push({ url: String(url), init }); return mcpJson({ list: [], total: 0, page: 1, limit: 20 }) } })
+  for (const kind of ['payment', 'revenue']) {
+    const result = await invokeRoute(routes.get(BASE), 'GET', `${BASE}/${kind}-plans?year=2026&months=1,10&keyword=模具&expenseType=FIXED_OPERATION&page=1&limit=20`)
+    assert.equal(result.status, 200)
+    const query = new URL(calls.at(-1).url).searchParams
+    assert.equal(query.get('months'), '1,10')
+    assert.equal(query.get('keyword'), '模具')
+    assert.equal(query.get('expenseType'), kind === 'payment' ? 'FIXED_OPERATION' : null)
+  }
 })

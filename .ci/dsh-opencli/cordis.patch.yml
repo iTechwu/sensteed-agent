@@ -1,4 +1,4 @@
+# The sealed product owns authenticated MCP transport; this bundle activates only itself.
 - insert:
-    - id: dsh-agent-reach-tools
-      name: '@dofe/dsh-agent-reach'
-
+    - id: dsh-opencli-tools
+      name: '@dofe/dsh-opencli'

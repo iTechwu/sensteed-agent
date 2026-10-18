@@ -15,7 +15,7 @@ const FINANCE_WORKSPACE_ACCESS_PATH = '/finance/permissions/workspace-access'
 const REQUEST_TIMEOUT_MS = 30000
 const MAX_BODY_BYTES = 256 * 1024
 
-export const inject = ['webServer', 'credentials', 'tools', 'systemPrompt', 'dofeAuth', 'dofeAccess']
+export const inject = ['webServer', 'credentials', 'tools', 'systemPrompt', 'dofeAuth', 'dofeAccess', 'hubMcp']
 export const capabilities = Object.freeze([
   {
     "id": "finance-management",
@@ -63,6 +63,9 @@ export function apply(ctx, overrides = {}) {
   }
 
   const disposers = []
+  if (!ctx.hubMcp?.register) throw new Error('HUB_MCP_SERVICE_REQUIRED')
+  const registration = ctx.hubMcp.register({ capability: 'finance', serverName: 'finance', path: 'finance', timeoutMs: 60000 })
+  disposers.push(() => registration.dispose())
 
   const canUseFinance = scope => {
     const gate = typeof ctx.dofeAccess === 'function' ? ctx.dofeAccess() : undefined
@@ -194,7 +197,7 @@ export function apply(ctx, overrides = {}) {
 // ---------------------------------------------------------------------------
 
 const QUERY_KEYS = [
-  'year', 'month', 'page', 'limit', 'severity', 'status', 'orgId', 'expenseType', 'recordType', 'planType',
+  'year', 'month', 'months', 'page', 'limit', 'severity', 'status', 'orgId', 'expenseType', 'recordType', 'planType',
   'versionId', 'departmentId', 'unassigned', 'operator', 'keyword', 'onlyUnmapped', 'systemUserId', 'days',
   'project', 'sortBy', 'sortDirection', 'alertType', 'baseVersionId', 'targetVersionId', 'planId', 'type', 'scope', 'kind', 'bizSystem', 'transport',
 ]
@@ -257,11 +260,11 @@ async function dispatchGet(fetchImpl, config, sub, url, res, logger) {
       calls = [['finance_get_payment_plans', {
         ...tenant(), year: query.year, orgId: query.orgId, departmentId: query.departmentId,
         unassigned: query.unassigned === '1' ? true : undefined,
-        month: query.month, planType: query.planType, page: query.page, limit: query.limit,
+        month: query.month, months: query.months, planType: query.planType, expenseType: query.expenseType, keyword: query.keyword, page: query.page, limit: query.limit,
       }]]
       break
     case '/revenue-plans':
-      calls = [['finance_get_revenue_plans', { ...tenant(), year: query.year, orgId: query.orgId, page: query.page, limit: query.limit }]]
+      calls = [['finance_get_revenue_plans', { ...tenant(), year: query.year, orgId: query.orgId, month: query.month, months: query.months, keyword: query.keyword, page: query.page, limit: query.limit }]]
       break
     case '/cash':
       calls = [['finance_get_cash_summary', { ...tenant(), year: query.year, orgId: query.orgId }]]
@@ -720,12 +723,12 @@ function safePathname(url) {
   try { return new URL(url || ROUTE_PREFIX, 'https://dsh.local').pathname } catch { return ROUTE_PREFIX }
 }
 
-async function readJsonBody(req) {
+async function readJsonBody(req, maxBytes = MAX_BODY_BYTES) {
   const chunks = []
   let size = 0
   for await (const chunk of req) {
     size += chunk.length
-    if (size > MAX_BODY_BYTES) return { error: 'body too large' }
+    if (size > maxBytes) return { error: 'body too large' }
     chunks.push(chunk)
   }
   const raw = Buffer.concat(chunks).toString('utf8')
@@ -753,7 +756,7 @@ function sendJson(res, status, body) {
 
 const FINANCE_GUIDANCE = `你是资深的财务分析师（CFO 视角），可使用 mcp__finance__* 工具读取与写入财务数据中心（datasource.dofe.ai）。分析纪律：
 
-【口径】金额单位一律为元；严格区分四个口径：预算（budgetAmount）、已打 PR（prSubmittedAmount）、预计 PR（prEstimatedAmount）、实际付款（paidAmount）。执行率 =（已打PR+预计PR）/预算，实际支付率 = 实际付款/预算。引用任何数字须说明口径与期间（年度/月度/主体）。
+【口径】金额单位一律为元；严格区分四个口径：预算（budgetAmount）、已打 PR（prSubmittedAmount）、预计 PR（prEstimatedAmount）、实际付款（paidAmount）。执行率 = 已打PR/预算；预计PR独立展示，不计入执行率，实际支付率 = 实际付款/预算。引用任何数字须说明口径与期间（年度/月度/主体）。
 
 【工作流】1) 先调 sensteed_finance_bootstrap 拿 tenantId 与主体列表；2) 用 mcp__finance__finance_analysis_brief 一次性建立全年口径基线（总览/预算/资金/预警/质量/批次）；3) 按需用 finance_get_budget_summary、finance_get_cash_summary、finance_get_payment_plans、finance_get_revenue_plans、finance_get_budget_lines（支持 departmentId/versionId/unassigned 筛选）、finance_get_payment_requests 下钻到主体×月度×部门；4) 预警细节用 finance_get_alerts 与 finance_get_alert_summary，数据可信度用 finance_get_data_quality 与 finance_get_import_batches；部门口径用 finance_get_departments，人员归属用 finance_get_employment_records。
 
@@ -767,7 +770,7 @@ const FINANCE_GUIDANCE = `你是资深的财务分析师（CFO 视角），可�
 
 【幂等与身份】所有写工具必须提供独立业务 idempotencyKey，同一操作重试复用该键。操作者使用 bootstrap 返回的 operator；服务端按飞书 token 校验实际用户与租户。
 
-【录入与回填】用户明确要求录入或回填时才可调用写入工具（finance_create_payment_plan / finance_create_revenue_plan / finance_create_budget_line / finance_patch_payment_plan_actuals / finance_patch_revenue_plan_actuals / finance_patch_payment_plan_schedule）；付款计划排款月份必填；调用前必须复述关键金额、期间与主体并等待确认；写入后建议调用 finance_run_alert_engine 刷新警情。
+【录入与回填】用户明确要求录入或回填时才可调用写入工具（finance_create_payment_plan / finance_create_revenue_plan / finance_patch_payment_plan_actuals / finance_patch_revenue_plan_actuals / finance_patch_payment_plan_schedule）；付款计划排款月份必填；调用前必须复述关键金额、期间与主体并等待确认；预算新增统一进入“预算填报与审核”，保存本人草稿并完成初审、终审、部门提交及财务确认；不得调用 finance_create_budget_line 直接新增正式预算。写入后建议调用 finance_run_alert_engine 刷新警情。
 
 【输出口吻】财务口吻、结论先行、金额精确到元并按万/亿辅助表述；先给结论摘要，再给明细与依据；区分"事实（数据口径）"与"判断（预测/归因）"；最后给出下一步行动清单。数据不可用时说明原因，绝不编造数字。`
 
@@ -780,7 +783,11 @@ async function dispatchPublicContract(fetchImpl, config, path, req, res, logger)
   if (complete) Object.assign(query, {page: 1, limit: 200})
   let body
   if (req.method !== 'GET') {
-    const parsed = await readJsonBody(req)
+    // 512 KB Excel 经过 base64 后需要更大的 JSON 空间；仅开放两个精确上传接口。
+    const excelUpload = /^\/finance\/budget-filing\/[^/]+\/excel\/(preview|import)$/.test(path)
+    // 1 MB 结构化资金证据 JSON（快照导入 / 逐笔交易导入）经 JSON 转义需要更大空间；同样仅精确路由放宽。
+    const cashEvidenceUpload = /^\/finance\/cash-evidence\/(snapshots|settlements)$/.test(path)
+    const parsed = await readJsonBody(req, excelUpload ? 768 * 1024 : cashEvidenceUpload ? 1536 * 1024 : MAX_BODY_BYTES)
     if (parsed.error) return sendJson(res, 400, { ok: false, error: parsed.error })
     body = stripControlFields(parsed.json)
     delete body.recipientId

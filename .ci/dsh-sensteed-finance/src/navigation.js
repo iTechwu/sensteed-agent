@@ -22,6 +22,18 @@ function financeNavigationItem(tab, params) {
     Object.entries(item[3] || {}).every(([key, value]) => value === (params?.[key] ?? (key === 'section' ? 'assignments' : key === 'mode' ? 'monthly' : undefined))))
 }
 
+/** 同一填报活动内切页保留活动与年度；活动管理和其他业务不携带活动筛选。 */
+function financeSidebarParams(item, tab, params, year) {
+  const next = { ...item[3], year: String(year) }
+  if (tab === 'filing' && item[2] === 'filing' && next.section !== 'tasks' && params?.taskId) next.taskId = params.taskId
+  return next
+}
+
+// 与网页 readPlanMonths 一致：显式多月优先、过滤非法值、去重排序。
+function financePlanMonths(months, month) {
+  return [...new Set(String(months ?? month ?? '').split(',').filter(Boolean).map(Number).filter(value => Number.isInteger(value) && value >= 1 && value <= 12))].sort((a, b) => a - b)
+}
+
 /** 只接收本站业务路径；拒绝外站和未知路径，不把错误目的地静默改成工作台。 */
 function financeBusinessDestination(path) {
   if (typeof path !== 'string' || !path.startsWith('/') || path.startsWith('//')) return null
@@ -50,6 +62,8 @@ function financeBusinessDestination(path) {
     '/filing/activities': ['filing', { section: 'tasks' }],
   }
   let route = routes[pathname]
+  // 资金页签的调整审批已移到审核队列（网页 /cash 审批同样移至工作台），旧链接保留入口不落空。
+  if (pathname === '/cash' && url.searchParams.get('tab') === 'adjustments') route = ['review', { section: 'plans' }]
   // 兼容旧通知/书签，代录不再承担填报和人员管理。
   if (pathname === '/data-entry') {
     const legacy = url.searchParams.get('tab')
@@ -60,12 +74,24 @@ function financeBusinessDestination(path) {
   if (!route) return null
   const params = { ...route[1] }
   if (pathname === '/budget') {
-    if (['lines', 'ledger', 'matrix', 'month', 'variance'].includes(url.searchParams.get('view'))) params.view = url.searchParams.get('view')
+    if (['lines', 'ledger', 'matrix', 'month', 'variance', 'adjustments', 'allocations', 'versions'].includes(url.searchParams.get('view'))) params.view = url.searchParams.get('view')
     const line = url.searchParams.get('line')
     if (url.searchParams.has('line') && (!line || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(line))) return null
     if (line && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(line)) { params.lineId = line; params.view = 'lines' }
   }
-  if (pathname === '/cash' && ['summary', 'plans', 'adjustments', 'revenue'].includes(url.searchParams.get('tab'))) params.view = url.searchParams.get('tab')
+  if (pathname === '/cash') {
+    const months = financePlanMonths(url.searchParams.get('months'), url.searchParams.get('month'))
+    if (url.searchParams.has('months')) params.months = months
+    const keyword = url.searchParams.get('q')?.trim()
+    if (keyword && keyword.length > 200) return null
+    if (keyword) params.keyword = keyword
+    if (url.searchParams.get('unassigned') === '1') params.unassigned = true
+    const page = Number(url.searchParams.get('page'))
+    if (Number.isSafeInteger(page) && page > 0) params.page = page
+    const expenseType = url.searchParams.get('expenseType')
+    if (['PROJECT_OPERATION', 'FIXED_OPERATION', 'MODEL_SPECIFIC', 'NON_PROJECT'].includes(expenseType)) params.expenseType = expenseType
+  }
+  if (pathname === '/cash' && ['summary', 'plans', 'revenue', 'accuracy'].includes(url.searchParams.get('tab'))) params.view = url.searchParams.get('tab')
   const allowedFilters = pathname === '/budget' ? {
     recordType: ['SUBMITTED', 'ESTIMATED'], expense: ['PROJECT_OPERATION', 'FIXED_OPERATION', 'MODEL_SPECIFIC', 'NON_PROJECT'],
   } : pathname === '/cash' ? { planType: ['PURCHASE', 'OTHER', 'NEW_RETAIL', 'PR_PAYMENT', 'DIRECT_PARTS'] }
@@ -79,7 +105,13 @@ function financeBusinessDestination(path) {
       if (value && /^[a-zA-Z0-9_-]{1,100}$/.test(value)) params[key] = value
     }
   }
-  if (pathname === '/filing/budget' && url.searchParams.has('task') && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(url.searchParams.get('task') || '')) return null
+  if (pathname === '/filing/budget') {
+    for (const [query, key] of [['task', 'taskId'], ['version', 'versionId']]) {
+      const value = url.searchParams.get(query)
+      if (url.searchParams.has(query) && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value || '')) return null
+      if (value) params[key] = value
+    }
+  }
   const year = url.searchParams.get('year')
   if (year && /^\d{4}$/.test(year) && Number(year) >= 2000 && Number(year) <= 2100) params.year = year
   for (const [query, key] of [['org', 'orgId'], ['task', 'taskId']]) {

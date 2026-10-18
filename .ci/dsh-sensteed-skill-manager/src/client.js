@@ -10,12 +10,14 @@ let lastTrigger = null
 const ROUTE = '/api/desktop/sensteed/skills'
 const COPY = {
   zh: {
+    generationTitle: "当前 Profile 整体管理", generationProfile: "当前 Profile", generationAction: "操作", generationEnabled: "启用", generationPreview: "查看完整变更计划", generationConfirm: "确认完整代际变更与访问声明", generationExpires: "计划截止", generationBytes: "制品字节", generationExecute: "确认并执行完整计划", generationPreviewFailed: "计划不可用或已过期，请重新检查。", generationStatusUnknown: "执行结果尚未确认。不要重复操作；请刷新检查 Host 恢复状态。", generationRestart: "已写入代际，等待 Host 安全重启；尚未确认实际加载。", generationPermissionsUnknown: "访问声明未提供；以 Host 确认计划与权限检查为准。", generationWorking: "Host 正在处理…", generation_skip: "不加入", generation_retain: "保留固定版本", generation_install: "安装", generation_update: "更新", generation_uninstall: "移除",
     title: '技能', description: '安装、创建和管理 Agent 技能', refresh: '刷新', add: '添加技能', chooseAddMethod: '选择添加技能方式',
     create: '让 Agent 创建', install: '安装第三方技能', empty: '还没有可用的技能', installedTitle: '已安装技能',
     loading: '正在读取技能…', refreshing: '正在刷新技能…', refreshFailed: '技能列表刷新失败。', serviceUnavailable: '技能服务暂时不可用，请稍后重试。', retry: '重试', repository: 'GitHub 仓库或技能目录链接',
     installAction: '安装', cancel: '取消', installing: '正在安装…', installed: '已安装',
     publish: '上传到公司', publishing: '正在上传…', publishSuccess: '已发布到公司技能库', publishError: '发布失败，请稍后重试。',
     shared: '公司共享（旧版）', sharedEmpty: '公司技能库还没有技能', sharedUnavailable: '暂时无法读取公司技能库', sharedInstall: '安装', sharedUpdate: '更新', sharedInstalled: '已安装', sharedLoading: '正在读取公司技能库…',
+    generationBase: '当前基础版本未启用统一代际管理；此处目录和旧版共享技能操作不代表整体 Profile 安装。', generationReady: '当前 Profile 的统一代际服务可用；检查结果不是安装授权。', generationUnavailable: '无法检查当前 Profile 的统一代际服务，请刷新重试。',
     hub: '企业 Hub', hubEmpty: '企业 Hub 目录还没有内容', hubUnavailable: '暂时无法读取企业 Hub（需桌面端登录企业账号）', hubOpen: '在 Hub 查看', hubSkillsTitle: 'Hub 技能', hubPluginsTitle: 'Hub 插件', hubHint: '目录原文可直接查看；发布并获批准后才可安装。', workspace: '工作空间', unpublished: '尚未发布', hubLoading: '正在读取企业目录…', hubSignIn: '登录企业账号', hubSigningIn: '正在打开登录…',
     hubScripts: '含脚本', hubFiles: '文件访问', hubAccessNone: '无', hubAccessSelected: '用户选择的文件', hubAccessWorkspace: '工作区文件', hubAccessSystem: '系统文件', hubNetwork: '网络访问', hubNone: '无', hubYes: '是', hubNo: '否', hubInstall: '安装', hubUpdate: '更新', hubRemove: '移除', hubUnsupported: '插件尚不支持安装', hubConfirmTitle: '确认企业技能操作', hubConfirm: '确认', hubShared: '此操作影响本机所有 Profile 的共享技能。', hubDeclaration: '作者访问声明（尚无运行兼容性测试）', hubWritten: '已写入，等待发现或重载', hubDiscovered: '已由技能服务发现', hubRemoved: '企业技能已移除', hubConflict: '本机内容冲突', hubWorking: '本机操作进行中', hubNotExecuted: '操作未执行，请重新查看计划', hubPending: '回执待同步', hubAttention: '操作需要核对；本机内容和恢复材料已保留', hubUnknown: '授权消费结果未知；本机技能未变更',
     withdraw: '撤回', withdrawing: '正在撤回…', withdrawSuccess: '已从公司技能库撤回',
@@ -27,12 +29,14 @@ const COPY = {
     installMenuHint: '从 GitHub 仓库或技能目录安装到本机。',
   },
   en: {
+    generationTitle: "Current Profile generation", generationProfile: "Current Profile", generationAction: "Action", generationEnabled: "Enabled", generationPreview: "Review complete change plan", generationConfirm: "Confirm generation changes and access declarations", generationExpires: "Plan expires", generationBytes: "Artifact bytes", generationExecute: "Confirm and execute complete plan", generationPreviewFailed: "Plan unavailable or expired. Check again.", generationStatusUnknown: "Execution outcome is unconfirmed. Do not repeat. Refresh Host recovery status.", generationRestart: "Generation written; awaiting safe Host restart. Actual loading is not confirmed.", generationPermissionsUnknown: "Access declaration unavailable; Host plan and permission checks remain authoritative.", generationWorking: "Host is processing…", generation_skip: "Exclude", generation_retain: "Retain pinned version", generation_install: "Install", generation_update: "Update", generation_uninstall: "Remove",
     title: 'Skills', description: 'Install, create, and manage Agent skills', refresh: 'Refresh', add: 'Add skill', chooseAddMethod: 'Choose how to add a skill',
     create: 'Create with Agent', install: 'Install third-party skill', empty: 'No skills available yet', installedTitle: 'Installed skills',
     loading: 'Loading skills…', refreshing: 'Refreshing skills…', refreshFailed: 'Could not refresh the skill list.', serviceUnavailable: 'The skill service is temporarily unavailable. Try again later.', retry: 'Retry', repository: 'GitHub repository or skill directory URL',
     installAction: 'Install', cancel: 'Cancel', installing: 'Installing…', installed: 'Installed',
     publish: 'Share with company', publishing: 'Publishing…', publishSuccess: 'Published to company skills', publishError: 'Could not publish this skill. Try again.',
     shared: 'Company shared', sharedEmpty: 'No company skills yet', sharedUnavailable: 'Company skills are temporarily unavailable', sharedInstall: 'Install', sharedUpdate: 'Update', sharedInstalled: 'Installed', sharedLoading: 'Loading company skills…',
+    generationBase: 'Unified generation management is not enabled in this base version. Catalog and legacy shared-skill actions do not install a complete Profile.', generationReady: 'Unified generation service is available for the current Profile. A check is not installation authorization.', generationUnavailable: 'Could not check the current Profile generation service. Refresh to retry.',
     hub: 'Company hub', hubEmpty: 'The company hub catalog is empty', hubUnavailable: 'The company hub is temporarily unavailable (desktop enterprise sign-in required)', hubOpen: 'Open in hub', hubSkillsTitle: 'Hub skills', hubPluginsTitle: 'Hub plugins', hubHint: 'Catalog documents can be viewed directly. Installation requires an approved release.', workspace: 'Workspace', unpublished: 'Not published', hubLoading: 'Loading enterprise catalog…', hubSignIn: 'Sign in to company', hubSigningIn: 'Opening sign-in…',
     hubScripts: 'Scripts', hubFiles: 'File access', hubAccessNone: 'None', hubAccessSelected: 'User selected files', hubAccessWorkspace: 'Workspace files', hubAccessSystem: 'System files', hubNetwork: 'Network access', hubNone: 'None', hubYes: 'Yes', hubNo: 'No', hubInstall: 'Install', hubUpdate: 'Update', hubRemove: 'Remove', hubUnsupported: 'Plugin installation is not supported yet', hubConfirmTitle: 'Confirm enterprise skill operation', hubConfirm: 'Confirm ', hubShared: 'This changes shared skills for every local Profile.', hubDeclaration: 'Author access declaration (no runtime compatibility test)', hubWritten: 'Written; awaiting discovery or reload', hubDiscovered: 'Discovered by the skill service', hubRemoved: 'Enterprise skill removed', hubConflict: 'Local content conflict', hubWorking: 'Local operation in progress', hubNotExecuted: 'Operation did not run; review a new plan', hubPending: 'Receipt pending sync', hubAttention: 'Review required; local content and recovery evidence preserved', hubUnknown: 'Consumption outcome unknown; local skill unchanged',
     withdraw: 'Withdraw', withdrawing: 'Withdrawing…', withdrawSuccess: 'Removed from company skills',
@@ -112,6 +116,87 @@ function hubRow(item, t, workspaceId, installed, preview, busy) {
       item.kind === 'plugin' ? h('span', {className:'sm-version'},t('hubUnsupported')) : h(React.Fragment,null,
         h('button',{type:'button',className:'sm-row-action',disabled:busy || !item.version || (installed?.version === item.version && !installed?.localModified),onClick:() => preview(item,installed ? 'update' : 'install')},t(installed ? 'hubUpdate' : 'hubInstall')),
         installed ? h('button',{type:'button',className:'sm-row-action',disabled:busy,onClick:() => preview(item,'uninstall')},t('hubRemove')) : null)))
+}
+
+const GENERATION_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const generationKey = item => `${item.kind}:${item.itemId}`
+function generationSelection(check) {
+  if (!check || !GENERATION_UUID.test(check.profileId) || !Array.isArray(check.entries) || !Array.isArray(check.activeItems)) throw new Error('Invalid Host generation check.')
+  const active=new Map(check.activeItems.map(i=>[generationKey(i),i]))
+  const rows=new Map(check.entries.map(i=>[generationKey(i),i]))
+  for(const [key,item] of active) if(!rows.has(key)) rows.set(key,item)
+  return [...rows.values()].map(item=>{
+    if(!['skill','plugin'].includes(item.kind)||!GENERATION_UUID.test(item.itemId)) throw new Error('Invalid Host generation item.')
+    const current=active.get(generationKey(item))
+    return {...item,action:current?'retain':item.required?'install':'skip',enabled:item.required||current?.enabled!==false,active:!!current}
+  })
+}
+function generationPreview(value) {
+  if(!value || !GENERATION_UUID.test(value.intentId)||!GENERATION_UUID.test(value.confirmationNonce)||!GENERATION_UUID.test(value.profileId)||!Array.isArray(value.items)||!Number.isFinite(Date.parse(value.expiresAt))||Date.parse(value.expiresAt)<=Date.now()||!/^[a-f0-9]{64}$/.test(value.planDigest)) throw new Error('Invalid or expired Host generation preview.')
+  for(const item of value.items) if(!['skill','plugin'].includes(item.kind)||!GENERATION_UUID.test(item.itemId)||!['retain','install','update','uninstall'].includes(item.action)||typeof item.enabled!=='boolean')throw Error('Invalid Host plan item.')
+  return value
+}
+function GenerationPanel({t}) {
+  const [phase,setPhase]=useState('idle'),[rows,setRows]=useState([]),[profile,setProfile]=useState(''),[intent,setIntent]=useState(null),[operation,setOperation]=useState(null),[error,setError]=useState('')
+  const mounted=useRef(true), serial=useRef(0), executing=useRef(false)
+  useEffect(()=>()=>{mounted.current=false;serial.current++},[])
+  const post=async(method,body,long=false)=>{
+    const value=await (long?requestLong:request)(`/hub/generation/${method}`,{method:'POST',body:JSON.stringify(body)})
+    if(value?.available!==true) {if(value?.reason==='BASE_VERSION_NOT_ENABLED'){setPhase('base');return null}throw Error('Generation service unavailable')}
+    return value.result
+  }
+  const check=async()=>{
+    const epoch=++serial.current;setPhase('checking');setIntent(null);setError('')
+    try {const value=await post('check',{channel:'stable'});if(!value||!mounted.current||epoch!==serial.current)return
+      setRows(generationSelection(value));setProfile(value.profileId);setOperation(value.operation||null);setPhase(value.operation?.operationId&&!['ACTIVATED','ROLLED_BACK'].includes(value.operation.phase)?'operation':'ready')
+    }catch{if(mounted.current&&epoch===serial.current){setPhase('error');setError(t('generationUnavailable'))}}
+  }
+  useEffect(()=>{void check()},[])
+  useEffect(()=>{
+    if(!operation?.operationId || ['ACTIVATED','ROLLED_BACK'].includes(operation.phase))return
+    const timer=setTimeout(()=>{void post('status',{operationId:operation.operationId}).then(value=>{if(mounted.current&&value)setOperation(value)}).catch(()=>{if(mounted.current)setError(t('generationStatusUnknown'))})},3000)
+    return ()=>clearTimeout(timer)
+  },[operation])
+  const preview=async()=>{
+    const epoch=++serial.current;setPhase('previewing');setIntent(null);setError('')
+    try {const value=await post('preview',{channel:'stable',requested:rows.filter(i=>i.action!=='skip').map(({kind,itemId,action,enabled})=>({kind,itemId,action,enabled}))});if(!value||!mounted.current||epoch!==serial.current)return
+      const checked=generationPreview(value);if(checked.profileId!==profile)throw Error('Profile changed');setIntent(checked);setPhase('confirm')
+    }catch{if(mounted.current&&epoch===serial.current){setPhase('ready');setError(t('generationPreviewFailed'))}}
+  }
+  const execute=async()=>{
+    if(executing.current||!intent)return
+    let valid;try{valid=generationPreview(intent)}catch{setIntent(null);setPhase('ready');setError(t('generationPreviewFailed'));return}
+    executing.current=true;setIntent(null);setPhase('executing');setError('')
+    try {const value=await post('execute',{intentId:valid.intentId,confirmationNonce:valid.confirmationNonce},true);if(!mounted.current||!value)return
+      if(!GENERATION_UUID.test(value.operationId))throw Error('Invalid operation')
+      setOperation(value);setPhase('operation')
+    }catch{if(mounted.current){setPhase('unknown');setError(t('generationStatusUnknown'))}}
+    finally{executing.current=false}
+  }
+  const busy=['checking','previewing','executing'].includes(phase)
+  return h('section',{className:'sm-generation','aria-label':t('generationTitle')},
+    h('h4',null,t('generationTitle')),
+    phase==='base'?h('p',{role:'status'},t('generationBase')):null,
+    phase==='error'?h('p',{role:'alert'},error):null,
+    phase!=='base'&&profile?h('p',null,`${t('generationProfile')}: ${profile}`):null,
+    !['base','idle','checking','error'].includes(phase)?h('div',null,
+      rows.map(item=>h('div',{key:generationKey(item),className:'sm-generation-row'},
+        h('span',null,`${item.displayName||item.itemId} (${item.kind}) ${item.version||''}`),
+        h('select',{'aria-label':`${t('generationAction')} ${item.displayName||item.itemId}`,value:item.action,disabled:busy||phase==='confirm'||phase==='operation'||phase==='unknown',onChange:e=>{const action=e.currentTarget.value;setRows(rows.map(i=>generationKey(i)===generationKey(item)?{...i,action}:i));setIntent(null)}},
+          (item.active?['retain','update',...(!item.required?['uninstall']:[])]:item.required?['install']:['skip','install']).map(action=>h('option',{key:action,value:action},t(`generation_${action}`)))),
+        h('label',null,h('input',{type:'checkbox',checked:item.enabled,disabled:busy||item.required||phase!=='ready',onChange:e=>{const enabled=e.currentTarget.checked;setRows(rows.map(i=>generationKey(i)===generationKey(item)?{...i,enabled}:i));setIntent(null)}}),t('generationEnabled')),
+        item.reason?h('p',null,item.reason):null)),
+      phase==='ready'?h('button',{type:'button',className:'sm-quiet',onClick:()=>void preview()},t('generationPreview')):null):null,
+    intent?h('div',{className:'sm-generation-confirm',role:'region','aria-label':t('generationConfirm')},
+      h('h4',null,t('generationConfirm')),h('p',null,`${t('generationProfile')}: ${intent.profileId}`),h('p',null,`${t('generationExpires')}: ${intent.expiresAt}`),h('p',null,`${t('generationBytes')}: ${intent.totalBytes??'—'}`),
+      intent.items.map((item,index)=>h('article',{key:index},h('strong',null,`${t(`generation_${item.action}`)} · ${item.displayName||item.itemId} · ${item.version||'—'}`),
+        item.accessDeclaration?h('p',null,`${t('hubScripts')}: ${String(item.accessDeclaration.containsScripts)} · ${t('hubFiles')}: ${item.accessDeclaration.fileAccess} · ${t('hubNetwork')}: ${(item.accessDeclaration.networkHosts||[]).join(', ')||t('hubNone')}`):h('p',null,t('generationPermissionsUnknown')))),
+      h('button',{type:'button',className:'sm-primary',disabled:busy,onClick:()=>void execute()},t('generationExecute')),
+      h('button',{type:'button',className:'sm-quiet',onClick:()=>{setIntent(null);setPhase('ready')}},t('cancel'))):null,
+    operation?h('div',{role:'status'},h('p',null,`${operation.operationId} · ${operation.state||''} · ${operation.phase||''}`),operation.errorCode?h('p',null,operation.errorCode):null,operation.restartRequired?h('p',null,t('generationRestart')):null):null,
+    error&&phase!=='error'?h('p',{role:'alert'},error):null,
+    busy?h('p',{role:'status'},t('generationWorking')):null,
+    !busy?h('button',{type:'button',className:'sm-quiet',onClick:()=>void check()},t('refresh')):null)
 }
 
 function SkillManagerPage({ view, t, createSkill, panelInfo }) {
@@ -416,6 +501,7 @@ function SkillManagerPage({ view, t, createSkill, panelInfo }) {
         h('select', { value: hubWorkspaceId, disabled: busy || hubLoading, onChange: event => void selectWorkspace(event.currentTarget.value) },
           hubWorkspaces.map(item => h('option', { key: item.ssoTeam.id, value: item.ssoTeam.id }, `${item.ssoTenant.name} · ${item.ssoTeam.name}`)))) : null,
       h('p', { className: 'sm-hub-hint' }, t('hubHint')),
+      h(GenerationPanel,{t}),
       hubLoading ? h('p', { className: 'sm-refreshing', role: 'status' }, t('hubLoading')) : null,
       hubError ? h('div', { className: 'sm-inline-error', role: 'status' }, hubError,
         hubSsoRequired
@@ -511,6 +597,7 @@ function apply(ctx) {
       .sm-page .sm-row-action{min-height:32px;padding:0 10px;border:1px solid var(--dsw-alias-border-l1);border-radius:6px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font-size:12px;white-space:nowrap}.sm-row-action:hover:not(:disabled){background:var(--dsw-alias-bg-layer-2)}.sm-page .is-danger{color:var(--dsw-alias-state-error-primary)}
       .sm-state{display:grid;justify-items:center;gap:16px;margin:0;padding:40px 16px;color:var(--dsw-alias-label-secondary);font-size:13px;text-align:center}.sm-state p{margin:0}
       .sm-workspace{display:flex;align-items:center;gap:12px;margin-bottom:12px;font-size:13px}.sm-workspace select{max-width:100%;min-height:36px;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;background:var(--dsw-alias-bg-layer-1);color:inherit;padding:0 8px}
+      .sm-generation{margin:12px 0;padding:14px;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;font-size:13px;overflow-wrap:anywhere}.sm-generation h4{margin:0 0 10px}.sm-generation-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 0}.sm-generation-row span{flex:1;min-width:160px}.sm-generation-row select{min-height:32px;background:var(--dsw-alias-bg-layer-1);color:inherit;border:1px solid var(--dsw-alias-border-l1);border-radius:6px}.sm-generation-confirm{margin-top:14px;padding-top:12px;border-top:1px solid var(--dsw-alias-border-l1)}.sm-generation-confirm article{padding:8px 0}.sm-generation button{margin:6px 8px 0 0}
       .sm-hub-hint{margin:0 0 12px;font-size:12px;line-height:1.6;color:var(--dsw-alias-label-secondary)}.sm-hub-group{margin:10px 0 0;padding:8px 8px 0;font-size:12px;font-weight:600;color:var(--dsw-alias-label-secondary)}
       .sm-error,.sm-inline-error{color:var(--dsw-alias-state-error-primary);font-size:13px;line-height:1.6;overflow-wrap:anywhere}.sm-error button,.sm-inline-error button{margin-left:8px}.sm-notice,.sm-refreshing{margin:0;font-size:13px;color:var(--dsw-alias-state-success-primary)}.sm-refreshing{color:var(--dsw-alias-label-secondary)}
       .sm-overlay{position:fixed;inset:0;z-index:60;display:grid;place-items:center;padding:24px;background:color-mix(in srgb,var(--dsw-alias-bg-base) 55%,transparent);backdrop-filter:blur(6px)}
@@ -526,4 +613,4 @@ function apply(ctx) {
   }, 'sensteed-skill-manager: styles')
 }
 
-module.exports = { apply, inject: ['slots', 'locale', 'sessions', 'uiWorkspace', 'workspaces', 'layout'], __test: { request, createSkillConversation } }
+module.exports = { apply, inject: ['slots', 'locale', 'sessions', 'uiWorkspace', 'workspaces', 'layout'], __test: { request, createSkillConversation, generationSelection, generationPreview, GenerationPanel } }
