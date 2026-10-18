@@ -710,6 +710,9 @@ export interface PreparedDesktopProfile {
 
 /** Optional observations emitted before profile preparation can fail. */
 export interface DesktopProfilePreparationHooks {
+  /** Enterprise sources resolve only from this sealed installation, including business bundles. */
+  sealedInstallOnly?: boolean
+
   /** Explicit Profile choice; false also enforces safe-mode exclusion. */
   aaEnabled?: boolean
 
@@ -963,6 +966,7 @@ function loadRecoveryFilteredProfile(
   disabledBundles: ReadonlySet<string>,
   marketProvider: DesktopMarketProvider,
   aaEnabled: boolean,
+  sealedInstallOnly = false,
 ): RecoveryFilteredProfile {
   if (!existsSync(join(profileDir, 'package.json'))) {
     const template = PROFILE_TEMPLATES[profileName]
@@ -977,7 +981,7 @@ function loadRecoveryFilteredProfile(
     && (!Array.isArray(rawBundles) || rawBundles.some(value => typeof value !== 'string'))) {
     throw new Error(`${BIN_NAME}: dsh.profile.bundles must be an array of package names`)
   }
-  const bundles = (rawBundles ?? []) as string[]
+  const bundles = sealedInstallOnly ? [...REQUIRED_BUNDLES] : (rawBundles ?? []) as string[]
   const selectedBundles = bundles.filter(packageName =>
     (aaEnabled || packageName !== AA_PACKAGE_NAME) &&
     packageName !== DESKTOP_MARKET_IDENTITIES.community.packageName
@@ -1011,6 +1015,7 @@ function loadRecoveryFilteredProfile(
       const packageDir = resolveOverlayPackage(packageName, {
         installPackageUrl,
         profilePackageUrl,
+        ...(sealedInstallOnly ? { hostOwnedOnly: true } : {}),
       }).selected.packageDir
       const bundleManifest: unknown = JSON.parse(readFileSync(join(packageDir, 'package.json'), 'utf8'))
       if ((isDshMarket || isAa) && (bundleManifest === null || typeof bundleManifest !== 'object'
@@ -1414,6 +1419,7 @@ export function prepareDesktopProfile(
     disabledBundles,
     marketSelection.requested,
     hooks.aaEnabled === true,
+    hooks.sealedInstallOnly === true,
   )
   // Only the patch document is substitutable: bundle layers, disabled-bundle
   // filtering and Market/AA admission stay launcher-owned even while an edit is
@@ -1460,8 +1466,12 @@ export function prepareDesktopProfile(
     bareModuleBaseUrl,
   )
   const filteredBundles = filterMarketProviderPatches(bundlePatches)
-  const filteredProfile = filterMarketProviderPatches(profile.patches)
-  const filteredHome = filterMarketProviderPatches(homePatches)
+  // User settings may configure existing sealed rows; never replace identities,
+  // insert packages or remove trusted rows through a Profile/home patch.
+  const settingsOnly = (items: readonly PatchOptions[]): PatchOptions[] => items.flatMap(patch =>
+    typeof patch.id === 'string' && patch.config !== undefined ? [{ id: patch.id, config: patch.config }] : [])
+  const filteredProfile = filterMarketProviderPatches(hooks.sealedInstallOnly ? settingsOnly(profile.patches) : profile.patches)
+  const filteredHome = filterMarketProviderPatches(hooks.sealedInstallOnly ? settingsOnly(homePatches) : homePatches)
   const hasProviderConflict = filteredBundles.removedProviderReference
     || filteredProfile.removedProviderReference
     || filteredHome.removedProviderReference
@@ -1894,3 +1904,13 @@ export function desktopInstallAnchor(): string {
 
 /** Preserve the public manifest type in the declaration graph used by plugin tooling. */
 export type DesktopProfileManifest = ProfileManifest
+
+/** Recompose the enterprise fallback from install-owned bundles, retaining settings only. */
+export function prepareSealedDesktopProfile(prepared: PreparedDesktopProfile, profilePatches?: readonly PatchOptions[]): PreparedDesktopProfile {
+  const options = prepared.reloadOptions
+  return prepareDesktopProfile(options.telemetryDisabled, prepared.homeDir, options.platform, options.profileName,
+    options.pluginStatePath, { ...options.marketSelection, requested: 'disabled', effective: 'disabled' }, {
+      sealedInstallOnly: true, aaEnabled: false, generationMode: prepared.mode, lanAddresses: prepared.lanAddresses,
+      ...(profilePatches === undefined ? {} : { profilePatches }),
+    })
+}

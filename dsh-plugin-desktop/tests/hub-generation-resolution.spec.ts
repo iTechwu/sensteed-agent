@@ -86,6 +86,17 @@ describe('exact managed package selection', () => {
     expect(() => reopenHubGenerationBoot(reference, store.identity, join(root, 'other'))).toThrow('boot reference')
     expect(() => reopenHubGenerationBoot({ ...reference, generationId: 'stale' }, store.identity, logical)).toThrow('boot reference')
   })
+  it('uses only install business fallback when no signed override exists, rejecting newer unsigned copies', async () => {
+    const { options, root } = await fixture('1.0.0')
+    const unsigned = join(root, 'unsigned'); mkdirSync(join(unsigned, 'node_modules/extension'), { recursive: true })
+    writeFileSync(join(unsigned, 'package.json'), '{}')
+    writeFileSync(join(unsigned, 'node_modules/extension/package.json'), '{"name":"extension","version":"99.0.0"}')
+    const { managedSelection: _unused, ...base } = options
+    const sealed = { ...base, profilePackageUrl: pathToFileURL(join(unsigned, 'package.json')).href, hostOwnedOnly: true }
+    expect(findOverlayPackage('extension', sealed)?.selected).toMatchObject({ source: 'install', version: '9.0.0' })
+    rmSync(join(root, 'install/node_modules/extension'), { recursive: true })
+    expect(findOverlayPackage('extension', sealed)).toBeUndefined()
+  })
   it('keeps ordinary Profile version selection unchanged', async () => {
     const { options } = await fixture('1.0.0')
     const { managedSelection: _unused, ...ordinary } = options

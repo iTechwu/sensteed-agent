@@ -36,11 +36,13 @@ describe('Hub generation local loaded health', () => {
   })
   it('reconstructs the real Host boot patch and rejects collisions before loading', async () => {
     const f = await fixture(), reference = hubGenerationBootReference(f.store, f.profile)
-    const boot = prepareHubHostBoot({ reference, expectedIdentity: f.store.identity, skillProviderName: 'hub-g1' }, f.profile, ['desktop-shell'])
+    const boot = prepareHubHostBoot({ reference, expectedIdentity: f.store.identity, skillProviderName: 'hub-g1' }, f.profile, [{ insert: [{ id: 'desktop-shell', name: 'dsh-plugin-desktop' }] }])
     expect(boot.patch.insert[0]?.name).toBe('example')
     expect(boot.generationId).toBe('g1')
+    const overriding = prepareHubHostBoot({ reference, expectedIdentity: f.store.identity, skillProviderName: 'hub-g1' }, f.profile, [{ insert: [{ id: 'old-host', name: 'example' }, { id: 'old-client', name: 'example/client' }, { id: 'other', name: 'other' }] }])
+    expect(overriding.patches[0]?.insert?.map(row => row.id)).toEqual(['other', 'example'])
     expect(() => prepareHubHostBoot({ reference, expectedIdentity: f.store.identity, skillProviderName: 'hub-other' }, f.profile, [])).toThrow('provider identity')
-    expect(() => prepareHubHostBoot({ reference, expectedIdentity: f.store.identity, skillProviderName: 'hub-g1' }, f.profile, ['example'])).toThrow('collides')
+    expect(() => prepareHubHostBoot({ reference, expectedIdentity: f.store.identity, skillProviderName: 'hub-g1' }, f.profile, [{ insert: [{ id: 'example', name: 'unrelated' }] }])).toThrow('collides')
   })
   it('does not treat boot success, missing modules or the wrong skill provider as health', async () => {
     const f = await fixture()

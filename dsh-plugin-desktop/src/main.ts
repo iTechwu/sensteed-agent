@@ -35,7 +35,6 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   boot,
-  composeEntries,
   createRuntimeResolution,
   installFailLoud,
   loadLayeredEnv,
@@ -163,7 +162,7 @@ import { DesktopStartupGeneration } from './startup-generation.ts'
 import {
   desktopInstallAnchor,
   healDesktopProfileModuleFallback,
-  prepareDesktopProfile,
+  prepareDesktopProfile, prepareSealedDesktopProfile,
   type SkippedOptionalEntry,
 } from './profile.ts'
 import { DesktopProfileCheckpoint } from './profile-checkpoint.ts'
@@ -1805,11 +1804,11 @@ async function start(): Promise<void> {
       throw new Error(`${BIN_NAME}: active Profile preferences were not initialized`)
     }
     hubBoot = prepared.hubGeneration === undefined ? undefined : prepareHubHostBoot(prepared.hubGeneration, prepared.profile.dir,
-      [...composeEntries([prepared.patches])].map(entry => entry.id))
+      prepared.patches)
     const hubRuntimeTarget=await readHubRuntimeTarget({isPackaged:app.isPackaged,appPath:app.getAppPath(),resourcesPath:process.resourcesPath,sensteedVersion:appVersion})
-    if(hubRuntimeTarget!==undefined){const{hubGeneration:_untrustedBoot,...base}=prepared;prepared={...base,patches:hubBaseComposition(prepared.patches)};hubBoot=undefined}
-    const hostPatches = hubBoot === undefined ? prepared.patches : [...prepared.patches, hubBoot.patch]
-    const profileBoot = createDesktopProfileBoot(prepared, desktopPnpmBootstrap, hubBoot?.selection, hubBoot === undefined ? [] : [hubBoot.patch],hubRuntimeTarget===undefined?undefined:hubBaseComposition,hubRuntimeTarget!==undefined)
+    if(hubRuntimeTarget!==undefined){prepared=prepareSealedDesktopProfile(prepared);prepared.patches=hubBaseComposition(prepared.patches);hubBoot=undefined}
+    const hostPatches = hubBoot === undefined ? prepared.patches : hubBoot.patches
+    const profileBoot = createDesktopProfileBoot(prepared, desktopPnpmBootstrap, hubBoot?.selection, hubBoot === undefined ? [] : [hubBoot.patch],hubRuntimeTarget===undefined?undefined:hubBaseComposition,hubRuntimeTarget!==undefined,hubBoot?.compose)
     const hubSupervisor=new HubHostSupervisor()
     generation.bindHost({fiber:{dispose:()=>hubSupervisor.dispose()}})
     const hubBasePrepared=prepared
@@ -1861,14 +1860,19 @@ async function start(): Promise<void> {
         const record=new HubExecutionJournal(store).read(),state=store.readState()
         if(!record||record.operationId!==request.operationId||record.phase!=='STAGED'||record.pendingReceipt!==null||state.phase!=='prepared'||state.pending?.descriptorDigest!==record.descriptorDigest)throw new Error('Hub staged restart mismatch')
         inspectSavedHubPlan(record,request.identity,hubRuntimeTarget,readSealedHubReleaseTrust())
-        await hubSupervisor.replace(async()=>{hubBoot=undefined;await store.activate()},async bind=>{await bootIsolatedHost(hubBasePrepared,bind)})
+        try {
+          await hubSupervisor.replace(async()=>{hubBoot=undefined;await store.activate()},async bind=>{await bootIsolatedHost(hubBasePrepared,bind)})
+        } catch (cause) {
+          await hubSupervisor.replace(async()=>{if(store.readState().phase==='verifying')await store.rollback()},async bind=>{await bootIsolatedHost(hubBasePrepared,bind)})
+          throw cause
+        }
       }else{
         const journal=new HubExecutionJournal(store),pendingRecord=journal.read(),active=store.readState().active,record=pendingRecord?.descriptorDigest===active?.descriptorDigest?pendingRecord:journal.readHealthyInventory()
         if(!record||record.generationDigest!==request.generationDigest||record.phase!=='COMMITTED'&&record.phase!=='ACTIVATED')throw new Error('Hub managed restart mismatch')
         verifyHubBootAuthorization(request.lease,readSealedHubReleaseTrust(),{...request.identity,target:hubRuntimeTarget,generationDigest:request.generationDigest,minimumPolicyRevision:inspectSavedHubPlan(record,request.identity,hubRuntimeTarget,readSealedHubReleaseTrust()).plan.policyRevision})
         const reference=hubGenerationBootReference(store,prepared.profile.dir),input={reference,expectedIdentity:request.identity,skillProviderName:`hub-${reference.generationId}`}
-        hubBoot=prepareHubHostBoot(input,prepared.profile.dir,[...composeEntries([hubBasePrepared.patches])].map(row=>row.id))
         try{
+        hubBoot=prepareHubHostBoot(input,prepared.profile.dir,hubBasePrepared.patches)
         await hubSupervisor.replace(async()=>{},async bind=>{await bootIsolatedHost({...hubBasePrepared,hubGeneration:input},bind)})
         if(!inspectHubHealth)throw new Error('Hub managed health unavailable')
         const evidence=await inspectHubHealth()

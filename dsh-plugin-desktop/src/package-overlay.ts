@@ -34,8 +34,9 @@ export interface PackageOverlayOptions {
   readonly installPackageUrl: string
   /** File URL for the active Profile package.json. */
   readonly profilePackageUrl: string
-  /** Store-issued exact generation authority; omitted for existing ordinary Profiles. */
+  /** Enterprise policy: unlisted packages resolve only from the sealed install, including business fallback. */
   readonly hostOwnedOnly?: boolean
+  /** Store-issued exact generation authority; omitted for existing ordinary Profiles. */
   readonly managedSelection?: HubManagedPackageSelection
 }
 
@@ -179,6 +180,8 @@ export function findOverlayPackage(
     }
   }
   const install = readCandidate(packageName, options.installPackageUrl, 'install')
+  // Enterprise fallback includes sealed business packages, never unsigned Profile copies.
+  if (options.hostOwnedOnly === true) return install === undefined ? undefined : { packageName, selected: install, install }
   let profile: PackageOverlayCandidate | undefined
   try {
     profile = readCandidate(packageName, options.profilePackageUrl, 'profile')

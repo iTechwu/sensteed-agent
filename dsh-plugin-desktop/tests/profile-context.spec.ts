@@ -7,8 +7,9 @@ import { Context } from '@deepseek-ai/cordis'
 import { composeEntries, initProfile, PROFILE_TEMPLATES, prepareProfileEntries, readProfilePatches } from '@deepseek-ai/dsh-app-boot'
 import { installProfilePackageResolver } from '../src/module-resolution.ts'
 import { afterEach, expect, it, vi } from 'vitest'
+import { hubBaseComposition, hubOverlayComposition } from '../src/hub-base-composition.ts'
 import { createDesktopProfileBoot } from '../src/profile-context.ts'
-import { prepareDesktopProfile } from '../src/profile.ts'
+import { prepareDesktopProfile, prepareSealedDesktopProfile } from '../src/profile.ts'
 
 const homes: string[] = []
 const contexts: Context[] = []
@@ -143,4 +144,40 @@ it('checks the selected artifact while still denying incompatible active Profile
     name: 'incompatible-plugin', version: '1.0.0', peerDependencies: { '@deepseek-ai/dsh-llm': '0.1.5-rc.2' },
   }))
   expect(prepareProfileEntries(ctx, [{ id: 'incompatible', name: 'incompatible-plugin' }], base)[0]?.disabled).toBe(true)
+})
+
+
+it('rebuilds enterprise fallback from sealed bundles and blocks Profile/home row injection during HMR', () => {
+  const { prepared, pnpm, home } = fixture()
+  writeFileSync(prepared.profile.patchPath, JSON.stringify([
+    { insert: [{ id: 'forged-finance', name: '@dofe/dsh-sensteed-finance' }, { id: 'forged-core', name: '@deepseek-ai/dsh-tools' }] },
+    { id: 'dofe-sensteed-finance', name: 'unsigned-replacement', disabled: true },
+    { id: 'desktop-shell', config: { port: 9998 } },
+  ]))
+  writeFileSync(join(home, 'cordis.patch.yml'), JSON.stringify([{ insert: [{ id: 'env-plugin', name: 'arbitrary' }] }]))
+  const sealed = prepareSealedDesktopProfile(prepared)
+  const ctx = new Context(); contexts.push(ctx)
+  createDesktopProfileBoot(sealed, pnpm, undefined, [], patches => patches, true).prepare(ctx)
+  const read = () => composeEntries([readProfilePatches('enterprise', ctx.profileContext)])
+  for (const rows of [composeEntries([sealed.patches]), read()]) {
+    expect(rows.some(row => ['forged-finance', 'forged-core', 'env-plugin'].includes(row.id))).toBe(false)
+    expect(rows.find(row => row.id === 'dofe-sensteed-finance')).toMatchObject({ name: '@dofe/dsh-sensteed-finance' })
+    expect(rows.find(row => row.id === 'desktop-shell')?.config).toMatchObject({ port: 9998 })
+  }
+  expect(sealed.market.effective).toBe('disabled')
+  expect(sealed.profile.layers.every(layer => !layer.packageDir.startsWith(prepared.profile.dir))).toBe(true)
+})
+
+
+it('keeps exactly one managed plugin row after repeated enterprise settings reloads', () => {
+  const { prepared, pnpm } = fixture()
+  const ctx = new Context(); contexts.push(ctx)
+  const patch = { insert: [{ id: 'hub-finance', name: '@dofe/dsh-sensteed-finance', config: {} }] }
+  createDesktopProfileBoot(prepareSealedDesktopProfile(prepared), pnpm, undefined, [patch], hubBaseComposition, true, base => hubOverlayComposition(base, patch)).prepare(ctx)
+  for (let iteration = 0; iteration < 3; iteration++) {
+    writeFileSync(prepared.profile.patchPath, JSON.stringify([{ insert: [{ id: `resurrected-${iteration}`, name: '@dofe/dsh-sensteed-finance/client' }] }]))
+    const rows = composeEntries([readProfilePatches('enterprise', ctx.profileContext)])
+    expect(rows.filter(row => row.name.startsWith('@dofe/dsh-sensteed-finance'))).toEqual(patch.insert)
+    expect(rows.some(row => row.name === '@deepseek-ai/dsh-plugin-manager')).toBe(false)
+  }
 })

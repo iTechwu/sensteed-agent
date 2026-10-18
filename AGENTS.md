@@ -26,7 +26,7 @@ This repository owns the desktop product around an unmodified DeepSeek Harness c
 
 - `../deepseek-harness/` is the user's own DeepSeek Harness fork (a sibling checkout, not vendored). Local-use behaviors land as ordinary fork commits on `dev`; the desktop repository never edits the fork from a desktop feature branch.
 - `dsh-plugin-desktop/` owns the Cordis Host and Client faces, Electron bootstrap, packaging, and release tests.
-- The sealed product `dofe-host-auth` row owns the SSO credential lifetime and shared access-settings document before Hub composition. `dofe-auth-routes` exposes only the private login endpoints. `dofe-managed` consumes this same service; it must not create a second auth instance or make base-only startup load business MCP clients.
+- The sealed product `dofe-host-auth` row owns the SSO credential lifetime and shared access-settings document before Hub composition. `dofe-auth-routes` exposes only the private login endpoints. `dofe-managed` consumes this same service; it must not create a second auth instance or bypass the authenticated transport boundary for bundled or Hub business plugins.
 - `dsh-desktop-next/` owns the separate experimental Desktop shell, Profiles and recovery, and adapters for the existing AA bridge and Community Market. Next-only changes do not belong in the Stable/Beta variant mirror. Keep its upstream reference and published runtime versions aligned; do not fork the official main frontend.
 - `dsh-community-fabric/` owns the community interoperability RFC. Until schemas and a reviewed reference adapter exist, it remains a private documentation scaffold and must not declare loadable DSH or package entry points.
 - `dsh-community-market/` owns the community-market shell. Until its runtime is implemented, it remains a private documentation scaffold and must not declare loadable DSH or package entry points.
@@ -50,7 +50,8 @@ This repository owns the desktop product around an unmodified DeepSeek Harness c
 ## 企业 Hub 唯一分发边界
 
 - 仅 packaged Sensteed 的 sealed target 启用企业 Hub 模式；开发态及其他品牌保留原行为。L0/core 始终从当前 sealed install 解析，禁止旧 Profile 中更高版本覆盖核心。
-- 企业普通启动先 base-only：企业 filesystem roots 为空；managed Host 只读取已签名、经授权、实际健康验收的 Hub generation。旧 bundled/env/customSkillDirs 不得进入企业技能来源，HMR 同样执行 base source policy。
+- 企业启动从当前 sealed install 重建核心与业务内置组合，保留 bundled 插件/技能作为离线回退；禁止从旧 Profile、env/customSkillDirs 或用户自选 bundle 引入企业内容。已签名、经授权的 Profile generation 按精确包身份整体覆盖相同内置插件的全部 Host/Client 子路径与资源，HMR 执行同一合成规则，禁止双版本并载。技能由 Host 密封根策略挂载，Hub 同名技能优先于 sealed bundled，其余内置技能继续可用。
+- App 构建和打包不访问 Hub；本地安装后由 Agent/内置更新器访问固定 Hub API 初始化和更新。候选内容只在确认重启后切换，失败恢复上一健康代际，无可用健康覆盖时回退当前安装原件。离线授权只可恢复已健康内容，不可授权新安装。
 - 企业模式不挂 native npm plugin-manager Host/tools 与安装页面，仍保留核心设置和只读 inventory。业务安装、更新、回滚、重启只走 L0 Hub manager；不得为了恢复旧 npm UI 绕过授权。
 - 个人技能显式入口为当前 Desktop home 的 `skills/`，provider/source 均为 `user-local`，调用名 `user-local-<原名>`。该保留命名空间不属于企业签名技能；两类技能不得互相覆盖。不要将仅保留磁盘文件称为用户技能可用。
 - `dofe-host-capabilities` 只拥有受认证的公共 MCP transport/权限门禁，不预注册业务路由；Hub 插件通过 `ctx.hubMcp` 声明相对路径，不得携带 URL、headers、tenant 或凭据。

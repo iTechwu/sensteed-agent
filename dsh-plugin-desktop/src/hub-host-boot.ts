@@ -5,6 +5,8 @@ import { hubGenerationPatch, inspectHubGenerationLoaded, type HubLoaderObservati
 import { managedProfilePackageUrls } from './module-resolution.ts'
 import { pathToFileURL } from 'node:url'
 import { join } from 'node:path'
+import type { PatchOptions } from '@deepseek-ai/cordis-plugin-include'
+import { hubOverlayComposition } from './hub-base-composition.ts'
 
 export interface HubGenerationHostHealth {
   readonly generationId: string
@@ -19,14 +21,15 @@ export interface HubTrustedHostBootInput {
   /** Host provider identity established by trusted roots policy, never a renderer field. */
   readonly skillProviderName: string
 }
-export function prepareHubHostBoot(input: HubTrustedHostBootInput, logicalProfileDirectory: string, existingEntryIds: readonly string[]) {
+export function prepareHubHostBoot(input: HubTrustedHostBootInput, logicalProfileDirectory: string, basePatches: readonly PatchOptions[]) {
   if (input.skillProviderName !== `hub-${input.reference.generationId}`) throw new Error('Invalid Hub skill provider identity')
   const boot = reopenHubGenerationBoot(input.reference, input.expectedIdentity, logicalProfileDirectory)
   const store = new HubGenerationStore(input.reference.root, input.expectedIdentity)
   const patch = hubGenerationPatch(store)
-  if (patch.insert.some(entry => existingEntryIds.includes(entry.id))) throw new Error('Hub composition collides with existing entry')
+  const compose = (base: readonly PatchOptions[]) => hubOverlayComposition(base, patch)
+  const patches = compose(basePatches)
   return {
-    ...boot, store, patch, skillProviderName: input.skillProviderName,
+    ...boot, store, patch, patches, compose, skillProviderName: input.skillProviderName,
     async inspectLoaded(loader: HubLoaderObservation, skills: HubSkillObservation, providerName: string) {
       return await inspectHubGenerationLoaded(store, boot.selection, logicalProfileDirectory, loader, skills, providerName,
         name => managedProfilePackageUrls(pathToFileURL(join(logicalProfileDirectory, 'package.json')).href, boot.selection, name))
