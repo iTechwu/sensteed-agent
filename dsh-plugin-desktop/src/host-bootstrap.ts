@@ -2,6 +2,7 @@
 import type { HubSkillObservation } from './hub-generation-health.ts'
 import { prepareHubHostBoot, type HubTrustedHostBootInput } from './hub-host-boot.ts'
 import { registerHubHostService } from './hub-host-service.ts'
+import { registerHubGenerationManager } from './hub-generation-manager.ts'
 import { registerHubSkillRoots } from './hub-skill-roots.ts'
 import { boot, composeEntries, resolveProfileDir } from '@deepseek-ai/dsh-app-boot'
 import { provideCmdline } from '@deepseek-ai/dsh-cmdline'
@@ -44,6 +45,8 @@ function desktopProfileMarketSnapshot(market: DesktopMarketProvider): DesktopMar
 }
 
 export interface DesktopHostOptions {
+  /** Actual sealed-base target selected by the launcher, never Profile or renderer input. */
+  hubRuntimeTarget?: import('./hub-sync-verifier.ts').HubSyncTarget
   /** Launcher supplies only after independent execution authorization; never a renderer input. */
   hubGeneration?: HubTrustedHostBootInput
   prepared: PreparedDesktopProfile
@@ -150,6 +153,7 @@ export async function bootDesktopHost(options: DesktopHostOptions, runtime: Desk
         // profile-overlay resolver used by packaged Electron.
         hostCtx.loader.internal = undefined
         registerHubHostService(hostCtx)
+        if(options.hubRuntimeTarget!==undefined)registerHubGenerationManager(hostCtx,{target:options.hubRuntimeTarget,userData:marketUserDataDir,profileDirectory:prepared.profile.dir})
         bindHost(hostCtx)
         hostCtx.effect(() => () => logSink.close(), 'dsh-plugin-desktop: Host log sink')
         hostCtx.effect(

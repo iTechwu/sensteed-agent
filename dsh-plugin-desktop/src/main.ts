@@ -9,6 +9,8 @@
 
 import { prepareHubHostBoot } from './hub-host-boot.ts'
 import { registerHubHostService } from './hub-host-service.ts'
+import { readHubRuntimeTarget } from './hub-runtime-target.ts'
+import { registerHubGenerationManager } from './hub-generation-manager.ts'
 import { registerHubSkillRoots } from './hub-skill-roots.ts'
 import { formatUnexpectedHostExit, startIsolatedDesktopHost } from './host-process.ts'
 import * as desktopOffice from './desktop-office.ts'
@@ -1794,13 +1796,14 @@ async function start(): Promise<void> {
     }
     hubBoot = prepared.hubGeneration === undefined ? undefined : prepareHubHostBoot(prepared.hubGeneration, prepared.profile.dir,
       [...composeEntries([prepared.patches])].map(entry => entry.id))
+    const hubRuntimeTarget=await readHubRuntimeTarget({isPackaged:app.isPackaged,appPath:app.getAppPath(),resourcesPath:process.resourcesPath,sensteedVersion:appVersion})
     const hostPatches = hubBoot === undefined ? prepared.patches : [...prepared.patches, hubBoot.patch]
     const profileBoot = createDesktopProfileBoot(prepared, desktopPnpmBootstrap, hubBoot?.selection, hubBoot === undefined ? [] : [hubBoot.patch])
     if (process.env.DSH_DESKTOP_ISOLATED_HOST !== '0') {
       startupStage = 'host-boot'
       lifecycleRecorder.transitionStartupStage(startupStage)
       await startIsolatedDesktopHost({
-        host: { prepared, profilePreferences, homeDir, activeProfileName, pluginManagementStatePath,
+        host: { ...(hubRuntimeTarget===undefined?{}:{hubRuntimeTarget}), prepared, profilePreferences, homeDir, activeProfileName, pluginManagementStatePath,
           selectionStatePath, marketUserDataDir, releaseUserDataLocations, desktopLaunchEnvironment,
           desktopProxyOverlay: proxyResolution.overlay,
           desktopPnpmBootstrap, primaryRuntime, logDirectory: join(desktopUserDataDir, 'logs', 'host') },
@@ -1882,6 +1885,7 @@ async function start(): Promise<void> {
           // profile-overlay resolver used by packaged Electron.
           hostCtx.loader.internal = undefined
           registerHubHostService(hostCtx)
+          if(hubRuntimeTarget!==undefined)registerHubGenerationManager(hostCtx,{target:hubRuntimeTarget,userData:marketUserDataDir,profileDirectory:prepared.profile.dir})
           if (hubBoot !== undefined) {
             const managedBoot = hubBoot
             registerHubSkillRoots(hostCtx, managedBoot)
