@@ -4,6 +4,9 @@ import { HUB_GENERATION_ORIGIN } from './hub-generation-store.ts'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024
+type HubRequestPath = '/skillhub/v1/me' | '/skillhub/v1/devices/bind' | '/skillhub/v1/sync/resolve'
+  | '/skillhub/v1/generations/plans' | '/skillhub/v1/generations/installation-reports'
+  | `/skillhub/v1/generations/plans/${string}/${'authorize' | 'consume' | 'consume-status'}`
 export interface HubSsoSession { readonly accessToken: string; readonly tenantId: string; readonly operator: string }
 /** Structural L0 SSO seam; no product or extension runtime imports and no second refresh-token writer. */
 export interface HubSsoSource {
@@ -68,7 +71,7 @@ export class HubHostClient {
     const current = this.current()
     if (current.revision !== context.revision || current.session.operator !== context.actorRef) fail('HUB_CONTEXT_CHANGED')
   }
-  private async request(path: '/skillhub/v1/me' | '/skillhub/v1/devices/bind' | '/skillhub/v1/sync/resolve', workspaceId?: string, body?: object): Promise<{ data: Record<string, unknown>; revision: number; actorRef: string }> {
+  private async request(path: HubRequestPath, workspaceId?: string, body?: object, idempotencyKey?: string): Promise<{ data: Record<string, unknown>; revision: number; actorRef: string }> {
     const current = this.current(), cancellation = this.controller.signal
     let response: Response
     try {
@@ -77,7 +80,8 @@ export class HubHostClient {
         signal: AbortSignal.any([cancellation, AbortSignal.timeout(15_000)]),
         headers: { accept: 'application/json', authorization: `Bearer ${current.session.accessToken}`,
           ...(workspaceId === undefined ? {} : { 'x-current-tenant': workspaceId }),
-          ...(body === undefined ? {} : { 'content-type': 'application/json' }) },
+          ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+          ...(idempotencyKey === undefined ? {} : { 'idempotency-key': idempotencyKey }) },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       })
     } catch { if (cancellation.aborted) fail('HUB_CONTEXT_CHANGED'); fail('HUB_UNAVAILABLE') }
@@ -85,7 +89,7 @@ export class HubHostClient {
     if (response.status === 403) fail('HUB_ACCESS_DENIED')
     if (!response.ok) fail('HUB_UNAVAILABLE')
     const envelope = object(await responseJson(response)), data = object(envelope.data)
-    if (envelope.code !== 200) fail('HUB_INVALID_RESPONSE')
+    if (envelope.code !== 200 && envelope.code !== 201) fail('HUB_INVALID_RESPONSE')
     const latest = this.current()
     if (current.revision !== latest.revision || cancellation.aborted) fail('HUB_CONTEXT_CHANGED')
     return { data, revision: current.revision, actorRef: current.session.operator }
@@ -119,6 +123,26 @@ export class HubHostClient {
     })
     this.assertCurrent(context)
     return verifyHubSyncSnapshot(result.data, trust, expected)
+  }
+  /** Host-only wire transport. Replies are untrusted until the execution verifier validates them. */
+  async generationRequest(context: HubHostContext, operation:
+    | { readonly kind: 'prepare'; readonly idempotencyKey: string; readonly body: object }
+    | { readonly kind: 'authorize' | 'consume' | 'consume-status'; readonly planId: string; readonly body: object }
+    | { readonly kind: 'receipt'; readonly body: object }): Promise<unknown> {
+    this.assertCurrent(context)
+    let path: HubRequestPath
+    if (operation.kind === 'prepare') {
+      if (!UUID.test(operation.idempotencyKey)) fail('HUB_INVALID_REQUEST')
+      path = '/skillhub/v1/generations/plans'
+    } else if (operation.kind === 'receipt') path = '/skillhub/v1/generations/installation-reports'
+    else {
+      if (!UUID.test(operation.planId)) fail('HUB_INVALID_REQUEST')
+      path = `/skillhub/v1/generations/plans/${operation.planId}/${operation.kind}`
+    }
+    const result = await this.request(path, context.workspaceId, operation.body,
+      operation.kind === 'prepare' ? operation.idempotencyKey : undefined)
+    this.assertCurrent(context)
+    return result.data
   }
   /** Changing workspace invalidates pending operations; caller must resolve a fresh context. */
   async selectWorkspace(workspaceId: string): Promise<HubHostContext> {
