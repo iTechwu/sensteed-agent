@@ -47,7 +47,7 @@ it('materializes an authorized signed skill into one sealed descriptor and never
   expect(store.readState().phase).toBe('prepared');expect(store.readState().active).toBeNull()
  }finally{rmSync(root,{recursive:true,force:true})}
 })
-it('materializes a signed pure plugin with exact tar files and safe self activation',async()=>{
+it.each([true,false])('materializes only signed pure plugins for the exact target (matching=%s)',async matching=>{
  const f=fixture(),keys=generateKeyPairSync('ed25519'),item=f.plan.items[0]!,pkg=Buffer.from('{"name":"example-plugin","version":"1.0.0","main":"index.js"}'),source=Buffer.from('export default function apply() {}')
  const contents={'package.json':pkg,'index.js':source},files=Object.entries(contents).map(([path,b])=>({path,bytes:b.length,sha256:createHash('sha256').update(b).digest('hex')})).sort((a,b)=>a.path<b.path?-1:1)
  const tarParts:Buffer[]=[]
@@ -56,7 +56,7 @@ it('materializes a signed pure plugin with exact tar files and safe self activat
  }
  const archive=(await import('node:zlib')).gzipSync(Buffer.concat([...tarParts,Buffer.alloc(1024)])),sha256=createHash('sha256').update(archive).digest('hex'),sri=`sha512-${createHash('sha512').update(archive).digest('base64')}`,fileDigest=hubSyncDigest(files)
  const node={nodeId:'',name:'example-plugin',version:'1.0.0',sha256,sri,bytes:archive.length,fileManifestDigest:fileDigest,origin:'upload',registryId:'test',engines:{},os:[],cpu:[],libc:[],peerContext:{},hostProvided:false,lockedResolved:null}
- const target={os:'darwin',cpu:'arm64',libc:null,nodeVersion:'22.0.0',sensteedVersion:'1.0.0',cordisVersion:'4.0.5',harnessVersion:'1.0.0'}
+ const target={os:'darwin',cpu:matching?'arm64':'x64',libc:null,nodeVersion:'22.0.0',sensteedVersion:'1.0.0',cordisVersion:'4.0.5',harnessVersion:'1.0.0'}
  const graph={schemaVersion:'plugin-lock-v1',rootNodeId:'',sourceLockDigest:'a'.repeat(64),target,nodes:[node],edges:[],hostRequirements:[]}
  const packSetDigest=hubSyncDigest([{nodeId:node.nodeId,name:node.name,version:node.version,sha256,sri,bytes:node.bytes,fileManifestDigest:fileDigest}]),artifactRef=randomUUID()
  const manifest={sourceLockGraphDigest:'a'.repeat(64),packSetDigest,schemaVersion:'2.0',kind:'plugin',tenantId:f.plan.tenantId,pluginId:item.itemId,releaseId:item.releaseId,npmPackageName:'example-plugin',exactVersion:'1.0.0',frozenInputDigest:'a'.repeat(64),reviewDigest:'b'.repeat(64),tarballDigest:sha256,sri,lockGraphDigest:hubSyncDigest(graph),graph,artifacts:[{nodeId:'',artifactRef,contentPath:`/plugins/api/skillhub/v1/plugins/artifacts/${artifactRef}/content`,sha256,sri,bytes:archive.length,fileManifestDigest:fileDigest}],root:{name:node.name,version:node.version,sha256,sri,bytes:archive.length,expandedBytes:pkg.length+source.length,files,fileManifestDigest:fileDigest,hostEntry:'index.js',clientEntry:null,bundlePatch:null,capabilities:[],capabilityIds:[]},accessDeclaration:{containsScripts:false,networkHosts:[],fileAccess:'none'},compatibility:{sensteed:'*',testedTargets:[]},issuedAt:new Date().toISOString()}
@@ -67,7 +67,9 @@ it('materializes a signed pure plugin with exact tar files and safe self activat
  try{
   const store=new HubGenerationStore(root,{origin:plan.origin,tenantId:plan.tenantId,actorRef:plan.actorRef,deviceId:plan.deviceId,profileId:plan.profileId})
   const envelope={manifest,signature:{algorithm:'Ed25519',canonicalization:'RFC8785',keyId:'artifact',payloadDigest:hubSyncDigest(manifest),signature:sign(null,Buffer.from(hubCanonicalJson(manifest)),keys.privateKey).toString('base64')}}
-  const descriptor=await materializeHubGeneration({store,generationId:'g1',plan:generationPlanData(cap),proof,downloads:{manifests:[{kind:'plugin',itemId:item.itemId,envelope}],descriptors:[{downloadId:randomUUID(),kind:'plugin',itemId:item.itemId,nodeId:'',artifactDigest:sha256,bytes:archive.length,contentType:'application/gzip',role:'primary'}]},trust:{schemaVersion:1,keys:{artifact:keys.publicKey.export({type:'spki',format:'der'}).toString('base64')},revokedKeyIds:[]},client:{generationBytes:async()=>archive} as never,context})
+  const materializing=materializeHubGeneration({store,generationId:'g1',plan:generationPlanData(cap),proof,downloads:{manifests:[{kind:'plugin',itemId:item.itemId,envelope}],descriptors:[{downloadId:randomUUID(),kind:'plugin',itemId:item.itemId,nodeId:'',artifactDigest:sha256,bytes:archive.length,contentType:'application/gzip',role:'primary'}]},trust:{schemaVersion:1,keys:{artifact:keys.publicKey.export({type:'spki',format:'der'}).toString('base64')},revokedKeyIds:[]},client:{generationBytes:async()=>archive} as never,context})
+  if(!matching){await expect(materializing).rejects.toThrow('target mismatch');return}
+  const descriptor=await materializing
   expect(descriptor.verifiedComposition?.entries).toEqual([{id:`hub-${item.itemId}`,packageName:'example-plugin',config:{}}]);await store.prepare(descriptor)
   expect(readFileSync(join(store.generationDirectory('g1'),'profile/node_modules/example-plugin/index.js'))).toEqual(source)
  }finally{rmSync(root,{recursive:true,force:true})}

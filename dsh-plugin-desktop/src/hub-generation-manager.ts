@@ -82,7 +82,9 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
     return result
    },
   }
-  async function resume(){
+  let recovery:Promise<void>|undefined
+  function resume():Promise<void>{if(recovery)return recovery;const pending=resumeOnce();recovery=pending;void pending.finally(()=>{if(recovery===pending)recovery=undefined}).catch(()=>{});return pending}
+  async function resumeOnce(){
    const context=await client.context(),identity=await resolveHubHostIdentity(options.userData,options.profileDirectory,client,context),store=new HubGenerationStore(options.userData,identity),journal=new HubExecutionJournal(store)
    let record=journal.read();if(!record)return
    const active=store.readState().active
