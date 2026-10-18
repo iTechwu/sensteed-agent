@@ -63,14 +63,17 @@ let mounted
 let mountedSpec
 let releasePackageResolver
 let pnpmRuntime
+const originalFetch = globalThis.fetch
+let authNetworkAttempts = 0
 const runnerEnvironment = Object.entries(process.env)
   .filter(([key]) => RUNNER_ENVIRONMENT_NAMES.has(key.toUpperCase()))
 
 try {
+  globalThis.fetch = async () => { throw new Error('Loader smoke forbids outbound network') }
   for (const [key] of runnerEnvironment) delete process.env[key]
   const launchEnvironment = createLaunchEnvironmentSnapshot([{
     source: 'process',
-    values: { ...process.env },
+    values: { ...(process.env.PATH === undefined ? {} : { PATH: process.env.PATH }) },
   }])
   const launchPath = launchEnvironment.get('PATH')?.value
   const packageRoot = new URL('../', import.meta.url)
@@ -139,6 +142,7 @@ try {
 
   const runtime = {
     platform: 'darwin',
+    async requestDofeAuth() { authNetworkAttempts++; throw new Error('Empty-session auth must not request network') },
     updates: { currentVersion: PRODUCT_VERSION },
     schedule(spec) {
       mountedSpec = spec
@@ -159,7 +163,12 @@ try {
     BIN_NAME,
     prepared.rootConfig,
     [{ insert: [
-      // sensteed builds: desktop-shell injects 'dofeAuth', which this plugin provides.
+      { id: 'smoke-credentials', name: '@deepseek-ai/dsh-credentials-local', config: { path: join(home, '.credentials.yaml'), watch: false } },
+      { id: 'smoke-config-editor', name: '@deepseek-ai/dsh-config-editor' },
+      { id: 'smoke-settings', name: '@deepseek-ai/dsh-settings' },
+      // Identity belongs to the actual L0 service, independently from business composition.
+      { id: 'dofe-host-auth', name: '@dofe/dsh-sensteed-product/dofe-host-auth' },
+      { id: 'dofe-host-capabilities', name: '@dofe/dsh-sensteed-product/dofe-host-capabilities' },
       { id: 'dofe-managed', name: '@dofe/dsh-sensteed-product/dofe-managed' },
       { id: 'desktop-shell', name: 'dsh-plugin-desktop' },
       { id: 'community-market', name: 'dsh-community-market' },
@@ -169,6 +178,10 @@ try {
     (host) => {
       // Packaged Electron does not expose Node's internal ESM loader.
       host.loader.internal = undefined
+      host.set('dshHomePath', (...segments) => join(home, ...segments))
+      host.provide('profileContext', { name: prepared.profile.name, dir: prepared.profile.dir,
+        patchPath: join(prepared.profile.dir, 'cordis.patch.yml'), installAnchor: desktopManifest,
+        cwd: home, home, startedBundles: [], overlays: [], telemetryDisabledEnv: '1', readPatches: () => [] })
       host.provide(DSH_LAUNCH_ENVIRONMENT_KEY, launchEnvironment)
       host.provide('desktopBrowserAccess', BROWSER_ACCESS)
       host.provide('desktopLanHttps', LAN_HTTPS)
@@ -192,49 +205,37 @@ try {
       host.provide('appExit', () => {})
       // dofe-managed publishes its workflow guidance through this seam.
       host.provide('systemPrompt', { section() {} })
-      host.provide('settings', {
-        register() {
-          return {
-            get: () => ({ mode: 'compatibility' }),
-            watch: () => () => {},
-            update: async () => {},
-            replace: async () => {},
-          }
-        },
-      })
       // The production shell waits for these host services before activation.
       // Keep the loader smoke fixture aligned with the desktop plugin contract.
       host.provide('tools', {
         schemas() { return [] },
         execute() { throw new Error('tools smoke execution is not expected') },
       })
-      host.provide('credentials', {
-        resolve() { return undefined },
-        describe() { return undefined },
-        set() {},
-        unset() {},
-      })
     },
     prepared.bareModuleBaseUrl,
   )
   await runtime.mountScheduled()
 
-  const desktopEntry = ctx.loader.resolve('include:desktop-shell')
-  const marketEntry = ctx.loader.resolve('include:community-market')
-  const dshMarketEntry = ctx.loader.resolve('include:dsh-market')
-  const thirdPartyEntry = ctx.loader.resolve('include:third-party-smoke')
-  if (desktopEntry?.options.name !== 'dsh-plugin-desktop') {
-    throw new Error('launcher-owned desktop plugin did not activate through its bare package name')
+  const required = {
+    'smoke-credentials': '@deepseek-ai/dsh-credentials-local',
+    'smoke-config-editor': '@deepseek-ai/dsh-config-editor',
+    'smoke-settings': '@deepseek-ai/dsh-settings',
+    'dofe-host-auth': '@dofe/dsh-sensteed-product/dofe-host-auth',
+    'dofe-host-capabilities': '@dofe/dsh-sensteed-product/dofe-host-capabilities',
+    'dofe-managed': '@dofe/dsh-sensteed-product/dofe-managed',
+    'desktop-shell': 'dsh-plugin-desktop',
+    'community-market': 'dsh-community-market',
+    'dsh-market': 'dshmarket',
+    'third-party-smoke': THIRD_PARTY_NAME,
   }
-  if (thirdPartyEntry?.options.name !== THIRD_PARTY_NAME) {
-    throw new Error('profile-local third-party plugin did not activate')
+  for (const [id, name] of Object.entries(required)) {
+    const entry = ctx.loader.resolve(`include:${id}`)
+    if (entry?.options.name !== name || entry.disabled || entry.fiber?.state !== 2) {
+      throw new Error(`Required loader smoke entry is not active: ${id} (state ${String(entry?.fiber?.state)})`)
+    }
   }
-  if (marketEntry?.options.name !== 'dsh-community-market') {
-    throw new Error('community market Host plugin did not activate through its bare package name')
-  }
-  if (dshMarketEntry?.options.name !== 'dshmarket') {
-    throw new Error('dsh-market Host plugin did not activate through its bare package name')
-  }
+  if (authNetworkAttempts !== 0) throw new Error('Empty-session auth attempted outbound network')
+  if (ctx.dofeAuth.getStatus().status !== 'idle') throw new Error('Private empty-session auth did not remain idle')
   if (mountedSpec?.mode !== 'compatibility') {
     throw new Error(`desktop plugin produced an unexpected shell mode: ${String(mountedSpec?.mode)}`)
   }
@@ -267,6 +268,7 @@ try {
           }
         }
         for (const [key, value] of runnerEnvironment) process.env[key] = value
+        globalThis.fetch = originalFetch
         rmSync(home, { recursive: true, force: true })
       }
     }
