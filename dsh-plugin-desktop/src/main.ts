@@ -531,6 +531,8 @@ async function start(): Promise<void> {
     | Extract<SessionProjectionCacheRecoveryResult, { status: 'quarantined' }>
     | undefined
   let recoveryTerminalAvailable = false
+  let hubBoot: ReturnType<typeof prepareHubHostBoot> | undefined
+  let inspectHubHealth: (() => Promise<import('./hub-generation-health.ts').HubLoadedEvidence>) | undefined
   let startupStage: DesktopStartupFailureStage = 'electron-ready'
   const desktopUserDataDir = app.getPath('userData')
   const appVersion = desktopProductVersion()
@@ -1789,7 +1791,7 @@ async function start(): Promise<void> {
     if (profilePreferences === undefined) {
       throw new Error(`${BIN_NAME}: active Profile preferences were not initialized`)
     }
-    const hubBoot = prepared.hubGeneration === undefined ? undefined : prepareHubHostBoot(prepared.hubGeneration, prepared.profile.dir,
+    hubBoot = prepared.hubGeneration === undefined ? undefined : prepareHubHostBoot(prepared.hubGeneration, prepared.profile.dir,
       [...composeEntries([prepared.patches])].map(entry => entry.id))
     const hostPatches = hubBoot === undefined ? prepared.patches : [...prepared.patches, hubBoot.patch]
     const profileBoot = createDesktopProfileBoot(prepared, desktopPnpmBootstrap, hubBoot?.selection, hubBoot === undefined ? [] : [hubBoot.patch])
@@ -1814,6 +1816,7 @@ async function start(): Promise<void> {
             ? undefined
             : async () => ({ source: 'ready' as const, ...(await impl()) })
         },
+        registerHubHealth: impl => { inspectHubHealth = impl },
         registerMandatoryDownload: impl => {
           mandatoryDownloadProbe = impl ?? undefined
         },
@@ -1879,9 +1882,10 @@ async function start(): Promise<void> {
           hostCtx.loader.internal = undefined
           registerHubHostService(hostCtx)
           if (hubBoot !== undefined) {
+            const managedBoot = hubBoot
             hostCtx.provide('hubGenerationBoot', {
               generationId: hubBoot.generationId, skillsRoot: hubBoot.skillsRoot,
-              inspectLoaded: (skills: import('./hub-generation-health.ts').HubSkillObservation, providerName: string) => hubBoot.inspectLoaded(hostCtx.loader, skills, providerName),
+              inspectLoaded: (skills: import('./hub-generation-health.ts').HubSkillObservation, providerName: string) => managedBoot.inspectLoaded(hostCtx.loader, skills, providerName),
             })
           }
           hostCtx.inject(['sensteedQuitInspection'], scope => {
@@ -2068,6 +2072,10 @@ async function start(): Promise<void> {
         throw cause
       })
       generation.bindHost(ctx)
+      if (hubBoot !== undefined) {
+        const managedBoot = hubBoot
+        inspectHubHealth = () => managedBoot.inspectLoaded(ctx.loader, ctx.skills, managedBoot.skillProviderName)
+      }
       profileBoot.markReady()
       observeDesktopPreferenceSettings(ctx, fileExporter, enqueueProfilePreferencesWrite)
       void logInactiveStartupEntries(ctx, BIN_NAME)
@@ -2077,6 +2085,12 @@ async function start(): Promise<void> {
     lifecycleRecorder.startRendererBoot()
     const rendererBoot = runtime.beginRendererBootMonitoring({
       commitHealthy: async () => {
+        if (hubBoot !== undefined) {
+          if (inspectHubHealth === undefined) throw new Error('Managed Hub health probe is unavailable')
+          const evidence = await inspectHubHealth()
+          if (evidence.generationId !== hubBoot.generationId) throw new Error('Managed Hub health generation mismatch')
+          if (hubBoot.store.readState().phase === 'verifying') await hubBoot.store.markHealthy(evidence.generationId)
+        }
         lifecycleRecorder.finishRendererBoot({ status: 'healthy' }, 'renderer-failed')
         startupStage = 'health-commit'
         lifecycleRecorder.transitionStartupStage(startupStage)
@@ -2132,6 +2146,9 @@ async function start(): Promise<void> {
       stage: startupStage,
     })
     const recoveryActionsSafe = await generation.quiesceForRecovery()
+    if (hubBoot !== undefined && recoveryActionsSafe && hubBoot.store.readState().phase === 'verifying') {
+      await hubBoot.store.rollback()
+    }
     if (failureRoute === 'startup-recovery') {
       const detail = cause instanceof Error ? cause.message : String(cause)
       const recoveryResult = await openStartupRecoveryWindow(

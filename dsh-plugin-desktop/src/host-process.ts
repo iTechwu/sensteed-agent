@@ -7,6 +7,7 @@ import { performance } from 'node:perf_hooks'
 import { StringDecoder } from 'node:string_decoder'
 import { HostRpc } from './host-rpc.ts'
 import { bindNativeRuntime, runtimeSnapshot } from './host-runtime-bridge.ts'
+import type { HubLoadedEvidence } from './hub-generation-health.ts'
 import type { DesktopHostOptions } from './host-bootstrap.ts'
 import type { DesktopRuntime } from './runtime.ts'
 import type { DesktopStartupGenerationHost } from './startup-generation.ts'
@@ -23,6 +24,7 @@ export interface IsolatedHostOptions {
   registerQuitInspection(impl: (() => Promise<DesktopQuitInspectionAnswer>) | undefined): void
   /** Receive the Host-side download trigger for the mandatory target release. */
   registerMandatoryDownload(impl: (() => Promise<void>) | undefined): void
+  registerHubHealth?(impl: (() => Promise<HubLoadedEvidence>) | undefined): void
   onFailure(error: Error, exit: IsolatedHostExit): void
 }
 
@@ -85,6 +87,7 @@ export async function startIsolatedDesktopHost(options: IsolatedHostOptions): Pr
     listen: receive => { child.on('message', receive); return () => { child.removeListener('message', receive) } },
   }, 120_000)
   const releaseNative = bindNativeRuntime(rpc, options.runtime)
+  options.registerHubHealth?.(() => rpc.call<HubLoadedEvidence>('hubGenerationHealth', [], undefined, 30_000))
   rpc.handle('certificate', () => options.prepareCertificate())
   options.registerMandatoryDownload?.(async () => await Promise.race([
     rpc.call<{ available: boolean; error?: string }>('mandatoryUpdateDownload', [], undefined, 120_000),
@@ -123,6 +126,7 @@ export async function startIsolatedDesktopHost(options: IsolatedHostOptions): Pr
   let stopTask: Promise<void> | undefined
   const stop = (): Promise<void> => stopTask ??= (async () => {
     stopping = true
+    options.registerHubHealth?.(undefined)
     if (!exited) {
       const controller = new AbortController()
       const timeout = setTimeout(() => controller.abort(), 3_000)

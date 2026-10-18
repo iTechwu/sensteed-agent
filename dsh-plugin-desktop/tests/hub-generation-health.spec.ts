@@ -36,10 +36,11 @@ describe('Hub generation local loaded health', () => {
   })
   it('reconstructs the real Host boot patch and rejects collisions before loading', async () => {
     const f = await fixture(), reference = hubGenerationBootReference(f.store, f.profile)
-    const boot = prepareHubHostBoot({ reference, expectedIdentity: f.store.identity }, f.profile, ['desktop-shell'])
+    const boot = prepareHubHostBoot({ reference, expectedIdentity: f.store.identity, skillProviderName: 'hub-g1' }, f.profile, ['desktop-shell'])
     expect(boot.patch.insert[0]?.name).toBe('example')
     expect(boot.generationId).toBe('g1')
-    expect(() => prepareHubHostBoot({ reference, expectedIdentity: f.store.identity }, f.profile, ['example'])).toThrow('collides')
+    expect(() => prepareHubHostBoot({ reference, expectedIdentity: f.store.identity, skillProviderName: 'hub-other' }, f.profile, [])).toThrow('provider identity')
+    expect(() => prepareHubHostBoot({ reference, expectedIdentity: f.store.identity, skillProviderName: 'hub-g1' }, f.profile, ['example'])).toThrow('collides')
   })
   it('does not treat boot success, missing modules or the wrong skill provider as health', async () => {
     const f = await fixture()

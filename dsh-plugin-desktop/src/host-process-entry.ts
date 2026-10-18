@@ -39,6 +39,11 @@ const rpc = new HostRpc({
   },
 }, 120_000)
 let host: DesktopStartupGenerationHost | undefined
+let inspectHubHealth: (() => Promise<import('./hub-generation-health.ts').HubLoadedEvidence>) | undefined
+rpc.handle('hubGenerationHealth', async () => {
+  if (inspectHubHealth === undefined) throw new Error('Managed Hub health is unavailable')
+  return await inspectHubHealth()
+})
 let inspectServices = () => ({ aaRuntime: false, aaOnboarding: false })
 // Set once the generation mounts and the product layer's quit inspection row is live.
 let inspectQuit: (() => Promise<{ activeTasks: boolean; scheduledTasks: boolean }>) | undefined
@@ -108,6 +113,13 @@ rpc.handle('boot', async args => {
         host = hostCtx
         const injectable = hostCtx as unknown as {
           inject(names: readonly string[], wire: (scope: Record<string, never>) => void): void
+        }
+        if (options.prepared.hubGeneration !== undefined || options.hubGeneration !== undefined) {
+          const trusted = options.hubGeneration ?? options.prepared.hubGeneration!
+          const probe = hostCtx as unknown as { inject(names: readonly string[], wire: (scope: { hubGenerationBoot: import('./hub-host-boot.ts').HubGenerationHostHealth; skills: import('./hub-generation-health.ts').HubSkillObservation }) => void): void }
+          probe.inject(['hubGenerationBoot', 'skills'], scope => {
+            inspectHubHealth = () => scope.hubGenerationBoot.inspectLoaded(scope.skills, trusted.skillProviderName)
+          })
         }
         injectable.inject(['sensteedQuitInspection'], scope => {
           inspectQuit = async () => await (scope as never as { sensteedQuitInspection: { inspect(): Promise<{ activeTasks: boolean; scheduledTasks: boolean }> } }).sensteedQuitInspection.inspect()
