@@ -278,6 +278,17 @@ describe('DofeAuthService', () => {
     try { await service.restore(); expect(await service.getOfflineIdentity()).toBeUndefined() }
     finally { await service.dispose() }
   })
+  it('retains owner observation after a mid-body transport reset but rejects malformed discovery JSON',async()=>{
+    const credentials=credentialStore('refresh'),owner={operator:'sub-1',tenantId:'11111111-1111-4111-8111-111111111111'}
+    await credentials.modifyRecord('',async()=>({kind:'grant',payload:{refreshToken:'refresh',verifiedOwner:owner}}))
+    const fetcher=vi.fn().mockResolvedValueOnce(new Response(new ReadableStream({start(controller){controller.error(new TypeError('terminated'))}})))
+      .mockResolvedValueOnce(new Response('{broken'))
+    const service=new DofeAuthService({openExternal:vi.fn()},credentials as never,fetcher)
+    try{
+      await service.restore();expect(await service.getOfflineIdentity()).toEqual(owner)
+      await service.restore();expect(await service.getOfflineIdentity()).toBeUndefined()
+    }finally{await service.dispose()}
+  })
 
   it('releases the pending loopback listener on dispose', async () => {
     const openExternal = vi.fn()

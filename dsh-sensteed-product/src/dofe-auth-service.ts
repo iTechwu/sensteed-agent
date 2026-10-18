@@ -278,7 +278,7 @@ export class DofeAuthService {
   private async readDiscovery(): Promise<OidcDiscovery> {
     const response = await this.authFetch(SENSTEED_SSO_DISCOVERY_URL, { redirect: 'error', signal: this.signal(10_000) })
     if (!response.ok) throw new Error(`SSO discovery 请求失败（${response.status}）`)
-    const value = await response.json() as Partial<OidcDiscovery>
+    const value = await this.authJson(response) as Partial<OidcDiscovery>
     const issuer = asString(value.issuer)
     const authorizationEndpoint = asString(value.authorization_endpoint)
     const tokenEndpoint = asString(value.token_endpoint)
@@ -334,7 +334,7 @@ export class DofeAuthService {
   }
 
   private async parseTokenResponse(response: Response, fallback: string): Promise<{ accessToken: string; refreshToken?: string }> {
-    const value = await response.json() as TokenResponse
+    const value = await this.authJson(response) as TokenResponse
     const accessToken = asString(value.access_token)
     const errorCode = asString(value.error)
     if (!response.ok || accessToken === undefined) throw new DofeAuthTokenError(errorCode ?? fallback, errorCode)
@@ -348,7 +348,7 @@ export class DofeAuthService {
       method: 'POST', redirect: 'error', signal: this.signal(15_000),
       headers: { authorization: `Bearer ${accessToken}`, 'x-company-code': 'sensteed', accept: 'application/json' },
     })
-    const value = await response.json() as ProvisionResponse
+    const value = await this.authJson(response) as ProvisionResponse
     const key = asString(value.key)
     const ssoSub = asString(value.user?.ssoSub)
     const tenantId = asString(value.tenant?.tenantId)
@@ -447,6 +447,14 @@ export class DofeAuthService {
     catch (error) {
       this.abort.signal.throwIfAborted()
       throw new DofeAuthNetworkError('Authentication transport unavailable', { cause: error })
+    }
+  }
+  private async authJson(response:Response):Promise<unknown>{
+    try{return await response.json()}
+    catch(error){
+      this.abort.signal.throwIfAborted()
+      if(error instanceof TypeError||error instanceof DOMException&&error.name==='AbortError')throw new DofeAuthNetworkError('Authentication response transport unavailable',{cause:error})
+      throw error
     }
   }
 
