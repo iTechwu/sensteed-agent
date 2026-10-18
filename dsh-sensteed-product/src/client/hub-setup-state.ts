@@ -3,7 +3,7 @@ export type HubKind='skill'|'plugin'
 export type HubAction='retain'|'install'|'update'|'uninstall'
 export interface HubEntry {kind:HubKind;itemId:string;displayName:string;version:string|null;required:boolean;initialInstall:boolean;enabled:boolean;disposition:string;reason:string|null;bytes:number}
 export interface HubOperation {operationId:string;state:string;phase?:string;restartRequired?:boolean;restartReady?:boolean;errorCode?:string}
-export interface HubCheck {profileId:string;activeGenerationDigest:string|null;entries:HubEntry[];activeItems:{kind:HubKind;itemId:string;enabled:boolean}[];operation?:HubOperation}
+export interface HubCheck {channel:'stable'|'beta';profileId:string;activeGenerationDigest:string|null;entries:HubEntry[];activeItems:{kind:HubKind;itemId:string;enabled:boolean}[];operation?:HubOperation}
 export interface HubSelection {kind:HubKind;itemId:string;action:HubAction;enabled:boolean}
 export interface HubPlanItem extends HubSelection {displayName?:string;releaseId?:string;version?:string|null;compatibility?:string;evidence?:string|null;accessDeclaration?:null|{containsScripts:boolean;networkHosts:string[];fileAccess:string}}
 export interface HubPreview {intentId:string;confirmationNonce:string;planDigest:string;expiresAt:string;totalBytes:number;items:HubPlanItem[]}
@@ -22,4 +22,11 @@ export async function hubSetupRequest<T>(action:'check'|'preview'|'execute'|'sta
  const value=await response.json() as T|{available:boolean;result?:T;reason?:string}
  if(value&&typeof value==='object'&&'available'in value){if(!value.available||!('result'in value))throw Error(value.reason??'BASE_VERSION_NOT_ENABLED');return value.result as T}
  return value as T
+}
+
+/** Host selects this Profile's verified channel; an older/malformed reply cannot silently mean stable. */
+export async function hubCheckRequest(signal?:AbortSignal):Promise<HubCheck>{
+ const result=await hubSetupRequest<HubCheck>('check',{},signal)
+ if(result.channel!=='stable'&&result.channel!=='beta')throw Error('HUB_CHECK_CHANNEL_REQUIRED')
+ return result
 }

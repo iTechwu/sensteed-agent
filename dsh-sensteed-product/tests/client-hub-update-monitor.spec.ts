@@ -2,7 +2,7 @@ import { afterEach,expect,it,vi } from 'vitest'
 import { createHubUpdateMonitor,HUB_UPDATE_INTERVAL_MS,HUB_UPDATE_MAX_DELAY_MS,hubUpdateDelay,hubUpdateNotice } from '../src/client/hub-update-monitor.ts'
 import type { HubCheck } from '../src/client/hub-setup-state.ts'
 const row={kind:'skill' as const,itemId:'one',displayName:'One',version:'1',required:true,initialInstall:true,enabled:true,disposition:'INSTALL',reason:null,bytes:1}
-const snapshot:HubCheck={profileId:'p',activeGenerationDigest:null,entries:[row],activeItems:[]}
+const snapshot:HubCheck={channel:'stable',profileId:'p',activeGenerationDigest:null,entries:[row],activeItems:[]}
 afterEach(()=>vi.useRealTimers())
 it('derives eligible additions/updates/restart from authoritative dispositions, never display versions',()=>{
  expect(hubUpdateNotice(snapshot)).toEqual({updates:0,additions:1,restart:false})

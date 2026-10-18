@@ -8,7 +8,7 @@ import { HubUpdateNotice } from '../src/client/HubUpdateNotice.tsx'
 import { DOFE_ACCESS_COPY } from '../src/client/dofe-access.ts'
 let root:Root|undefined,node:HTMLDivElement
 const row={kind:'skill',itemId:'one',displayName:'One',version:'1',required:true,initialInstall:true,enabled:true,disposition:'INSTALL',reason:null,bytes:1}
-const snapshot={profileId:'p',activeGenerationDigest:null,entries:[row],activeItems:[]}
+const snapshot={channel:'stable',profileId:'p',activeGenerationDigest:null,entries:[row],activeItems:[]}
 afterEach(async()=>{await act(async()=>root?.unmount());node?.remove();vi.unstubAllGlobals()})
 function harness(){
  let account:string|undefined='alice';const listeners=new Set<()=>void>();let reconnect=()=>{}

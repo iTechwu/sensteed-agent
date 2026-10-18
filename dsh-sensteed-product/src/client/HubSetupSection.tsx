@@ -1,28 +1,41 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { DofeAccessLocaleKey } from './dofe-access.ts'
-import { hubBlocked, hubInitialSelections, hubKey, hubSetupRequest, hubTerminal, type HubCheck, type HubOperation, type HubPreview, type HubSelection } from './hub-setup-state.ts'
-type Props={t:(key:DofeAccessLocaleKey)=>string}
-export function HubSetupSection({t}:Props){
+import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { DofeAccessSettings } from '../dofe-plugins.ts'
+import { hubCheckRequest, hubBlocked, hubInitialSelections, hubKey, hubSetupRequest, hubTerminal, type HubCheck, type HubOperation, type HubPreview, type HubSelection } from './hub-setup-state.ts'
+type Props={t:(key:DofeAccessLocaleKey)=>string;settingsScope?:ConfigForm<DofeAccessSettings>;subscribeReconnect?:(listener:()=>void)=>()=>void}
+const noSubscribe=()=>()=>{}
+const standaloneAccount=()=>'standalone'
+/** Key the entire editor to the account so no previous account's plan/nonce remains visible. */
+export function HubSetupSection({t,settingsScope,subscribeReconnect}:Props){
+ const [connectionEpoch,setConnectionEpoch]=useState(0)
+ useEffect(()=>subscribeReconnect?.(()=>setConnectionEpoch(value=>value+1)),[subscribeReconnect])
+ const store=useMemo(()=>settingsScope?{subscribe:(fn:()=>void)=>settingsScope.subscribe(fn),getSnapshot:()=>{const value=settingsScope.getSnapshot().value;return value?.authMode==='feishu'?value.identity?.ssoSub:undefined}}:undefined,[settingsScope])
+ const account=useSyncExternalStore(store?.subscribe??noSubscribe,store?.getSnapshot??standaloneAccount,store?.getSnapshot??standaloneAccount)
+ return account?<HubSetupEditor key={`${account}:${connectionEpoch}`} t={t}/>:<p role="status">{t('settingsLoginRequired')}</p>
+}
+function HubSetupEditor({t}:Pick<Props,'t'>){
  const [check,setCheck]=useState<HubCheck>(),[selection,setSelection]=useState<HubSelection[]>([]),[preview,setPreview]=useState<HubPreview>(),[operation,setOperation]=useState<HubOperation>(),[busy,setBusy]=useState(false),[error,setError]=useState<string>(),[recovering,setRecovering]=useState(false),[clock,setClock]=useState(Date.now())
  const lock=useRef(false),intent=useRef<HubPreview>(),mounted=useRef(true),sequence=useRef(0)
  const message=(e:unknown)=>e instanceof Error&&e.message==='BASE_VERSION_NOT_ENABLED'?t('hubUnavailable'):t('hubRequestFailed')
  const refresh=useCallback(async(signal?:AbortSignal)=>{
   const epoch=++sequence.current
-  const value=await hubSetupRequest<HubCheck>('check',{channel:'stable'},signal)
+  const value=await hubCheckRequest(signal)
   if(!mounted.current||epoch!==sequence.current)return
   setCheck(value);setSelection(hubInitialSelections(value));intent.current=undefined;setPreview(undefined)
   let next=value.operation
   if(next&&!hubTerminal(next)){try{next=await hubSetupRequest<HubOperation>('status',{operationId:next.operationId},signal)}catch{/* The next explicit check/poll recovers the actual Host operation. */}}
-  if(mounted.current){setOperation(next);setRecovering(false);setError(undefined)}
+  if(mounted.current&&epoch===sequence.current&&!signal?.aborted){setOperation(next);setRecovering(false);setError(undefined)}
  },[])
  useEffect(()=>{mounted.current=true;const controller=new AbortController();void refresh(controller.signal).catch(e=>{if(!controller.signal.aborted)setError(message(e))});return()=>{mounted.current=false;controller.abort();intent.current=undefined}},[refresh])
  useEffect(()=>{const timer=setInterval(()=>setClock(Date.now()),1000);return()=>clearInterval(timer)},[])
  useEffect(()=>{
   if(hubTerminal(operation)&&!recovering)return
-  const controller=new AbortController();const timer=setInterval(()=>{if(lock.current)return
-   if(recovering){void refresh(controller.signal).catch(()=>{});return}
-   void hubSetupRequest<HubOperation>('status',{operationId:operation?.operationId},controller.signal).then(value=>{if(mounted.current){setOperation(value);setError(undefined)}}).catch(()=>{if(!controller.signal.aborted){setRecovering(true);setError(t('hubConnectionRecovering'))}})
+  const controller=new AbortController();let polling=false;const timer=setInterval(()=>{if(lock.current||polling)return
+   polling=true
+   if(recovering){void refresh(controller.signal).catch(()=>{}).finally(()=>{polling=false});return}
+   void hubSetupRequest<HubOperation>('status',{operationId:operation?.operationId},controller.signal).then(value=>{if(mounted.current&&!controller.signal.aborted){setOperation(value);setError(undefined)}}).catch(()=>{if(!controller.signal.aborted){setRecovering(true);setError(t('hubConnectionRecovering'))}}).finally(()=>{polling=false})
   },3000)
   return()=>{clearInterval(timer);controller.abort()}
  },[operation?.operationId,operation?.state,operation?.phase,recovering,refresh])
@@ -33,7 +46,7 @@ export function HubSetupSection({t}:Props){
   <h2 id="hub-setup-title">{t('hubTitle')}</h2><p>{t('hubIntro')}</p><p>{t('hubPersonalSkills')}</p>
   {error&&<p role="alert">{error}</p>}
   <div><Button disabled={busy||recovering} onClick={()=>void run(()=>refresh())}>{busy?t('hubWorking'):t('hubCheck')}</Button></div>
-  {check&&<><p>{t('hubProfile')}: <code>{check.profileId}</code> · {check.activeGenerationDigest?t('hubActive'):t('hubInitial')}</p>
+  {check&&<><p>{t('hubProfile')}: <code>{check.profileId}</code> · <code>{check.channel}</code> · {check.activeGenerationDigest?t('hubActive'):t('hubInitial')}</p>
    <ul style={{listStyle:'none',padding:0,display:'grid',gap:12}}>{check.entries.map(entry=>{const active=check.activeItems.some(i=>hubKey(i)===hubKey(entry)),chosen=selection.find(i=>hubKey(i)===hubKey(entry)),unavailable=hubBlocked(entry)
     return <li key={hubKey(entry)} style={{border:'1px solid var(--dsw-alias-border-l1, #ddd)',borderRadius:8,padding:12}}>
      <strong>{entry.displayName}</strong> <small>{entry.kind} · {entry.version??t('hubUnpublished')} {entry.required?`· ${t('hubRequired')}`:''}</small>
@@ -47,7 +60,7 @@ export function HubSetupSection({t}:Props){
      </select></label>
     </li>})}</ul>
    {blocked&&<p role="status">{t('hubRequiredBlocked')}</p>}
-   <Button disabled={busy||recovering||pending||blocked||selection.length===0} onClick={()=>void run(async()=>{intent.current=undefined;setPreview(undefined);const value=await hubSetupRequest<HubPreview>('preview',{channel:'stable',requested:selection});if(!value.intentId||!value.confirmationNonce||!value.items?.length||!Number.isFinite(Date.parse(value.expiresAt)))throw Error('INVALID_PREVIEW');intent.current=value;setPreview(value)})}>{t('hubPreview')}</Button>
+   <Button disabled={busy||recovering||pending||blocked||selection.length===0} onClick={()=>void run(async()=>{intent.current=undefined;setPreview(undefined);const value=await hubSetupRequest<HubPreview>('preview',{channel:check.channel,requested:selection});if(!value.intentId||!value.confirmationNonce||!value.items?.length||!Number.isFinite(Date.parse(value.expiresAt)))throw Error('INVALID_PREVIEW');intent.current=value;setPreview(value)})}>{t('hubPreview')}</Button>
   </>}
   {preview&&<div aria-label={t('hubPlan')}><h3>{t('hubPlan')}</h3><p>{t('hubBytes')}: {preview.totalBytes.toLocaleString()} bytes · {t('hubExpires')}: {new Date(preview.expiresAt).toLocaleString()}</p>
    <code>{preview.planDigest}</code><ul>{preview.items.map(item=><li key={hubKey(item)}><strong>{item.displayName??item.itemId}</strong> · {item.kind} · {item.action} · {item.version??t('hubUnknown')} · {item.enabled?t('hubEnabled'):t('hubDisabled')}
