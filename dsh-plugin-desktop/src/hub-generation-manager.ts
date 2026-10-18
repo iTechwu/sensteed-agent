@@ -23,15 +23,16 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
   async function closeManaged(){if(!options.managed||closing)return;closing=true;await scope.hubGenerationSupervisor.request({kind:'base'})}
   const unwatch=client.watchInvalidation(()=>{intents.clear();if(options.managed){void closeManaged().catch(()=>{})}else{setImmediate(()=>{void resume().catch(()=>{})})}})
   scope.effect(()=>()=>unwatch(),'Hub identity fence')
-  async function environment(channel:'stable'|'beta'){
+  async function environment(requestedChannel?:'stable'|'beta'){
    const context=await client.context(),identity=await resolveHubHostIdentity(options.userData,options.profileDirectory,client,context)
    const store=new HubGenerationStore(options.userData,identity);lastStore=store
    const state=store.readState(),journal=new HubExecutionJournal(store),pendingRecord=journal.read(),record=pendingRecord?.descriptorDigest===state.active?.descriptorDigest?pendingRecord:journal.readHealthyInventory()
-   let activeGenerationDigest:string|null=null,minimumPolicyRevision=0
+   let activeGenerationDigest:string|null=null,minimumPolicyRevision=0,channel=requestedChannel??'stable'
    let installed:Parameters<HubHostClient['check']>[1]['installed']=[]
    if(state.active!==null){
     if(!record||record.phase!=='ACTIVATED'&&record.phase!=='COMMITTED')throw new Error('HUB_ACTIVE_INVENTORY_RECOVERY_REQUIRED')
     const saved=inspectSavedHubPlan(record,identity,options.target,trust)
+    channel=requestedChannel??saved.plan.channel
     const lease=await client.bootAuthorization(context,{deviceId:identity.deviceId,profileId:identity.profileId,generationDigest:saved.plan.proposedGenerationDigest,target:options.target})
     verifyHubBootAuthorization(lease,trust,{...identity,target:options.target,generationDigest:saved.plan.proposedGenerationDigest,minimumPolicyRevision:saved.plan.policyRevision})
     activeGenerationDigest=saved.plan.proposedGenerationDigest;minimumPolicyRevision=saved.plan.policyRevision
@@ -44,8 +45,8 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
   }
   const manager={
    async check(input:unknown){
-    const{channel}=z.strictObject({channel:z.enum(['stable','beta'])}).parse(input),env=await environment(channel)
-    return{profileId:env.identity.profileId,activeGenerationDigest:env.activeGenerationDigest,entries:env.snapshot.entries,activeItems:env.installed.filter(i=>!i.userRemoved).map(i=>({kind:i.kind,itemId:i.itemId,enabled:i.enabled})),operation:summary(env.store)}
+    const{channel}=z.strictObject({channel:z.enum(['stable','beta']).optional()}).parse(input),env=await environment(channel)
+    return{channel:env.snapshot.channel,profileId:env.identity.profileId,activeGenerationDigest:env.activeGenerationDigest,entries:env.snapshot.entries,activeItems:env.installed.filter(i=>!i.userRemoved).map(i=>({kind:i.kind,itemId:i.itemId,enabled:i.enabled})),operation:summary(env.store)}
    },
    async preview(input:unknown){
     const{channel,requested}=z.strictObject({channel:z.enum(['stable','beta']),requested:requestedSchema}).parse(input),env=await environment(channel)
