@@ -2,22 +2,24 @@
 
 [English](README.md) | 中文
 
-基于 DeepSeek Harness **0.1.6-alpha.2** 的独立实验包。主窗口直接加载官方发布的 `@deepseek-ai/dsh-web-frontend`，复用官方 Web 应用、插件管理器和基本桌面样式；Next 添加系统托盘、桌面设置和工具、Profile、恢复、Agents Anywhere 手机远控、社区市场和 dshmarket。
+基于 DeepSeek Harness **0.2.1-rc.2** 的独立实验包。主窗口直接加载同一固定版本本地 fork workspace 中的上游 `@deepseek-ai/dsh-web-frontend`，复用官方 Web 应用、插件管理器和基本桌面样式；Next 添加系统托盘、桌面设置和工具、Profile、恢复、Agents Anywhere 手机远控、社区市场和 dshmarket。
+
+Harness runtime 的精确版本跟随 `upstream.json`，pnpm 链接本地 fork 中版本匹配的包。fork 升级时，源码构建不会替换成不同的 registry 发布版本。
 
 ## 开发与验证
 
-在外层仓库根目录执行，使用 Node.js `^22.19.0` 或 `>=24.0.0`，以及 Corepack 提供的 Yarn 4.18.0：
+在外层仓库根目录执行，使用 Node.js `^22.19.0` 或 `>=24.0.0`，以及 根 manifest 指定的 Corepack pnpm 版本：
 
 ```sh
-git submodule update --init --recursive
+git -C ../deepseek-harness status --short
 corepack pnpm install --frozen-lockfile
 corepack pnpm --filter dsh-desktop-next run check
 corepack pnpm --filter dsh-desktop-next run dev
 ```
 
-`check:next` 构建市场与 Next，执行类型检查、单元测试、官方前端与沙箱 preload 检查，以及临时目录中的真实 Host 检查，不打开图形应用。后者使用离线本地测试插件验证 pnpm、通过官方插件管理器完成的市场开关与卸载、鉴权、Profile 切换和恢复后启动，并清理测试进程与文件。额外的真实运行时检查覆盖原生 HTTP/WebSocket 访问限制、浏览器访问切换、损坏清单、独立安全模式、全局补丁修复与进程退出。
+本包 `check` 命令 构建市场与 Next，执行类型检查、单元测试、官方前端与沙箱 preload 检查，以及临时目录中的真实 Host 检查，不打开图形应用。后者使用离线本地测试插件验证 pnpm、通过官方插件管理器完成的市场开关与卸载、鉴权、Profile 切换和恢复后启动，并清理测试进程与文件。额外的真实运行时检查覆盖原生 HTTP/WebSocket 访问限制、浏览器访问切换、损坏清单、独立安全模式、全局补丁修复与进程退出。
 
-`dev:next` 是显式的图形启动命令；已有构建可用 `corepack pnpm --filter dsh-desktop-next run start` 启动。两者都会在壳启动前于 `.desktop-build/runtime` 下准备随包解释器载荷，与上游桌面端的开发启动器一致，因此开发运行中也有 Office 技能；首次启动会下载锁定的压缩包和 wheel。Electron 二进制尚未缓存时会下载。需要额外检查真实 Electron Node 模式时，先完成构建，再运行：
+本包 `dev` 命令 是显式的图形启动命令；已有构建可用 `corepack pnpm --filter dsh-desktop-next run start` 启动。两者都会在壳启动前于 `.desktop-build/runtime` 下准备随包解释器载荷，与上游桌面端的开发启动器一致，因此开发运行中也有 Office 技能；首次启动会下载锁定的压缩包和 wheel。Electron 二进制尚未缓存时会下载。需要额外检查真实 Electron Node 模式时，先完成构建，再运行：
 
 ```sh
 corepack pnpm --filter dsh-desktop-next run verify:host:electron
@@ -25,7 +27,7 @@ corepack pnpm --filter dsh-desktop-next run verify:host:electron
 
 此检查不打开 Electron 窗口。主窗口呈现、原生对话框和真实手机连接仍需手动验收。
 
-CI 还会在 Linux 中运行 `xvfb-run --auto-servernum corepack pnpm --filter dsh-desktop-next run verify:protocol --no-sandbox`。此独立测试使用真实 Electron 渲染进程、自定义协议和临时 Host，在关闭普通浏览器访问时验证市场源操作，并拒绝其他页面来源的请求。它不属于跨平台的 `check:next` 命令；关闭沙箱的参数仅用于这个隔离的 CI 进程。
+CI 还会在 Linux 中运行 `xvfb-run --auto-servernum corepack pnpm --filter dsh-desktop-next run verify:protocol --no-sandbox`。此独立测试使用真实 Electron 渲染进程、自定义协议和临时 Host，在关闭普通浏览器访问时验证市场源操作，并拒绝其他页面来源的请求。它不属于跨平台的 本包 `check` 命令 命令；关闭沙箱的参数仅用于这个隔离的 CI 进程。
 
 同一 Linux/Xvfb 环境中的 `verify:sidebar-browser --no-sandbox` 使用同时返回 `frame-ancestors 'none'` 和 `X-Frame-Options: DENY` 的本地测试页，验证 iframe 被拦截、凭租约挂载的真实访客页成功加载、访客自身的安全设置、应用 Cookie 与 preload 隔离、原生历史、伪造租约被拒、工作区分区隔离，以及释放后的清理。跨平台的 `verify:window-controls` 则通过模拟原生接口检查官方工具栏、分栏缩放、弹窗遮挡、标签切换与关闭，并验证普通 Web 客户端仍使用 iframe。
 

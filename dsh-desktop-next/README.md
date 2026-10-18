@@ -2,22 +2,24 @@
 
 English | [中文](README.zh.md)
 
-A separate experimental package based on DeepSeek Harness **0.1.6-alpha.2**. The main window loads the official published `@deepseek-ai/dsh-web-frontend`, sharing the official Web application, plugin manager, and basic Desktop presentation. Next adds the system tray, desktop preferences and tools, Profiles, recovery, Agents Anywhere remote control, Community Market, and dshmarket.
+A separate experimental package based on DeepSeek Harness **0.2.1-rc.2**. The main window loads the upstream `@deepseek-ai/dsh-web-frontend` from the same pinned local fork workspace, sharing the official Web application, plugin manager, and basic Desktop presentation. Next adds the system tray, desktop preferences and tools, Profiles, recovery, Agents Anywhere remote control, Community Market, and dshmarket.
+
+The exact Harness runtime pins follow `upstream.json`; pnpm links matching packages from the local fork. Source builds do not substitute a different registry release when the fork version changes.
 
 ## Development and verification
 
-Run from the outer repository root with Node.js `^22.19.0` or `>=24.0.0` and Corepack's Yarn 4.18.0:
+Run from the outer repository root with Node.js `^22.19.0` or `>=24.0.0` and the root manifest’s Corepack pnpm version:
 
 ```sh
-git submodule update --init --recursive
+git -C ../deepseek-harness status --short
 corepack pnpm install --frozen-lockfile
 corepack pnpm --filter dsh-desktop-next run check
 corepack pnpm --filter dsh-desktop-next run dev
 ```
 
-`check:next` builds Market and Next, runs typechecks, unit tests, official-frontend and sandboxed-preload checks, and a real Host smoke in a temporary home. It never opens a graphical application. The smoke uses an offline local fixture plugin to exercise pnpm, Market toggles and removal through the official plugin manager, authentication, profile switching, and recovery boot, then cleans up its processes and files. An additional real-runtime smoke exercises the native-only HTTP/WebSocket gate, browser access changes, corrupt manifests, isolated safe mode, global-patch repair, and process teardown.
+The package `check` command builds Next, runs typechecks, unit tests, official-frontend and sandboxed-preload checks, and a real Host smoke in a temporary home. It never opens a graphical application. The smoke uses an offline local fixture plugin to exercise pnpm, Market toggles and removal through the official plugin manager, authentication, profile switching, and recovery boot, then cleans up its processes and files. An additional real-runtime smoke exercises the native-only HTTP/WebSocket gate, browser access changes, corrupt manifests, isolated safe mode, global-patch repair, and process teardown.
 
-`dev:next` explicitly launches the graphical application. Use `corepack pnpm --filter dsh-desktop-next run start` with an existing build. Both prepare the bundled interpreter payload under `.desktop-build/runtime` before the shell starts, as upstream Desktop's development launcher does, so the Office skills are available in development; the first launch downloads the locked archives and wheels. An uncached Electron binary is downloaded on first use. To additionally exercise the real Electron executable in Node mode, build first and run:
+The package `dev` command explicitly launches the graphical application. Use `corepack pnpm --filter dsh-desktop-next run start` with an existing build. Both prepare the bundled interpreter payload under `.desktop-build/runtime` before the shell starts, as upstream Desktop's development launcher does, so the Office skills are available in development; the first launch downloads the locked archives and wheels. An uncached Electron binary is downloaded on first use. To additionally exercise the real Electron executable in Node mode, build first and run:
 
 ```sh
 corepack pnpm --filter dsh-desktop-next run verify:host:electron
