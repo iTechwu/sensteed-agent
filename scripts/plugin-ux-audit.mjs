@@ -1,7 +1,7 @@
 import { readdir, readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { auditPluginRequestCancellation, boundedFetchCount, localApiPaths } from './plugin-request-policy.mjs'
-import { readCiPackageManifests } from './plugin-ux-audit-packages.mjs'
+import { readCiPackageManifests, auditThinHubSettingsEntry } from './plugin-ux-audit-packages.mjs'
 
 const ciRoot = new URL('../.ci/', import.meta.url)
 const ciEntries = (await readdir(ciRoot, { withFileTypes: true }))
@@ -21,6 +21,13 @@ async function readSourceTree(root, extensions) {
 const clientPlugins = []
 const clientArtifacts = new Map()
 for (const name of entries) {
+  const manifest = JSON.parse(await readFile(new URL(`../.ci/${name}/package.json`, import.meta.url), 'utf8'))
+  if (name === 'dsh-sensteed-skill-manager' && manifest.exports?.['./client'] === './thin/client.js') {
+    // Audit the entry actually shipped by this package, not its retained legacy source.
+    clientPlugins.push(name)
+    clientArtifacts.set(name, `../.ci/${name}/thin/client.js`)
+    continue
+  }
   try {
     await stat(new URL(`../.ci/${name}/src/client.js`, import.meta.url))
     clientPlugins.push(name)
@@ -395,6 +402,11 @@ for (const name of clientPlugins) {
   if (legacyClientPlugins.has(name)) continue
   const clientPath = clientArtifacts.get(name)
   const source = await readFile(new URL(clientPath, import.meta.url), 'utf8')
+  if (name === 'dsh-sensteed-skill-manager' && clientPath.endsWith('/thin/client.js')) {
+    const manifest = JSON.parse(await readFile(new URL(`../.ci/${name}/package.json`, import.meta.url), 'utf8'))
+    failures.push(...auditThinHubSettingsEntry(manifest, source).map(failure => `${name}: ${failure}`))
+    continue
+  }
   const clientApiPaths = localApiPaths(source)
   const sidebarOrder = source.match(/name:\s*['"]sidebar\.footer\.action['"][\s\S]{0,180}?order:\s*(\d+)/u)?.[1]
   const overlayOrder = source.match(/name:\s*['"]shell\.overlay['"][\s\S]{0,180}?order:\s*(\d+)/u)?.[1]

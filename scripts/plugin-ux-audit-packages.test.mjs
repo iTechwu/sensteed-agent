@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join, sep } from 'node:path'
 import { test } from 'node:test'
 import { pathToFileURL } from 'node:url'
-import { readCiPackageManifests } from './plugin-ux-audit-packages.mjs'
+import { readCiPackageManifests, auditThinHubSettingsEntry } from './plugin-ux-audit-packages.mjs'
 import { boundedFetchCount, localApiPaths } from './plugin-request-policy.mjs'
 import { readFile } from 'node:fs/promises'
 
@@ -55,4 +55,17 @@ test('rejects malformed package manifests', async t => {
   await writeFile(join(root, 'dsh-broken', 'package.json'), '{')
 
   await assert.rejects(readCiPackageManifests(url, ['dsh-broken']), SyntaxError)
+})
+
+test('audits the actual thin Hub settings entry and rejects installer expansion', async () => {
+  const root = new URL('../.ci/dsh-sensteed-skill-manager/', import.meta.url)
+  const manifest = JSON.parse(await readFile(new URL('package.json', root), 'utf8'))
+  const source = await readFile(new URL('thin/client.js', root), 'utf8')
+  assert.deepEqual(auditThinHubSettingsEntry(manifest, source), [])
+  assert(auditThinHubSettingsEntry({ ...manifest, dependencies: { installer: '1.0.0' } }, source).length)
+  assert(auditThinHubSettingsEntry({ ...manifest, files: [...manifest.files, 'src'] }, source).length)
+  for (const addition of ["fetch('/install')", "ctx.rpc.call('install')", "ctx.slots.inject('shell.overlay', installer)"]) {
+    assert(auditThinHubSettingsEntry(manifest, source + '\n' + addition).length)
+  }
+  assert(auditThinHubSettingsEntry(manifest, source.replace("'aria-labelledby'", "'data-label'")).length)
 })
