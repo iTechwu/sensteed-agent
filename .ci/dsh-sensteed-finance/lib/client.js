@@ -139,6 +139,9 @@ window.__ModuleLoader__.load({
         analysis_forecast: '成本与资金预判', analysis_forecast_desc: '结合完整月份样本与收付款计划预测支出；有可靠期初时推演余额。',
         analysis_version: '版本健康检查', analysis_version_desc: '核对主版本与候选调整稿差异、冻结约束和版本推进所需依据。',
         analysis_rules: '预警规则核查', analysis_rules_desc: '核对生效规则、阈值与当前未关闭预警，说明历史统计的覆盖范围。',
+        analysisScope: '本次分析范围：{year} 年 · {org}', analysisAllAuthorized: '全部授权主体', analysisOrgPending: '名称待核实', analysisPromptLabel: '本次未发送的分析指令（可手动复制）',
+        analysisSessionUnavailable: '会话服务暂不可用', analysisSkillInvalid: '分析技能指令无效', analysisCatalogUnavailable: '无法核验分析技能，请稍后重试', analysisSkillUnavailable: '当前会话缺少对应分析技能，请更新默认技能后重试',
+        analysisLoginRequired: '登录已过期，请重新使用飞书登录', analysisAccessDenied: '当前账号没有财务助手权限', analysisAccessUnavailable: '无法核验财务助手权限，请稍后重试', analysisStartFailed: '会话未能接受分析请求，请稍后重试', sendFailCopyFailed: '发送失败（{reason}），且无法复制；请使用下方指令或重试。',
         analyzeTitle: '深度分析入口', analyzeHint: '每个入口都会创建新会话并调用对应财务分析 skill，由 Agent 调用财务数据中心 MCP（mcp__finance__*）完成分析。', send: '开始分析', analysisStarting: '正在开启新会话…', sent: '已在新会话开始分析', sendFail: '发送失败，指令已复制到剪贴板', sendFailReason: '发送失败（{reason}），指令已复制到剪贴板', analyzingNote: '分析会读取真实账面数据；录入/回填类操作 Agent 会先与你确认再执行。审批与过账由财务本人执行，Agent 不代批。',
         // 通用动作
         submit: '提交', cancel: '取消', submitted: '已提交', saved: '已保存', deleted: '已删除', confirm: '确认', close: '关闭', actions: '操作', runEngine: '触发预警引擎', running: '执行中', runDone: '已触发：新建 {created} · 更新 {updated} · 关闭 {resolved}', backfill: '回填', backfillActual: '回填实际值', submitConfirm: '确认提交？', opFailed: '操作失败', refreshed: '已刷新', required: '必填', invalidJson: '表映射必须是合法 JSON。',
@@ -210,6 +213,9 @@ window.__ModuleLoader__.load({
         analysis_forecast: 'Cost & cash forecast', analysis_forecast_desc: 'Cash-outflow scenarios from complete months and plans; balance forecasts require a reliable opening balance.',
         analysis_version: 'Version health', analysis_version_desc: 'Primary and candidate version differences, frozen periods and evidence for progression.',
         analysis_rules: 'Alert rules check', analysis_rules_desc: 'Effective rules, thresholds and open alerts, with explicit coverage for historical counts.',
+        analysisScope: 'Analysis scope: {year} · {org}', analysisAllAuthorized: 'All authorized entities', analysisOrgPending: 'Name pending verification', analysisPromptLabel: 'Unsent analysis prompt (copy manually)',
+        analysisSessionUnavailable: 'Session service is unavailable', analysisSkillInvalid: 'Invalid analysis skill command', analysisCatalogUnavailable: 'Could not verify the analysis skill. Please retry', analysisSkillUnavailable: 'The analysis skill is missing in this session. Update the default skills and retry',
+        analysisLoginRequired: 'Your login expired. Sign in with Feishu again', analysisAccessDenied: 'Your account does not have finance assistant permission', analysisAccessUnavailable: 'Could not verify finance assistant permission. Please retry', analysisStartFailed: 'The session could not accept the analysis request. Please retry', sendFailCopyFailed: 'Send failed ({reason}) and copying failed. Use the prompt below or retry.',
         analyzeTitle: 'Deep analysis entries', analyzeHint: 'Each entry creates a new session and invokes its finance skill; the agent calls finance MCP tools (mcp__finance__*) for the analysis.', send: 'Analyze', analysisStarting: 'Starting a new session…', sent: 'Started in a new session', sendFail: 'Send failed; copied to clipboard', sendFailReason: 'Send failed ({reason}); copied to clipboard', analyzingNote: 'Analysis reads real ledger data; write actions always require your confirmation first. Approvals and posting are done by finance users, never the agent.',
         submit: 'Submit', cancel: 'Cancel', submitted: 'Submitted', saved: 'Saved', deleted: 'Deleted', confirm: 'Confirm', close: 'Close', actions: 'Actions', runEngine: 'Run alert engine', running: 'Running...', runDone: 'Done: created {created} · updated {updated} · resolved {resolved}', backfill: 'Backfill', backfillActual: 'Backfill actuals', submitConfirm: 'Confirm submit?', opFailed: 'Operation failed', refreshed: 'Refreshed', required: 'required', invalidJson: 'Table mappings must be valid JSON.',
         scheduleMonthBackfill: 'Add plan month', scheduleMonthMissing: 'Add the plan month before saving.', scheduleCashBad: 'Cash amount must be a number ≥ 0.', scheduleAcceptanceBad: 'Acceptance amount must be a number ≥ 0.', scheduleSplitBad: 'Cash and acceptance amounts are both required, at most two decimals.', scheduleSumBad: 'Cash plus acceptance must equal the plan amount.', scheduleNoAcceptance: 'Acceptance amount must be zero when acceptance is not accepted.', scheduleNoPlanAmount: 'Plan amount is missing; the cash/acceptance split cannot be edited.',
@@ -1405,6 +1411,7 @@ window.__ModuleLoader__.load({
     }
     function financeSectionAllowed(section, identity) {
       if (section === 'entry') return Boolean(identity.financeWriter && identity.permissions?.includes('budget.submission.edit'))
+      if (section === 'costitems') return identity.role === 'FINANCE_OWNER'
       if (section === 'identity') return identity.role === 'FINANCE_OWNER'
       const permission = FINANCE_SECTION_PERMISSIONS[section]
       if (section === 'facts') return Boolean(identity.permissions?.some(code => ['budget.execution.read', 'cash.plan.read', 'finance.source.review'].includes(code)))
@@ -1420,10 +1427,10 @@ window.__ModuleLoader__.load({
       ['预算管理', [['engine', '全面预算', 'engine'], ['budget', '预算执行', 'budget'], ['compare-monthly', '月结滚动对比', 'comparisons', { mode: 'monthly' }], ['compare-yearly', '年度对比', 'comparisons', { mode: 'yearly' }], ['compare-versions', '预算版本对比', 'comparisons', { mode: 'versions' }]]],
       ['资金管理', [['cash', '资金分析', 'cash']]],
       ['经营分析', [['operations', '经营分析', 'operations']]],
-      ['数据与异常', [['datacenter', '数据中心', 'datacenter'], ['sources', '来源记录', 'sources'], ['facts', '已发布事实', 'facts'], ['alerts', '预警中心', 'alerts']]],
+      ['数据与异常', [['datacenter', '数据中心', 'datacenter'], ['costitems', '费用类别', 'costitems'], ['sources', '来源记录', 'sources'], ['facts', '已发布事实', 'facts'], ['alerts', '预警中心', 'alerts']]],
       ['财务处理', [['review', '审核队列', 'review'], ['entry', '财务代录', 'entry'], ['filing-activities', '填报活动', 'filing', { section: 'tasks' }]]],
       ['身份与权限', [['identity-members', '成员与角色', 'identity', { directorySection: 'members' }], ['identity-directory', '组织通讯录', 'identity', { directorySection: 'directory' }], ['identity-employment', '部门归属', 'identity', { directorySection: 'employment' }], ['permissions', '功能与数据授权', 'permissions']]],
-      ['更多工具', [['bom', '成本 BOM', 'bom'], ['analyze', 'AI 财务助手', 'analyze'], ['notifications', '通知中心', 'notifications']]],
+      ['更多工具', [['bom', '成本工程', 'bom'], ['analyze', 'AI 财务助手', 'analyze'], ['notifications', '通知中心', 'notifications']]],
     ]
 
     function financeNavigationAllowed(item, identity) {
@@ -1462,7 +1469,7 @@ window.__ModuleLoader__.load({
         '/budget/comparison/yearly': ['comparisons', { mode: 'yearly' }],
         '/budget/comparison/versions': ['comparisons', { mode: 'versions' }],
         '/cash': ['cash'], '/operations': ['operations'], '/alerts': ['alerts'],
-        '/data-center': ['datacenter'],
+        '/data-center': ['datacenter'], '/data-center/cost-items': ['costitems'],
         '/review': ['review'], '/data-entry': ['entry'], '/assistant': ['analyze'],
         '/cost-engineering': ['bom'], '/notifications': ['notifications'],
         '/settings/finance-permissions': ['permissions'],
@@ -1487,9 +1494,23 @@ window.__ModuleLoader__.load({
         else if (legacy === 'dept') route = ['filing', { section: 'department' }]
         else if (legacy === 'tasks' || url.searchParams.has('task')) route = ['filing', { section: 'assignments' }]
       }
+      if (pathname === '/budget') {
+        const legacy = { 'snapshot-compare': 'monthly', 'year-compare': 'yearly', versions: 'versions' }[url.searchParams.get('view')]
+        if (legacy) route = ['comparisons', { mode: legacy }]
+      }
       if (!route) return null
       const params = { ...route[1] }
-      if (pathname === '/budget') {
+      if (pathname === '/budget' && route[0] === 'budget') {
+        for (const [query, key] of [['orgs', 'orgIds'], ['depts', 'departmentIds'], ['expenses', 'expenseTypes'], ['months', 'months']]) {
+          if (!url.searchParams.has(query)) continue
+          const values = [...new Set((url.searchParams.get(query) || '').split(',').filter(Boolean))]
+          const valid = key === 'months' ? values.every(value => /^(?:[1-9]|1[0-2])$/.test(value)) : key === 'expenseTypes' ? values.every(value => ['PROJECT_OPERATION', 'FIXED_OPERATION', 'MODEL_SPECIFIC', 'NON_PROJECT'].includes(value)) : values.every(value => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value))
+          if (!valid || values.length > 200) return null
+          params[key] = values
+        }
+        if (url.searchParams.get('unassigned') === '1') params.unassigned = true
+        const page = Number(url.searchParams.get('page'))
+        if (Number.isSafeInteger(page) && page > 0) params.page = page
         if (['lines', 'ledger', 'matrix', 'month', 'variance', 'adjustments', 'allocations', 'versions'].includes(url.searchParams.get('view'))) params.view = url.searchParams.get('view')
         const line = url.searchParams.get('line')
         if (url.searchParams.has('line') && (!line || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(line))) return null
@@ -1513,12 +1534,12 @@ window.__ModuleLoader__.load({
       } : pathname === '/cash' ? { planType: ['PURCHASE', 'OTHER', 'NEW_RETAIL', 'PR_PAYMENT', 'DIRECT_PARTS'] }
         : pathname === '/alerts' ? { status: ['OPEN', 'CONFIRMED', 'RESOLVED', 'IGNORED'], severity: ['INFO', 'WARN', 'CRITICAL'], alertType: ['BUDGET_OVERRUN', 'EXECUTION_SLOW', 'CASH_GAP', 'DATA_QUALITY'] } : {}
       for (const [key, values] of Object.entries(allowedFilters)) if (values.includes(url.searchParams.get(key))) params[key === 'expense' ? 'expenseType' : key] = url.searchParams.get(key)
-      if (['/budget', '/cash', '/alerts'].includes(pathname)) {
+      if (['/budget', '/budget-engine', '/cash', '/alerts'].includes(pathname)) {
         const month = url.searchParams.get('month')
         if (/^(?:[1-9]|1[0-2])$/.test(month || '')) params.month = month
         for (const [query, key] of [['dept', 'departmentId'], ['version', 'versionId']]) {
           const value = url.searchParams.get(query)
-          if (value && /^[a-zA-Z0-9_-]{1,100}$/.test(value)) params[key] = value
+          if (value && /^[a-zA-Z0-9_-]{1,100}$/.test(value) && value !== 'primary') params[key] = value
         }
       }
       if (pathname === '/filing/budget') {
@@ -1532,8 +1553,10 @@ window.__ModuleLoader__.load({
       if (year && /^\d{4}$/.test(year) && Number(year) >= 2000 && Number(year) <= 2100) params.year = year
       for (const [query, key] of [['org', 'orgId'], ['task', 'taskId']]) {
         const value = url.searchParams.get(query)
-        if (value && /^[a-zA-Z0-9_-]{1,100}$/.test(value)) params[key] = value
+        if (value && /^[a-zA-Z0-9_-]{1,100}$/.test(value) && value !== 'primary') params[key] = value
       }
+      if (params.orgId === 'all') params.orgId = ''
+      if (params.orgId || params.orgIds?.length) delete params.unassigned
       return { tab: route[0], params }
     }
 
@@ -1742,16 +1765,14 @@ window.__ModuleLoader__.load({
         paid: finite(point.paidAmount),
       }))
       const openAlerts = (data.openAlerts || alertsSummary.top || []).slice(0, 5)
-      const workItems = workQueue?.state === 'loading' ? null : [
-        {
-          id: 'filing', icon: 'plan', tone: 'blue', label: t('pendingFiling'), hint: t('pendingFilingHint'), value: (workQueue?.tasks?.list || []).filter(item => item.status !== 'CLOSED').length, target: 'filing',
-        },
-        {
-          id: 'quality', icon: 'database', tone: 'amber', label: t('pendingQuality'), hint: t('pendingQualityHint'), value: (workQueue?.quality?.issues || []).reduce((sum, item) => sum + (finite(item.count) ?? 0), 0), target: 'datacenter',
-        },
-        {
-          id: 'alerts', icon: 'warning', tone: 'rose', label: t('pendingAlerts'), hint: t('pendingAlertsHint'), value: workQueue?.alerts?.total ?? alertsSummary.total ?? 0, target: 'alerts',
-        },
+      const workItems = workQueue?.state === 'loading' ? null : workQueue?.financeWriter ? [
+        { id: 'review', icon: 'plan', tone: 'blue', label: '待财务验证', hint: '填报、批次与调整单等待复核', value: workQueue.review?.total ?? '—', target: 'review' },
+        { id: 'quality', icon: 'database', tone: 'amber', label: '数据质量待处理', hint: '未分配主体、缺失金额等', value: workQueue.quality ? (workQueue.quality.issues || []).reduce((sum, item) => sum + (finite(item.count) ?? 0), 0) : '—', target: 'datacenter' },
+        { id: 'alerts', icon: 'warning', tone: 'rose', label: '待处理预警', hint: '当前年度规则引擎结果', value: workQueue.alerts?.total ?? '—', target: 'alerts', params: { status: 'OPEN' } },
+      ] : [
+        { id: 'filing', icon: 'plan', tone: 'blue', label: '待填报', hint: '截止时间前完成并提交', value: workQueue?.assignments ? workQueue.assignments.fillablePending + workQueue.assignments.fillableDraft : '—', target: 'filing', params: { section: 'assignments' } },
+        { id: 'submitted', icon: 'clock', tone: 'amber', label: '待财务验证', hint: '确认前不计入正式数据', value: workQueue?.assignments?.submitted ?? '—', target: 'filing', params: { section: 'mine' } },
+        { id: 'rejected', icon: 'warning', tone: 'rose', label: '已退回', hint: '按退回原因修改后重提', value: workQueue?.assignments?.fillableRejected ?? '—', target: 'filing', params: { section: 'assignments' } },
       ]
       const workbench = h('section', { className: 'sf-workbench', 'aria-labelledby': 'sf-workbench-title' },
         h('div', { className: 'sf-workbench-head' },
@@ -1761,7 +1782,7 @@ window.__ModuleLoader__.load({
           workQueue?.state === 'partial' ? h('span', { className: 'sf-workbench-status' }, t('loadPartial')) : null),
         workItems
           ? h('div', { className: 'sf-work-items' }, ...workItems.map(item => h('button', {
-            type: 'button', key: item.id, className: `sf-work-item is-${item.tone}`, onClick: () => onDrill(item.target),
+            type: 'button', key: item.id, className: `sf-work-item is-${item.tone}`, onClick: () => onDrill(item.target, item.params),
           },
             h('span', { className: 'sf-work-icon' }, h(Glyph, { name: item.icon, size: 15 })),
             h('span', { className: 'sf-work-copy' }, h('strong', null, item.label), h('small', null, item.hint)),
@@ -1818,7 +1839,7 @@ window.__ModuleLoader__.load({
                 },
               },
             ],
-            rows: overview.byOrg || [], empty: t('empty'), onRowClick: row => onDrill('budget', { view: 'lines', orgId: row.orgId || '', unassigned: !row.orgId }),
+            rows: [...(data.budget?.list || []).reduce((map, row) => { const key = row.orgId || ''; const value = map.get(key) || { orgId: row.orgId, orgName: row.orgName || t('unassigned'), budgetAmount: 0, prSubmittedAmount: 0, prEstimatedAmount: 0, paidAmount: 0 }; for (const field of ['budgetAmount', 'prSubmittedAmount', 'prEstimatedAmount', 'paidAmount']) value[field] += finite(row[field]) ?? 0; map.set(key, value); return map }, new Map()).values()], empty: t('empty'), onRowClick: row => onDrill('budget', { view: 'lines', orgId: row.orgId || '', unassigned: !row.orgId }),
           })),
           h('div', { className: 'sf-two-col' },
             h(Card, { title: t('incomeAch'), unit: t('unitNote') },
@@ -1840,7 +1861,7 @@ window.__ModuleLoader__.load({
 
     const BUDGET_VIEWS = [
       ['matrix', 'viewMatrix'], ['month', 'viewMonth'], ['lines', 'viewLines'], ['ledger', 'viewLedger'],
-      ['variance', 'viewVariance'], ['adjustments', 'viewAdjustments'], ['allocations', 'viewAllocations'], ['versions', 'viewVersions'],
+      ['variance', 'viewVariance'], ['adjustments', 'viewAdjustments'], ['allocations', 'viewAllocations'],
     ]
     const ADJ_TYPES = [['NEW_BUDGET', 'typeNew'], ['TRANSFER_SAME_DEPT', 'typeTransferSame'], ['TRANSFER_CROSS_DEPT', 'typeTransferCross'], ['REDUCE', 'typeReduce']]
     const ADJ_STATUSES = [
@@ -1854,13 +1875,32 @@ window.__ModuleLoader__.load({
     /** 预算行选择器的行标签 */
     const lineLabel = line => [line.orgName, line.departmentName, line.costItemName, line.month != null ? mm(line.month) + '月' : null].filter(Boolean).join(' / ')
 
+    // 保存视图使用网页 URL 的字段名，兼容历史插件单值字段。
+    function financeBudgetFilters(q = {}, orgId = '') {
+      const values = (multi, single) => multi ? String(multi).split(',').filter(Boolean) : single ? [String(single)] : []
+      return { orgIds: q.orgIds || values(q.orgs, q.org === 'all' ? '' : q.org || q.orgId || orgId), departmentIds: q.departmentIds || values(q.depts, q.dept || q.departmentId), expenseTypes: q.expenseTypes || values(q.expenses, q.expense || q.expenseType), months: Array.isArray(q.months) ? q.months.map(String) : values(q.months, q.month), versionId: q.version === 'primary' ? '' : q.version || q.versionId || '', recordType: q.recordType || '', month: String(q.month || ''), unassigned: !orgId && (q.unassigned === true || q.unassigned === '1') }
+    }
+    function financeBudgetSavedQuery(view, filters) {
+      const q = { view }
+      for (const [key, value] of [['orgs', filters.orgIds], ['depts', filters.departmentIds], ['expenses', filters.expenseTypes], ['months', filters.months]]) if (value?.length) q[key] = value.join(',')
+      if (filters.versionId) q.version = filters.versionId
+      if (filters.recordType) q.recordType = filters.recordType
+      if (filters.unassigned) q.unassigned = '1'
+      return q
+    }
+    function financeBudgetVisible(budget, filters, view) {
+      if (!budget?.summary) return budget
+      const list = (budget.summary.list || []).filter(row => (!filters.expenseTypes.length || filters.expenseTypes.includes(row.expenseType)) && (view === 'month' || !filters.months.length || filters.months.map(Number).includes(row.month)))
+      return { ...budget, summary: { ...budget.summary, list } }
+    }
+
     function BudgetView({ ctx, t }) {
       const { year, orgId, orgs, departments, revision } = ctx
       const availableViews = BUDGET_VIEWS.filter(([id]) => ctx.financeWriter || !['adjustments', 'allocations', 'versions'].includes(id))
       useEffect(() => { if (!availableViews.some(([id]) => id === view)) setView('matrix') }, [ctx.financeWriter])
       const [view, setView] = useState(() => BUDGET_VIEWS.map(([id]) => id).includes(ctx.drillParams?.view) ? ctx.drillParams.view : 'matrix')
-      const [filters, setFilters] = useState({ expenseType: ctx.drillParams?.expenseType || '', departmentId: ctx.drillParams?.departmentId || '', versionId: ctx.drillParams?.versionId || '', recordType: ctx.drillParams?.recordType || '', month: ctx.drillParams?.month ? String(ctx.drillParams.month) : '', unassigned: false })
-      const [page, setPage] = useState(1)
+      const [filters, setFilters] = useState(() => financeBudgetFilters(ctx.drillParams || {}, orgId))
+      const [page, setPage] = useState(ctx.drillParams?.page || 1)
       const [budget, setBudget] = useState(null) // { summary, lines }
       const [pr, setPr] = useState(null)
       const [versions, setVersions] = useState(null) // 筛选条里的版本下拉也用
@@ -1873,13 +1913,18 @@ window.__ModuleLoader__.load({
 
       const query = (extra = {}) => {
         const params = new URLSearchParams({ year })
-        if (orgId) params.set('orgId', orgId)
-        if (view === 'ledger' && filters.recordType) params.set('recordType', filters.recordType)
-        if (filters.expenseType) params.set('expenseType', filters.expenseType)
-        if (filters.departmentId) params.set('departmentId', filters.departmentId)
-        if (filters.versionId) params.set('versionId', filters.versionId)
-        if (filters.month) params.set('month', filters.month)
-        if (filters.unassigned) params.set('unassigned', '1')
+        if (filters.orgIds.length === 1) params.set('orgId', filters.orgIds[0])
+        else if (filters.orgIds.length) params.set('orgIds', JSON.stringify(filters.orgIds))
+        if (view === 'ledger') {
+          if (filters.recordType) params.set('recordType', filters.recordType)
+          if (filters.month) params.set('month', filters.month)
+        } else {
+          if (filters.departmentIds.length) params.set('departmentIds', JSON.stringify(filters.departmentIds))
+          if (filters.expenseTypes.length) params.set('expenseTypes', JSON.stringify(filters.expenseTypes))
+          if (filters.versionId) params.set('versionId', filters.versionId)
+          if (filters.months.length) params.set('months', JSON.stringify(filters.months.map(Number)))
+          if (filters.unassigned && !filters.orgIds.length) params.set('unassigned', '1')
+        }
         for (const [key, value] of Object.entries(extra)) if (value !== undefined && value !== '') params.set(key, value)
         return params.toString()
       }
@@ -1889,13 +1934,15 @@ window.__ModuleLoader__.load({
       useEffect(() => {
         let cancelled = false
         if (view === 'matrix' || view === 'month' || view === 'lines' || view === 'variance') {
-          api(`/budget?${query({ page, limit: BUDGET_LINE_LIMIT })}`).then(value => { if (!cancelled) setBudget(value) }).catch(() => { if (!cancelled) setBudget({ error: true }) })
+          setBudget(null)
+          api(`/budget?${query({ page, limit: PAGE_SIZE })}`).then(value => { if (!cancelled) setBudget(value) }).catch(() => { if (!cancelled) setBudget({ error: true }) })
         }
         if (view === 'ledger') {
+          setPr(null)
           api(`/pr?${query({ page, limit: PAGE_SIZE })}`).then(value => { if (!cancelled) setPr(value) }).catch(() => { if (!cancelled) setPr({ error: true }) })
         }
         return () => { cancelled = true }
-      }, [view, page, year, orgId, filters.expenseType, filters.departmentId, filters.versionId, filters.month, filters.recordType, filters.unassigned, revision, reloadTick])
+      }, [view, page, year, orgId, JSON.stringify(filters), revision, reloadTick])
 
       useEffect(() => {
         api(`/budget-versions?year=${year}`).then(value => setVersions(value.data ?? { list: [] })).catch(() => setVersions({ list: [] }))
@@ -1913,24 +1960,26 @@ window.__ModuleLoader__.load({
         } catch (error) { setNotice(`${t('opFailed')}: ${error.message}`); return false } finally { setBusy(false) }
       }
 
-      const activeCount = ['expenseType', 'departmentId', 'versionId', 'month', 'recordType'].filter(key => filters[key]).length + (filters.unassigned ? 1 : 0)
+      const activeCount = filters.orgIds.length + filters.departmentIds.length + filters.expenseTypes.length + filters.months.length + (filters.versionId ? 1 : 0) + (filters.recordType ? 1 : 0) + (filters.unassigned ? 1 : 0)
+      const update = patch => { setPage(1); setFilters(current => ({ ...current, ...patch })) }
       const filterBar = h('div', { className: 'sf-filters sf-budget-filters' },
-        view === 'ledger' ? h(Select, { 'aria-label': 'PR 记录类型', value: filters.recordType || '', onChange: value => { setPage(1); setFilters(current => ({ ...current, recordType: value })) }, options: [['SUBMITTED', '已打 PR'], ['ESTIMATED', '预计 PR']], placeholder: '全部 PR 类型' }) : null,
-        h(Select, { value: filters.expenseType, onChange: value => { setPage(1); setFilters(f => ({ ...f, expenseType: value })) }, options: EXPENSE_TYPES.map(([id, label]) => [id, t(label)]), placeholder: t('expenseType') }),
-        h(SearchSelect, { value: filters.departmentId, onChange: value => { setPage(1); setFilters(f => ({ ...f, departmentId: value })) }, options: (departments || []).map(d => [d.id, d.name]), placeholder: t('department') }),
-        h(Select, { value: filters.month, onChange: value => { setPage(1); setFilters(f => ({ ...f, month: value })) }, options: Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1} 月`]), placeholder: t('monthCol') }),
-        view === 'matrix' || view === 'lines' ? h(SearchSelect, { value: filters.versionId, onChange: value => { setPage(1); setFilters(f => ({ ...f, versionId: value })) }, options: (versions?.list || []).map(version => [version.id, budgetVersionLabel(version)]), placeholder: t('version') }) : null,
-        view === 'matrix' || view === 'lines' ? h('label', { className: 'sf-row', style: { gap: 6, fontSize: 12, color: 'var(--sf-ink2)' } },
-          h('input', { type: 'checkbox', checked: filters.unassigned, onChange: event => { setPage(1); setFilters(f => ({ ...f, unassigned: event.target.checked })) } }), t('unassigned')) : null,
-        activeCount > 0 ? h(LinkButton, { onClick: () => { setPage(1); setFilters({ expenseType: '', departmentId: '', versionId: '', recordType: '', month: '', unassigned: false }) } }, `${t('clearFilters')} (${activeCount})`) : null)
+        h(MultiSearchSelect, { value: filters.orgIds, onChange: orgIds => update({ orgIds, unassigned: false }), options: (orgs || []).filter(org => org.type !== 'GROUP').map(org => [org.id, org.name]), placeholder: t('org') }),
+        view === 'ledger' ? h(Select, { 'aria-label': 'PR 记录类型', value: filters.recordType, onChange: recordType => update({ recordType }), options: [['SUBMITTED', '已打 PR'], ['ESTIMATED', '预计 PR']], placeholder: '全部 PR 类型' }) : null,
+        view !== 'ledger' ? h(MultiSearchSelect, { value: filters.expenseTypes, onChange: expenseTypes => update({ expenseTypes }), options: EXPENSE_TYPES.map(([id, label]) => [id, t(label)]), placeholder: t('expenseType') }) : null,
+        view !== 'ledger' ? h(MultiSearchSelect, { value: filters.departmentIds, onChange: departmentIds => update({ departmentIds }), options: (departments || []).map(d => [d.id, d.name]), placeholder: t('department') }) : null,
+        view === 'month' || view === 'ledger' ? h(Select, { 'aria-label': '预算月份', value: filters.month, onChange: month => update({ month, months: month ? [month] : [] }), options: Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1} 月`]), placeholder: t('monthCol') }) : h(MultiSearchSelect, { value: filters.months.map(String), onChange: months => update({ months }), options: Array.from({ length: 12 }, (_, i) => [String(i + 1), `${i + 1} 月`]), placeholder: t('monthCol') }),
+        ['matrix', 'month', 'lines', 'variance'].includes(view) ? h(SearchSelect, { value: filters.versionId, onChange: versionId => update({ versionId }), options: (versions?.list || []).map(version => [version.id, budgetVersionLabel(version)]), placeholder: t('version') }) : null,
+        !filters.orgIds.length && ['matrix', 'month', 'lines', 'variance'].includes(view) ? h('label', { className: 'sf-row' }, h('input', { type: 'checkbox', checked: filters.unassigned, onChange: event => update({ unassigned: event.target.checked }) }), t('unassigned')) : null,
+        activeCount > 0 ? h(LinkButton, { onClick: () => { setPage(1); setFilters(financeBudgetFilters()) } }, `${t('clearFilters')} (${activeCount})`) : null)
+      const visibleBudget = financeBudgetVisible(budget, filters, view)
 
       const savedViewsBar = h('div', { className: 'sf-row' },
         ...(savedViews?.list || []).map(item => h('span', { key: item.id, className: 'sf-pill sf-pill-muted' },
           item.name,
           h(LinkButton, { style: { marginLeft: 6 }, onClick: () => {
             const q = item.query || {}
-            setFilters({ expenseType: q.expenseType || '', departmentId: q.departmentId || '', versionId: q.versionId || '', month: q.month || '', unassigned: q.unassigned === '1' })
-            if (q.view) setView(q.view)
+            setPage(1); setFilters(financeBudgetFilters(q))
+            if (BUDGET_VIEWS.some(([id]) => id === q.view)) setView(q.view)
           } }, t('applyView')),
           h(LinkButton, { style: { marginLeft: 4 }, onClick: () => act(`/saved-views/delete`, { id: item.id }, t('deleted')).then(() => api('/saved-views').then(value => setSavedViews(value.data ?? { list: [] })).catch(() => {})) }, '×'))),
         h(LinkButton, { onClick: () => setDialog({ kind: 'saveView' }) }, t('saveView')))
@@ -1940,13 +1989,15 @@ window.__ModuleLoader__.load({
           h(PillTabs, { tabs: availableViews, value: view, onChange: id => { setView(id); setPage(1) }, t }),
           savedViewsBar),
         budget?.summary?.budgetVersionId === null ? h('p', { role: 'status', className: 'sf-banner sf-banner-amber' }, '当前年度没有已发布预算；空汇总不代表已批准零预算。') : null,
-        h('div', { className: 'sf-row-between' }, filterBar, notice ? h(Notice, null, notice) : null),
+        h('div', { className: 'sf-row-between' }, ['matrix', 'month', 'lines', 'ledger', 'variance'].includes(view) ? filterBar : null, notice ? h(Notice, null, notice) : null),
 
-        view === 'matrix' ? h(MatrixView, { budget, t, onCell: cell => { setFilters(f => ({ ...f, month: cell.month ? String(cell.month) : '' })); setView('lines') } }) : null,
-        view === 'month' ? h(MonthView, { budget, t }) : null,
-        view === 'lines' ? h(LinesView, { budget, page, onPage: setPage, t, onDetail: line => setDialog({ kind: 'lineDetail', line }) }) : null,
+        ['matrix', 'month', 'lines', 'variance'].includes(view) && !budget ? h('p', { role: 'status' }, '预算加载中…') : null,
+        budget?.error ? h(ListLoadError, { label: '预算', onRetry: () => setReloadTick(value => value + 1) }) : null,
+        view === 'matrix' && budget && !budget.error ? h(MatrixView, { budget: visibleBudget, t, onCell: cell => { update({ orgIds: cell.orgId ? [cell.orgId] : [], unassigned: !cell.orgId, departmentIds: cell.departmentId ? [cell.departmentId] : [], expenseTypes: cell.expenseType ? [cell.expenseType] : [], months: [String(cell.month)] }); setView('lines') } }) : null,
+        view === 'month' && budget && !budget.error ? h(MonthView, { budget: visibleBudget, t, month: Number(filters.month || filters.months[0]) || new Date().getMonth() + 1, onMonth: month => update({ month: String(month), months: [String(month)] }) }) : null,
+        view === 'lines' && budget && !budget.error ? h(LinesView, { budget, page, onPage: setPage, t, onDetail: line => setDialog({ kind: 'lineDetail', line }) }) : null,
         view === 'ledger' ? h(LedgerView, { pr, page, onPage: setPage, t }) : null,
-        view === 'variance' ? h(VarianceView, { budget, t }) : null,
+        view === 'variance' && budget && !budget.error ? h(VarianceView, { budget: visibleBudget, t }) : null,
         view === 'adjustments' ? h(AdjustmentsView, { page, onPage: setPage, t, busy, revision, reloadTick, act, onDialog: setDialog }) : null,
         view === 'allocations' ? h(AllocationsView, { query, page, onPage: setPage, t, revision, reloadTick, act, onDialog: setDialog }) : null,
         view === 'versions' ? h(VersionsView, { versions, year, t, revision, reloadTick, act, onDialog: setDialog }) : null,
@@ -1956,7 +2007,7 @@ window.__ModuleLoader__.load({
         dialog?.kind === 'adjCreate' ? h(AdjustCreateDialog, { year, orgs, departments, lines: budget?.lines?.list || [], busy, t, onClose: () => setDialog(null), act }) : null,
         dialog?.kind === 'reason' ? h(ReasonDialog, { title: dialog.title, required: dialog.required, t, onClose: () => setDialog(null), onSubmit: reason => { setDialog(null); return dialog.run(reason) } }) : null,
         dialog?.kind === 'adjDetail' ? h(AdjustDetailDialog, { id: dialog.id, t, onClose: () => setDialog(null) }) : null,
-        dialog?.kind === 'allocPick' ? h(AllocPickDialog, { entry: dialog.entry, availability, t, onClose: () => setDialog(null), act }) : null,
+        dialog?.kind === 'allocPick' ? h(AllocPickDialog, { entry: dialog.entry, availability: dialog.availability, t, onClose: () => setDialog(null), act }) : null,
         dialog?.kind === 'carryover' ? h(CarryoverDialog, { t, onClose: () => setDialog(null), act }) : null,
         dialog?.kind === 'versionDiff' ? h(VersionDiffDialog, { versions, year, t, onClose: () => setDialog(null) }) : null,
       )
@@ -1970,8 +2021,8 @@ window.__ModuleLoader__.load({
       if (!rows.length) return h(EmptyState, null, t('empty'))
       const groups = new Map()
       for (const row of rows) {
-        const key = `${row.orgName ?? t('unassigned')}|${row.expenseType ?? ''}|${row.departmentName ?? ''}`
-        if (!groups.has(key)) groups.set(key, { label: [row.orgName ?? t('unassigned'), row.expenseType ? financeEnumLabel(row.expenseType, t, EXPENSE_LABELS) : '', row.departmentName].filter(Boolean).join(' / '), months: {}, total: { budget: 0, pr: 0, paid: 0, prEstimated: 0 } })
+        const key = `${row.orgId || ''}|${row.expenseType || ''}|${row.departmentId || ''}`
+        if (!groups.has(key)) groups.set(key, { orgId: row.orgId, departmentId: row.departmentId, expenseType: row.expenseType, label: [row.orgName ?? t('unassigned'), row.expenseType ? financeEnumLabel(row.expenseType, t, EXPENSE_LABELS) : '', row.departmentName].filter(Boolean).join(' / '), months: {}, total: { budget: 0, pr: 0, paid: 0, prEstimated: 0 } })
         const group = groups.get(key)
         const month = row.month ?? 0
         group.months[month] = {
@@ -1987,7 +2038,7 @@ window.__ModuleLoader__.load({
       const data = [...groups.values()]
       const columns = [
         { label: t('org'), key: 'label', stickyLeft: true },
-        ...Array.from({ length: 12 }, (_, index) => ({ label: `${index + 1}`, key: 'month-' + (index + 1), sortValue: row => row.months[index + 1]?.pr ?? null, render: row => renderCell(row.months[index + 1], index + 1), num: true })),
+        ...Array.from({ length: 12 }, (_, index) => ({ label: `${index + 1}`, key: 'month-' + (index + 1), sortValue: row => row.months[index + 1]?.pr ?? null, render: row => renderCell(row.months[index + 1], index + 1, row), num: true })),
         { label: t('annualTotal'), key: 'total.budget', sortValue: row => row.total.budget, render: row => wan(row.total.budget) ?? '—', num: true },
         { label: t('kpiPrSubmitted'), key: 'total.pr', sortValue: row => row.total.pr, render: row => wan(row.total.pr) ?? '—', num: true },
         { label: t('kpiPaid'), key: 'total.paid', sortValue: row => row.total.paid, render: row => wan(row.total.paid) ?? '—', num: true },
@@ -2000,14 +2051,14 @@ window.__ModuleLoader__.load({
           },
         },
       ]
-      function renderCell(cell, month) {
-        if (!cell || !cell.budget) return h('span', { style: { color: 'var(--sf-ink3)' } }, '·')
+      function renderCell(cell, month, row) {
+        if (!cell) return h('span', { style: { color: 'var(--sf-ink3)' } }, '·')
         const rate = execRateOf(cell.pr, 0, cell.budget)
         const level = heatLevel(rate)
         return h('a', {
           href: '#', style: { textDecoration: 'none', color: 'inherit' },
           className: level ? `sf-heat sf-heat-${level}` : '',
-          onClick: event => { event.preventDefault(); onCell({ month }) },
+          onClick: event => { event.preventDefault(); onCell({ month, orgId: row.orgId, departmentId: row.departmentId, expenseType: row.expenseType }) },
         }, wan(cell.pr))
       }
       return h(Card, { title: t('budgetSummaryTitle'), unit: t('unitNote') }, h(Table, { tableId: 'finance-MatrixView-1', columns, rows: data, minColumns: 1080, empty: t('empty') }))
@@ -2015,8 +2066,8 @@ window.__ModuleLoader__.load({
 
     // ---- 月度视图 ----
 
-    function MonthView({ budget, t }) {
-      const [month, setMonth] = useState(new Date().getMonth() + 1)
+    function MonthView({ budget, t, month, onMonth }) {
+      const setMonth = next => onMonth(typeof next === 'function' ? next(month) : next)
       const rows = (budget?.summary?.list || []).filter(row => row.month === month)
       const totals = rows.reduce((acc, row) => {
         acc.budget += finite(row.budgetAmount) ?? 0
@@ -2071,7 +2122,7 @@ window.__ModuleLoader__.load({
           ],
           rows: lines?.list || [], empty: t('empty'), onRowClick: onDetail, rowKey: 'id',
         }),
-        h('div', { className: 'sf-row-between' }, h(LimitNote, { rows: lines?.list, limit: BUDGET_LINE_LIMIT, t }), h(Pager, { page, total: lines?.total, limit: PAGE_SIZE, onPage })))
+        h(Pager, { page, total: lines?.total, limit: PAGE_SIZE, onPage }))
     }
 
     function LineDetailDialog({ line, t, onClose }) {
@@ -2292,6 +2343,7 @@ window.__ModuleLoader__.load({
       const [pool, setPool] = useState(null)
       const [availability, setAvailability] = useState(null)
       const [recent, setRecent] = useState(null)
+      const scope = query()
       useEffect(() => {
         let cancelled = false
         void Promise.all([
@@ -2303,7 +2355,7 @@ window.__ModuleLoader__.load({
           setPool(poolValue.data); setAvailability(availabilityValue.data); setRecent(recentValue.data)
         })
         return () => { cancelled = true }
-      }, [page, revision, reloadTick]) // eslint-disable-line react-hooks/exhaustive-deps
+      }, [page, scope, revision, reloadTick]) // eslint-disable-line react-hooks/exhaustive-deps
       const entries = pool?.entries || []
       const recentList = recent?.list || []
       return h('div', { className: 'sf-stack' },
@@ -2318,7 +2370,7 @@ window.__ModuleLoader__.load({
                 label: t('actions'), key: 'actions', sortable: false,
                 render: row => h('div', { className: 'sf-row', style: { justifyContent: 'flex-end', flexWrap: 'nowrap' } },
                   row.suggestions?.[0] ? h(LinkButton, { onClick: () => act('/allocations', { sourceType: row.sourceType, sourceId: row.sourceId, budgetLineId: row.suggestions[0].budgetLineId ?? row.suggestions[0].id, amount: row.amount }) }, t('allocOneClick')) : null,
-                  h(LinkButton, { onClick: () => onDialog({ kind: 'allocPick', entry: row }) }, t('allocPick'))),
+                  h(LinkButton, { onClick: () => onDialog({ kind: 'allocPick', entry: row, availability }) }, t('allocPick'))),
               },
             ],
             rows: entries, empty: t('empty'),
@@ -2460,8 +2512,7 @@ window.__ModuleLoader__.load({
       const [name, setName] = useState('')
       const submit = () => {
         if (!name.trim()) return
-        const query = { view }
-        for (const [key, value] of Object.entries(filters)) if (value) query[key] = value
+        const query = financeBudgetSavedQuery(view, filters)
         post('/saved-views', { name: name.trim(), query })
           .then(() => api('/saved-views'))
           .then(value => { onSaved(value.data ?? { list: [] }); onClose() })
@@ -2646,7 +2697,7 @@ window.__ModuleLoader__.load({
           notice ? h(Notice, null, notice) : null),
         filterBar ? h('div', { className: 'sf-row-between' }, filterBar) : null,
 
-        tab === 'summary' ? h(SummaryTab, { cash, t, year }) : null,
+        tab === 'summary' ? h(SummaryTab, { cash, t, year, onDrill }) : null,
         tab === 'plans' ? !currentPlans ? h('p', { role: 'status' }, t('loading')) : currentPlans.error ? h(CashPlanListError, { onRetry: retryList }) : h(PlansTab, { rows: planRows, total: currentPlans.value?.data?.total ?? currentPlans.value?.total, page, onPage: setPage, t, busy, act, canWrite, onDialog: setDialog }) : null,
         tab === 'revenue' ? !currentRevenues ? h('p', { role: 'status' }, t('loading')) : currentRevenues.error ? h(CashPlanListError, { onRetry: retryList }) : h(RevenueTab, { revenues: currentRevenues.value, page: revenuePage, onPage: setRevenuePage, t, canWrite, onBackfill: row => setDialog({ kind: 'backfill', row }), onLedger: row => setDialog({ kind: 'receiptLedger', row }) }) : null,
         tab === 'accuracy' ? h(CashAccuracyView, { ctx, t }) : null,
@@ -2679,7 +2730,7 @@ window.__ModuleLoader__.load({
       return { year, month, isCurrentYear, rows: current, totals }
     }
 
-    function SummaryTab({ cash, t, year, now }) {
+    function SummaryTab({ cash, t, year, now, onDrill }) {
       if (cash?.error) return h(EmptyState, null, t('loadError'))
       const rows = cash?.data?.list || cash?.list || []
       const model = cashSummaryModel(rows, year, now)
@@ -2687,7 +2738,7 @@ window.__ModuleLoader__.load({
         model.isCurrentYear ? h(Card, { title: `${model.year}-${String(model.month).padStart(2, '0')} · ${t('cashMonthlyExecution')}`, unit: t('unitNote') },
           h('div', { className: 'sf-kpis' },
             ...[['actualBalance', 'cashBalance'], ['plannedIncome', 'plannedIncome'], ['plannedExpense', 'plannedExpense'], ['actualIncome', 'actualIncome'], ['actualExpense', 'actualExpense'], ['remainingPayment', 'remainingUnpaid']].map(([key, label]) =>
-              h(KpiCard, { key, icon: 'data', label: t(label), value: yuan(model.totals[key]) ?? '—', negative: model.totals[key] !== null && model.totals[key] < 0 }))),
+              h(KpiCard, { key, icon: 'data', label: t(label), value: yuan(model.totals[key]) ?? '—', negative: model.totals[key] !== null && model.totals[key] < 0, onClick: onDrill && key !== 'actualBalance' ? () => onDrill('cash', { view: /Income$/.test(key) ? 'revenue' : 'plans', year: String(model.year), month: String(model.month) }) : undefined }))),
           h('p', { className: 'sf-note' }, t('cashMissingMetrics'))) : null,
         h(Card, { title: t('cashSummaryTable'), unit: t('unitNote') }, h(CashSummaryTable, { rows, t })))
     }
@@ -3290,9 +3341,6 @@ window.__ModuleLoader__.load({
 
     function AlertsView({ ctx, t, onDrill }) {
       const { year, orgId, revision } = ctx
-      const [summary, setSummary] = useState(null)
-      const [rules, setRules] = useState(null)
-      const [rows, setRows] = useState(null)
       const [filters, setFilters] = useState({ severity: ctx.drillParams?.severity || '', alertType: ctx.drillParams?.alertType || '', month: ctx.drillParams?.month || '', status: ctx.drillParams?.status || 'OPEN' })
       const [activeStat, setActiveStat] = useState('')
       const [page, setPage] = useState(1)
@@ -3301,46 +3349,43 @@ window.__ModuleLoader__.load({
       const [detail, setDetail] = useState(null)
       const [statusDialog, setStatusDialog] = useState(null)
 
-      const load = () => {
-        api(`/alerts-summary?year=${year}${orgId ? `&orgId=${orgId}` : ''}`).then(value => setSummary(value.data ?? {})).catch(() => setSummary({}))
-        api('/alert-rules').then(value => setRules(value.data ?? { list: [], activeVersion: null })).catch(() => setRules({ list: [], activeVersion: null }))
-        fetchRows()
-      }
-      const fetchRows = () => {
-        const params = new URLSearchParams({ year, page: String(page), limit: String(PAGE_SIZE) })
-        if (orgId) params.set('orgId', orgId)
-        if (filters.severity) params.set('severity', filters.severity)
-        if (filters.status) params.set('status', filters.status)
-        if (filters.alertType) params.set('alertType', filters.alertType)
-        if (filters.month) params.set('month', filters.month)
-        api(`/alerts?${params}`).then(value => setRows(value)).catch(() => setRows({ error: true }))
-      }
-      useEffect(() => { load() }, [year, orgId, revision]) // eslint-disable-line react-hooks/exhaustive-deps
-      useEffect(() => { fetchRows() }, [page, filters.severity, filters.status, filters.alertType, filters.month]) // eslint-disable-line react-hooks/exhaustive-deps
-
+      const [reloadTick, setReloadTick] = useState(0)
+      const params = new URLSearchParams({ year, page: String(page), limit: String(PAGE_SIZE), ...filters })
+      if (orgId) params.set('orgId', orgId)
+      for (const key of [...params.keys()]) if (!params.get(key)) params.delete(key)
+      const summaryResource = useFinanceResource(`/finance/alerts/summary?year=${year}${orgId ? `&orgId=${encodeURIComponent(orgId)}` : ''}`, `${revision}-${reloadTick}`)
+      const rulesResource = useFinanceResource('/finance/alert-rules', `${revision}-${reloadTick}`)
+      const rowsResource = useFinanceResource(`/finance/alerts?${params}`, `${revision}-${reloadTick}`)
+      const summary = summaryResource.data
+      const rules = rulesResource.data
+      const rows = rowsResource.data
+      const load = () => setReloadTick(value => value + 1)
+      const scanLock = useRef(false)
       const runEngine = async () => {
+        if (scanLock.current) return
+        scanLock.current = true
         setBusy(true); setNotice(null)
         try {
           const result = await post('/alerts/run', {})
           const data = result.data || {}
           setNotice(t('runDone').replace('{created}', data.created ?? 0).replace('{updated}', data.updated ?? 0).replace('{resolved}', data.resolved ?? 0))
           load()
-        } catch (error) { setNotice(`${t('opFailed')}: ${error.message}`) } finally { setBusy(false) }
+        } catch (error) { setNotice(`${t('opFailed')}: ${error.message}`) } finally { scanLock.current = false; setBusy(false) }
       }
 
       const activeRuleSet = (rules?.list || []).find(item => item.status === 'ACTIVE')
       const statCards = [
-        ['critical', summary?.critical ?? 0, 'rose', 'sevCritical'],
-        ['warn', summary?.warn ?? 0, 'amber', 'sevWarn'],
-        ['info', summary?.info ?? 0, 'sky', 'sevInfo'],
-        ['resolved', summary?.resolved ?? 0, 'green', 'sevResolved'],
+        ['critical', summary?.critical ?? '—', 'rose', 'sevCritical'],
+        ['warn', summary?.warn ?? '—', 'amber', 'sevWarn'],
+        ['info', summary?.info ?? '—', 'sky', 'sevInfo'],
+        ['resolved', summary?.resolved ?? '—', 'green', 'sevResolved'],
       ]
-      const alertRows = rows?.data?.list || rows?.list || []
+      const alertRows = rows?.list || []
 
-      const drillTarget = alertType => {
-        if (alertType === 'CASH_GAP') return ['cash', {}]
-        if (alertType === 'DATA_QUALITY') return ['datacenter', {}]
-        return ['budget', {}]
+      const drillTarget = alert => {
+        const params = { year: String(alert.year || year), orgId: alert.orgId || '', ...(alert.month ? { month: String(alert.month) } : {}) }
+        if (alert.alertType === 'CASH_GAP') return ['cash', { ...params, view: 'summary' }]
+        return ['budget', { ...params, view: 'lines', ...(!alert.orgId || alert.alertType === 'DATA_QUALITY' ? { orgId: '', unassigned: true } : {}) }]
       }
 
       return h('div', { className: 'sf-view' },
@@ -3358,37 +3403,38 @@ window.__ModuleLoader__.load({
             }))),
           ctx.financeWriter ? h(PrimaryButton, { busy, onClick: runEngine }, h(Glyph, { name: 'refresh', size: 12 }), busy ? t('running') : t('runEngine')) : null),
         notice ? h(Notice, null, notice) : null,
+        ...[summaryResource, rulesResource].filter(resource => resource.error || resource.loading).map((resource, key) => h(FinanceResource, { key, resource })),
         rules ? h('div', { className: `sf-banner ${activeRuleSet ? 'sf-banner-green' : 'sf-banner-amber'}`, role: 'status' },
           h(Glyph, { name: 'shield', size: 14 }),
           activeRuleSet
             ? t('rulesConfirmed').replace('{v}', String(activeRuleSet.version)).replace('{date}', shortDate(activeRuleSet.confirmedAt) ?? '—')
             : t('rulesUnconfirmed'),
-          !activeRuleSet && ctx.role === 'FINANCE_OWNER' ? h(PrimaryButton, { onClick: () => post('/alert-rules/confirm', {}).then(() => api('/alert-rules').then(value => setRules(value.data ?? { list: [], activeVersion: null })).catch(() => {})).catch(error => setNotice(`${t('opFailed')}: ${error.message}`)) }, t('confirmDefaultRules')) : null) : null,
+          !activeRuleSet && ctx.role === 'FINANCE_OWNER' ? h(PrimaryButton, { onClick: () => post('/alert-rules/confirm', {}).then(load).catch(error => setNotice(`${t('opFailed')}: ${error.message}`)) }, t('confirmDefaultRules')) : null) : null,
         h('div', { className: 'sf-filters' },
           h(Select, { 'aria-label': '预警类型', value: filters.alertType, onChange: value => { setPage(1); setFilters(f => ({ ...f, alertType: value })) }, options: ALERT_TYPES.map(([id, key]) => [id, t(key)]), placeholder: '全部类型' }),
           h(Select, { 'aria-label': '预警月份', value: filters.month, onChange: value => { setPage(1); setFilters(f => ({ ...f, month: value })) }, options: Array.from({ length: 12 }, (_, i) => [String(i + 1), `${i + 1}月`]), placeholder: '全部月份' }),
           h(Select, { value: filters.severity, onChange: value => { setPage(1); setFilters(f => ({ ...f, severity: value })) }, options: [['CRITICAL', t('sevCritical')], ['WARN', t('sevWarn')], ['INFO', t('sevInfo')]], placeholder: t('severity') }),
           h(Select, { value: filters.status, onChange: value => { setPage(1); setFilters(f => ({ ...f, status: value })) }, options: ALERT_STATUS_OPTIONS.map(([id, key]) => [id, t(key)]), placeholder: t('stAll') })),
-        h(Card, { title: t('alertsTitle') }, h(Table, { tableId: 'finance-AlertsView-1',
+        h(Card, { title: t('alertsTitle') }, h(FinanceResource, { resource: rowsResource }, h(Table, { tableId: 'finance-AlertsView-1',
           columns: [
             { label: t('severity'), key: 'severity', sortValue: row => ({ INFO: 0, WARN: 1, CRITICAL: 2 }[row.severity] ?? 0), render: row => h(SeverityBadge, { severity: row.severity, t }) },
             { label: t('alertType'), key: 'alertType', render: row => alertTypeLabel(row.alertType, t) },
             { label: t('alertTitleCol'), key: 'title', stickyLeft: false },
             { label: t('detail'), key: 'detail', render: row => h('span', { style: { whiteSpace: 'normal', wordBreak: 'break-all', display: 'block', maxWidth: 420, textAlign: 'left' } }, row.detail ?? '—') },
             { label: t('org'), key: 'orgName' },
-            { key: 'actions', label: '处理状态', sortable: false, render: row => h(GhostButton, { onClick: event => { event.stopPropagation(); setStatusDialog(row) } }, '处理预警') },
+            { key: 'actions', label: '处理状态', sortable: false, render: row => ctx.financeWriter ? h(GhostButton, { onClick: event => { event.stopPropagation(); setStatusDialog(row) } }, '处理预警') : '只读' },
             { label: t('lastSeen'), key: 'lastSeenAt', render: row => shortDate(row.lastSeenAt) ?? '—', num: true },
           ],
-          rows: alertRows, empty: rows?.error ? h(ListLoadError, { label: '预警', onRetry: fetchRows }) : t('empty'),
+          rows: alertRows, empty: t('empty'),
           onRowClick: row => setDetail(row), rowKey: 'id',
-        }), h(Pager, { page, total: rows?.data?.total ?? rows?.total, limit: PAGE_SIZE, onPage: setPage })),
+        })), h(Pager, { page, total: rows?.total, limit: PAGE_SIZE, onPage: setPage })),
         statusDialog ? h(FinanceFormDialog, { title: '更新预警处理状态', initial: { status: statusDialog.status }, fields: [{ key: 'status', label: '处理状态', options: [['OPEN', '待处理'], ['CONFIRMED', '已确认'], ['RESOLVED', '已解决'], ['IGNORED', '已忽略']], required: true }, { key: 'note', label: '处理说明' }], onClose: () => setStatusDialog(null), onSubmit: async body => { await financeRest(`/finance/alerts/${statusDialog.id}/status`, 'PATCH', body); load() } }) : null,
         detail ? h(Dialog, { title: t('alertDetail'), onClose: () => setDetail(null) },
           h('div', { className: 'sf-stack' },
             h('div', { className: 'sf-row' }, h(SeverityBadge, { severity: detail.severity, t }), h(Pill, { tone: 'muted' }, alertTypeLabel(detail.alertType, t) ?? '—'), h('span', { className: 'sf-note' }, `${shortDate(detail.firstSeenAt) ?? '—'} → ${shortDate(detail.lastSeenAt) ?? '—'}`)),
             h('p', { className: 'sf-note' }, detail.detail ?? detail.title ?? ''),
             detail.evidence && Object.keys(detail.evidence).length ? h('div', null, h('strong', null, t('evidence')), h(FinanceEvidence, { value: detail.evidence })) : null,
-            h('div', { className: 'sf-row' }, h(PrimaryButton, { onClick: () => { const [tab, params] = drillTarget(detail.alertType); setDetail(null); onDrill(tab, params) } }, t('viewSource'))))) : null,
+            h('div', { className: 'sf-row' }, h(PrimaryButton, { onClick: () => { const [tab, params] = drillTarget(detail); setDetail(null); onDrill(tab, params) } }, t('viewSource'))))) : null,
       )
     }
 
@@ -3397,6 +3443,7 @@ window.__ModuleLoader__.load({
     function DataCenterView({ ctx, t }) {
       const { revision } = ctx
       const canManage = ctx.financeWriter && ctx.permissions.includes('finance.source.review')
+      const request = useRef(0)
       const [configs, setConfigs] = useState(null)
       const [runs, setRuns] = useState(null)
       const [metrics, setMetrics] = useState(null)
@@ -3410,13 +3457,15 @@ window.__ModuleLoader__.load({
       const [syncResult, setSyncResult] = useState(null)
 
       const load = () => {
-        setLoadState('loading')
+        const sequence = ++request.current
+        setLoadState('loading'); setQuality(null); setRuns(null); setMetrics(null); setConfigs(null)
         Promise.allSettled([
           api('/data-source-configs?limit=50'),
           api('/data-source-runs?limit=20'),
           api('/data-source-metrics?days=7'),
           api('/quality'),
         ]).then(results => {
+          if (request.current !== sequence) return
           const [configsResult, runsResult, metricsResult, qualityResult] = results
           setConfigs(configsResult.status === 'fulfilled' ? (configsResult.value.data ?? { list: [] }) : null)
           setRuns(runsResult.status === 'fulfilled' ? (runsResult.value.data ?? { list: [] }) : null)
@@ -3426,7 +3475,7 @@ window.__ModuleLoader__.load({
           setLoadState(failed === results.length ? 'error' : failed ? 'partial' : 'ready')
         })
       }
-      useEffect(() => { load() }, [revision]) // eslint-disable-line react-hooks/exhaustive-deps
+      useEffect(() => { load(); return () => { request.current++ } }, [revision]) // eslint-disable-line react-hooks/exhaustive-deps
 
       const saveConfig = async form => {
         setBusy(true); setNotice(null)
@@ -3475,10 +3524,6 @@ window.__ModuleLoader__.load({
       const criticalTotal = issues.filter(issue => issue.severity === 'CRITICAL').reduce((sum, issue) => sum + (finite(issue.count) ?? 0), 0)
       const warnTotal = issues.filter(issue => issue.severity === 'WARN').reduce((sum, issue) => sum + (finite(issue.count) ?? 0), 0)
 
-      if (loadState === 'error') {
-        return h('div', { className: 'sf-view' },
-          h('div', { className: 'sf-fatal', role: 'alert' }, h(Glyph, { name: 'warning' }), h('strong', null, t('dataCenterFailed')), h('p', { className: 'sf-note' }, t('loadPartial')), h(GhostButton, { onClick: load }, t('dataCenterRetry'))))
-      }
 
       const scopeOptions = [['HEADQUARTERS', t('scopeHq')], ['HEZHONG', t('scopeHezhong')]]
       const systemOptions = [['OA', 'OA'], ['NC', 'NC'], ['ERP', 'ERP']]
@@ -3486,13 +3531,16 @@ window.__ModuleLoader__.load({
       const mappingOptions = [['OA/PURCHASE', 'OA / 采购'], ['NC/PURCHASE', 'NC / 采购'], ['ERP/PURCHASE', 'ERP / 采购']]
 
       return h('div', { className: 'sf-view' },
+        h(FinanceDataAssets, { ctx }),
+        h(Card, { title: '数据流转与追溯' }, h('p', { className: 'sf-note' }, '数据资产 → 采集来源 → 暂存记录 → 核对发布 → 正式事实。来源采集成功不代表已发布，正式预算事实从预算执行查看。'), h('div', { className: 'sf-row' }, h(GhostButton, { onClick: () => ctx.onNavigate('sources', { year: String(new Date().getFullYear()) }) }, '查看来源暂存'), h(GhostButton, { onClick: () => ctx.onNavigate('facts', { year: String(new Date().getFullYear()) }) }, '核对发布与正式事实'))),
         notice ? h(Notice, null, notice) : null,
         loadState === 'loading' ? h('div', { className: 'sf-loading', role: 'status' }, h(Glyph, { name: 'loading' }), t('dataCenterLoading')) : null,
+        loadState === 'error' ? h('div', { className: 'sf-fatal', role: 'alert' }, h('strong', null, t('dataCenterFailed')), h('p', { className: 'sf-note' }, t('loadPartial')), h(GhostButton, { onClick: load }, t('dataCenterRetry'))) : null,
         loadState === 'partial' ? h('div', { className: 'sf-banner sf-banner-amber', role: 'status' }, h(Glyph, { name: 'warning', size: 14 }), t('dataCenterPartial'), h(GhostButton, { onClick: load }, t('dataCenterRetry'))) : null,
         h('div', { className: 'sf-dc-summary' },
-          h('article', { className: 'sf-dc-stat' }, h('span', null, t('qualityIssues')), h('strong', null, formatNumber(issueTotal) ?? '0'), h('small', null, `${t('qualityCritical')} ${formatNumber(criticalTotal) ?? '0'} · ${t('qualityWarn')} ${formatNumber(warnTotal) ?? '0'}`)),
-          h('article', { className: 'sf-dc-stat' }, h('span', null, t('dsRuns')), h('strong', null, formatNumber(runList.length) ?? '0'), h('small', null, `${t('latestSync')} ${shortDate(runList[0]?.runAt ?? runList[0]?.startedAt) ?? '—'}`)),
-          h('article', { className: 'sf-dc-stat' }, h('span', null, t('batchesTitle')), h('strong', null, formatNumber(batchList.length) ?? '0'), h('small', null, `${t('successRows')} ${formatNumber(batchList.reduce((sum, row) => sum + (finite(row.successRows) ?? 0), 0)) ?? '0'}`))),
+          h('article', { className: 'sf-dc-stat' }, h('span', null, t('qualityIssues')), h('strong', null, quality ? formatNumber(issueTotal) : '—'), h('small', null, `${t('qualityCritical')} ${quality ? formatNumber(criticalTotal) : '—'} · ${t('qualityWarn')} ${quality ? formatNumber(warnTotal) : '—'}`)),
+          h('article', { className: 'sf-dc-stat' }, h('span', null, '最近同步（最多20条）'), h('strong', null, runs ? formatNumber(runList.length) : '—'), h('small', null, `${t('latestSync')} ${shortDate(runList[0]?.runAt ?? runList[0]?.startedAt) ?? '—'}`)),
+          h('article', { className: 'sf-dc-stat' }, h('span', null, '最近导入批次（最多20条）'), h('strong', null, quality ? formatNumber(batchList.length) : '—'), h('small', null, `${t('successRows')} ${formatNumber(batchList.reduce((sum, row) => sum + (finite(row.successRows) ?? 0), 0)) ?? '0'}`))),
         canManage ? h(Card, { title: t('dsManualSync'), actions: h('span', { className: 'sf-card-unit' }, t('dsRouteHint')) },
           h('div', { className: 'sf-stack' },
             h('div', { className: 'sf-inline-form' },
@@ -3529,7 +3577,7 @@ window.__ModuleLoader__.load({
           ], rows: metrics || [], empty: metrics ? t('empty') : t('loading'),
         })),
         h('div', { className: 'sf-two-col' },
-          h(Card, { title: t('dsRuns') }, h(Table, { tableId: 'finance-DataCenterView-runs', minColumns: '1200px',
+          h(Card, { title: '最近同步（最多20条）' }, h(Table, { tableId: 'finance-DataCenterView-runs', minColumns: '1200px',
             columns: [
               { label: t('startedAt'), key: 'startedAt', render: row => shortDate(row.startedAt) ?? '—' },
               { label: t('dsScope'), key: 'scope', render: row => row.scope === 'HEADQUARTERS' ? t('scopeHq') : t('scopeHezhong') },
@@ -3550,9 +3598,10 @@ window.__ModuleLoader__.load({
               { label: t('issue'), key: 'label' },
               { label: t('count'), key: 'count', num: true },
               { label: t('severity'), key: 'severity', sortValue: row => ({ INFO: 0, WARN: 1, CRITICAL: 2 }[row.severity] ?? 0), render: row => h(SeverityBadge, { severity: row.severity === 'CRITICAL' ? 'CRITICAL' : row.severity === 'WARN' ? 'WARN' : 'INFO', t }) },
-            ], rows: issues, empty: t('empty'),
+              { key: 'repair', label: '修复入口', render: row => h(GhostButton, { onClick: () => { const target = financeQualityDestination(row); ctx.onNavigate(target.tab, target.params) } }, '查看对应明细') },
+            ], rows: issues, empty: quality ? t('empty') : '质量清单未加载，不能据此判断没有问题',
           }))),
-        h(Card, { title: t('batchesTitle') }, h(Table, { tableId: 'finance-DataCenterView-batches',
+        h(Card, { title: '最近导入批次（最多20条）' }, h(Table, { tableId: 'finance-DataCenterView-batches',
           columns: [
             { label: t('bizType'), key: 'bizType', render: row => financeLabel(row.bizType, '业务类型待核查') },
             { label: t('sourceFile'), key: 'sourceFile' },
@@ -3590,8 +3639,8 @@ window.__ModuleLoader__.load({
         setFormError('')
         onSave({ scope: form.scope, kind: form.kind, displayName: form.displayName.trim(), endpoint: form.endpoint.trim() || undefined, secretRef: form.secretRef.trim() || undefined, tableMappings, active: form.active })
       }
-      return h(Dialog, { title: config ? t('dsEdit') : t('dsAdd'), onClose, footer: [
-        h(GhostButton, { key: 'cancel', onClick: onClose }, t('cancel')),
+      return h(Dialog, { title: config ? t('dsEdit') : t('dsAdd'), dismissDisabled: busy, onClose: busy ? undefined : onClose, footer: [
+        h(GhostButton, { key: 'cancel', disabled: busy, onClick: onClose }, t('cancel')),
         h(PrimaryButton, { key: 'save', busy, disabled: !form.displayName.trim(), onClick: submit }, t('save')),
       ] },
         h('fieldset', { className: 'sf-stack sf-fieldset', disabled: busy },
@@ -3607,6 +3656,32 @@ window.__ModuleLoader__.load({
           h('div', { className: 'sf-row-between' }, h('span', null, t('dsEnabled')), h(Switch, { checked: form.active, onChange: value => setForm(current => ({ ...current, active: value })), label: t('dsEnabled') })),
           h('p', { className: 'sf-note' }, t('secretRefHint')),
         ))
+    }
+
+    function financeQualityDestination(issue) {
+      const year = String(new Date().getFullYear()), unassigned = String(issue.label).includes('未分配')
+      return issue.dataset === 'budget_line' ? { tab: 'budget', params: { year, orgId: '', view: 'lines', unassigned } }
+        : issue.dataset === 'payment_plan' ? { tab: 'cash', params: { year, orgId: '', view: 'plans', unassigned } }
+        : { tab: 'cash', params: { year, orgId: '', view: 'summary' } }
+    }
+    function FinanceDataAssets({ ctx }) {
+      const year = String(new Date().getFullYear())
+      const budget = useFinanceResource(`/finance/budget/lines?year=${year}&page=1&limit=1`, ctx.revision)
+      const pr = useFinanceResource('/finance/payment-requests?page=1&limit=1', ctx.revision)
+      const plans = useFinanceResource('/finance/payment-plans?page=1&limit=1', ctx.revision)
+      const revenues = useFinanceResource('/finance/revenue-plans?page=1&limit=1', ctx.revision)
+      const datasets = [
+        [budget, `${year}年主版本预算`, '仅当年正式主版本，不含草稿与其他版本', 'budget', { year, orgId: '', view: 'lines' }],
+        [pr, '付款申请PR（已打 / 预计）', '全部年度付款申请记录', 'budget', { year, orgId: '', view: 'ledger' }],
+        [plans, '付款计划', '全部年度付款计划记录', 'cash', { year, orgId: '', view: 'plans' }],
+        [revenues, '收入计划', '全部年度收入计划记录', 'cash', { year, orgId: '', view: 'revenue' }],
+      ]
+      const totals = datasets.map(([resource]) => !resource.error && !resource.loading ? finite(resource.data?.total) : null)
+      return h(Card, { title: '数据集入库规模' },
+        h('p', { className: 'sf-note' }, '预算为当年正式主版本；PR、付款与收入计划为全部年度。下钻默认进入当年，可在明细切换年度。统计取服务端总数，不以当前页条数代替。'),
+        h('div', { className: 'sf-row' }, h('strong', null, `四大类合计：${totals.every(total => total !== null) ? formatNumber(totals.reduce((sum, value) => sum + value, 0)) : '—'} 行`), h('span', null, `财务主体 / 业务线（不含集团）：${ctx.orgs.filter(row => row.type !== 'GROUP').length}`)),
+        ...datasets.map(([resource, label, note, tab, params], index) => h('div', { key: label, className: 'sf-row-between' }, h('div', null, h('strong', null, label), h('p', { className: 'sf-note' }, note)), h('div', { className: 'sf-row' }, h('span', null, totals[index] === null ? '—' : `${formatNumber(totals[index])} 行`), h(GhostButton, { onClick: () => ctx.onNavigate(tab, params) }, '查看明细')))),
+        ...datasets.filter(([resource]) => resource.error).map(([resource, label]) => h('div', { key: label, role: 'alert' }, `${label}统计加载失败，未知不计为零。`, h(GhostButton, { onClick: resource.retry }, '重试'))))
     }
 
     // 片段 5/7 视图：录入（填报控制台：任务管理/我的填报 + 通讯录 + 归属记录 + 成员角色 + 录入面板 4 类型）
@@ -3876,6 +3951,8 @@ window.__ModuleLoader__.load({
       const [reload, setReload] = useState(0)
       const [saving, setSaving] = useState(false)
       const [error, setError] = useState('')
+      const [excelBusy, setExcelBusy] = useState(false)
+      const writeLock = useRef(false)
       useEffect(() => {
         let cancelled = false
         setCostError(false)
@@ -3887,7 +3964,7 @@ window.__ModuleLoader__.load({
       const months = Array.from({ length: 12 }, (_, index) => [String(index + 1), (index + 1) + '月'])
       const updateRow = (index, patch) => setRows(current => current.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)))
       const persist = async thenSubmit => {
-        if (!editable || saving || busy) return
+        if (!editable || saving || busy || excelBusy || writeLock.current) return
         const filled = rows.filter(row => String(row.plannedAmount ?? '').trim())
         if (filled.some(row => !Number.isFinite(Number(row.plannedAmount)) || Number(row.plannedAmount) <= 0)) {
           setError('请填写大于 0 的金额'); return
@@ -3895,6 +3972,7 @@ window.__ModuleLoader__.load({
         if (thenSubmit && (!filled.length || filled.some(row => !row.costItemId || !row.month))) {
           setError('请至少填写一行，并补全费用类别、月份和金额'); return
         }
+        writeLock.current = true
         setSaving(true); setError('')
         try {
           const saved = await act('/filing-assignments/' + assignment.id + '/rows', {
@@ -3912,25 +3990,26 @@ window.__ModuleLoader__.load({
           onClose()
         } catch {
           setError('操作失败，填写内容已保留，请重试')
-        } finally { setSaving(false) }
+        } finally { writeLock.current = false; setSaving(false) }
       }
-      return h(Dialog, { title: t('assignmentTitle') + ' · ' + (assignment.departmentName ?? ''), width: 'lg', onClose, footer: [
-        editable ? h(GhostButton, { key: 'save', disabled: busy || saving, onClick: () => persist(false) }, t('saveDraft')) : null,
-        editable ? h(PrimaryButton, { key: 'submit', busy: busy || saving, onClick: () => persist(true) }, t('submitFiling')) : null,
+      return h(Dialog, { title: t('assignmentTitle') + ' · ' + (assignment.departmentName ?? ''), width: 'lg', dismissDisabled: saving || excelBusy, onClose: saving || excelBusy ? undefined : onClose, footer: [
+        editable ? h(GhostButton, { key: 'save', disabled: busy || saving || excelBusy, onClick: () => persist(false) }, t('saveDraft')) : null,
+        editable ? h(PrimaryButton, { key: 'submit', busy: busy || saving || excelBusy, onClick: () => persist(true) }, t('submitFiling')) : null,
         canVerify && assignment.status === 'SUBMITTED' ? h(PrimaryButton, {
-          key: 'commit', busy: busy || saving,
+          key: 'commit', busy: busy || saving || excelBusy,
           onClick: async () => { if (await act('/filing-assignments/' + assignment.id + '/commit', {})) onClose() },
         }, t('commitFiling')) : null,
-        h(GhostButton, { key: 'cancel', disabled: saving, onClick: onClose }, t('close')),
+        h(GhostButton, { key: 'cancel', disabled: saving || excelBusy, onClick: onClose }, t('close')),
       ] },
         h('div', { className: 'sf-stack' },
           !editable ? h('p', { className: 'sf-note' }, '当前填报只读；仅开放且未过期的活动可填写，已提交记录须在允许修改的窗口内重提。') : null,
+          editable ? h(FilingExcelDraft, { assignmentId: assignment.id, disabled: saving || busy, onBusyChange: setExcelBusy, onApply: imported => setRows(imported.map(row => ({ ...row, month: row.month == null ? '' : String(row.month), plannedAmount: String(row.plannedAmount) }))) }) : null,
           costError ? h('div', { role: 'alert' }, '费用类别加载失败', h(LinkButton, { onClick: () => setReload(value => value + 1) }, '重试')) : null,
           costItems && !costItems.length && !costError ? h('p', { className: 'sf-note' }, '暂无可用费用类别，请联系财务维护。') : null,
           error ? h('p', { role: 'alert', className: 'sf-neg' }, error) : null,
           h('div', { className: 'sf-row-between' },
             h('strong', null, t('rowsEditor')),
-            editable ? h(LinkButton, { disabled: busy || saving, onClick: () => setRows(current => [...current, emptyRow()]) }, h(Glyph, { name: 'plus', size: 12 }), t('addRow')) : null),
+            editable ? h(LinkButton, { disabled: busy || saving || excelBusy, onClick: () => setRows(current => [...current, emptyRow()]) }, h(Glyph, { name: 'plus', size: 12 }), t('addRow')) : null),
           ...rows.map((row, index) => h('div', { key: row.id ?? index, className: 'sf-inline-form' },
             h('div', { className: 'sf-filters' },
               h(FormRow, { label: '费用类别' }, h(SearchSelect, {
@@ -3941,7 +4020,7 @@ window.__ModuleLoader__.load({
               h(FormRow, { label: t('monthCol') }, h(Select, { value: String(row.month ?? ''), onChange: value => updateRow(index, { month: value }), options: months, placeholder: t('monthCol'), disabled: !editable || busy || saving })),
               h(FormRow, { label: t('description') }, h(Field, { value: row.description ?? '', onChange: value => updateRow(index, { description: value }), maxLength: 500, disabled: !editable || busy || saving })),
               h(FormRow, { label: t('planned') }, h(Field, { type: 'number', min: '0.01', step: '0.01', value: row.plannedAmount ?? '', onChange: value => updateRow(index, { plannedAmount: value }), disabled: !editable || busy || saving })),
-              editable ? h(LinkButton, { disabled: busy || saving, onClick: () => setRows(current => current.filter((_, rowIndex) => rowIndex !== index)) }, h(Glyph, { name: 'trash', size: 13 })) : null))),
+              editable ? h(LinkButton, { disabled: busy || saving || excelBusy, onClick: () => setRows(current => current.filter((_, rowIndex) => rowIndex !== index)) }, h(Glyph, { name: 'trash', size: 13 })) : null))),
           h('p', { className: 'sf-note' }, t('entryHint'))))
     }
 
@@ -4062,7 +4141,7 @@ window.__ModuleLoader__.load({
     }
 
 
-    function CostItemCreator({ t, onCreated, onCancel, onBusyChange }) {
+    function CostItemCreator({ t, onCreated, onCancel, onBusyChange, submitLabel = '新增并选用' }) {
       const [code, setCode] = useState('')
       const [name, setName] = useState('')
       const [failure, setFailure] = useState('')
@@ -4094,7 +4173,7 @@ window.__ModuleLoader__.load({
         h('p', { className: 'sf-note' }, '编号使用字母、数字、下划线或连字符；新增后会自动选中。'),
         failure ? h('p', { role: 'alert', className: 'sf-neg' }, failure) : null,
         h('div', { className: 'sf-row' },
-          h(PrimaryButton, { type: 'button', busy: saving, disabled: !valid, onClick: save }, saving ? '正在新增…' : '新增并选用'),
+          h(PrimaryButton, { type: 'button', busy: saving, disabled: !valid, onClick: save }, saving ? '正在新增…' : submitLabel),
           h(GhostButton, { disabled: saving, onClick: onCancel }, t('cancel'))))
     }
 
@@ -4372,6 +4451,53 @@ window.__ModuleLoader__.load({
               notice ? h('div', { role: 'status', 'aria-live': 'polite' }, h(Notice, null, notice)) : null))))))
     }
 
+    // 与网页组织通讯录使用同一权威目录；本地镜像和手工填写用户 ID 不作为身份来源。
+    function financeDirectoryRows(directory, keyword = '', onlyPending = false) {
+      const departments = new Map((directory?.departments || []).map(row => [row.id, row.name]))
+      const search = keyword.trim().toLocaleLowerCase('zh-CN')
+      return (directory?.members || []).filter(row => row.source !== 'LOCAL_MIRROR')
+        .filter(row => !onlyPending || !(row.identityEnabled ?? row.enabled))
+        .filter(row => !search || `${row.name} ${(row.departmentIds || []).map(id => departments.get(id) || '').join(' ')}`.toLocaleLowerCase('zh-CN').includes(search))
+        .map(row => ({ ...row, id: row.key, identityReady: row.identityEnabled ?? row.enabled, syncedAt: directory.lastSyncedAt, departmentName: (row.departmentIds || []).map(id => departments.get(id)).filter(Boolean).join('、') }))
+    }
+    function FinanceDirectoryView({ ctx }) {
+      const [keyword, setKeyword] = useState('')
+      const [onlyPending, setOnlyPending] = useState(false)
+      const action = useFinanceAction()
+      const directory = useFinanceResource('/finance/permissions/organization-directory', `${ctx.revision}-${action.revision}`)
+      const rows = financeDirectoryRows(directory.data, keyword, onlyPending)
+      const maskPhone = value => value ? String(value).replace(/^(\+?\d{0,3})?(\d{3})\d+(\d{4})$/, '$1$2****$3') : '—'
+      const maskEmail = value => value ? String(value).replace(/^(.).*(@.*)$/, '$1***$2') : '—'
+      return h('div', { className: 'sf-stack' },
+        h('p', { className: 'sf-note' }, '组织身份由 SSO 与飞书同步维护；成员无需先登录，不能手工填写用户 ID 建立身份。'),
+        h(Notice, null, action.notice),
+        h(FinanceOrganizationNotice, { directory: directory.data, onRefresh: directory.retry }),
+        h(Card, { title: '组织通讯录', actions: [h(GhostButton, { key: 'sync', disabled: action.busy, onClick: async () => {
+          try { const result = await action.run('/finance/feishu/directory/sync'); if (result?.skipped) action.report(`同步跳过：${result.reason || '应用未配置'}`) } catch { /* notice retains the failure */ }
+        } }, action.busy ? '同步中…' : '同步组织通讯录')] },
+          h('div', { className: 'sf-filters' }, h(Field, { value: keyword, onChange: setKeyword, 'aria-label': '搜索姓名或部门', placeholder: '搜索姓名或部门' }), h('label', null, h('input', { type: 'checkbox', checked: onlyPending, onChange: event => setOnlyPending(event.target.checked) }), '只看待同步身份')),
+          h(FinanceResource, { resource: directory }, h(Table, { tableId: 'finance-authoritative-directory', rows, rowKey: 'id', empty: keyword || onlyPending ? '没有匹配的人员' : '暂无组织人员', columns: [
+            { key: 'name', label: '姓名' }, { key: 'departmentName', label: '部门' },
+            { key: 'mobile', label: '手机', render: row => maskPhone(row.mobile) }, { key: 'email', label: '邮箱', render: row => maskEmail(row.email) },
+            { key: 'identityReady', label: '身份状态', render: row => row.identityReady ? '身份就绪' : '待同步身份' },
+            { key: 'syncedAt', label: '同步时间', render: row => shortDate(row.syncedAt) || '—' }, { key: 'warning', label: '同步提示' },
+          ] }))))
+    }
+    function FinanceCostItemsView({ ctx, t }) {
+      const [creating, setCreating] = useState(false)
+      const [busy, setBusy] = useState(false)
+      const [revision, setRevision] = useState(0)
+      const [page, setPage] = useState(1)
+      const items = useFinanceResource(`/finance/cost-items?page=${page}&limit=20`, `${ctx.revision}-${revision}`)
+      if (ctx.role !== 'FINANCE_OWNER') return h('p', { role: 'alert' }, '费用类别仅财务负责人可维护')
+      return h('div', { className: 'sf-stack' },
+        h('p', { className: 'sf-note' }, '维护预算与填报共用的费用类别，统一费用分类口径。'),
+        h(Card, { title: '共享费用类别', actions: [h(GhostButton, { key: 'create', disabled: busy, onClick: () => setCreating(true) }, '新增费用类别')] },
+          creating ? h(CostItemCreator, { t, submitLabel: '新增费用类别', onBusyChange: setBusy, onCancel: () => setCreating(false), onCreated: () => { setCreating(false); setPage(1); setRevision(value => value + 1) } }) : null,
+          h(FinanceResource, { resource: items }, h(Table, { tableId: 'finance-cost-items', rows: financeRows(items.data), rowKey: 'id', columns: financeColumns([['code', '费用类别编号'], ['name', '费用类别名称']]), empty: '暂无费用类别，请先新增' })),
+          h(Pager, { page, total: items.data?.total, limit: 20, onPage: setPage })))
+    }
+
     // Datasource 2027 年度配置录入：仅使用已导入的部门/费用映射，不能回退自由选科目。
     function BudgetSaveReceipt({ line, onNavigate }) {
       if (!line?.id) return null
@@ -4410,36 +4536,36 @@ window.__ModuleLoader__.load({
 
     // 深度分析入口：在独立新会话调用对应默认技能。
 
-    function sendErrorReason(error) {
+    function sendErrorReason(error, t) {
       const message = error instanceof Error ? error.message : String(error)
-      const reasons = { conversation_unavailable: '会话服务暂不可用', conversation_service_unavailable: '会话服务暂不可用', session_unavailable: '未找到可用会话', analysis_skill_invalid: '分析技能指令无效', analysis_catalog_unavailable: '无法核验分析技能，请稍后重试', analysis_skill_unavailable: '当前会话缺少对应分析技能，请更新默认技能后重试' }
-      return Object.hasOwn(reasons, message) ? reasons[message] : financeErrorText(message)
+      const reasons = {
+        conversation_unavailable: 'analysisSessionUnavailable', conversation_service_unavailable: 'analysisSessionUnavailable', session_unavailable: 'analysisSessionUnavailable',
+        analysis_skill_invalid: 'analysisSkillInvalid', analysis_catalog_unavailable: 'analysisCatalogUnavailable', analysis_skill_unavailable: 'analysisSkillUnavailable',
+        analysis_login_required: 'analysisLoginRequired', analysis_access_denied: 'analysisAccessDenied', analysis_access_unavailable: 'analysisAccessUnavailable',
+      }
+      return Object.hasOwn(reasons, message) ? t(reasons[message]) : t('analysisStartFailed')
     }
 
-    async function sendToAgent(prompt, setNotice, t) {
+    async function sendToAgent(prompt, setNotice, t, setRecovery) {
       // 由宿主桥接创建新会话；服务不可用时保留分析指令供用户重试。
       try {
         const conversation = globalThis.__sensteed_finance_conversation?.() ?? null
-        if (conversation?.send) {
-          await conversation.send(prompt)
-          globalThis.__sensteed_finance_close?.()
-          setNotice(t('sent'))
-          return
-        }
+        if (!conversation?.send) throw new Error('conversation_unavailable')
+        await conversation.send(prompt)
+        globalThis.__sensteed_finance_close?.()
+        setNotice(t('sent'))
       } catch (error) {
-        globalThis.console?.warn?.('[dofe.sensteed-finance] conversation bridge unavailable', error)
-        await copyFallback(prompt, setNotice, t, sendErrorReason(error))
-        return
+        await copyFallback(prompt, setNotice, t, sendErrorReason(error, t), setRecovery)
       }
-      await copyFallback(prompt, setNotice, t)
     }
 
-    async function copyFallback(prompt, setNotice, t, reason) {
+    async function copyFallback(prompt, setNotice, t, reason, setRecovery) {
+      setRecovery(prompt)
       try {
         if (!navigator.clipboard?.writeText) throw new Error('clipboard_unavailable')
         await navigator.clipboard.writeText(prompt)
-        setNotice(reason ? t('sendFailReason', { reason }) : t('sendFail'))
-      } catch { setNotice(t('copyFailed')) }
+        setNotice(t('sendFailReason', { reason }))
+      } catch { setNotice(t('sendFailCopyFailed', { reason })) }
     }
 
     function analysisPrompt(entry, year, orgName, orgId) {
@@ -4452,23 +4578,28 @@ window.__ModuleLoader__.load({
       const { year, orgId, orgs } = ctx
       const [notice, setNotice] = useState(null)
       const [starting, setStarting] = useState(null)
+      const [recovery, setRecovery] = useState(null)
       const startingRef = useRef(false)
       const orgName = (orgs || []).find(org => org.id === orgId)?.name
+      const scopeName = orgId ? `${orgName || t('analysisOrgPending')} (${orgId})` : t('analysisAllAuthorized')
       const startAnalysis = async entry => {
         if (startingRef.current) return
         startingRef.current = true
         setStarting(entry.id)
         setNotice(null)
-        try { await sendToAgent(analysisPrompt(entry, year, orgName, orgId), setNotice, t) }
+        setRecovery(null)
+        try { await sendToAgent(analysisPrompt(entry, year, orgName, orgId), setNotice, t, setRecovery) }
         finally { startingRef.current = false; setStarting(null) }
       }
       return h('div', { className: 'sf-view' },
         h('p', { className: 'sf-note' }, t('analyzeHint')),
+        h('p', { className: 'sf-note', role: 'status' }, t('analysisScope', { year, org: scopeName })),
+        notice ? h('p', { className: 'sf-notice', role: recovery ? 'alert' : 'status' }, notice) : null,
+        recovery ? h('label', { className: 'sf-form-row' }, h('span', null, t('analysisPromptLabel')), h('textarea', { readOnly: true, rows: 6, value: recovery, 'aria-label': t('analysisPromptLabel') })) : null,
         h('div', { className: 'sf-analysis-grid' }, ...ANALYSIS_ENTRIES.map(entry => h('article', { className: 'sf-card sf-analysis-card', key: entry.id },
           h('div', { className: 'sf-analysis-head' }, h(Glyph, { name: entry.icon, size: 15 }), h('h2', null, t(`analysis_${entry.id}`))),
           h('p', null, t(`analysis_${entry.id}_desc`)),
           h('div', null, h(PrimaryButton, { busy: starting === entry.id, disabled: starting !== null, onClick: () => startAnalysis(entry), 'aria-label': `${t(`analysis_${entry.id}`)}：${t('send')}` }, h(Glyph, { name: 'send', size: 12 }), t(starting === entry.id ? 'analysisStarting' : 'send')))))),
-        notice ? h(Notice, null, notice) : null,
         h('p', { className: 'sf-note' }, t('analyzingNote')))
     }
 
@@ -4558,17 +4689,19 @@ window.__ModuleLoader__.load({
       const quotes = useFinanceResource(`${path}/quotes`, action.revision)
       const params = useFinanceResource(`${path}/param-versions`, action.revision)
       const approvals = useFinanceResource(`${path}/approvals`, action.revision)
-      const run = async (target, body) => { const result = await action.run(target, body); setReceipt(result); onChanged(); return result }
-      const fields = (entries) => entries.map(([key, label, type, required]) => ({ key, label, type, required }))
-      const nodeOptions = (detail?.nodes || []).map(node => [node.id, `${node.partNo || ''} ${node.name}`])
+      const run = async (target, body, method) => { const result = await action.run(target, body, method); setReceipt(result); onChanged(); return result }
+      const fields = (entries) => entries.map(([key, label, type, required]) => ({ key, label, type, required, ...(type === 'number' ? { min: 0, max: 999999999999.9999 } : {}) }))
+      const nodeOptions = (dialog?.node ? [dialog.node] : detail?.nodes || []).map(node => [node.id, `${node.partNo || ''} ${node.name}`])
       const costFields = fields([['materialCost', '材料费（元）', 'number'], ['laborCost', '人工费（元）', 'number'], ['processCost', '加工费（元）', 'number'], ['otherCost', '其他费用（元）', 'number']])
       const status = detail?.package?.status
       const reviewActions = status === 'DRAFT' ? [['SUBMIT_REVIEW', '提交评审']] : status === 'IN_REVIEW' ? [['APPROVE', '批准'], ['REJECT', '驳回']] : status === 'APPROVED' ? [['OBSOLETE', '作废']] : []
       return h('div', { className: 'sf-stack' },
         action.notice ? h(Notice, null, action.notice) : null,
+        writer && status === 'DRAFT' ? h(FinanceEbomExcel, { packageId, onChanged }) : null,
         writer ? h(Card, { title: '成本工程操作', unit: '元' }, h('div', { className: 'sf-row' },
-          ...[['import', '逐行导入 BOM'], ['importJson', '批量导入 BOM'], ['estimate', '维护估算'], ['breakdown', '目标成本反算'], ['change', '模拟工程变更'], ['quote', '登记报价'], ['params', '新建参数版本'], ['export', '创建导出批次']].map(([kind, label]) => h(GhostButton, { key: kind, disabled: action.busy, onClick: () => setDialog({ kind, title: label }) }, label)),
+          ...[['import', '逐行导入 BOM'], ['importJson', '批量导入 BOM'], ['estimate', '维护估算'], ['breakdown', '目标成本反算'], ['change', '模拟工程变更'], ['quote', '登记报价'], ['params', '新建参数版本'], ['download', '下载成本预测Excel'], ['export', '创建系统导出批次']].map(([kind, label]) => h(GhostButton, { key: kind, disabled: action.busy || (status !== 'DRAFT' && !['download', 'export', 'breakdown'].includes(kind)), onClick: () => setDialog({ kind, title: label }) }, label)),
           ...reviewActions.map(([reviewAction, title]) => h(GhostButton, { key: reviewAction, disabled: action.busy, onClick: () => setDialog({ kind: 'review', reviewAction, title }) }, title)))) : null,
+        writer && status === 'DRAFT' ? h(Card, { title: '装配位置维护（目标与预测分别保存）' }, h(Table, { tableId: 'finance-ce-node-actions', rows: detail?.nodes || [], empty: '请先导入 EBOM', columns: [...financeColumns([['partNo', '零件号'], ['name', '名称']]), { key: 'actions', label: '操作', render: node => h('div', { className: 'sf-row' }, ...[['pricing', '成本预测'], ['acTarget', '单件AC目标'], ['procurement', 'SOR与货源']].map(([kind, title]) => h(GhostButton, { key: kind, disabled: action.busy || (kind === 'pricing' && Boolean(node.coveredBy)), onClick: () => setDialog({ kind, title, node }) }, title))) }] })) : null,
         receipt ? h(Card, { title: '操作回执与模拟结果' }, h(FinanceEvidence, { value: receipt })) : null,
         breakdown ? h(Card, { title: '目标成本反算（服务端结果）', unit: '元' }, h(Table, { tableId: 'bom-breakdown', rows: breakdown.entries || [], empty: '暂无结果', columns: financeColumns([['nodeId', '物料节点'], ['estimateUnitCost', '估算单位成本'], ['targetUnitCost', '目标单位成本'], ['gap', '缺口']]) })) : null,
         h(Card, { title: '工程变更与模拟差异' }, h(FinanceResource, { resource: changes }, h(Table, { tableId: 'bom-changes', rows: financeRows(changes.data), empty: '暂无工程变更', columns: [
@@ -4577,20 +4710,35 @@ window.__ModuleLoader__.load({
         ] }))),
         ...[[quotes, '供应商报价', [['supplierName', '供应商'], ['partNo', '零件号'], ['price', '报价（元）'], ['currency', '币种'], ['batchNo', '报价批次']]],
           [params, '参数版本', [['version', '版本'], ['params', '参数'], ['note', '说明'], ['createdAt', '创建时间']]],
-          [approvals, '审批与操作留痕', [['action', '操作'], ['actorName', '操作者'], ['note', '说明'], ['createdAt', '时间']]]].map(([resource, title, columns]) => h(Card, { key: title, title }, h(FinanceResource, { resource }, h(Table, { tableId: `bom-${title}`, rows: financeRows(resource.data), columns: financeColumns(columns), empty: '暂无记录' })))),
+          [approvals, '审批与操作留痕', [['action', '操作'], ['actorName', '操作者'], ['note', '说明'], ['createdAt', '时间']]]].map(([resource, title, columns]) => h(Card, { key: title, title }, h(FinanceResource, { resource }, h(Table, { tableId: `bom-${title}`, rows: financeRows(resource.data), columns: [...financeColumns(columns), ...(resource === quotes && writer && status === 'DRAFT' ? [{ key: 'actions', label: '操作', render: row => h(GhostButton, { onClick: () => setDialog({ kind: 'quoteApply', quote: row }) }, '预览并采用报价') }] : [])], empty: '暂无记录' })))),
         pendingExport ? h(Card, { title: '导出批次回写' }, h('p', null, `批次 ${pendingExport}`), h(GhostButton, { disabled: action.busy, onClick: () => setDialog({ kind: 'completeExport', title: '回写导出结果' }) }, '回写结果')) : null,
         dialog?.kind === 'import' ? h(FinanceRowsDialog, { title: dialog.title, fields: fields([['partNo', '零件号'], ['name', '物料名称', 'text', true], ['parentPartNo', '父级零件号'], ['level', '层级', 'number'], ['qty', '用量', 'number', true]]), initial: [{ qty: 1 }], onClose: () => setDialog(null), onSubmit: nodes => run(`${path}/nodes`, { nodes: nodes.map(node => ({ ...node, partNo: node.partNo || null, parentPartNo: node.parentPartNo || null })) }) }) : null,
-        dialog && dialog.kind !== 'import' ? h(FinanceFormDialog, { title: dialog.title, onClose: () => setDialog(null),
-          fields: dialog.kind === 'importJson' ? [{ key: 'nodesJson', label: 'BOM 行（JSON 数组，最多 200 行）', type: 'textarea', maxLength: 200000, required: true }] : dialog.kind === 'estimate' ? [{ key: 'nodeId', label: '物料节点', options: nodeOptions, required: true }, ...costFields, { key: 'paramVersionId', label: '参数版本', options: financeRows(params.data).map(row => [row.id, row.version]) }, { key: 'sourceRef', label: '来源引用' }]
+        dialog?.kind === 'quoteApply' ? h(FinanceQuoteApply, { packageId, quote: dialog.quote, nodes: detail?.nodes || [], onClose: () => setDialog(null), onChanged }) : null,
+        dialog && !['import', 'quoteApply'].includes(dialog.kind) ? h(FinanceFormDialog, { title: dialog.title, description: dialog.node ? `${dialog.node.partNo || ''} ${dialog.node.name} · 装配位置 ${dialog.node.sourceKey || dialog.node.id}。仅保存当前表单对应的数据，AC目标和成本预测相互独立。` : undefined, onClose: () => setDialog(null),
+          fields: dialog.kind === 'acTarget' ? [{ key: 'nodeId', label: '装配位置', options: nodeOptions, required: true }, { key: 'unitCost', label: '单件AC目标（元）', type: 'number', min: 0, max: 999999999999.9999, required: true }, { key: 'source', label: '目标来源', maxLength: 200, required: true }]
+            : dialog.kind === 'procurement' ? [{ key: 'nodeId', label: '装配位置', options: nodeOptions, required: true }, { key: 'sorNo', label: 'SOR编号（留空清除）', maxLength: 200 }, { key: 'sourcing', label: '货源（留空清除）', maxLength: 200 }]
+            : dialog.kind === 'pricing' ? [{ key: 'nodeId', label: '装配位置', options: nodeOptions, required: true }, { key: 'pricing.acUnitPrice', label: '预测AC单价（元）', type: 'number', min: 0, max: 999999999999.9999, required: true }, { key: 'pricing.acSource', label: 'AC价格来源', maxLength: 200, required: true }, { key: 'pricing.pricingMode', label: '计价口径', options: [['OWN', '仅自身费用'], ['PACKAGE', '总成包价（覆盖子件）']], required: true }, { key: 'allocation', label: '成本分项口径', options: [['UNALLOCATED', '保持待拆分'], ['MATERIAL', '全部计入直接材料'], ['CUSTOM', '手工分项']], required: true }, ...[['directMaterial', '直接材料'], ['directLabor', '直接人工'], ['otherManufacturing', '其他制造成本']].map(([key, label]) => ({ key: `pricing.costBreakdown.${key}`, label, type: 'number', min: 0, max: 999999999999.9999, required: true, when: values => values.allocation === 'CUSTOM' })), { key: 'pricing.nominatedPrice', label: '定点价格（元，可空）', type: 'number', min: 0 }, { key: 'pricing.minimumPrice', label: '最低价格（元，可空）', type: 'number', min: 0 }, { key: 'pricing.annualReductionRate', label: '年降率（0—1）', type: 'number', min: 0, max: 1 }, { key: 'pricing.reductionYears', label: '年降年数', type: 'number', min: 0, max: 30 }, { key: 'pricing.supplierName', label: '供应商', maxLength: 200 }, { key: 'nominated', label: '是否定点', options: [['false', '未定点'], ['true', '已定点']] }, { key: 'samePart', label: '更新范围', options: [['false', '仅当前位置'], ['true', '同零件号全部未覆盖位置']] }]
+            : dialog.kind === 'download' ? [{ key: 'targetCost', label: '目标成本（元，可选）', type: 'number', min: 0.0001 }]
+            : dialog.kind === 'importJson' ? [{ key: 'nodesJson', label: 'BOM 行（JSON 数组，最多 200 行）', type: 'textarea', maxLength: 200000, required: true }] : dialog.kind === 'estimate' ? [{ key: 'nodeId', label: '物料节点', options: nodeOptions, required: true }, ...costFields, { key: 'paramVersionId', label: '参数版本', options: financeRows(params.data).map(row => [row.id, row.version]) }, { key: 'sourceRef', label: '来源引用' }]
             : dialog.kind === 'change' ? [{ key: 'title', label: '变更名称', required: true }, { key: 'nodeId', label: '物料节点', options: nodeOptions, required: true }, { key: 'qty', label: '新用量', type: 'number', min: 0.000001 }, ...costFields.map(field => ({ ...field, key: `estimate.${field.key}` }))]
-            : dialog.kind === 'quote' ? fields([['supplierName', '供应商', 'text', true], ['partNo', '零件号'], ['price', '单价（元）', 'number', true], ['currency', '币种'], ['batchNo', '报价批次']])
+            : dialog.kind === 'quote' ? [{ key: 'supplierName', label: '供应商', required: true, maxLength: 200 }, { key: 'partNo', label: '零件号', maxLength: 100 }, { key: 'price', label: '报价单价（元）', type: 'number', min: 0.0001, max: 999999999999.9999, required: true }, { key: 'currency', label: '币种（大写三字母）', required: true, maxLength: 3 }, { key: 'batchNo', label: '报价批次', maxLength: 100 }, { key: 'validUntil', label: '有效期', type: 'datetime-local' }]
             : dialog.kind === 'params' ? fields([['version', '版本号', 'text', true], ['params.laborRate', '人工费率', 'number'], ['params.overheadRate', '制造费率', 'number'], ['note', '说明']]).concat([{ key: 'paramsJson', label: '扩展业务参数（JSON 对象，可选）', type: 'textarea', maxLength: 32000 }])
             : dialog.kind === 'breakdown' ? [{ key: 'targetCost', label: '目标成本（元）', type: 'number', min: 0.000001 }]
             : dialog.kind === 'export' ? [{ key: 'target', label: '目标系统', required: true }]
             : dialog.kind === 'completeExport' ? [{ key: 'fileRef', label: '文件引用' }, { key: 'success', label: '导出结果', options: [['true', '成功'], ['false', '失败']], required: true }]
             : dialog.kind === 'apply' ? [] : [{ key: 'note', label: '说明', type: 'textarea' }],
-          initial: dialog.kind === 'export' ? { target: 'SAP' } : dialog.kind === 'params' ? { version: 'P1' } : {},
+          initial: dialog.node ? dialog.kind === 'pricing' ? { nodeId: dialog.node.id, pricing: dialog.node.estimate?.pricing || { acUnitPrice: '', acSource: '', pricingMode: 'OWN', annualReductionRate: 0, reductionYears: 0 }, allocation: dialog.node.estimate?.pricing?.costBreakdown ? 'CUSTOM' : 'UNALLOCATED', nominated: dialog.node.estimate?.pricing?.isNominated ? 'true' : 'false', samePart: 'false' } : dialog.kind === 'acTarget' ? { nodeId: dialog.node.id, unitCost: dialog.node.acTarget?.unitCost ?? '', source: dialog.node.acTarget?.source || '' } : { nodeId: dialog.node.id, sorNo: dialog.node.procurement?.sorNo ?? dialog.node.sourceData?.['SOR编号'] ?? dialog.node.sourceData?.['SOR号'] ?? '', sourcing: dialog.node.procurement?.sourcing ?? dialog.node.sourceData?.['货源'] ?? '' } : dialog.kind === 'quote' ? { currency: 'CNY' } : dialog.kind === 'pricing' ? { pricing: { pricingMode: 'OWN', annualReductionRate: 0, reductionYears: 0 }, allocation: 'UNALLOCATED', nominated: 'false', samePart: 'false' } : dialog.kind === 'export' ? { target: 'SAP' } : dialog.kind === 'params' ? { version: 'P1' } : {},
           onSubmit: async body => {
+            if (dialog.kind === 'download') { const result = await financeRest(`${path}/cost-excel`, 'POST', body); financeDownloadBudgetTemplate(result.data); return }
+            if (dialog.kind === 'acTarget') return run(`/ce/nodes/${body.nodeId}/ac-target`, { unitCost: body.unitCost, source: body.source.trim() }, 'PUT')
+            if (dialog.kind === 'procurement') return run(`/ce/nodes/${body.nodeId}/procurement`, { sorNo: (body.sorNo || '').trim(), sourcing: (body.sourcing || '').trim() }, 'PATCH')
+            if (dialog.kind === 'pricing') {
+              const pricing = { ...body.pricing, isNominated: body.nominated === 'true' }
+              if (!Number.isInteger(pricing.reductionYears)) throw new Error('年降年数必须为整数')
+              if (body.allocation === 'MATERIAL') pricing.costBreakdown = { directMaterial: pricing.acUnitPrice, directLabor: 0, otherManufacturing: 0 }
+              if (body.allocation === 'CUSTOM' && Math.abs(Object.values(pricing.costBreakdown || {}).reduce((sum, value) => sum + value, 0) - pricing.acUnitPrice) > 0.00005) throw new Error('分项之和必须等于预测AC单价')
+              return run(`/ce/nodes/${body.nodeId}/estimate`, { nodeId: body.nodeId, algo: 'BOTTOM_UP', pricing, applyToSamePart: body.samePart === 'true' })
+            }
             if (dialog.kind === 'importJson') {
               let nodes
               try { nodes = JSON.parse(body.nodesJson) } catch { throw new Error('BOM 行必须是合法 JSON 数组') }
@@ -4604,7 +4752,11 @@ window.__ModuleLoader__.load({
               return run(`${path}/changes`, { title, changes: [change] })
             }
             if (dialog.kind === 'breakdown') { setBreakdown(await run(`${path}/breakdown`, body)); return }
-            if (dialog.kind === 'quote') return run(`${path}/quotes`, body)
+            if (dialog.kind === 'quote') {
+              body.currency = String(body.currency || '').trim().toUpperCase()
+              if (!/^[A-Z]{3}$/.test(body.currency) || !(body.price > 0) || Math.abs(body.price * 10000 - Math.round(body.price * 10000)) > 0.0001) throw new Error('币种须为三位大写字母，报价须大于0且最多四位小数')
+              return run(`${path}/quotes`, body)
+            }
             if (dialog.kind === 'params') {
               let extra = {}
               if (body.paramsJson) {
@@ -4620,6 +4772,72 @@ window.__ModuleLoader__.load({
           } }) : null)
     }
 
+    function FinanceEbomExcel({ packageId, onChanged }) {
+      const [preview, setPreview] = useState(null), [page, setPage] = useState(1), [keyword, setKeyword] = useState('')
+      const [acknowledged, setAcknowledged] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('')
+      const lock = useRef(false)
+      const run = async operation => {
+        if (lock.current) return
+        lock.current = true; setBusy(true); setError(''); setNotice('')
+        try { await operation() } catch (cause) { setError(cause.message); setPreview(null) }
+        finally { lock.current = false; setBusy(false) }
+      }
+      const filtered = (preview?.nodes || []).filter(row => `${row.partNo || ''} ${row.name}`.toLowerCase().includes(keyword.trim().toLowerCase()))
+      return h(Card, { title: 'EBOM Excel 导入' },
+        h('p', { className: 'sf-note' }, '上传非空、8 MB 以内的 .xlsx；先核对结构和原始字段，再确认导入。已有装配位置会跳过，不覆盖价格与结构。'),
+        h('input', { type: 'file', accept: '.xlsx', 'aria-label': '上传 EBOM Excel 并预览', disabled: busy, onChange: event => { const file = event.target.files?.[0]; event.target.value = ''; if (!file) return; void run(async () => {
+          setPreview(null); setAcknowledged(false); setPage(1); setKeyword('')
+          if (!/\.xlsx$/i.test(file.name) || !file.size || file.size > 8 * 1024 * 1024 || file.name.length > 255) throw new Error('请选择非空、8 MB 以内的 .xlsx 文件，文件名最多 255 字')
+          const contentBase64 = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onerror = () => reject(new Error('读取文件失败')); reader.onload = () => resolve(String(reader.result).split(',')[1] || ''); reader.readAsDataURL(file) })
+          const result = await financeRest(`/ce/packages/${packageId}/ebom/preview`, 'POST', { fileName: file.name, contentBase64 }); setPreview(result.data)
+        }) } }),
+        busy ? h('p', { role: 'status' }, '正在处理 EBOM…') : null,
+        error ? h('p', { role: 'alert' }, error) : null,
+        notice ? h('p', { role: 'status' }, notice) : null,
+        preview ? h('div', { className: 'sf-stack' },
+          h('p', null, `预览 ${preview.rowCount} 条 · 预计新增 ${preview.newCount ?? '待核对'} 条 · 已有位置 ${preview.existingCount ?? preview.duplicateCount} 条`),
+          ...preview.warnings.map((warning, key) => h('p', { key, className: 'sf-note' }, warning)),
+          h(Field, { value: keyword, onChange: value => { setKeyword(value); setPage(1) }, 'aria-label': '搜索预览零件', placeholder: '按零件号或名称核对预览' }),
+          h(Table, { tableId: 'finance-ebom-preview', rows: filtered.slice((page - 1) * 20, page * 20), columns: [
+            ...financeColumns([['partNo', '零件号'], ['name', '名称'], ['level', '级别'], ['parentPartNo', '父总成'], ['qty', '对父件用量']]),
+            { key: 'sourceData', label: '原始字段', render: row => h('details', null, h('summary', null, '查看原始字段'), h(FinanceEvidence, { value: row.sourceData })) },
+          ], empty: '无匹配零件' }), h(Pager, { page, total: filtered.length, limit: 20, onPage: setPage }),
+          h('label', null, h('input', { type: 'checkbox', checked: acknowledged, disabled: busy, onChange: event => setAcknowledged(event.target.checked) }), '已核对结构、用量及提示，确认导入当前成本包'),
+          h(PrimaryButton, { busy, disabled: !acknowledged || !preview.nodes.length, onClick: () => run(async () => { const result = await financeRest(`/ce/packages/${packageId}/nodes`, 'POST', { nodes: preview.nodes }); setPreview(null); setNotice(`导入完成：新增 ${result.data.created}，已有装配位置跳过 ${result.data.skipped}`); onChanged() }) }, '确认导入 EBOM')) : null)
+    }
+    function FinanceQuoteApply({ packageId, quote, nodes, onClose, onChanged }) {
+      const [nodeId, setNodeId] = useState(''), [mode, setMode] = useState(''), [allocation, setAllocation] = useState('')
+      const [parts, setParts] = useState({ directMaterial: '', directLabor: '', otherManufacturing: '' })
+      const [preview, setPreview] = useState(null), [busy, setBusy] = useState(false), [error, setError] = useState('')
+      const lock = useRef(false)
+      const change = operation => { operation(); setPreview(null); setError('') }
+      const matches = nodes.filter(node => node.partNo?.trim() === quote.partNo?.trim() && !node.coveredBy)
+      const run = async apply => {
+        if (lock.current) return
+        if (!matches.some(row => row.id === nodeId) || !['PACKAGE', 'OWN'].includes(mode) || !allocation) { setError('请选择装配位置、计价及分项口径'); return }
+        const breakdown = allocation === 'MATERIAL' ? { directMaterial: quote.price, directLabor: 0, otherManufacturing: 0 } : allocation === 'CUSTOM' ? Object.fromEntries(Object.entries(parts).map(([key, value]) => [key, value.trim() ? Number(value) : NaN])) : undefined
+        if (breakdown && (Object.values(breakdown).some(value => !Number.isFinite(value) || value < 0 || Math.abs(value * 10000 - Math.round(value * 10000)) > 0.0001) || Math.abs(Object.values(breakdown).reduce((sum, value) => sum + value, 0) - quote.price) > 0.00005)) { setError('请完整填写最多四位小数的非负分项，分项之和须等于报价'); return }
+        if (apply && !preview) return
+        lock.current = true; setBusy(true); setError('')
+        try {
+          const body = { nodeId, pricingMode: mode, ...(breakdown ? { costBreakdown: breakdown } : {}) }
+          const result = await financeRest(`/ce/packages/${packageId}/quotes/${quote.id}/${apply ? 'apply' : 'preview'}`, 'POST', apply ? { ...body, baseline: preview.baseline } : body)
+          if (apply) { onChanged(); onClose() } else setPreview(result.data)
+        } catch (cause) { setError(cause.message); setPreview(null) }
+        finally { lock.current = false; setBusy(false) }
+      }
+      return h(Dialog, { title: '预览并采用供应商报价', dismissDisabled: busy, onClose: busy ? undefined : onClose },
+        h('div', { className: 'sf-stack' },
+          h('p', null, `${quote.supplierName} · ${quote.partNo || '未指定零件'} · ${formatNumber(quote.price)} ${quote.currency}；仅 CNY 报价可用于成本预测。`),
+          h(SearchSelect, { 'aria-label': '报价装配位置', value: nodeId, disabled: busy, options: matches.map(row => [row.id, `${row.partNo} ${row.name} · ${row.sourceKey || row.id}`]), placeholder: '选择装配位置', onChange: value => change(() => setNodeId(value)) }),
+          h(Select, { 'aria-label': '报价计价口径', value: mode, disabled: busy, options: [['OWN', '仅当前位置自身成本'], ['PACKAGE', '总成包价（覆盖子件）']], placeholder: '选择计价口径', onChange: value => change(() => setMode(value)) }),
+          h(Select, { 'aria-label': '报价分项口径', value: allocation, disabled: busy, options: [['UNALLOCATED', '保持待拆分'], ['MATERIAL', '全部计入直接材料'], ['CUSTOM', '手工分项']], placeholder: '选择分项口径', onChange: value => change(() => setAllocation(value)) }),
+          allocation === 'CUSTOM' ? Object.entries({ directMaterial: '直接材料', directLabor: '直接人工', otherManufacturing: '其他制造成本' }).map(([key, label]) => h(FormRow, { key, label }, h(Field, { type: 'number', min: 0, step: '0.0001', disabled: busy, value: parts[key], onChange: value => change(() => setParts(current => ({ ...current, [key]: value }))) }))) : null,
+          preview ? h('div', null, h('p', null, `正算总额：${formatNumber(preview.beforeTotal)} → ${formatNumber(preview.afterTotal)} 元；差额 ${formatNumber(preview.totalDelta)} 元`), h(Table, { tableId: 'finance-quote-cost-impact', rows: [['directMaterial', '直接材料'], ['directLabor', '直接人工'], ['otherManufacturing', '其他制造成本'], ['unallocated', '待拆分']].map(([key, label]) => ({ label, before: preview.beforeComposition?.[key], after: preview.afterComposition?.[key] })), columns: [{ key: 'label', label: '成本分项' }, { key: 'before', label: '采用前（元）', render: row => formatNumber(row.before) ?? '—' }, { key: 'after', label: '采用后（元）', render: row => formatNumber(row.after) ?? '—' }] }), h('p', { className: 'sf-note' }, `缺失单价位置：${preview.beforeMissingPriceCount ?? '—'} → ${preview.afterMissingPriceCount ?? '—'}。确认后更新成本预测，不改变独立AC目标。`)) : null,
+          error ? h('p', { role: 'alert' }, error) : null,
+          h('div', { className: 'sf-row' }, h(GhostButton, { disabled: busy || quote.currency !== 'CNY', onClick: () => run(false) }, '预览成本影响'), h(PrimaryButton, { busy, disabled: !preview || quote.currency !== 'CNY', onClick: () => run(true) }, '确认采用此报价'))))
+    }
+
     function NotificationsView({ ctx, onDrill }) {
       const [category, setCategory] = useState('ACTION_REQUIRED')
       const [unread, setUnread] = useState(false)
@@ -4630,7 +4848,7 @@ window.__ModuleLoader__.load({
       const summary = useFinanceResource('/finance/notifications/summary', revision)
       return h('div', { className: 'sf-stack' },
         h(FinanceResource, { resource: summary }, h('div', { className: 'sf-kpis' }, ...[['total', '通知总数'], ['unread', '未读'], ['pending', '待处理']].map(([key, label]) => h(KpiCard, { key, label, value: summary.data?.[key] })))),
-        h('div', { className: 'sf-row' }, h(Select, { value: category, 'aria-label': '通知分类', options: [['ACTION_REQUIRED', '待我处理'], ['RELATED_TO_ME', '与我相关'], ['SYSTEM', '系统通知']], onChange: value => { setCategory(value); setPage(1) } }),
+        h('div', { className: 'sf-row' }, h(Select, { value: category, 'aria-label': '通知分类', options: [['ACTION_REQUIRED', '待我处理'], ['RELATED_TO_ME', '与我有关'], ['SYSTEM', '系统提醒']], onChange: value => { setCategory(value); setPage(1) } }),
           h('label', null, h('input', { type: 'checkbox', checked: unread, onChange: event => { setUnread(event.target.checked); setPage(1) } }), '只看未读'),
           h(GhostButton, { disabled: action.busy, onClick: () => { void action.run('/finance/notifications/read-all', { category }).catch(() => {}) } }, '本分类全部标为已读')),
         h(Notice, null, action.notice),
@@ -4639,7 +4857,7 @@ window.__ModuleLoader__.load({
           { key: 'readAt', label: '阅读状态', render: row => row.readAt ? '已读' : '未读' },
           { key: 'actions', label: '操作', sortable: false, render: row => h('div', { className: 'sf-row' },
             !row.readAt ? h(GhostButton, { disabled: action.busy, onClick: () => { void action.run(`/finance/notifications/${row.id}/read`).catch(() => {}) } }, '标为已读') : null,
-            financeBusinessDestination(row.linkPath) ? h(GhostButton, { onClick: () => { const destination = financeBusinessDestination(row.linkPath); onDrill(destination.tab, destination.params) } }, '查看业务') : row.linkPath ? h('span', { className: 'sf-note' }, '此业务入口暂不可用') : null) },
+            financeBusinessDestination(row.linkPath) ? h(GhostButton, { onClick: () => { const destination = financeBusinessDestination(row.linkPath); if (!row.readAt) void financeRest(`/finance/notifications/${row.id}/read`, 'POST', {}).then(action.invalidate).catch(() => {}); onDrill(destination.tab, destination.params) } }, '查看业务') : row.linkPath ? h('span', { className: 'sf-note' }, '此业务入口暂不可用') : null) },
         ] })), h(Pager, { page, total: list.data?.total, limit: 20, onPage: setPage })),
         h('p', { className: 'sf-note' }, '标记已读只改变阅读状态，不会确认、发布或完成对应业务。'))
     }
@@ -4704,7 +4922,7 @@ window.__ModuleLoader__.load({
       return h('div', { className: 'sf-stack' },
         h(Card, { title: '我的权限可用范围' }, h(FinanceResource, { resource: me }, h(Table, { tableId: 'finance-my-permissions', rows: (me.data?.permissions || []).map(permission => ({ permission, scopes: me.data?.scopes?.find(row => row.permission === permission)?.scopes || [] })), empty: '暂无权限', columns: [
           { key: 'permission', label: '功能', render: row => FINANCE_PERMISSION_NAMES[row.permission] || row.permission },
-          { key: 'scopes', label: '数据范围', render: row => h(FinanceEvidence, { value: row.scopes }) },
+          { key: 'scopes', label: '数据范围', render: row => financeScopeDescription(row.scopes, ctx.orgs, ctx.departments) },
         ] }))),
         manage ? h(Card, { title: '功能与数据权限', actions: [h(GhostButton, { key: 'edit', disabled: !ready || action.busy, onClick: () => edit() }, '配置完整权限')] },
           h('p', { className: 'sf-note' }, '成员有独立配置时仅使用成员权限；未配置时继承岗位角色。部门仅辅助选人，不会自动授权未来加入的成员。'),
@@ -4714,11 +4932,12 @@ window.__ModuleLoader__.load({
           h(Table, { tableId: 'finance-complete-policies-' + tab, rows: tab === 'USER' ? policyRows.filter(row => row.subjectType === 'USER') : roleRows.map(role => ({ subjectType: 'ROLE', subjectId: role.id, role, ...policyRows.find(row => row.subjectType === 'ROLE' && row.subjectId === role.id) })), empty: '暂无成员独立配置，成员继承岗位角色', columns: [
             { key: 'subjectId', label: tab === 'USER' ? '成员' : '岗位角色', render: row => name(row.subjectType, row.subjectId) },
             { key: 'permissions', label: '功能', render: row => row.permissions ? row.permissions.length ? row.permissions.map(code => FINANCE_PERMISSION_NAMES[code] || code).join('、') : '全部关闭' : '使用内置角色默认模板' },
-            { key: 'scopes', label: '数据范围', render: row => row.scopes ? h(FinanceEvidence, { value: row.scopes }) : '默认范围' },
+            { key: 'scopes', label: '数据范围', render: row => row.scopes ? financeScopeDescription(row.scopes, ctx.orgs, ctx.departments) : '默认范围' },
             { key: 'actions', label: '操作', sortable: false, render: row => h('div', { className: 'sf-row' }, h(GhostButton, { disabled: !ready || action.busy || row.role?.enabled === false, onClick: () => edit(row) }, '配置'),
               row.id && (row.subjectType === 'USER' || row.role?.builtIn) ? h(GhostButton, { disabled: !ready || action.busy, onClick: () => setDialog({ kind: 'restore', policy: row }) }, row.subjectType === 'USER' ? '恢复继承岗位' : '恢复内置模板') : null) },
           ] }),
           ctx.role === 'FINANCE_OWNER' ? h(GhostButton, { onClick: () => ctx.onNavigate('identity', { directorySection: 'members' }) }, '前往成员与角色管理岗位') : null) : null,
+        manage ? h(FinancePermissionHistory, { ctx, directory: directory.data }) : null,
         dialog?.kind === 'policy' ? h(FinancePolicyDialog, { key: dialog.policy?.id || dialog.policy?.subjectId || 'new', policy: dialog.policy, initialTab: tab, people, roles: roleRows.map(role => ({ ...role, policy: policyRows.find(policy => policy.subjectType === 'ROLE' && policy.subjectId === role.id) })), directory: directory.data, onDirectoryRefresh: directory.retry, orgs: ctx.orgs, departments: ctx.departments, onClose: () => setDialog(null), onSave: async request => { await action.run(request.path, request.body, 'PUT'); setDialog(null) } }) : null,
         dialog?.kind === 'restore' ? h(FinanceFormDialog, { title: dialog.policy.subjectType === 'USER' ? '恢复继承岗位' : '恢复内置模板', onClose: () => setDialog(null), fields: [{ key: 'reason', label: '恢复原因', required: true, maxLength: 500, type: 'textarea' }], onSubmit: async body => { await action.run(`/finance/permission-policies/${dialog.policy.id}/remove`, body); setDialog(null) } }) : null)
     }
@@ -4788,6 +5007,45 @@ window.__ModuleLoader__.load({
           ...(dialog.kind === 'remove' ? [] : [{ key: 'name', label: '岗位名称', required: true, maxLength: 100 }, { key: 'description', label: '岗位说明', type: 'textarea', maxLength: 500 }, ...(dialog.kind === 'create' ? [{ key: 'baseRole', label: '基础岗位模板', searchable: true, options: Object.entries(FINANCE_POLICY_ROLE_NAMES), required: true }] : [{ key: 'enabled', label: '状态', options: [['true', '启用'], ['false', '停用']], required: true }])]),
           { key: 'reason', label: '变更原因', required: true, type: 'textarea', maxLength: 500 },
         ], onSubmit: run }) : null)
+    }
+
+    function financeScopeDescription(scopes, orgs = [], departments = []) {
+      return (scopes || []).map(scope => {
+        const target = scope.scopeType === 'ORG' ? `指定主体：${orgs.find(row => row.id === scope.orgId)?.name || scope.orgId || '待核对'}`
+          : scope.scopeType === 'DEPARTMENT' ? `指定部门：${departments.find(row => row.id === scope.departmentId)?.name || scope.departmentId || '待核对'}`
+          : scope.scopeType === 'SELF' ? '本人数据' : scope.scopeType === 'GLOBAL' ? '全域数据' : '范围待核对'
+        return `${target}${scope.yearFrom != null || scope.yearTo != null ? ` · ${scope.yearFrom ?? '不限'}—${scope.yearTo ?? '不限'}年` : ''}`
+      }).join('；') || '未配置数据范围'
+    }
+    function financeHistoricalGrantStatus(grant, now = Date.now()) {
+      return grant.revokedAt ? '已撤销' : grant.expiresAt && Date.parse(grant.expiresAt) <= now ? '已过期'
+        : grant.startsAt && Date.parse(grant.startsAt) > now ? '待生效' : '未撤销且在有效期内'
+    }
+    function FinancePermissionHistory({ ctx, directory }) {
+      const [page, setPage] = useState(1), [userId, setUserId] = useState(''), [permission, setPermission] = useState('')
+      const [activeOnly, setActiveOnly] = useState(false), [selected, setSelected] = useState(null)
+      const action = useFinanceAction()
+      const query = new URLSearchParams({ page: String(page), limit: '20', activeOnly: String(activeOnly) })
+      if (userId) query.set('userId', userId)
+      if (permission) query.set('permission', permission)
+      const resource = useFinanceResource(`/finance/permissions?${query}`, `${ctx.revision}-${action.revision}`)
+      const name = grant => directory?.members?.find(row => row.userId === grant.userId)?.name || grant.userName || `目录外成员（${grant.userId}）`
+      return h(Card, { title: '历史补充授权台账（审计）' },
+        h('p', { className: 'sf-note' }, '仅用于历史查阅与撤销标记，不参与当前有效权限计算。当前可用范围以“我的权限可用范围”和完整权限策略为准；有效期内不代表当前可用。'),
+        h('div', { className: 'sf-row' },
+          h(SearchSelect, { value: userId, options: (directory?.members || []).filter(row => row.userId).map(row => [row.userId, row.name]), placeholder: '全部历史成员', onChange: value => { setUserId(value); setPage(1) } }),
+          h(SearchSelect, { value: permission, options: Object.entries(FINANCE_PERMISSION_NAMES), placeholder: '全部历史功能', onChange: value => { setPermission(value); setPage(1) } }),
+          h('label', null, h('input', { type: 'checkbox', checked: activeOnly, onChange: event => { setActiveOnly(event.target.checked); setPage(1) } }), '仅未撤销且在有效期内')),
+        h(Notice, null, action.notice),
+        h(FinanceResource, { resource }, h(Table, { tableId: 'finance-historical-permission-ledger', rows: financeRows(resource.data), empty: '当前筛选无历史授权记录', columns: [
+          { key: 'userName', label: '成员', render: name }, { key: 'permission', label: '历史功能', render: row => FINANCE_PERMISSION_NAMES[row.permission] || row.permission },
+          { key: 'scope', label: '历史数据范围', render: row => financeScopeDescription([row], ctx.orgs, ctx.departments) },
+          { key: 'status', label: '历史记录状态', render: row => financeHistoricalGrantStatus(row) },
+          { key: 'validity', label: '有效期', render: row => `${row.startsAt ? new Date(row.startsAt).toLocaleString('zh-CN', { hour12: false }) : '立即开始'} 至 ${row.expiresAt ? new Date(row.expiresAt).toLocaleString('zh-CN', { hour12: false }) : '长期'}` },
+          ...financeColumns([['grantedByName', '授权人'], ['grantReason', '原授权原因'], ['revokeReason', '撤销原因'], ['revokedAt', '撤销时间']]),
+          { key: 'actions', label: '审计操作', sortable: false, render: row => !row.revokedAt ? h(GhostButton, { disabled: action.busy, onClick: () => setSelected(row) }, '标记撤销') : '已留痕' },
+        ] }), h(Pager, { page, total: resource.data?.total, limit: 20, onPage: setPage })),
+        selected ? h(FinanceFormDialog, { title: '标记撤销历史补充授权', description: `${name(selected)} · ${FINANCE_PERMISSION_NAMES[selected.permission] || selected.permission} · ${financeScopeDescription([selected], ctx.orgs, ctx.departments)}。只标记此条历史记录，当前完整权限策略不变。`, fields: [{ key: 'reason', label: '撤销原因', required: true, maxLength: 500, type: 'textarea' }], onClose: () => setSelected(null), onSubmit: async body => { const reason = String(body.reason || '').trim(); if (!reason) throw new Error('请填写撤销原因'); await action.run(`/finance/permissions/${selected.id}/revoke`, { reason }); setSelected(null) } }) : null)
     }
 
     // 与网页“成员与角色”同一任务边界：岗位分配、岗位维护和移除确认。
@@ -4883,7 +5141,7 @@ window.__ModuleLoader__.load({
       const revision = `${ctx.revision}-${action.revision}`
       const summary = useFinanceResource('/finance/review/summary', revision)
       const paths = { filing: '/finance/filing/assignments?status=SUBMITTED', facts: '/data-source/fact-batches?status=PENDING_REVIEW', budget: '/finance/budget/adjustments?status=SUBMITTED', plans: '/finance/payment-plan-adjustments?status=SUBMITTED' }
-      const list = useFinanceResource(`${paths[section]}&page=${page}&limit=20`, revision)
+      const list = useFinanceResource(`${paths[section]}&page=${page}&limit=20${section === 'filing' && ctx.drillParams?.taskId ? `&taskId=${encodeURIComponent(ctx.drillParams.taskId)}` : ''}`, revision)
       const detailPath = dialog?.kind === 'detail' ? section === 'filing' ? `/finance/filing/assignments/${dialog.row.id}` : section === 'budget' ? `/finance/budget/adjustments/${dialog.row.id}` : section === 'plans' ? `/finance/payment-plan-adjustments/${dialog.row.id}` : null : null
       const detail = useFinanceResource(detailPath, revision)
       const batch = useFinanceResource(ctx.drillParams?.sourcePath?.match(/batch=([\w-]+)/)?.[1] ? `/finance/filing/batches/${ctx.drillParams.sourcePath.match(/batch=([\w-]+)/)[1]}` : null, revision)
@@ -4894,7 +5152,7 @@ window.__ModuleLoader__.load({
       const canVerify = ctx.permissions.includes(section === 'facts' ? 'finance.source.review' : section === 'budget' ? 'budget.adjustment.approve' : section === 'plans' ? 'cash.plan.verify' : 'budget.submission.verify') && ctx.financeWriter
       const act = async (target, body) => { const result = await action.run(target, body); if (result?.results) setReceipt(result); return result }
       return h('div', { className: 'sf-stack' },
-        h(Card, { title: '复核队列汇总' }, h(FinanceResource, { resource: summary }, h('div', { className: 'sf-kpis' }, ...(summary.data?.sources || []).map(row => h(KpiCard, { key: row.source, label: ({ FILING: '填报', FACT_BATCH: '事实批次', BUDGET_ADJUSTMENT: '预算调整', PLAN_ADJUSTMENT: '计划调整' })[row.source], value: row.pending }))))),
+        h(Card, { title: '复核队列汇总' }, h(FinanceResource, { resource: summary }, h('div', { className: 'sf-kpis' }, ...(summary.data?.sources || []).map(row => h(KpiCard, { key: row.source, label: ({ FILING: '填报', FACT_BATCH: '事实批次', BUDGET_ADJUSTMENT: '预算调整', PLAN_ADJUSTMENT: '计划调整' })[row.source], value: row.pending, onClick: () => { const next = ({ FILING: 'filing', FACT_BATCH: 'facts', BUDGET_ADJUSTMENT: 'budget', PLAN_ADJUSTMENT: 'plans' })[row.source]; if (next) { setSection(next); setPage(1); setDialog(null) } } }))))),
         h(Select, { 'aria-label': '复核类别', value: section, options: FINANCE_REVIEW_SOURCES, onChange: value => { setSection(value); setPage(1); setDialog(null) } }), h(Notice, null, action.notice),
         section === 'filing' && canVerify ? h(GhostButton, { disabled: !selected.length || mixedTasks || action.busy, onClick: () => setDialog({ kind: 'batch', title: `批量定稿（${selected.length} 条）` }) }, `批量定稿（已选 ${selected.length}${mixedTasks ? ' · 跨任务不可批量定稿' : ''}）`) : null,
         h(Card, { title: FINANCE_REVIEW_SOURCES.find(([id]) => id === section)[1], unit: '元' }, h(FinanceResource, { resource: list }, h(Table, { tableId: `finance-review-${section}`, rows, empty: '暂无待复核事项', columns: [
@@ -4934,13 +5192,14 @@ window.__ModuleLoader__.load({
       const runs = useFinanceResource(`/data-source/runs?scope=${scope}&limit=100`, ctx.revision)
       const rows = financeRows(records.data)
       const fieldLabels = new Map(rows.flatMap(row => (row.fields || []).map(field => [field.key, field.label])))
-      return h('div', { className: 'sf-stack' }, h('p', { className: 'sf-banner sf-banner-amber' }, '来源暂存用于核对与追溯，采集成功不代表已审核发布，不计入正式财务指标。'),
+      return h('div', { className: 'sf-stack' }, h(GhostButton, { onClick: () => ctx.onNavigate('datacenter') }, '返回数据中心'), h('p', { className: 'sf-banner sf-banner-amber' }, '来源暂存用于核对与追溯，采集成功不代表已审核发布，不计入正式财务指标。'),
         h('div', { className: 'sf-row' }, h(Select, { 'aria-label': '来源范围', value: scope, options: [['HEADQUARTERS', '总部'], ['HEZHONG', '合众']], onChange: value => { setScope(value); setRunId(''); setPage(1); setSelected(null) } }),
-          h(Select, { 'aria-label': '同步批次', value: runId, options: financeRows(runs.data).map(row => [row.id, `${financeLabel(row.bizSystem)} ${row.batchId || row.startedAt}`]), placeholder: '全部批次', onChange: value => { setRunId(value); setPage(1) } }),
-          h('form', { className: 'sf-row', onSubmit: event => { event.preventDefault(); setSearch(searchInput.trim()); setPage(1) } }, h(Field, { 'aria-label': '来源记录搜索', value: searchInput, onChange: setSearchInput, placeholder: '单据号或关键词', maxLength: 100 }), h(GhostButton, { type: 'submit' }, '搜索'))),
+          h(Select, { 'aria-label': '同步批次', value: runId, options: financeRows(runs.data).map(row => [row.id, `${financeLabel(row.bizSystem)} ${row.batchId || row.startedAt}`]), placeholder: '全部批次', onChange: value => { setRunId(value); setPage(1); setSelected(null) } }),
+          h('form', { className: 'sf-row', onSubmit: event => { event.preventDefault(); setSearch(searchInput.trim()); setPage(1); setSelected(null) } }, h(Field, { 'aria-label': '来源记录搜索', value: searchInput, onChange: setSearchInput, placeholder: '单据号或关键词', maxLength: 100 }), h(GhostButton, { type: 'submit' }, '搜索'))),
         h(Card, { title: '来源记录' }, h(FinanceResource, { resource: records }, h(Table, { tableId: `finance-source-${scope}`, rows, empty: '暂无来源记录', onRowClick: setSelected, columns: [
           ...financeColumns([['sourceDocNo', '单据号'], ['tableName', '来源表'], ['revision', '修订版本'], ['createdAt', '入库时间']]),
-          { key: 'category', label: '财务分类', render: row => financeDisplayValue(row.financialAnalysis?.category || '未分类', 'category') },
+          { key: 'category', label: '财务分类', render: row => `${financeDisplayValue(row.financialAnalysis?.category || '未分类', 'category')} · ${row.financialAnalysis?.level || '层级待核对'}` },
+          { key: 'primaryAmount', label: '主金额 / 单位 / 币种', sortValue: row => row.financialAnalysis?.primaryAmount?.amount, render: row => row.financialAnalysis?.primaryAmount ? `${formatNumber(row.financialAnalysis.primaryAmount.amount)} ${row.financialAnalysis.primaryAmount.unit} · ${row.financialAnalysis.primaryAmount.currency}` : '主金额未提供' },
           ...[...fieldLabels].map(([key, label]) => ({ key: `field:${key}`, label, sortValue: row => sourceCellText(row.fields?.find(field => field.key === key)?.value), render: row => sourceCellText(row.fields?.find(field => field.key === key)?.value, label) })),
         ] })), h(Pager, { page, total: records.data?.total, limit: 20, onPage: setPage })),
         selected ? h(Dialog, { title: `来源详情：${selected.sourceDocNo}`, onClose: () => setSelected(null) }, h(FinanceEvidence, { value: selected.financialAnalysis }), h(Table, { tableId: 'finance-source-detail', rows: selected.fields || [], columns: [{ key: 'label', label: '字段' }, { key: 'value', label: '值', render: row => sourceCellText(row.value, row.label) }], empty: '无来源字段' })) : null)
@@ -4969,31 +5228,64 @@ window.__ModuleLoader__.load({
       const snapshots = useFinanceResource(mode === 'monthly' ? `/finance/budget-snapshots?year=${ctx.year}` : null, revision)
       const baseRows = mode === 'monthly' ? financeRows(snapshots.data).filter(row => row.status === 'ACTIVE') : financeRows(versions.data)
       const targetRows = mode === 'yearly' ? financeRows(targetVersions.data) : baseRows
-      const validA = baseRows.some(row => row.id === a) ? a : ''
-      const validB = targetRows.some(row => row.id === b) ? b : ''
-      const path = validA && validB ? mode === 'monthly' ? `/finance/budget-snapshots/compare?snapshotAId=${validA}&snapshotBId=${validB}` : mode === 'versions' ? `/finance/budget-versions/detail-diff?baseVersionId=${validA}&targetVersionId=${validB}` : `/finance/budget/versions/diff?baseVersionId=${validA}&targetVersionId=${validB}` : null
+      const validA = baseRows.some(row => row.id === a) ? a : mode === 'monthly' ? baseRows[1]?.id || baseRows[0]?.id || '' : baseRows.find(row => row.isPrimary)?.id || baseRows[0]?.id || ''
+      const validB = targetRows.some(row => row.id === b) ? b : mode === 'yearly' ? targetRows.find(row => row.isPrimary)?.id || targetRows[0]?.id || '' : targetRows.find(row => row.id !== validA)?.id || ''
+      const path = validA && validB && validA !== validB ? mode === 'monthly' ? `/finance/budget-snapshots/compare?snapshotAId=${validA}&snapshotBId=${validB}` : mode === 'versions' ? `/finance/budget-versions/detail-diff?baseVersionId=${validA}&targetVersionId=${validB}` : `/finance/budget/versions/diff?baseVersionId=${validA}&targetVersionId=${validB}` : null
       const comparison = useFinanceResource(path, revision)
       useEffect(() => { setA(''); setB(''); setDialog(null) }, [mode, ctx.year, targetYear])
-      const versionLabel = row => mode === 'monthly' ? `${row.label} · ${row.frozenThroughMonth}+${12 - row.frozenThroughMonth}` : `${row.name} · ${financeDisplayValue(row.status, 'status')}${row.isPrimary ? ' · 主版本' : ''}`
+      const versionLabel = row => mode === 'monthly' ? `${row.label} · 已冻结${row.frozenThroughMonth}个月 / 剩余预测${12 - row.frozenThroughMonth}个月` : `${row.name} · ${financeDisplayValue(row.status, 'status')}${row.isPrimary ? ' · 主版本' : ''}`
       const selectedVersions = [baseRows.find(row => row.id === validA), targetRows.find(row => row.id === validB)]
       const trial = mode !== 'monthly' && selectedVersions.some(row => row?.status === 'DRAFT' || row?.status === 'CONFIRMED')
       const rows = financeRows(comparison.data)
-      const comparable = mode === 'yearly' ? rows.filter(row => row.baseBudget !== 0 && row.targetBudget !== 0) : rows
-      const oneSided = mode === 'yearly' ? rows.filter(row => row.baseBudget === 0 || row.targetBudget === 0) : []
+      const comparable = mode === 'yearly' ? rows.filter(row => (row.basePresent ?? row.baseBudget !== 0) && (row.targetPresent ?? row.targetBudget !== 0)) : rows
+      const oneSided = mode === 'yearly' ? rows.filter(row => !(row.basePresent ?? row.baseBudget !== 0) || !(row.targetPresent ?? row.targetBudget !== 0)) : []
+      const baseTotal = comparable.reduce((sum, row) => sum + row.baseBudget, 0), targetTotal = comparable.reduce((sum, row) => sum + row.targetBudget, 0)
+      const targetOrgs = new Set(rows.filter(row => row.targetPresent ?? row.targetBudget !== 0).map(row => row.orgId))
+      const covered = [...targetOrgs].filter(orgId => rows.some(row => row.orgId === orgId && (row.basePresent ?? row.baseBudget !== 0))).length
       return h('div', { className: 'sf-stack' },
+        mode === 'monthly' && snapshots.data && baseRows.length < 2 ? h('p', { role: 'status' }, baseRows.length ? '当前仅有一份有效快照，请封存另一份月结快照后比较。' : '当前尚无有效快照，请先封存初始或月结快照。') : null,
+        mode === 'versions' ? h(FinanceVersionsPanel, { ctx, resource: versions, onChanged: action.invalidate }) : null,
+        validA && validB && validA === validB ? h('p', { role: 'status' }, '请选择不同的快照或预算版本') : null,
         mode === 'yearly' ? h(FormRow, { label: '对比年度' }, h(Select, { 'aria-label': '对比年度', value: targetYear, onChange: setTargetYear, options: yearOptions(targetYear) })) : null,
         h('div', { className: 'sf-row' },
           h(Select, { 'aria-label': '基准快照或版本', value: validA, onChange: setA, options: baseRows.map(row => [row.id, versionLabel(row)]), placeholder: '选择基准' }),
           h(Select, { 'aria-label': '对比快照或版本', value: validB, onChange: setB, options: targetRows.map(row => [row.id, versionLabel(row)]), placeholder: '选择对比' })),
         [versions, targetVersions, snapshots].filter(resource => resource.error).map((resource, i) => h(FinanceResource, { key: i, resource })),
+        mode === 'yearly' && comparison.data ? h('div', { className: 'sf-kpis' }, h(KpiCard, { label: '可比预算变化', value: formatNumber(targetTotal - baseTotal) }), h(KpiCard, { label: '可比预算变化率', value: baseTotal ? `${formatNumber((targetTotal - baseTotal) / Math.abs(baseTotal) * 100)}%` : '—' }), h(KpiCard, { label: '主体覆盖率', value: targetOrgs.size ? `${formatNumber(covered / targetOrgs.size * 100)}%` : '—' })) : null,
         trial ? h('p', { className: 'sf-banner sf-banner-amber' }, '试算比较：含未正式发布的预算版本，不能作为正式同比结论。') : null,
         h('p', { className: 'sf-note' }, mode === 'monthly' ? 'B−A 为全年预计差额。已发生金额与剩余预测分列，不能把已发生误认为预算增加。' : '差异采用服务端结果。单侧缺失项目单独展示，不计入年度同比结论。'),
-        h(Card, { title: '预算比较结果', unit: '元' }, !path ? h('p', null, '请选择两份快照或预算版本') : h(FinanceResource, { resource: comparison }, h(Table, { tableId: `finance-compare-${mode}`, rows: comparable, empty: '暂无可比较项目', columns: financeColumns(mode === 'monthly' ? [['orgName', '主体'], ['aForecast', 'A 全年预计'], ['bActual', 'B 已发生'], ['bRemaining', 'B 剩余预测'], ['bForecast', 'B 全年预计'], ['diff', '差额'], ['changeRate', '变化率']] : mode === 'versions' ? [['orgName', '主体'], ['departmentName', '部门'], ['costItemName', '费用项'], ['baseAmount', '基准金额'], ['targetAmount', '对比金额'], ['diff', '差额'], ['changeType', '变化类型']] : [['orgName', '主体'], ['expenseType', '费用类别'], ['baseBudget', '基准年度金额'], ['targetBudget', '对比年度金额'], ['diff', '差额']]) }))),
+        h(Card, { title: '预算比较结果', unit: '元' }, !path ? h('p', null, '请选择两份快照或预算版本') : h(FinanceResource, { resource: comparison }, h(Table, { tableId: `finance-compare-${mode}`, rows: comparable, empty: '暂无可比较项目', onRowClick: mode === 'versions' ? row => ctx.onNavigate('budget', { year: ctx.year, view: 'lines', versionId: validB, orgId: row.orgId || '', unassigned: !row.orgId, ...(row.departmentId ? { departmentId: row.departmentId } : {}), ...(row.expenseType ? { expenseType: row.expenseType } : {}), ...(row.month ? { month: row.month } : {}) }) : undefined, columns: financeColumns(mode === 'monthly' ? [['orgName', '主体'], ['aForecast', 'A 全年预计'], ['bActual', 'B 已发生'], ['bRemaining', 'B 剩余预测'], ['bForecast', 'B 全年预计'], ['diff', '差额'], ['changeRate', '变化率']] : mode === 'versions' ? [['orgName', '主体'], ['departmentName', '部门'], ['costItemName', '费用项'], ['baseAmount', '基准金额'], ['targetAmount', '对比金额'], ['diff', '差额'], ['changeType', '变化类型']] : [['orgName', '主体'], ['expenseType', '费用类别'], ['baseBudget', '基准年度金额'], ['targetBudget', '对比年度金额'], ['diff', '差额']]) }))),
         oneSided.length ? h(Card, { title: '单侧缺失：不计入同比结论', unit: '元' }, h(Table, { tableId: 'finance-compare-one-sided', rows: oneSided, empty: '无单侧缺失', columns: financeColumns([['orgName', '主体'], ['expenseType', '费用类别'], ['baseBudget', '基准年度金额'], ['targetBudget', '对比年度金额']]) })) : null,
         mode === 'monthly' && comparison.data?.bUnsplitAmount ? h('p', { role: 'status' }, `B 版本未分月金额 ${formatNumber(comparison.data.bUnsplitAmount)} 元，仅计入全年预计。`) : null,
         mode === 'monthly' && ctx.financeWriter && ctx.permissions.includes('budget.version.publish') ? h(GhostButton, { onClick: () => setDialog({ title: '封存月结快照' }) }, '封存月结快照') : null,
         h(Notice, null, action.notice),
         dialog ? h(FinanceFormDialog, { title: dialog.title, fields: [{ key: 'versionId', label: '预算版本', options: financeRows(versions.data).map(row => [row.id, row.name]), required: true }, { key: 'month', label: '月结月份（0 为初始）', type: 'number', min: 0, max: 12, required: true }, { key: 'label', label: '快照名称' }, { key: 'note', label: '说明' }], onClose: () => setDialog(null), onSubmit: body => action.run('/finance/budget-snapshots', body) }) : null)
+    }
+
+    function FinanceVersionsPanel({ ctx, resource, onChanged }) {
+      const [dialog, setDialog] = useState(null)
+      const action = useFinanceAction()
+      const canManage = ctx.financeWriter && ctx.permissions.includes('budget.version.manage')
+      const canPublish = ctx.financeWriter && ctx.permissions.includes('budget.version.publish')
+      const rows = financeRows(resource.data)
+      const open = (kind, row) => setDialog({ kind, row })
+      const labels = { create: '新建预算草稿', clone: '复制预算草稿', confirm: '确认预算版本', activate: '发布正式预算', lock: '锁定预算版本' }
+      return h(Card, { title: `预算版本 · ${ctx.year} 年`, actions: canManage ? [h(GhostButton, { key: 'create', disabled: action.busy, onClick: () => open('create') }, labels.create)] : [] },
+        h('p', { className: 'sf-note' }, '新建草稿 → 发起填报或编制 → 确认 → 发布 → 锁定。未发布版本只用于编制与试算。'),
+        h(Notice, null, action.notice),
+        h(FinanceResource, { resource }, h(Table, { tableId: 'finance-version-management', rows, empty: '该年度暂无版本，请先新建预算草稿，再发起预算填报活动。', columns: [
+          ...financeColumns([['name', '版本名称'], ['status', '状态'], ['isPrimary', '主版本'], ['lineCount', '明细行数'], ['budgetTotal', '预算总额（元）']]),
+          { key: 'actions', label: '操作', render: row => h('div', { className: 'sf-row' },
+            h(GhostButton, { onClick: () => ctx.onNavigate('engine', { year: ctx.year, versionId: row.id }) }, '查看编制'),
+            h(GhostButton, { onClick: () => ctx.onNavigate('budget', { year: ctx.year, orgId: '', view: 'lines', versionId: row.id }) }, '查看预算明细'),
+            ...['clone', ...(row.status === 'DRAFT' ? ['confirm'] : row.status === 'CONFIRMED' ? ['activate'] : row.status === 'PUBLISHED' ? ['lock'] : [])].filter(kind => ['activate', 'lock'].includes(kind) ? canPublish : canManage).map(kind => h(GhostButton, { key: kind, disabled: action.busy, onClick: () => open(kind, row) }, labels[kind]))) },
+        ] })),
+        dialog ? h(FinanceFormDialog, { title: labels[dialog.kind], description: dialog.row ? `${dialog.row.name} · ${financeDisplayValue(dialog.row.status, 'status')} · ${dialog.row.lineCount} 行 · 预算 ${formatNumber(dialog.row.budgetTotal)} 元。发布将切换正式预算口径，锁定后不能继续修改。` : `${ctx.year} 年空白初始预算；创建后可在填报活动中选择。`, fields: ['create', 'clone'].includes(dialog.kind) ? [{ key: dialog.kind === 'create' ? 'name' : 'newName', label: '预算版本名称', required: true, maxLength: 150 }] : [], onClose: () => setDialog(null), onSubmit: async body => {
+          if (dialog.kind === 'create') body = { year: Number(ctx.year), name: String(body.name || '').trim() }
+          if (['create', 'clone'].includes(dialog.kind) && !String(body.name || body.newName || '').trim()) throw new Error('请填写预算版本名称')
+          await action.run(dialog.kind === 'create' ? '/finance/budget/versions' : `/finance/budget/versions/${dialog.row.id}/${dialog.kind}`, body)
+          onChanged()
+        } }) : null)
     }
 
     function FactsView({ ctx }) {
@@ -5024,7 +5316,7 @@ window.__ModuleLoader__.load({
 
     const BUDGET_OUTPUT_LABELS = { REVENUE: '收入', RECEIPT: '回款', CASH_BALANCE: '月末现金', FUNDING_GAP: '资金缺口', TAX: '应缴税费', PAYMENT: '实际付款', INVENTORY_HOLDING: '存货占用', LABOR_COST: '人工成本', OVERHEAD_COST: '制造费用' }
     function EngineView({ ctx }) {
-      const [versionId, setVersionId] = useState('')
+      const [versionId, setVersionId] = useState(ctx.drillParams?.versionId || '')
       const [paramId, setParamId] = useState('')
       const [runId, setRunId] = useState('')
       const [baseRunId, setBaseRunId] = useState('')
@@ -5034,7 +5326,8 @@ window.__ModuleLoader__.load({
       const revision = `${ctx.revision}-${action.revision}`
       const versions = useFinanceResource(`/finance/budget/versions?year=${ctx.year}`, revision)
       const rows = financeRows(versions.data)
-      const version = rows.find(row => row.id === versionId)
+      const defaultVersion = rows.find(row => row.status === 'DRAFT') || rows.find(row => row.isPrimary) || rows[0]
+      const version = versionId ? rows.find(row => row.id === versionId) : defaultVersion
       const validId = version?.id
       const draft = version?.status === 'DRAFT'
       const path = validId ? `/budget-engine/versions/${validId}` : null
@@ -5048,8 +5341,9 @@ window.__ModuleLoader__.load({
       const outputs = useFinanceResource(validRun ? `/budget-engine/runs/${validRun}/outputs` : null, revision)
       const statements = useFinanceResource(validRun ? `/budget-engine/runs/${validRun}/statements` : null, revision)
       const diff = useFinanceResource(validRun && validBase ? `/budget-engine/runs/diff?baseRunId=${validBase}&targetRunId=${validRun}` : null, revision)
-      const selectedParams = financeRows(params.data).find(row => row.id === paramId)
-      useEffect(() => { setVersionId(''); setParamId(''); setRunId(''); setBaseRunId(''); setDialog(null) }, [ctx.year])
+      const selectedParams = paramId ? financeRows(params.data).find(row => row.id === paramId) : financeRows(params.data)[0]
+      const readiness = useFinanceResource(validId ? `/finance/budget/summary?year=${ctx.year}&versionId=${validId}&unassigned=true` : null, revision)
+      useEffect(() => { setVersionId(ctx.drillParams?.versionId || ''); setParamId(''); setRunId(''); setBaseRunId(''); setDialog(null) }, [ctx.year])
       const selectVersion = value => { setVersionId(value); setParamId(''); setRunId(''); setBaseRunId(''); setReceipt(null); setDialog(null) }
       const canEdit = ctx.financeWriter && ctx.permissions.includes('budget.version.manage')
       const canPublish = ctx.financeWriter && ctx.permissions.includes('budget.version.publish')
@@ -5058,6 +5352,9 @@ window.__ModuleLoader__.load({
       return h('div', { className: 'sf-stack' },
         h(FinanceResource, { resource: versions }, h(FormRow, { label: '预算版本' }, h(Select, { 'aria-label': '编制预算版本', value: validId || '', options: rows.map(row => [row.id, `${row.name} · ${financeDisplayValue(row.status, 'status')}${row.isPrimary ? ' · 主版本' : ''}`]), placeholder: '选择预算版本', onChange: selectVersion }))),
         h(Notice, null, action.notice),
+        !versions.loading && !versions.error && !rows.length ? h('div', { role: 'status', className: 'sf-stack' }, '该年度暂无预算版本。请先新建预算草稿，再开始填报和编制。', h(GhostButton, { onClick: () => ctx.onNavigate('comparisons', { mode: 'versions', year: ctx.year }) }, '前往预算版本')) : null,
+        versionId && !versions.loading && !versions.error && !version ? h('p', { role: 'alert' }, '指定版本不在当前年度或不可访问，请重新选择预算版本。') : null,
+        version ? h(Card, { title: '预算准备度', actions: [h(GhostButton, { key: 'unassigned', onClick: () => ctx.onNavigate('budget', { year: ctx.year, versionId: validId, orgId: '', unassigned: true, view: 'lines' }) }, '核对未分配主体预算')] }, h(FinanceResource, { resource: readiness }, h('p', null, `版本明细 ${version.lineCount} 行 · 未分配主体预算 ${readiness.data ? formatNumber(readiness.data.totals?.budgetAmount) : '—'} 元`))) : null,
         version ? h('p', { className: 'sf-note' }, `${financeDisplayValue(version.status, 'status')} · ${version.lineCount ?? 0} 行。草稿可编辑；确认、发布和锁定以服务端状态与发布检查为准。`) : null,
         validId && (canEdit || canPublish) ? h('div', { className: 'sf-row' },
           canEdit ? h(GhostButton, { disabled: action.busy, onClick: () => setDialog({ kind: 'roll', title: '创建滚动预测草稿' }) }, '创建滚动草稿') : null,
@@ -5162,7 +5459,7 @@ window.__ModuleLoader__.load({
         dialog?.kind === 'create' ? h(CreateTaskDialog, { year: ctx.year, orgs: ctx.orgs, departments: ctx.departments, members: members.error ? { error: true } : members.data, busy: action.busy, t, act, onClose: () => { setDialog(null); tasks.retry() } }) : null,
         dialog?.kind === 'assignment' ? detail.error || detail.loading ? h(Dialog, { title: '填报详情', onClose: () => setDialog(null) }, h(FinanceResource, { resource: detail })) : detail.data ? detail.data.task?.type === 'BUDGET' ? h(Dialog, { title: '预算填报与审核', onClose: () => setDialog(null) }, h('p', null, '预算按条目填报，经对接人初审和负责人终审后整体提交。'), h(PrimaryButton, { onClick: () => ctx.onNavigate?.('budget-filing', { year: String(detail.data.task.year), taskId: detail.data.taskId || detail.data.task.id }) }, '进入预算填报与审核')) : h(AssignmentDialog, { key: detail.data.id, assignment: detail.data, canEdit: ctx.permissions.includes('budget.submission.edit'), canVerify: verify, busy: action.busy, t, act, onClose: () => { setDialog(null); assignments.retry() } }) : null : null,
         dialog?.kind === 'history' ? h(Dialog, { title: dialog.title, onClose: () => setDialog(null) }, h(FinanceResource, { resource: history }, h(FinanceEvidence, { value: history.data }))) : null,
-        dialog && !['create', 'assignment', 'history'].includes(dialog.kind) ? h(FinanceFormDialog, { title: dialog.title, onClose: () => setDialog(null), fields: dialog.kind === 'assignee' ? [{ key: 'assigneeUserId', label: '填报人（留空清除指定）', options: financeRows(members.data).map(row => [row.userId, row.name || row.userId]) }] : dialog.kind === 'publish' || dialog.kind === 'confirmAll' || dialog.kind === 'lock' ? [] : [{ key: 'reason', label: '原因', required: ['reopenTask', 'reopenAssignment', 'void'].includes(dialog.kind), type: 'textarea' }, ...(dialog.kind === 'reopenTask' ? [{ key: 'newDueAt', label: '新的截止时间', type: 'datetime-local' }] : [])], onSubmit: body => {
+        dialog && !['create', 'assignment', 'history'].includes(dialog.kind) ? h(FinanceFormDialog, { title: dialog.title, description: `${dialog.row.title || dialog.row.taskTitle || dialog.row.task?.title || '当前填报'} · ${dialog.row.departmentName || ''} · ${financeDisplayValue(dialog.row.status, 'status')}。操作仅作用于此活动或填报，请核对后确认。`, onClose: () => setDialog(null), fields: dialog.kind === 'assignee' ? [{ key: 'assigneeUserId', label: '填报人（留空清除指定）', options: financeRows(members.data).map(row => [row.userId, row.name || row.userId]) }] : dialog.kind === 'publish' || dialog.kind === 'confirmAll' || dialog.kind === 'lock' ? [] : [{ key: 'reason', label: '原因', required: ['reopenTask', 'reopenAssignment', 'void'].includes(dialog.kind), type: 'textarea' }, ...(dialog.kind === 'reopenTask' ? [{ key: 'newDueAt', label: '新的截止时间', type: 'datetime-local' }] : [])], onSubmit: body => {
           const id = dialog.row.id
           if (dialog.kind === 'assignee') return run(`/finance/filing/assignments/${id}/assignee`, { assigneeUserId: body.assigneeUserId || null, assigneeName: financeRows(members.data).find(row => row.userId === body.assigneeUserId)?.name || null })
           if (dialog.kind === 'reopenAssignment' || dialog.kind === 'lock' || dialog.kind === 'void') return run(`/finance/filing/assignments/${id}/${dialog.kind === 'reopenAssignment' ? 'reopen' : dialog.kind}`, body)
@@ -5438,6 +5735,30 @@ window.__ModuleLoader__.load({
               h(GhostButton, { disabled: busy, onClick: () => { setPreview(null); setFile(null) } }, '取消预览'))) : null)
     }
 
+    function FilingExcelDraft({ assignmentId, disabled, onBusyChange, onApply }) {
+      const [preview, setPreview] = useState(null)
+      const [busy, setBusy] = useState(false), [error, setError] = useState('')
+      const lock = useRef(false)
+      const run = async operation => {
+        if (lock.current || disabled) return
+        lock.current = true; setBusy(true); onBusyChange?.(true); setError('')
+        try { await operation() } catch (cause) { setError(cause.message) }
+        finally { lock.current = false; setBusy(false); onBusyChange?.(false) }
+      }
+      return h('section', { className: 'sf-stack', 'aria-label': '填报 Excel 导入' },
+        h('p', { className: 'sf-note' }, 'Excel 先预览，再替换当前编辑内容；暂存或提交后才会保存，不直接写入正式数据。'),
+        h('div', { className: 'sf-row' },
+          h(GhostButton, { disabled: disabled || busy, onClick: () => run(async () => { const result = await financeRest(`/finance/filing/assignments/${assignmentId}/excel-template`, 'POST', {}); financeDownloadBudgetTemplate(result.data) }) }, '下载填报 Excel 模板'),
+          h(FormRow, { label: '选择填报 Excel 并预览' }, h('input', { type: 'file', accept: '.xlsx', 'aria-label': '选择填报 Excel 并预览', disabled: disabled || busy, onChange: event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void run(async () => { setPreview(null); const body = await financeBudgetExcelFile(file); const result = await financeRest(`/finance/filing/assignments/${assignmentId}/excel-preview`, 'POST', body); setPreview(result.data) }) } }))),
+        error ? h('p', { role: 'alert' }, error) : null,
+        preview ? h('div', { className: 'sf-stack' },
+          h('p', null, `预览 ${preview.rows.length} 条 · 合计 ${formatNumber(preview.totalAmount)} 元`),
+          ...(preview.errors || []).map(item => h('p', { key: item.row, role: 'alert' }, `第 ${item.row} 行：${item.message}`)),
+          h(Table, { tableId: 'filing-excel-preview', rows: preview.rows.slice(0, 20), columns: financeColumns([['month', '月份'], ['plannedAmount', '金额（元）'], ['description', '编制说明']]), empty: '暂无可导入内容' }),
+          preview.rows.length > 20 ? h('p', { className: 'sf-note' }, `当前预览前 20 条，确认后载入全部 ${preview.rows.length} 条。`) : null,
+          h(PrimaryButton, { disabled: disabled || busy || !preview.rows.length || preview.errors.length > 0, onClick: () => { onApply(preview.rows); setPreview(null) } }, '确认替换当前编辑内容')) : null)
+    }
+
     const BUDGET_HISTORY_ACTIONS = { COPY_ROUND: '复制预算新轮次', SAVE: '保存草稿', SUBMIT: '提交初审', INITIAL_APPROVE: '初审通过', FINAL_APPROVE: '终审通过', REJECT: '退回条目', DELETE: '删除条目', ASSIGN_OWNER: '明确归属', DEPARTMENT_SUBMIT: '部门提交', DEPARTMENT_CONFIRM: '财务确认', DEPARTMENT_REJECT: '财务退回', IMPORT_EXCEL: 'Excel 追加草稿' }
     const BUDGET_HISTORY_CHANGES = { ADDED: '新增', MODIFIED: '修改', DELETED: '删除', UNCHANGED: '未变' }
     function BudgetHistoryRows({ rows, label }) {
@@ -5547,22 +5868,17 @@ window.__ModuleLoader__.load({
         if (!active || tab !== 'overview') return undefined
         let cancelled = false
         setWorkQueue({ state: 'loading' })
-        const requests = [
-          api(`/filing-tasks?year=${year}&status=OPEN&limit=100`),
-          api('/quality'),
-          api(`/alerts-summary?year=${year}${orgId ? `&orgId=${orgId}` : ''}`),
-        ]
+        const requests = financeWriter ? [
+          financeRest('/finance/review/summary'), api('/quality'), api(`/alerts-summary?year=${year}${orgId ? `&orgId=${orgId}` : ''}`),
+        ] : [financeRest(`/finance/filing/assignments/summary?year=${year}`)]
         Promise.allSettled(requests).then(results => {
           if (cancelled) return
-          const [tasksResult, qualityResult, alertsResult] = results
-          const tasks = tasksResult.status === 'fulfilled' ? (tasksResult.value.data ?? {}) : null
-          const quality = qualityResult.status === 'fulfilled' ? (qualityResult.value.quality ?? {}) : null
-          const alerts = alertsResult.status === 'fulfilled' ? (alertsResult.value.data ?? {}) : null
+          const value = index => results[index]?.status === 'fulfilled' ? results[index].value.data ?? results[index].value.quality ?? null : null
           const failed = results.filter(result => result.status === 'rejected').length
-          setWorkQueue({ state: failed === results.length ? 'error' : failed ? 'partial' : 'ready', tasks, quality, alerts })
+          setWorkQueue({ state: failed === results.length ? 'error' : failed ? 'partial' : 'ready', financeWriter, review: financeWriter ? value(0) : null, assignments: financeWriter ? null : value(0), quality: financeWriter ? value(1) : null, alerts: financeWriter ? value(2) : null })
         })
         return () => { cancelled = true }
-      }, [active, tab, year, orgId, revision])
+      }, [active, tab, year, orgId, revision, financeWriter])
 
       const refresh = () => { if (loadingRef.current) return; setRevision(value => value + 1) }
       useEffect(() => {
@@ -5581,9 +5897,10 @@ window.__ModuleLoader__.load({
         const item = financeNavigationItem(target, params)
         if (!canOpen(target) || (item && !financeNavigationAllowed(item, identity))) return
         const navigate = () => {
-          setDrillParams(params ?? null)
-          if (params?.year) setYear(params.year)
-          if (params?.orgId) setOrgId(params.orgId)
+          const next = { year, orgId, ...params }
+          setDrillParams(next)
+          if (next.year) setYear(String(next.year))
+          setOrgId(next.orgId || '')
           setTab(target)
         }
         if (entryLeaveRef.current) entryLeaveRef.current(navigate)
@@ -5599,17 +5916,18 @@ window.__ModuleLoader__.load({
         ? h('div', { className: 'sf-loading', role: 'status' }, h(Glyph, { name: 'loading' }), t('loading'))
         : (tab === 'overview' || tab === 'operations') && briefState === 'error' && !brief
           ? h('div', { className: 'sf-fatal', role: 'alert' }, h(Glyph, { name: 'warning' }), h('strong', null, t('loadError')), h(GhostButton, { onClick: refresh }, t('retry')))
-          : h(React.Fragment, { key: `${tab}-${JSON.stringify(drillParams)}` },
+          : h(React.Fragment, { key: `${tab}-${year}-${JSON.stringify(drillParams)}` },
             tab === 'overview' ? h(OverviewView, { key: `ov-${year}-${orgId}-${revision}`, ...briefProps, workQueue }) : null,
             tab === 'operations' ? h(OperationsView, { key: `op-${year}-${orgId}-${revision}`, ...briefProps }) : null,
-            tab === 'budget' ? ctx.drillParams?.lineId ? h(BudgetSavedRecordView, { ctx, t }) : h(BudgetView, { ctx: { ...ctx, orgId: ctx.drillParams?.orgId || '' }, t }) : null,
+            tab === 'budget' ? ctx.drillParams?.lineId ? h(BudgetSavedRecordView, { ctx, t }) : h(BudgetView, { ctx, t }) : null,
             tab === 'cash' ? h(CashView, { ctx, t, onDrill }) : null,
             tab === 'alerts' ? h(AlertsView, { ctx, t, onDrill }) : null,
+            tab === 'costitems' ? h(FinanceCostItemsView, { ctx, t }) : null,
             tab === 'datacenter' ? h(DataCenterView, { ctx, t }) : null,
             tab === 'entry' ? h(EntryPanel, { year, orgId, orgs, departments, role: ctx.role, t, onSaved: refresh, onYearChange: setYear, onNavigate: onDrill, onLeaveGuardChange: registerEntryLeave }) : null,
             tab === 'budget-filing' ? h(BudgetFilingView, { key: `budget-filing-${year}-${drillParams?.taskId || ''}`, ctx, t }) : null,
             tab === 'filing' ? h(FilingParityView, { key: `filing-${year}-${drillParams?.section || 'assignments'}-${drillParams?.taskId || ''}`, ctx, t }) : null,
-            tab === 'identity' ? drillParams?.directorySection === 'members' ? h(FinanceMembersView, { ctx, t }) : h(EntryView, { ctx, t, directoryOnly: true, directorySection: drillParams?.directorySection }) : null,
+            tab === 'identity' ? drillParams?.directorySection === 'members' ? h(FinanceMembersView, { ctx, t }) : drillParams?.directorySection === 'directory' ? h(FinanceDirectoryView, { ctx }) : h(EntryView, { ctx, t, directoryOnly: true, directorySection: drillParams?.directorySection }) : null,
             tab === 'bom' && canOpen('bom') ? h(BomView, { ctx, t }) : null,
             tab === 'analyze' ? h(AnalyzeView, { ctx, t }) : null,
             tab === 'engine' ? h(EngineView, { ctx, t }) : null,
@@ -5631,8 +5949,8 @@ window.__ModuleLoader__.load({
               h('h1', { id: 'sf-title' }, activeItem?.[1] ?? t(SECTION_META[tab]?.[0] ?? 'title')),
               h('p', { className: 'sf-desc' }, [operator ? `${t('operatorAs')} ${operator}` : null, tab === 'budget-filing' ? '本人填报、两级审核与部门预算确认' : tab === 'filing' ? '完成部门填报并跟踪提交、退回与确认进度' : tab === 'identity' ? '维护成员职责、组织身份与部门归属' : t(SECTION_META[tab]?.[1] ?? 'subtitle')].filter(Boolean).join(' · '))),
             h('div', { className: 'sf-header-side' },
-              !['entry', 'identity', 'bom', 'sources', 'datacenter', 'review', 'notifications', 'permissions'].includes(tab) ? h('label', { className: 'sf-filter' }, h('span', null, t('year')), h(Select, { value: year, onChange: value => { setYear(value); setDrillParams(current => current ? { ...current, year: value, taskId: undefined, versionId: undefined, lineId: undefined } : null) }, options: yearOptions(year) })) : null,
-              ['overview', 'operations', 'cash', 'alerts'].includes(tab) ? h('label', { className: 'sf-filter' }, h('span', null, t('org')), h(SearchSelect, { value: orgId, onChange: value => { setOrgId(value); setDrillParams(null) }, options: orgs.filter(org => org.type !== 'GROUP').map(org => [org.id, org.name]), placeholder: t('allOrgs') })) : null,
+              !['entry', 'identity', 'bom', 'sources', 'datacenter', 'costitems', 'review', 'notifications', 'permissions'].includes(tab) ? h('label', { className: 'sf-filter' }, h('span', null, t('year')), h(Select, { value: year, onChange: value => { setYear(value); setDrillParams(current => current ? { ...current, year: value, taskId: undefined, versionId: undefined, lineId: undefined } : null) }, options: yearOptions(year) })) : null,
+              ['overview', 'operations', 'cash', 'alerts', 'analyze'].includes(tab) ? h('label', { className: 'sf-filter' }, h('span', null, t('org')), h(SearchSelect, { value: orgId, onChange: value => { setOrgId(value); setDrillParams(null) }, options: orgs.filter(org => org.type !== 'GROUP').map(org => [org.id, org.name]), placeholder: t('allOrgs') })) : null,
               h('div', { className: 'sf-header-buttons' },
                 h(Tooltip, { label: t('refresh') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('refresh'), onClick: refresh }, h(IconRefreshOutlineRegular, { size: 16 }))),
                 h(Tooltip, { label: t('close') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('close'), onClick: closeSafely }, h(IconCloseOutlineRegular, { size: 16 })))))),
@@ -5669,16 +5987,25 @@ window.__ModuleLoader__.load({
           const sessions = ctx.get?.('sessions')
           const navigation = ctx.get?.('uiWorkspace')
           if (!sessions || !navigation) throw new Error('conversation_unavailable')
+          const skillName = /^\/(finance-[a-z0-9-]+)(?:\s|$)/.exec(prompt)?.[1]
+          if (!ANALYSIS_ENTRIES.some(entry => entry.skill === skillName)) throw new Error('analysis_skill_invalid')
+          // Recheck on each click: an open panel may outlive its login or assistant permission.
+          let access
+          try { access = await api('/access?permission=finance.assistant.read') }
+          catch (error) {
+            if (error.status === 401) throw new Error('analysis_login_required')
+            if (error.status === 403) throw new Error('analysis_access_denied')
+            throw new Error('analysis_access_unavailable')
+          }
+          if (access?.ok !== true || typeof access.allowed !== 'boolean') throw new Error('analysis_access_unavailable')
+          if (!access.allowed) throw new Error('analysis_access_denied')
           // 每次深度分析都从独立会话开始，避免把上一次分析的上下文带入本次结论。
           const id = await sessions.create()
-          navigation.openSession(id)
           // Retain until ready, catalog check and submission finish; an unknown /skill is plain prose to the Host.
           await sessions.using(id, { source: 'controllerOperation' }, async reference => {
             await reference.ready
             const scoped = sessions.scope(id)
             if (!scoped) throw new Error('session_unavailable')
-            const skillName = /^\/(finance-[a-z0-9-]+)(?:\s|$)/.exec(prompt)?.[1]
-            if (!skillName) throw new Error('analysis_skill_invalid')
             const skills = ctx.get?.('remote.skills')
             if (!skills?.list) throw new Error('analysis_catalog_unavailable')
             const catalog = await skills.list({ sessionId: id }, AbortSignal.timeout(REQUEST_TIMEOUT_MS))
@@ -5687,6 +6014,7 @@ window.__ModuleLoader__.load({
             const conversation = scoped.get('conversation')
             if (!conversation) throw new Error('conversation_service_unavailable')
             await conversation.send(prompt)
+            navigation.openSession(id)
           })
         } })
         globalThis.__sensteed_finance_close = closeOverlay

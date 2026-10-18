@@ -72,22 +72,17 @@ function Dashboard({ t, embedded = false, onClose = closeOverlay }) {
     if (!active || tab !== 'overview') return undefined
     let cancelled = false
     setWorkQueue({ state: 'loading' })
-    const requests = [
-      api(`/filing-tasks?year=${year}&status=OPEN&limit=100`),
-      api('/quality'),
-      api(`/alerts-summary?year=${year}${orgId ? `&orgId=${orgId}` : ''}`),
-    ]
+    const requests = financeWriter ? [
+      financeRest('/finance/review/summary'), api('/quality'), api(`/alerts-summary?year=${year}${orgId ? `&orgId=${orgId}` : ''}`),
+    ] : [financeRest(`/finance/filing/assignments/summary?year=${year}`)]
     Promise.allSettled(requests).then(results => {
       if (cancelled) return
-      const [tasksResult, qualityResult, alertsResult] = results
-      const tasks = tasksResult.status === 'fulfilled' ? (tasksResult.value.data ?? {}) : null
-      const quality = qualityResult.status === 'fulfilled' ? (qualityResult.value.quality ?? {}) : null
-      const alerts = alertsResult.status === 'fulfilled' ? (alertsResult.value.data ?? {}) : null
+      const value = index => results[index]?.status === 'fulfilled' ? results[index].value.data ?? results[index].value.quality ?? null : null
       const failed = results.filter(result => result.status === 'rejected').length
-      setWorkQueue({ state: failed === results.length ? 'error' : failed ? 'partial' : 'ready', tasks, quality, alerts })
+      setWorkQueue({ state: failed === results.length ? 'error' : failed ? 'partial' : 'ready', financeWriter, review: financeWriter ? value(0) : null, assignments: financeWriter ? null : value(0), quality: financeWriter ? value(1) : null, alerts: financeWriter ? value(2) : null })
     })
     return () => { cancelled = true }
-  }, [active, tab, year, orgId, revision])
+  }, [active, tab, year, orgId, revision, financeWriter])
 
   const refresh = () => { if (loadingRef.current) return; setRevision(value => value + 1) }
   useEffect(() => {
@@ -106,9 +101,10 @@ function Dashboard({ t, embedded = false, onClose = closeOverlay }) {
     const item = financeNavigationItem(target, params)
     if (!canOpen(target) || (item && !financeNavigationAllowed(item, identity))) return
     const navigate = () => {
-      setDrillParams(params ?? null)
-      if (params?.year) setYear(params.year)
-      if (params?.orgId) setOrgId(params.orgId)
+      const next = { year, orgId, ...params }
+      setDrillParams(next)
+      if (next.year) setYear(String(next.year))
+      setOrgId(next.orgId || '')
       setTab(target)
     }
     if (entryLeaveRef.current) entryLeaveRef.current(navigate)
@@ -124,17 +120,18 @@ function Dashboard({ t, embedded = false, onClose = closeOverlay }) {
     ? h('div', { className: 'sf-loading', role: 'status' }, h(Glyph, { name: 'loading' }), t('loading'))
     : (tab === 'overview' || tab === 'operations') && briefState === 'error' && !brief
       ? h('div', { className: 'sf-fatal', role: 'alert' }, h(Glyph, { name: 'warning' }), h('strong', null, t('loadError')), h(GhostButton, { onClick: refresh }, t('retry')))
-      : h(React.Fragment, { key: `${tab}-${JSON.stringify(drillParams)}` },
+      : h(React.Fragment, { key: `${tab}-${year}-${JSON.stringify(drillParams)}` },
         tab === 'overview' ? h(OverviewView, { key: `ov-${year}-${orgId}-${revision}`, ...briefProps, workQueue }) : null,
         tab === 'operations' ? h(OperationsView, { key: `op-${year}-${orgId}-${revision}`, ...briefProps }) : null,
-        tab === 'budget' ? ctx.drillParams?.lineId ? h(BudgetSavedRecordView, { ctx, t }) : h(BudgetView, { ctx: { ...ctx, orgId: ctx.drillParams?.orgId || '' }, t }) : null,
+        tab === 'budget' ? ctx.drillParams?.lineId ? h(BudgetSavedRecordView, { ctx, t }) : h(BudgetView, { ctx, t }) : null,
         tab === 'cash' ? h(CashView, { ctx, t, onDrill }) : null,
         tab === 'alerts' ? h(AlertsView, { ctx, t, onDrill }) : null,
+        tab === 'costitems' ? h(FinanceCostItemsView, { ctx, t }) : null,
         tab === 'datacenter' ? h(DataCenterView, { ctx, t }) : null,
         tab === 'entry' ? h(EntryPanel, { year, orgId, orgs, departments, role: ctx.role, t, onSaved: refresh, onYearChange: setYear, onNavigate: onDrill, onLeaveGuardChange: registerEntryLeave }) : null,
         tab === 'budget-filing' ? h(BudgetFilingView, { key: `budget-filing-${year}-${drillParams?.taskId || ''}`, ctx, t }) : null,
         tab === 'filing' ? h(FilingParityView, { key: `filing-${year}-${drillParams?.section || 'assignments'}-${drillParams?.taskId || ''}`, ctx, t }) : null,
-        tab === 'identity' ? drillParams?.directorySection === 'members' ? h(FinanceMembersView, { ctx, t }) : h(EntryView, { ctx, t, directoryOnly: true, directorySection: drillParams?.directorySection }) : null,
+        tab === 'identity' ? drillParams?.directorySection === 'members' ? h(FinanceMembersView, { ctx, t }) : drillParams?.directorySection === 'directory' ? h(FinanceDirectoryView, { ctx }) : h(EntryView, { ctx, t, directoryOnly: true, directorySection: drillParams?.directorySection }) : null,
         tab === 'bom' && canOpen('bom') ? h(BomView, { ctx, t }) : null,
         tab === 'analyze' ? h(AnalyzeView, { ctx, t }) : null,
         tab === 'engine' ? h(EngineView, { ctx, t }) : null,
@@ -156,8 +153,8 @@ function Dashboard({ t, embedded = false, onClose = closeOverlay }) {
           h('h1', { id: 'sf-title' }, activeItem?.[1] ?? t(SECTION_META[tab]?.[0] ?? 'title')),
           h('p', { className: 'sf-desc' }, [operator ? `${t('operatorAs')} ${operator}` : null, tab === 'budget-filing' ? '本人填报、两级审核与部门预算确认' : tab === 'filing' ? '完成部门填报并跟踪提交、退回与确认进度' : tab === 'identity' ? '维护成员职责、组织身份与部门归属' : t(SECTION_META[tab]?.[1] ?? 'subtitle')].filter(Boolean).join(' · '))),
         h('div', { className: 'sf-header-side' },
-          !['entry', 'identity', 'bom', 'sources', 'datacenter', 'review', 'notifications', 'permissions'].includes(tab) ? h('label', { className: 'sf-filter' }, h('span', null, t('year')), h(Select, { value: year, onChange: value => { setYear(value); setDrillParams(current => current ? { ...current, year: value, taskId: undefined, versionId: undefined, lineId: undefined } : null) }, options: yearOptions(year) })) : null,
-          ['overview', 'operations', 'cash', 'alerts'].includes(tab) ? h('label', { className: 'sf-filter' }, h('span', null, t('org')), h(SearchSelect, { value: orgId, onChange: value => { setOrgId(value); setDrillParams(null) }, options: orgs.filter(org => org.type !== 'GROUP').map(org => [org.id, org.name]), placeholder: t('allOrgs') })) : null,
+          !['entry', 'identity', 'bom', 'sources', 'datacenter', 'costitems', 'review', 'notifications', 'permissions'].includes(tab) ? h('label', { className: 'sf-filter' }, h('span', null, t('year')), h(Select, { value: year, onChange: value => { setYear(value); setDrillParams(current => current ? { ...current, year: value, taskId: undefined, versionId: undefined, lineId: undefined } : null) }, options: yearOptions(year) })) : null,
+          ['overview', 'operations', 'cash', 'alerts', 'analyze'].includes(tab) ? h('label', { className: 'sf-filter' }, h('span', null, t('org')), h(SearchSelect, { value: orgId, onChange: value => { setOrgId(value); setDrillParams(null) }, options: orgs.filter(org => org.type !== 'GROUP').map(org => [org.id, org.name]), placeholder: t('allOrgs') })) : null,
           h('div', { className: 'sf-header-buttons' },
             h(Tooltip, { label: t('refresh') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('refresh'), onClick: refresh }, h(IconRefreshOutlineRegular, { size: 16 }))),
             h(Tooltip, { label: t('close') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('close'), onClick: closeSafely }, h(IconCloseOutlineRegular, { size: 16 })))))),
@@ -194,16 +191,25 @@ function apply(ctx) {
       const sessions = ctx.get?.('sessions')
       const navigation = ctx.get?.('uiWorkspace')
       if (!sessions || !navigation) throw new Error('conversation_unavailable')
+      const skillName = /^\/(finance-[a-z0-9-]+)(?:\s|$)/.exec(prompt)?.[1]
+      if (!ANALYSIS_ENTRIES.some(entry => entry.skill === skillName)) throw new Error('analysis_skill_invalid')
+      // Recheck on each click: an open panel may outlive its login or assistant permission.
+      let access
+      try { access = await api('/access?permission=finance.assistant.read') }
+      catch (error) {
+        if (error.status === 401) throw new Error('analysis_login_required')
+        if (error.status === 403) throw new Error('analysis_access_denied')
+        throw new Error('analysis_access_unavailable')
+      }
+      if (access?.ok !== true || typeof access.allowed !== 'boolean') throw new Error('analysis_access_unavailable')
+      if (!access.allowed) throw new Error('analysis_access_denied')
       // 每次深度分析都从独立会话开始，避免把上一次分析的上下文带入本次结论。
       const id = await sessions.create()
-      navigation.openSession(id)
       // Retain until ready, catalog check and submission finish; an unknown /skill is plain prose to the Host.
       await sessions.using(id, { source: 'controllerOperation' }, async reference => {
         await reference.ready
         const scoped = sessions.scope(id)
         if (!scoped) throw new Error('session_unavailable')
-        const skillName = /^\/(finance-[a-z0-9-]+)(?:\s|$)/.exec(prompt)?.[1]
-        if (!skillName) throw new Error('analysis_skill_invalid')
         const skills = ctx.get?.('remote.skills')
         if (!skills?.list) throw new Error('analysis_catalog_unavailable')
         const catalog = await skills.list({ sessionId: id }, AbortSignal.timeout(REQUEST_TIMEOUT_MS))
@@ -212,6 +218,7 @@ function apply(ctx) {
         const conversation = scoped.get('conversation')
         if (!conversation) throw new Error('conversation_service_unavailable')
         await conversation.send(prompt)
+        navigation.openSession(id)
       })
     } })
     globalThis.__sensteed_finance_close = closeOverlay

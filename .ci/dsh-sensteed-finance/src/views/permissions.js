@@ -58,7 +58,7 @@ function PermissionsView({ ctx }) {
   return h('div', { className: 'sf-stack' },
     h(Card, { title: '我的权限可用范围' }, h(FinanceResource, { resource: me }, h(Table, { tableId: 'finance-my-permissions', rows: (me.data?.permissions || []).map(permission => ({ permission, scopes: me.data?.scopes?.find(row => row.permission === permission)?.scopes || [] })), empty: '暂无权限', columns: [
       { key: 'permission', label: '功能', render: row => FINANCE_PERMISSION_NAMES[row.permission] || row.permission },
-      { key: 'scopes', label: '数据范围', render: row => h(FinanceEvidence, { value: row.scopes }) },
+      { key: 'scopes', label: '数据范围', render: row => financeScopeDescription(row.scopes, ctx.orgs, ctx.departments) },
     ] }))),
     manage ? h(Card, { title: '功能与数据权限', actions: [h(GhostButton, { key: 'edit', disabled: !ready || action.busy, onClick: () => edit() }, '配置完整权限')] },
       h('p', { className: 'sf-note' }, '成员有独立配置时仅使用成员权限；未配置时继承岗位角色。部门仅辅助选人，不会自动授权未来加入的成员。'),
@@ -68,11 +68,12 @@ function PermissionsView({ ctx }) {
       h(Table, { tableId: 'finance-complete-policies-' + tab, rows: tab === 'USER' ? policyRows.filter(row => row.subjectType === 'USER') : roleRows.map(role => ({ subjectType: 'ROLE', subjectId: role.id, role, ...policyRows.find(row => row.subjectType === 'ROLE' && row.subjectId === role.id) })), empty: '暂无成员独立配置，成员继承岗位角色', columns: [
         { key: 'subjectId', label: tab === 'USER' ? '成员' : '岗位角色', render: row => name(row.subjectType, row.subjectId) },
         { key: 'permissions', label: '功能', render: row => row.permissions ? row.permissions.length ? row.permissions.map(code => FINANCE_PERMISSION_NAMES[code] || code).join('、') : '全部关闭' : '使用内置角色默认模板' },
-        { key: 'scopes', label: '数据范围', render: row => row.scopes ? h(FinanceEvidence, { value: row.scopes }) : '默认范围' },
+        { key: 'scopes', label: '数据范围', render: row => row.scopes ? financeScopeDescription(row.scopes, ctx.orgs, ctx.departments) : '默认范围' },
         { key: 'actions', label: '操作', sortable: false, render: row => h('div', { className: 'sf-row' }, h(GhostButton, { disabled: !ready || action.busy || row.role?.enabled === false, onClick: () => edit(row) }, '配置'),
           row.id && (row.subjectType === 'USER' || row.role?.builtIn) ? h(GhostButton, { disabled: !ready || action.busy, onClick: () => setDialog({ kind: 'restore', policy: row }) }, row.subjectType === 'USER' ? '恢复继承岗位' : '恢复内置模板') : null) },
       ] }),
       ctx.role === 'FINANCE_OWNER' ? h(GhostButton, { onClick: () => ctx.onNavigate('identity', { directorySection: 'members' }) }, '前往成员与角色管理岗位') : null) : null,
+    manage ? h(FinancePermissionHistory, { ctx, directory: directory.data }) : null,
     dialog?.kind === 'policy' ? h(FinancePolicyDialog, { key: dialog.policy?.id || dialog.policy?.subjectId || 'new', policy: dialog.policy, initialTab: tab, people, roles: roleRows.map(role => ({ ...role, policy: policyRows.find(policy => policy.subjectType === 'ROLE' && policy.subjectId === role.id) })), directory: directory.data, onDirectoryRefresh: directory.retry, orgs: ctx.orgs, departments: ctx.departments, onClose: () => setDialog(null), onSave: async request => { await action.run(request.path, request.body, 'PUT'); setDialog(null) } }) : null,
     dialog?.kind === 'restore' ? h(FinanceFormDialog, { title: dialog.policy.subjectType === 'USER' ? '恢复继承岗位' : '恢复内置模板', onClose: () => setDialog(null), fields: [{ key: 'reason', label: '恢复原因', required: true, maxLength: 500, type: 'textarea' }], onSubmit: async body => { await action.run(`/finance/permission-policies/${dialog.policy.id}/remove`, body); setDialog(null) } }) : null)
 }
@@ -142,4 +143,43 @@ function FinanceRoleManager({ roles, ready, action }) {
       ...(dialog.kind === 'remove' ? [] : [{ key: 'name', label: '岗位名称', required: true, maxLength: 100 }, { key: 'description', label: '岗位说明', type: 'textarea', maxLength: 500 }, ...(dialog.kind === 'create' ? [{ key: 'baseRole', label: '基础岗位模板', searchable: true, options: Object.entries(FINANCE_POLICY_ROLE_NAMES), required: true }] : [{ key: 'enabled', label: '状态', options: [['true', '启用'], ['false', '停用']], required: true }])]),
       { key: 'reason', label: '变更原因', required: true, type: 'textarea', maxLength: 500 },
     ], onSubmit: run }) : null)
+}
+
+function financeScopeDescription(scopes, orgs = [], departments = []) {
+  return (scopes || []).map(scope => {
+    const target = scope.scopeType === 'ORG' ? `指定主体：${orgs.find(row => row.id === scope.orgId)?.name || scope.orgId || '待核对'}`
+      : scope.scopeType === 'DEPARTMENT' ? `指定部门：${departments.find(row => row.id === scope.departmentId)?.name || scope.departmentId || '待核对'}`
+      : scope.scopeType === 'SELF' ? '本人数据' : scope.scopeType === 'GLOBAL' ? '全域数据' : '范围待核对'
+    return `${target}${scope.yearFrom != null || scope.yearTo != null ? ` · ${scope.yearFrom ?? '不限'}—${scope.yearTo ?? '不限'}年` : ''}`
+  }).join('；') || '未配置数据范围'
+}
+function financeHistoricalGrantStatus(grant, now = Date.now()) {
+  return grant.revokedAt ? '已撤销' : grant.expiresAt && Date.parse(grant.expiresAt) <= now ? '已过期'
+    : grant.startsAt && Date.parse(grant.startsAt) > now ? '待生效' : '未撤销且在有效期内'
+}
+function FinancePermissionHistory({ ctx, directory }) {
+  const [page, setPage] = useState(1), [userId, setUserId] = useState(''), [permission, setPermission] = useState('')
+  const [activeOnly, setActiveOnly] = useState(false), [selected, setSelected] = useState(null)
+  const action = useFinanceAction()
+  const query = new URLSearchParams({ page: String(page), limit: '20', activeOnly: String(activeOnly) })
+  if (userId) query.set('userId', userId)
+  if (permission) query.set('permission', permission)
+  const resource = useFinanceResource(`/finance/permissions?${query}`, `${ctx.revision}-${action.revision}`)
+  const name = grant => directory?.members?.find(row => row.userId === grant.userId)?.name || grant.userName || `目录外成员（${grant.userId}）`
+  return h(Card, { title: '历史补充授权台账（审计）' },
+    h('p', { className: 'sf-note' }, '仅用于历史查阅与撤销标记，不参与当前有效权限计算。当前可用范围以“我的权限可用范围”和完整权限策略为准；有效期内不代表当前可用。'),
+    h('div', { className: 'sf-row' },
+      h(SearchSelect, { value: userId, options: (directory?.members || []).filter(row => row.userId).map(row => [row.userId, row.name]), placeholder: '全部历史成员', onChange: value => { setUserId(value); setPage(1) } }),
+      h(SearchSelect, { value: permission, options: Object.entries(FINANCE_PERMISSION_NAMES), placeholder: '全部历史功能', onChange: value => { setPermission(value); setPage(1) } }),
+      h('label', null, h('input', { type: 'checkbox', checked: activeOnly, onChange: event => { setActiveOnly(event.target.checked); setPage(1) } }), '仅未撤销且在有效期内')),
+    h(Notice, null, action.notice),
+    h(FinanceResource, { resource }, h(Table, { tableId: 'finance-historical-permission-ledger', rows: financeRows(resource.data), empty: '当前筛选无历史授权记录', columns: [
+      { key: 'userName', label: '成员', render: name }, { key: 'permission', label: '历史功能', render: row => FINANCE_PERMISSION_NAMES[row.permission] || row.permission },
+      { key: 'scope', label: '历史数据范围', render: row => financeScopeDescription([row], ctx.orgs, ctx.departments) },
+      { key: 'status', label: '历史记录状态', render: row => financeHistoricalGrantStatus(row) },
+      { key: 'validity', label: '有效期', render: row => `${row.startsAt ? new Date(row.startsAt).toLocaleString('zh-CN', { hour12: false }) : '立即开始'} 至 ${row.expiresAt ? new Date(row.expiresAt).toLocaleString('zh-CN', { hour12: false }) : '长期'}` },
+      ...financeColumns([['grantedByName', '授权人'], ['grantReason', '原授权原因'], ['revokeReason', '撤销原因'], ['revokedAt', '撤销时间']]),
+      { key: 'actions', label: '审计操作', sortable: false, render: row => !row.revokedAt ? h(GhostButton, { disabled: action.busy, onClick: () => setSelected(row) }, '标记撤销') : '已留痕' },
+    ] }), h(Pager, { page, total: resource.data?.total, limit: 20, onPage: setPage })),
+    selected ? h(FinanceFormDialog, { title: '标记撤销历史补充授权', description: `${name(selected)} · ${FINANCE_PERMISSION_NAMES[selected.permission] || selected.permission} · ${financeScopeDescription([selected], ctx.orgs, ctx.departments)}。只标记此条历史记录，当前完整权限策略不变。`, fields: [{ key: 'reason', label: '撤销原因', required: true, maxLength: 500, type: 'textarea' }], onClose: () => setSelected(null), onSubmit: async body => { const reason = String(body.reason || '').trim(); if (!reason) throw new Error('请填写撤销原因'); await action.run(`/finance/permissions/${selected.id}/revoke`, { reason }); setSelected(null) } }) : null)
 }

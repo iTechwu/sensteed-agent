@@ -18,16 +18,14 @@ function OverviewView({ brief, t, onDrill, orgId, workQueue }) {
     paid: finite(point.paidAmount),
   }))
   const openAlerts = (data.openAlerts || alertsSummary.top || []).slice(0, 5)
-  const workItems = workQueue?.state === 'loading' ? null : [
-    {
-      id: 'filing', icon: 'plan', tone: 'blue', label: t('pendingFiling'), hint: t('pendingFilingHint'), value: (workQueue?.tasks?.list || []).filter(item => item.status !== 'CLOSED').length, target: 'filing',
-    },
-    {
-      id: 'quality', icon: 'database', tone: 'amber', label: t('pendingQuality'), hint: t('pendingQualityHint'), value: (workQueue?.quality?.issues || []).reduce((sum, item) => sum + (finite(item.count) ?? 0), 0), target: 'datacenter',
-    },
-    {
-      id: 'alerts', icon: 'warning', tone: 'rose', label: t('pendingAlerts'), hint: t('pendingAlertsHint'), value: workQueue?.alerts?.total ?? alertsSummary.total ?? 0, target: 'alerts',
-    },
+  const workItems = workQueue?.state === 'loading' ? null : workQueue?.financeWriter ? [
+    { id: 'review', icon: 'plan', tone: 'blue', label: '待财务验证', hint: '填报、批次与调整单等待复核', value: workQueue.review?.total ?? '—', target: 'review' },
+    { id: 'quality', icon: 'database', tone: 'amber', label: '数据质量待处理', hint: '未分配主体、缺失金额等', value: workQueue.quality ? (workQueue.quality.issues || []).reduce((sum, item) => sum + (finite(item.count) ?? 0), 0) : '—', target: 'datacenter' },
+    { id: 'alerts', icon: 'warning', tone: 'rose', label: '待处理预警', hint: '当前年度规则引擎结果', value: workQueue.alerts?.total ?? '—', target: 'alerts', params: { status: 'OPEN' } },
+  ] : [
+    { id: 'filing', icon: 'plan', tone: 'blue', label: '待填报', hint: '截止时间前完成并提交', value: workQueue?.assignments ? workQueue.assignments.fillablePending + workQueue.assignments.fillableDraft : '—', target: 'filing', params: { section: 'assignments' } },
+    { id: 'submitted', icon: 'clock', tone: 'amber', label: '待财务验证', hint: '确认前不计入正式数据', value: workQueue?.assignments?.submitted ?? '—', target: 'filing', params: { section: 'mine' } },
+    { id: 'rejected', icon: 'warning', tone: 'rose', label: '已退回', hint: '按退回原因修改后重提', value: workQueue?.assignments?.fillableRejected ?? '—', target: 'filing', params: { section: 'assignments' } },
   ]
   const workbench = h('section', { className: 'sf-workbench', 'aria-labelledby': 'sf-workbench-title' },
     h('div', { className: 'sf-workbench-head' },
@@ -37,7 +35,7 @@ function OverviewView({ brief, t, onDrill, orgId, workQueue }) {
       workQueue?.state === 'partial' ? h('span', { className: 'sf-workbench-status' }, t('loadPartial')) : null),
     workItems
       ? h('div', { className: 'sf-work-items' }, ...workItems.map(item => h('button', {
-        type: 'button', key: item.id, className: `sf-work-item is-${item.tone}`, onClick: () => onDrill(item.target),
+        type: 'button', key: item.id, className: `sf-work-item is-${item.tone}`, onClick: () => onDrill(item.target, item.params),
       },
         h('span', { className: 'sf-work-icon' }, h(Glyph, { name: item.icon, size: 15 })),
         h('span', { className: 'sf-work-copy' }, h('strong', null, item.label), h('small', null, item.hint)),
@@ -94,7 +92,7 @@ function OverviewView({ brief, t, onDrill, orgId, workQueue }) {
             },
           },
         ],
-        rows: overview.byOrg || [], empty: t('empty'), onRowClick: row => onDrill('budget', { view: 'lines', orgId: row.orgId || '', unassigned: !row.orgId }),
+        rows: [...(data.budget?.list || []).reduce((map, row) => { const key = row.orgId || ''; const value = map.get(key) || { orgId: row.orgId, orgName: row.orgName || t('unassigned'), budgetAmount: 0, prSubmittedAmount: 0, prEstimatedAmount: 0, paidAmount: 0 }; for (const field of ['budgetAmount', 'prSubmittedAmount', 'prEstimatedAmount', 'paidAmount']) value[field] += finite(row[field]) ?? 0; map.set(key, value); return map }, new Map()).values()], empty: t('empty'), onRowClick: row => onDrill('budget', { view: 'lines', orgId: row.orgId || '', unassigned: !row.orgId }),
       })),
       h('div', { className: 'sf-two-col' },
         h(Card, { title: t('incomeAch'), unit: t('unitNote') },

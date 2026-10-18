@@ -147,7 +147,7 @@
       "source": "sibling",
       "siblingDir": "../docker-helm.dofe.ai/skills/finance-budget-version-health",
       "snapshotDir": "dsh-plugin-desktop/bundled/skills/finance-budget-version-health",
-      "resolvedSha": "5117d35b1510bc0756948ac5b765ffb02b993dab"
+      "resolvedSha": "576edd33710233fe7d0a08b716a2868cc29d741b"
     },
     {
       "name": "finance-alert-rules-audit",

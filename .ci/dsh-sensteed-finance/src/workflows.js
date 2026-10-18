@@ -294,6 +294,7 @@ const FINANCE_SECTION_PERMISSIONS = {
 }
 function financeSectionAllowed(section, identity) {
   if (section === 'entry') return Boolean(identity.financeWriter && identity.permissions?.includes('budget.submission.edit'))
+  if (section === 'costitems') return identity.role === 'FINANCE_OWNER'
   if (section === 'identity') return identity.role === 'FINANCE_OWNER'
   const permission = FINANCE_SECTION_PERMISSIONS[section]
   if (section === 'facts') return Boolean(identity.permissions?.some(code => ['budget.execution.read', 'cash.plan.read', 'finance.source.review'].includes(code)))

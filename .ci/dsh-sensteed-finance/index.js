@@ -193,7 +193,7 @@ export function apply(ctx, overrides = {}) {
 // 路由分发：GET 统计面 / POST 录入与回填面
 // ---------------------------------------------------------------------------
 
-const QUERY_KEYS = [
+const QUERY_KEYS = ['orgIds', 'departmentIds', 'expenseTypes',
   'year', 'month', 'months', 'page', 'limit', 'severity', 'status', 'orgId', 'expenseType', 'recordType', 'planType',
   'versionId', 'departmentId', 'unassigned', 'operator', 'keyword', 'onlyUnmapped', 'systemUserId', 'days',
   'project', 'sortBy', 'sortDirection', 'alertType', 'baseVersionId', 'targetVersionId', 'planId', 'type', 'scope', 'kind', 'bizSystem', 'transport',
@@ -242,16 +242,16 @@ async function dispatchGet(fetchImpl, config, sub, url, res, logger) {
     }
     case '/budget':
       calls = [
-        ['finance_get_budget_summary', { ...tenant(), year: query.year, orgId: query.orgId, versionId: query.versionId, departmentId: query.departmentId, unassigned: query.unassigned === '1' ? true : undefined }],
+        ['finance_get_budget_summary', { ...tenant(), year: query.year, orgId: query.orgId, orgIds: query.orgIds, departmentIds: query.departmentIds, expenseTypes: query.expenseTypes, versionId: query.versionId, departmentId: query.departmentId, unassigned: query.unassigned === '1' ? true : undefined }],
         ['finance_get_budget_lines', {
-          ...tenant(), year: query.year, orgId: query.orgId, versionId: query.versionId,
+          ...tenant(), year: query.year, orgId: query.orgId, orgIds: query.orgIds, departmentIds: query.departmentIds, expenseTypes: query.expenseTypes, months: query.months, versionId: query.versionId,
           departmentId: query.departmentId, unassigned: query.unassigned === '1' ? true : undefined,
           month: query.month, expenseType: query.expenseType, page: query.page, limit: query.limit,
         }],
       ]
       break
     case '/pr':
-      calls = [['finance_get_payment_requests', { ...tenant(), year: query.year, orgId: query.orgId, month: query.month, recordType: query.recordType, page: query.page, limit: query.limit }]]
+      calls = [['finance_get_payment_requests', { ...tenant(), year: query.year, orgId: query.orgId, orgIds: query.orgIds, month: query.month, recordType: query.recordType, page: query.page, limit: query.limit }]]
       break
     case '/payment-plans':
       calls = [['finance_get_payment_plans', {
@@ -781,10 +781,12 @@ async function dispatchPublicContract(fetchImpl, config, path, req, res, logger)
   let body
   if (req.method !== 'GET') {
     // 512 KB Excel 经过 base64 后需要更大的 JSON 空间；仅开放两个精确上传接口。
+    const filingExcelUpload = /^\/finance\/filing\/assignments\/[^/]+\/excel-preview$/.test(path)
     const excelUpload = /^\/finance\/budget-filing\/[^/]+\/excel\/(preview|import)$/.test(path)
     // 1 MB 结构化资金证据 JSON（快照导入 / 逐笔交易导入）经 JSON 转义需要更大空间；同样仅精确路由放宽。
     const cashEvidenceUpload = /^\/finance\/cash-evidence\/(snapshots|settlements)$/.test(path)
-    const parsed = await readJsonBody(req, excelUpload ? 768 * 1024 : cashEvidenceUpload ? 1536 * 1024 : MAX_BODY_BYTES)
+    const ceUpload = /^\/ce\/packages\/[^/]+\/(ebom\/preview|nodes)$/.test(path)
+    const parsed = await readJsonBody(req, ceUpload ? 12 * 1024 * 1024 + 4096 : (excelUpload || filingExcelUpload) ? 768 * 1024 : cashEvidenceUpload ? 1536 * 1024 : MAX_BODY_BYTES)
     if (parsed.error) return sendJson(res, 400, { ok: false, error: parsed.error })
     body = stripControlFields(parsed.json)
     delete body.recipientId

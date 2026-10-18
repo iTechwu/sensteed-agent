@@ -265,6 +265,8 @@ function AssignmentDialog({ assignment, canEdit = true, canVerify = true, busy, 
   const [reload, setReload] = useState(0)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [excelBusy, setExcelBusy] = useState(false)
+  const writeLock = useRef(false)
   useEffect(() => {
     let cancelled = false
     setCostError(false)
@@ -276,7 +278,7 @@ function AssignmentDialog({ assignment, canEdit = true, canVerify = true, busy, 
   const months = Array.from({ length: 12 }, (_, index) => [String(index + 1), (index + 1) + '月'])
   const updateRow = (index, patch) => setRows(current => current.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)))
   const persist = async thenSubmit => {
-    if (!editable || saving || busy) return
+    if (!editable || saving || busy || excelBusy || writeLock.current) return
     const filled = rows.filter(row => String(row.plannedAmount ?? '').trim())
     if (filled.some(row => !Number.isFinite(Number(row.plannedAmount)) || Number(row.plannedAmount) <= 0)) {
       setError('请填写大于 0 的金额'); return
@@ -284,6 +286,7 @@ function AssignmentDialog({ assignment, canEdit = true, canVerify = true, busy, 
     if (thenSubmit && (!filled.length || filled.some(row => !row.costItemId || !row.month))) {
       setError('请至少填写一行，并补全费用类别、月份和金额'); return
     }
+    writeLock.current = true
     setSaving(true); setError('')
     try {
       const saved = await act('/filing-assignments/' + assignment.id + '/rows', {
@@ -301,25 +304,26 @@ function AssignmentDialog({ assignment, canEdit = true, canVerify = true, busy, 
       onClose()
     } catch {
       setError('操作失败，填写内容已保留，请重试')
-    } finally { setSaving(false) }
+    } finally { writeLock.current = false; setSaving(false) }
   }
-  return h(Dialog, { title: t('assignmentTitle') + ' · ' + (assignment.departmentName ?? ''), width: 'lg', onClose, footer: [
-    editable ? h(GhostButton, { key: 'save', disabled: busy || saving, onClick: () => persist(false) }, t('saveDraft')) : null,
-    editable ? h(PrimaryButton, { key: 'submit', busy: busy || saving, onClick: () => persist(true) }, t('submitFiling')) : null,
+  return h(Dialog, { title: t('assignmentTitle') + ' · ' + (assignment.departmentName ?? ''), width: 'lg', dismissDisabled: saving || excelBusy, onClose: saving || excelBusy ? undefined : onClose, footer: [
+    editable ? h(GhostButton, { key: 'save', disabled: busy || saving || excelBusy, onClick: () => persist(false) }, t('saveDraft')) : null,
+    editable ? h(PrimaryButton, { key: 'submit', busy: busy || saving || excelBusy, onClick: () => persist(true) }, t('submitFiling')) : null,
     canVerify && assignment.status === 'SUBMITTED' ? h(PrimaryButton, {
-      key: 'commit', busy: busy || saving,
+      key: 'commit', busy: busy || saving || excelBusy,
       onClick: async () => { if (await act('/filing-assignments/' + assignment.id + '/commit', {})) onClose() },
     }, t('commitFiling')) : null,
-    h(GhostButton, { key: 'cancel', disabled: saving, onClick: onClose }, t('close')),
+    h(GhostButton, { key: 'cancel', disabled: saving || excelBusy, onClick: onClose }, t('close')),
   ] },
     h('div', { className: 'sf-stack' },
       !editable ? h('p', { className: 'sf-note' }, '当前填报只读；仅开放且未过期的活动可填写，已提交记录须在允许修改的窗口内重提。') : null,
+      editable ? h(FilingExcelDraft, { assignmentId: assignment.id, disabled: saving || busy, onBusyChange: setExcelBusy, onApply: imported => setRows(imported.map(row => ({ ...row, month: row.month == null ? '' : String(row.month), plannedAmount: String(row.plannedAmount) }))) }) : null,
       costError ? h('div', { role: 'alert' }, '费用类别加载失败', h(LinkButton, { onClick: () => setReload(value => value + 1) }, '重试')) : null,
       costItems && !costItems.length && !costError ? h('p', { className: 'sf-note' }, '暂无可用费用类别，请联系财务维护。') : null,
       error ? h('p', { role: 'alert', className: 'sf-neg' }, error) : null,
       h('div', { className: 'sf-row-between' },
         h('strong', null, t('rowsEditor')),
-        editable ? h(LinkButton, { disabled: busy || saving, onClick: () => setRows(current => [...current, emptyRow()]) }, h(Glyph, { name: 'plus', size: 12 }), t('addRow')) : null),
+        editable ? h(LinkButton, { disabled: busy || saving || excelBusy, onClick: () => setRows(current => [...current, emptyRow()]) }, h(Glyph, { name: 'plus', size: 12 }), t('addRow')) : null),
       ...rows.map((row, index) => h('div', { key: row.id ?? index, className: 'sf-inline-form' },
         h('div', { className: 'sf-filters' },
           h(FormRow, { label: '费用类别' }, h(SearchSelect, {
@@ -330,7 +334,7 @@ function AssignmentDialog({ assignment, canEdit = true, canVerify = true, busy, 
           h(FormRow, { label: t('monthCol') }, h(Select, { value: String(row.month ?? ''), onChange: value => updateRow(index, { month: value }), options: months, placeholder: t('monthCol'), disabled: !editable || busy || saving })),
           h(FormRow, { label: t('description') }, h(Field, { value: row.description ?? '', onChange: value => updateRow(index, { description: value }), maxLength: 500, disabled: !editable || busy || saving })),
           h(FormRow, { label: t('planned') }, h(Field, { type: 'number', min: '0.01', step: '0.01', value: row.plannedAmount ?? '', onChange: value => updateRow(index, { plannedAmount: value }), disabled: !editable || busy || saving })),
-          editable ? h(LinkButton, { disabled: busy || saving, onClick: () => setRows(current => current.filter((_, rowIndex) => rowIndex !== index)) }, h(Glyph, { name: 'trash', size: 13 })) : null))),
+          editable ? h(LinkButton, { disabled: busy || saving || excelBusy, onClick: () => setRows(current => current.filter((_, rowIndex) => rowIndex !== index)) }, h(Glyph, { name: 'trash', size: 13 })) : null))),
       h('p', { className: 'sf-note' }, t('entryHint'))))
 }
 
@@ -451,7 +455,7 @@ function EmploymentDialog({ contacts, contactsLoading, contactsError, department
 }
 
 
-function CostItemCreator({ t, onCreated, onCancel, onBusyChange }) {
+function CostItemCreator({ t, onCreated, onCancel, onBusyChange, submitLabel = '新增并选用' }) {
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
   const [failure, setFailure] = useState('')
@@ -483,7 +487,7 @@ function CostItemCreator({ t, onCreated, onCancel, onBusyChange }) {
     h('p', { className: 'sf-note' }, '编号使用字母、数字、下划线或连字符；新增后会自动选中。'),
     failure ? h('p', { role: 'alert', className: 'sf-neg' }, failure) : null,
     h('div', { className: 'sf-row' },
-      h(PrimaryButton, { type: 'button', busy: saving, disabled: !valid, onClick: save }, saving ? '正在新增…' : '新增并选用'),
+      h(PrimaryButton, { type: 'button', busy: saving, disabled: !valid, onClick: save }, saving ? '正在新增…' : submitLabel),
       h(GhostButton, { disabled: saving, onClick: onCancel }, t('cancel'))))
 }
 
@@ -759,4 +763,51 @@ function EntryPanel({ year, orgId, orgs, departments, role, t, onSaved, onYearCh
         h('div', { className: 'sf-form-actions sf-entry-wide' },
           h(PrimaryButton, { type: 'submit', busy, disabled: (kind !== 'backfill' && !orgOptions.length) || (kind === 'backfill' && (!backfillReady || !backfillAmount.trim())) }, busy ? t('running') : t(kind === 'backfill' ? 'entryBackfillAction' : 'entrySaveAction')),
           notice ? h('div', { role: 'status', 'aria-live': 'polite' }, h(Notice, null, notice)) : null))))))
+}
+
+// 与网页组织通讯录使用同一权威目录；本地镜像和手工填写用户 ID 不作为身份来源。
+function financeDirectoryRows(directory, keyword = '', onlyPending = false) {
+  const departments = new Map((directory?.departments || []).map(row => [row.id, row.name]))
+  const search = keyword.trim().toLocaleLowerCase('zh-CN')
+  return (directory?.members || []).filter(row => row.source !== 'LOCAL_MIRROR')
+    .filter(row => !onlyPending || !(row.identityEnabled ?? row.enabled))
+    .filter(row => !search || `${row.name} ${(row.departmentIds || []).map(id => departments.get(id) || '').join(' ')}`.toLocaleLowerCase('zh-CN').includes(search))
+    .map(row => ({ ...row, id: row.key, identityReady: row.identityEnabled ?? row.enabled, syncedAt: directory.lastSyncedAt, departmentName: (row.departmentIds || []).map(id => departments.get(id)).filter(Boolean).join('、') }))
+}
+function FinanceDirectoryView({ ctx }) {
+  const [keyword, setKeyword] = useState('')
+  const [onlyPending, setOnlyPending] = useState(false)
+  const action = useFinanceAction()
+  const directory = useFinanceResource('/finance/permissions/organization-directory', `${ctx.revision}-${action.revision}`)
+  const rows = financeDirectoryRows(directory.data, keyword, onlyPending)
+  const maskPhone = value => value ? String(value).replace(/^(\+?\d{0,3})?(\d{3})\d+(\d{4})$/, '$1$2****$3') : '—'
+  const maskEmail = value => value ? String(value).replace(/^(.).*(@.*)$/, '$1***$2') : '—'
+  return h('div', { className: 'sf-stack' },
+    h('p', { className: 'sf-note' }, '组织身份由 SSO 与飞书同步维护；成员无需先登录，不能手工填写用户 ID 建立身份。'),
+    h(Notice, null, action.notice),
+    h(FinanceOrganizationNotice, { directory: directory.data, onRefresh: directory.retry }),
+    h(Card, { title: '组织通讯录', actions: [h(GhostButton, { key: 'sync', disabled: action.busy, onClick: async () => {
+      try { const result = await action.run('/finance/feishu/directory/sync'); if (result?.skipped) action.report(`同步跳过：${result.reason || '应用未配置'}`) } catch { /* notice retains the failure */ }
+    } }, action.busy ? '同步中…' : '同步组织通讯录')] },
+      h('div', { className: 'sf-filters' }, h(Field, { value: keyword, onChange: setKeyword, 'aria-label': '搜索姓名或部门', placeholder: '搜索姓名或部门' }), h('label', null, h('input', { type: 'checkbox', checked: onlyPending, onChange: event => setOnlyPending(event.target.checked) }), '只看待同步身份')),
+      h(FinanceResource, { resource: directory }, h(Table, { tableId: 'finance-authoritative-directory', rows, rowKey: 'id', empty: keyword || onlyPending ? '没有匹配的人员' : '暂无组织人员', columns: [
+        { key: 'name', label: '姓名' }, { key: 'departmentName', label: '部门' },
+        { key: 'mobile', label: '手机', render: row => maskPhone(row.mobile) }, { key: 'email', label: '邮箱', render: row => maskEmail(row.email) },
+        { key: 'identityReady', label: '身份状态', render: row => row.identityReady ? '身份就绪' : '待同步身份' },
+        { key: 'syncedAt', label: '同步时间', render: row => shortDate(row.syncedAt) || '—' }, { key: 'warning', label: '同步提示' },
+      ] }))))
+}
+function FinanceCostItemsView({ ctx, t }) {
+  const [creating, setCreating] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [revision, setRevision] = useState(0)
+  const [page, setPage] = useState(1)
+  const items = useFinanceResource(`/finance/cost-items?page=${page}&limit=20`, `${ctx.revision}-${revision}`)
+  if (ctx.role !== 'FINANCE_OWNER') return h('p', { role: 'alert' }, '费用类别仅财务负责人可维护')
+  return h('div', { className: 'sf-stack' },
+    h('p', { className: 'sf-note' }, '维护预算与填报共用的费用类别，统一费用分类口径。'),
+    h(Card, { title: '共享费用类别', actions: [h(GhostButton, { key: 'create', disabled: busy, onClick: () => setCreating(true) }, '新增费用类别')] },
+      creating ? h(CostItemCreator, { t, submitLabel: '新增费用类别', onBusyChange: setBusy, onCancel: () => setCreating(false), onCreated: () => { setCreating(false); setPage(1); setRevision(value => value + 1) } }) : null,
+      h(FinanceResource, { resource: items }, h(Table, { tableId: 'finance-cost-items', rows: financeRows(items.data), rowKey: 'id', columns: financeColumns([['code', '费用类别编号'], ['name', '费用类别名称']]), empty: '暂无费用类别，请先新增' })),
+      h(Pager, { page, total: items.data?.total, limit: 20, onPage: setPage })))
 }

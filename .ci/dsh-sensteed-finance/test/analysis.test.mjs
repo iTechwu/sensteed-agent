@@ -9,14 +9,14 @@ const shell = await readFile(new URL('src/shell.js', root), 'utf8')
 const entries = new Function(head.slice(head.indexOf('const ANALYSIS_ENTRIES'), head.indexOf('\nconst copy =')) + '\nreturn ANALYSIS_ENTRIES')()
 const expected = ['finance-monthly-risk', 'finance-cost-structure', 'finance-cash-pressure', 'finance-budget-review', 'finance-revenue-attainment', 'finance-data-quality', 'finance-cost-cash-forecast', 'finance-budget-version-health', 'finance-alert-rules-audit']
 
-function bridge(sessions, globals = {}, catalog = async () => ({ ok: true, value: { skills: expected.map(name => ({ name })) } })) {
+function bridge(sessions, globals = {}, catalog = async () => ({ ok: true, value: { skills: expected.map(name => ({ name })) } }), access = async () => ({ ok: true, allowed: true })) {
   const inheritedUsing = sessions.using
   sessions.using = async (id, options, callback) => inheritedUsing
     ? inheritedUsing.call(sessions, id, options, callback)
     : callback({ ready: Promise.resolve() })
   const opened = []
   const effects = new Map()
-  const apply = new Function('globalThis', 'closeOverlay', 'NS', 'REQUEST_TIMEOUT_MS', `${shell}\nreturn apply`)(globals, () => {}, 'dofe.sensteed-finance', 30000)
+  const apply = new Function('globalThis', 'closeOverlay', 'NS', 'REQUEST_TIMEOUT_MS', 'ANALYSIS_ENTRIES', 'api', `${shell}\nreturn apply`)(globals, () => {}, 'dofe.sensteed-finance', 30000, entries, access)
   apply({
     effect: (callback, label) => effects.set(label, callback),
     get: name => name === 'sessions' ? sessions : name === 'remote.skills' ? { list: catalog } : { openSession: id => opened.push(id) },
@@ -26,7 +26,7 @@ function bridge(sessions, globals = {}, catalog = async () => ({ ok: true, value
   return { globals, opened }
 }
 
-function analysis(globals, navigator = {}, context = {}) {
+function analysis(globals, navigator = {}, context = {}, translate = key => key) {
   const values = []
   let cursor = 0
   const useState = initial => {
@@ -42,11 +42,12 @@ function analysis(globals, navigator = {}, context = {}) {
       return ref
     }, entries, PrimaryButton, () => {}, () => {}, message => message,
   )
-  const props = { ctx: { year: '2026', orgId: 'org-a', orgs: [{ id: 'org-a', name: '主体甲' }], ...context }, t: key => key }
+  const props = { ctx: { year: '2026', orgId: 'org-a', orgs: [{ id: 'org-a', name: '主体甲' }], ...context }, t: translate }
   const nodes = node => node && typeof node === 'object' ? [node, ...node.children.flatMap(nodes)] : []
   return {
     render() { cursor = 0; return nodes(component(props)).filter(node => node.type === PrimaryButton) },
     notice: () => values[0],
+    tree() { cursor = 0; return nodes(component(props)) },
   }
 }
 
@@ -129,7 +130,7 @@ test('missing conversation and clipboard report failure without claiming analysi
   for (const navigator of [{}, { clipboard: { writeText: async () => { throw new Error('denied') } } }]) {
     const ui = analysis({}, navigator)
     await ui.render()[0].props.onClick()
-    assert.equal(ui.notice(), 'copyFailed')
+    assert.equal(ui.notice(), 'sendFailCopyFailed')
     assert.ok(ui.render().every(button => !button.props.disabled))
   }
 })
@@ -161,7 +162,7 @@ test('missing or failed session skill catalog blocks submission and keeps the pr
     globals.__sensteed_finance_close = () => { closed = true }
     const ui = analysis(globals, { clipboard: { writeText: async prompt => copied.push(prompt) } })
     await ui.render()[0].props.onClick()
-    assert.deepEqual(opened, ['new-missing'])
+    assert.deepEqual(opened, [])
     assert.deepEqual(sent, [])
     assert.equal(closed, false)
     assert.equal(copied.length, 1)
@@ -189,4 +190,83 @@ test('catalog is checked for the new session after readiness and ownership lasts
   })
   await analysis(globals).render()[0].props.onClick()
   assert.deepEqual(order, ['retain', 'ready', 'catalog', 'send', 'release'])
+})
+
+const dictionaries = new Function(head.slice(head.indexOf('const copy ='), head.indexOf('\nlet opened')) + '\nreturn copy')()
+const translate = language => (key, values = {}) => (dictionaries[language][key] || key).replace(/\{(\w+)\}/g, (_, name) => values[name] ?? '')
+
+test('each start rechecks assistant access before creating a session and rejects expired or unavailable access', async () => {
+  const cases = [
+    [async () => ({ ok: true, allowed: false }), 'analysisAccessDenied'],
+    [async () => { throw Object.assign(new Error('expired'), { status: 401 }) }, 'analysisLoginRequired'],
+    [async () => { throw Object.assign(new Error('forbidden'), { status: 403 }) }, 'analysisAccessDenied'],
+    [async () => { throw Object.assign(new Error('upstream failure'), { status: 503 }) }, 'analysisAccessUnavailable'],
+    [async () => ({ ok: true }), 'analysisAccessUnavailable'],
+    [async () => ({ ok: false, allowed: true }), 'analysisAccessUnavailable'],
+  ]
+  for (const [access, reason] of cases) {
+    let created = 0, catalogCalls = 0
+    const { globals, opened } = bridge({ create: async () => { created++; return 'unauthorized' } }, {}, async () => { catalogCalls++ }, async path => {
+      assert.equal(path, '/access?permission=finance.assistant.read')
+      return access()
+    })
+    const t = translate('zh')
+    const ui = analysis(globals, {}, {}, t)
+    await ui.render()[0].props.onClick()
+    assert.equal(created, 0)
+    assert.equal(catalogCalls, 0)
+    assert.deepEqual(opened, [])
+    assert.ok(ui.notice().includes(t(reason)))
+    assert.ok(ui.tree().some(node => node.type === 'textarea' && node.props.value.startsWith('/finance-monthly-risk\n')))
+    assert.ok(ui.render().every(button => !button.props.disabled))
+  }
+})
+
+test('permission revocation between clicks cannot reuse a prior successful access check', async () => {
+  let allowed = true, calls = 0, created = 0
+  const { globals } = bridge({ create: async () => `session-${++created}`, scope: () => ({ get: () => ({ send: async () => {} }) }) }, {}, undefined, async () => {
+    calls++; return { ok: true, allowed }
+  })
+  const ui = analysis(globals)
+  await ui.render()[0].props.onClick()
+  allowed = false
+  await ui.render()[1].props.onClick()
+  assert.equal(calls, 2)
+  assert.equal(created, 1)
+  assert.equal(ui.notice(), 'sendFailCopyFailed')
+})
+
+test('clipboard failure keeps the original reason and an exact manually copyable prompt in both locales', async () => {
+  for (const language of ['zh', 'en']) {
+    let attempts = 0
+    const { globals } = bridge({ create: async () => `session-${++attempts}`, scope: () => ({ get: () => ({ send: async () => { if (attempts === 1) throw new Error('rejected private diagnostic') } }) }) })
+    let closed = 0
+    globals.__sensteed_finance_close = () => { closed++ }
+    const t = translate(language)
+    const ui = analysis(globals, { clipboard: { writeText: async () => { throw new Error('denied') } } }, {}, t)
+    await ui.render()[0].props.onClick()
+    const recovery = ui.tree().find(node => node.type === 'textarea')
+    assert.equal(recovery.props.readOnly, true)
+    assert.equal(recovery.props['aria-label'], t('analysisPromptLabel'))
+    assert.match(recovery.props.value, /^\/finance-monthly-risk\n/)
+    assert.match(recovery.props.value, /org-a/)
+    assert.ok(ui.notice().includes(t('analysisStartFailed')))
+    assert.ok(!ui.notice().includes('private diagnostic'))
+    assert.equal(closed, 0)
+    await ui.render()[0].props.onClick()
+    assert.equal(closed, 1)
+    assert.equal(ui.notice(), t('sent'))
+    assert.equal(ui.tree().some(node => node.type === 'textarea'), false)
+  }
+})
+
+test('visible scope matches the selected year and stable entity id including unresolved and all-authorized scopes', () => {
+  for (const context of [{ year: '2027' }, { orgs: [] }, { orgId: '' }]) {
+    const ui = analysis({}, {}, context, translate('en'))
+    const scope = ui.tree().find(node => node.props.role === 'status').children.join('')
+    assert.ok(scope.includes(context.year || '2026'))
+    if (context.orgId === '') assert.ok(scope.includes('All authorized entities'))
+    else assert.ok(scope.includes('org-a'))
+    if (context.orgs) assert.ok(scope.includes('Name pending verification'))
+  }
 })

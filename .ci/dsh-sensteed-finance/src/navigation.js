@@ -5,10 +5,10 @@ const FINANCE_NAVIGATION = [
   ['预算管理', [['engine', '全面预算', 'engine'], ['budget', '预算执行', 'budget'], ['compare-monthly', '月结滚动对比', 'comparisons', { mode: 'monthly' }], ['compare-yearly', '年度对比', 'comparisons', { mode: 'yearly' }], ['compare-versions', '预算版本对比', 'comparisons', { mode: 'versions' }]]],
   ['资金管理', [['cash', '资金分析', 'cash']]],
   ['经营分析', [['operations', '经营分析', 'operations']]],
-  ['数据与异常', [['datacenter', '数据中心', 'datacenter'], ['sources', '来源记录', 'sources'], ['facts', '已发布事实', 'facts'], ['alerts', '预警中心', 'alerts']]],
+  ['数据与异常', [['datacenter', '数据中心', 'datacenter'], ['costitems', '费用类别', 'costitems'], ['sources', '来源记录', 'sources'], ['facts', '已发布事实', 'facts'], ['alerts', '预警中心', 'alerts']]],
   ['财务处理', [['review', '审核队列', 'review'], ['entry', '财务代录', 'entry'], ['filing-activities', '填报活动', 'filing', { section: 'tasks' }]]],
   ['身份与权限', [['identity-members', '成员与角色', 'identity', { directorySection: 'members' }], ['identity-directory', '组织通讯录', 'identity', { directorySection: 'directory' }], ['identity-employment', '部门归属', 'identity', { directorySection: 'employment' }], ['permissions', '功能与数据授权', 'permissions']]],
-  ['更多工具', [['bom', '成本 BOM', 'bom'], ['analyze', 'AI 财务助手', 'analyze'], ['notifications', '通知中心', 'notifications']]],
+  ['更多工具', [['bom', '成本工程', 'bom'], ['analyze', 'AI 财务助手', 'analyze'], ['notifications', '通知中心', 'notifications']]],
 ]
 
 function financeNavigationAllowed(item, identity) {
@@ -47,7 +47,7 @@ function financeBusinessDestination(path) {
     '/budget/comparison/yearly': ['comparisons', { mode: 'yearly' }],
     '/budget/comparison/versions': ['comparisons', { mode: 'versions' }],
     '/cash': ['cash'], '/operations': ['operations'], '/alerts': ['alerts'],
-    '/data-center': ['datacenter'],
+    '/data-center': ['datacenter'], '/data-center/cost-items': ['costitems'],
     '/review': ['review'], '/data-entry': ['entry'], '/assistant': ['analyze'],
     '/cost-engineering': ['bom'], '/notifications': ['notifications'],
     '/settings/finance-permissions': ['permissions'],
@@ -72,9 +72,23 @@ function financeBusinessDestination(path) {
     else if (legacy === 'dept') route = ['filing', { section: 'department' }]
     else if (legacy === 'tasks' || url.searchParams.has('task')) route = ['filing', { section: 'assignments' }]
   }
+  if (pathname === '/budget') {
+    const legacy = { 'snapshot-compare': 'monthly', 'year-compare': 'yearly', versions: 'versions' }[url.searchParams.get('view')]
+    if (legacy) route = ['comparisons', { mode: legacy }]
+  }
   if (!route) return null
   const params = { ...route[1] }
-  if (pathname === '/budget') {
+  if (pathname === '/budget' && route[0] === 'budget') {
+    for (const [query, key] of [['orgs', 'orgIds'], ['depts', 'departmentIds'], ['expenses', 'expenseTypes'], ['months', 'months']]) {
+      if (!url.searchParams.has(query)) continue
+      const values = [...new Set((url.searchParams.get(query) || '').split(',').filter(Boolean))]
+      const valid = key === 'months' ? values.every(value => /^(?:[1-9]|1[0-2])$/.test(value)) : key === 'expenseTypes' ? values.every(value => ['PROJECT_OPERATION', 'FIXED_OPERATION', 'MODEL_SPECIFIC', 'NON_PROJECT'].includes(value)) : values.every(value => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value))
+      if (!valid || values.length > 200) return null
+      params[key] = values
+    }
+    if (url.searchParams.get('unassigned') === '1') params.unassigned = true
+    const page = Number(url.searchParams.get('page'))
+    if (Number.isSafeInteger(page) && page > 0) params.page = page
     if (['lines', 'ledger', 'matrix', 'month', 'variance', 'adjustments', 'allocations', 'versions'].includes(url.searchParams.get('view'))) params.view = url.searchParams.get('view')
     const line = url.searchParams.get('line')
     if (url.searchParams.has('line') && (!line || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(line))) return null
@@ -98,12 +112,12 @@ function financeBusinessDestination(path) {
   } : pathname === '/cash' ? { planType: ['PURCHASE', 'OTHER', 'NEW_RETAIL', 'PR_PAYMENT', 'DIRECT_PARTS'] }
     : pathname === '/alerts' ? { status: ['OPEN', 'CONFIRMED', 'RESOLVED', 'IGNORED'], severity: ['INFO', 'WARN', 'CRITICAL'], alertType: ['BUDGET_OVERRUN', 'EXECUTION_SLOW', 'CASH_GAP', 'DATA_QUALITY'] } : {}
   for (const [key, values] of Object.entries(allowedFilters)) if (values.includes(url.searchParams.get(key))) params[key === 'expense' ? 'expenseType' : key] = url.searchParams.get(key)
-  if (['/budget', '/cash', '/alerts'].includes(pathname)) {
+  if (['/budget', '/budget-engine', '/cash', '/alerts'].includes(pathname)) {
     const month = url.searchParams.get('month')
     if (/^(?:[1-9]|1[0-2])$/.test(month || '')) params.month = month
     for (const [query, key] of [['dept', 'departmentId'], ['version', 'versionId']]) {
       const value = url.searchParams.get(query)
-      if (value && /^[a-zA-Z0-9_-]{1,100}$/.test(value)) params[key] = value
+      if (value && /^[a-zA-Z0-9_-]{1,100}$/.test(value) && value !== 'primary') params[key] = value
     }
   }
   if (pathname === '/filing/budget') {
@@ -117,7 +131,9 @@ function financeBusinessDestination(path) {
   if (year && /^\d{4}$/.test(year) && Number(year) >= 2000 && Number(year) <= 2100) params.year = year
   for (const [query, key] of [['org', 'orgId'], ['task', 'taskId']]) {
     const value = url.searchParams.get(query)
-    if (value && /^[a-zA-Z0-9_-]{1,100}$/.test(value)) params[key] = value
+    if (value && /^[a-zA-Z0-9_-]{1,100}$/.test(value) && value !== 'primary') params[key] = value
   }
+  if (params.orgId === 'all') params.orgId = ''
+  if (params.orgId || params.orgIds?.length) delete params.unassigned
   return { tab: route[0], params }
 }

@@ -37,7 +37,7 @@ function clientHarness(source, componentName, overrides = {}) {
     financePlanMonths: planMonths,
     yearOptions: () => [['2026', '2026']],
     budgetVersionLabel: version => version.name,
-    PLAN_TYPES: [], EXPENSE_TYPES: [], ConfiguredBudgetEntry() {}, BudgetSaveReceipt() {},
+    PLAN_TYPES: [], EXPENSE_TYPES: [], ConfiguredBudgetEntry() {}, BudgetSaveReceipt() {}, FilingExcelDraft() {},
     ...overrides,
   }
   const component = new Function(...Object.keys(dependencies), source + '\nreturn ' + componentName)(...Object.values(dependencies))
@@ -2692,4 +2692,185 @@ test('source records deep link opens the source task instead of dropping its anc
   const resolve = new Function(await readFile(new URL('src/navigation.js', root), 'utf8') + '\nreturn financeBusinessDestination')()
   assert.deepEqual(resolve('/data-center#source-records'), { tab: 'sources', params: {} })
   assert.deepEqual(resolve('/data-center'), { tab: 'datacenter', params: {} })
+})
+
+test('budget host preserves web multi-select dimensions and uses the same pagination window', async () => {
+  const calls = []
+  const { routes } = await loadHost({ fetch: async url => { calls.push(new URL(url)); return mcpJson({ list: [], total: 0 }) } })
+  const params = new URLSearchParams({ year: '2026', orgIds: JSON.stringify(['11111111-1111-4111-8111-111111111111']), departmentIds: JSON.stringify(['22222222-2222-4222-8222-222222222222']), expenseTypes: JSON.stringify(['PROJECT_OPERATION']), months: '[3,10]', page: '2', limit: '20' })
+  assert.equal((await invokeRoute(routes.get(BASE), 'GET', BASE + '/budget?' + params)).status, 200)
+  for (const call of calls.filter(url => /budget\/(summary|lines)$/.test(url.pathname))) {
+    assert.equal(call.searchParams.get('orgIds'), params.get('orgIds'))
+    assert.equal(call.searchParams.get('departmentIds'), params.get('departmentIds'))
+    assert.equal(call.searchParams.get('expenseTypes'), params.get('expenseTypes'))
+    if (call.pathname.endsWith('/lines')) { assert.equal(call.searchParams.get('months'), '[3,10]'); assert.equal(call.searchParams.get('page'), '2'); assert.equal(call.searchParams.get('limit'), '20') }
+  }
+})
+
+test('alerts keep failed counts unknown, expose retries and ignore responses from the previous scope', async () => {
+  const pending = []
+  const source = (await Promise.all(['src/components.js', 'src/format.js', 'src/workflows.js', 'src/views/alerts.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  const harness = clientHarness(source, 'AlertsView', { PAGE_SIZE: 20, api: path => new Promise((resolve, reject) => pending.push({ path, resolve, reject })) })
+  const props = { ctx: { year: '2026', orgId: 'old', revision: 0, financeWriter: false }, t: key => key, onDrill() {} }
+  harness.render(props); harness.flushEffects()
+  const old = pending.splice(0)
+  const next = { ...props, ctx: { ...props.ctx, orgId: 'new' } }
+  harness.render(next); harness.flushEffects()
+  for (const request of old) { if (request.path.endsWith('/alert-rules')) request.reject(new Error('规则读取失败')); else request.resolve({ data: request.path.includes('/summary') ? { critical: 99 } : { list: [{ id: 'old' }] } }) }
+  for (const request of pending) {
+    if (request.path.includes('/summary') || request.path.endsWith('/alert-rules')) request.reject(new Error('读取失败'))
+    else request.resolve({ data: { list: [{ id: 'new' }], total: 1 } })
+  }
+  await new Promise(resolve => setImmediate(resolve))
+  const tree = harness.render(next), all = clientNodes(tree)
+  assert.ok(all.filter(node => node.type?.name === 'StatCard').every(node => node.props.value === '—'))
+  assert.equal(all.find(node => node.props.tableId === 'finance-AlertsView-1').props.rows[0].id, 'new')
+  assert.equal(all.filter(node => node.type?.name === 'FinanceResource' && node.props.resource.error).length, 2)
+  assert.ok(!all.some(node => node.children.includes('confirmDefaultRules')))
+  const actions = all.find(node => node.props.tableId === 'finance-AlertsView-1').props.columns.find(column => column.key === 'actions')
+  assert.equal(actions.render({ id: 'new' }), '只读')
+})
+
+test('alert source navigation preserves the alert year, organization and month', async () => {
+  const source = (await Promise.all(['src/components.js', 'src/format.js', 'src/views/alerts.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  const drills = []
+  const harness = clientHarness(source, 'AlertsView', { PAGE_SIZE: 20, useFinanceResource: () => ({ data: { list: [] } }), FinanceResource() {}, FinanceEvidence() {}, financeEnumLabel: value => value, onDrill() {} })
+  const props = { ctx: { year: '2026', orgId: '', revision: 0, financeWriter: false }, t: key => key, onDrill: (...args) => drills.push(args) }
+  const table = clientNodes(harness.render(props)).find(node => node.props.tableId === 'finance-AlertsView-1')
+  table.props.onRowClick({ id: 'a', alertType: 'BUDGET_OVERRUN', year: 2025, month: 3, orgId: 'org-1' })
+  clientNodes(harness.render(props)).find(node => node.children.includes('viewSource')).props.onClick()
+  assert.deepEqual(drills, [['budget', { year: '2025', orgId: 'org-1', month: '3', view: 'lines' }]])
+})
+
+test('initial budget drafts use the explicit public create contract and preserve the caller body', async () => {
+  const calls = []
+  const { routes } = await loadHost({ fetch: async (url, init) => { calls.push({ url: new URL(url), body: init.body && JSON.parse(init.body) }); return mcpJson({ id: 'new', status: 'DRAFT' }) } })
+  const result = await invokeRoute(routes.get(BASE), 'POST', BASE + '/rest/finance/budget/versions', { year: 2027, name: '年度初始预算' })
+  assert.equal(result.status, 200)
+  assert.equal(calls.at(-1).url.pathname, '/api/finance/budget/versions')
+  assert.deepEqual(calls.at(-1).body, { year: 2027, name: '年度初始预算' })
+})
+test('budget engine honors a linked version, defaults to a draft, and explains an invalid version', async () => {
+  const source = (await Promise.all(['src/components.js', 'src/format.js', 'src/views/engine.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  const rows = [{ id: 'published', name: '正式预算', status: 'PUBLISHED', isPrimary: true, lineCount: 1 }, { id: 'draft', name: '编制草稿', status: 'DRAFT', lineCount: 0 }]
+  for (const [versionId, expected] of [[undefined, 'draft'], ['published', 'published'], ['missing', '']]) {
+    const paths = []
+    const harness = clientHarness(source, 'EngineView', { useFinanceAction: () => ({ revision: 0 }), useFinanceResource: path => { paths.push(path); return { data: path?.startsWith('/finance/budget/versions?') ? { list: rows } : { list: [] } } }, financeRows: data => data?.list || [], financeColumns: () => [], financeDisplayValue: value => value, FinanceResource() {}, Notice() {}, FinanceEvidence() {} })
+    const tree = harness.render({ ctx: { year: '2027', drillParams: { versionId }, permissions: [], financeWriter: false, revision: 0 } })
+    const selector = clientNodes(tree).find(node => node.props['aria-label'] === '编制预算版本')
+    assert.equal(selector.props.value, expected)
+    if (expected) assert.ok(paths.includes(`/budget-engine/versions/${expected}/params`))
+    else assert.ok(clientNodes(tree).some(node => node.props.role === 'alert' && node.children.some(value => typeof value === 'string' && value.includes('指定版本'))))
+  }
+})
+
+test('yearly comparison keeps real zero budgets comparable and excludes one-sided changes from its rate', async () => {
+  const source = (await Promise.all(['src/components.js', 'src/format.js', 'src/views/comparisons.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  const rows = [{ orgId: 'a', baseBudget: 100, targetBudget: 120, diff: 20, basePresent: true, targetPresent: true }, { orgId: 'zero', baseBudget: 0, targetBudget: 0, diff: 0, basePresent: true, targetPresent: true }, { orgId: 'new', baseBudget: 0, targetBudget: 900, diff: 900, basePresent: false, targetPresent: true }]
+  const harness = clientHarness(source, 'ComparisonsView', { useFinanceAction: () => ({ revision: 0 }), useFinanceResource: path => ({ data: path?.includes('/diff?') ? { rows } : { list: [{ id: path?.includes('2027') ? 'target' : 'base', isPrimary: true, status: 'PUBLISHED' }] } }), financeRows: data => data?.rows || data?.list || [], financeColumns: () => [], financeDisplayValue: value => value, FinanceResource() {}, Notice() {} })
+  const tree = harness.render({ ctx: { year: '2026', drillParams: { mode: 'yearly' }, permissions: [], revision: 0 } })
+  assert.equal(clientNodes(tree).find(node => node.props.tableId === 'finance-compare-yearly').props.rows.length, 2)
+  assert.equal(clientNodes(tree).find(node => node.props.label === '可比预算变化率').props.value, '20%')
+})
+
+test('filing Excel applies a validated preview only to the editor and never writes before saving', async () => {
+  const source = (await Promise.all(['src/components.js', 'src/format.js', 'src/views/budget-excel.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  const applied = [], writes = []
+  const preview = { rows: [{ month: 10, plannedAmount: 120, description: '导入草稿' }], errors: [], totalAmount: 120 }
+  const harness = clientHarness(source, 'FilingExcelDraft', { financeRest: async (path, method) => { writes.push({ path, method }); return { data: preview } }, financeColumns: () => [], FileReader: class { readAsDataURL() { this.result = 'data:test;base64,YQ=='; this.onload() } } })
+  const props = { assignmentId: 'a1', onApply: rows => applied.push(rows) }
+  let tree = harness.render(props)
+  clientNodes(tree).find(node => node.props.type === 'file').props.onChange({ target: { files: [{ name: 'draft.xlsx', size: 10 }], value: 'draft.xlsx' } })
+  await new Promise(resolve => setImmediate(resolve))
+  tree = harness.render(props)
+  clientNodes(tree).find(node => node.children.includes('确认替换当前编辑内容')).props.onClick()
+  assert.deepEqual(applied, [preview.rows])
+  assert.deepEqual(writes, [{ path: '/finance/filing/assignments/a1/excel-preview', method: 'POST' }])
+})
+
+test('CE quote application requires preview, invalidates it on input change and sends its baseline on confirm', async () => {
+  const source = (await Promise.all(['src/components.js', 'src/format.js', 'src/views/bom.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  const writes = [], closed = []
+  const harness = clientHarness(source, 'FinanceQuoteApply', { FinanceEvidence() {}, financeRest: async (path, method, body) => { writes.push({ path, body }); return { data: { baseline: 'a'.repeat(64), beforeTotal: 100, afterTotal: 120, totalDelta: 20 } } } })
+  const props = { packageId: 'p1', quote: { id: 'q1', partNo: 'part-1', price: 120, currency: 'CNY', supplierName: '测试供应商' }, nodes: [{ id: 'node-1', partNo: 'part-1', name: '测试零件' }], onClose: () => closed.push(true), onChanged() {} }
+  let tree = harness.render(props)
+  const set = (label, value) => { clientNodes(tree).find(node => node.props['aria-label'] === label).props.onChange(value); tree = harness.render(props) }
+  set('报价装配位置', 'node-1'); set('报价计价口径', 'OWN'); set('报价分项口径', 'UNALLOCATED')
+  assert.equal(clientNodes(tree).find(node => node.children.includes('确认采用此报价')).props.disabled, true)
+  await clientNodes(tree).find(node => node.children.includes('预览成本影响')).props.onClick()
+  tree = harness.render(props)
+  assert.equal(writes[0].path, '/ce/packages/p1/quotes/q1/preview')
+  set('报价计价口径', 'PACKAGE')
+  assert.equal(clientNodes(tree).find(node => node.children.includes('确认采用此报价')).props.disabled, true)
+  await clientNodes(tree).find(node => node.children.includes('预览成本影响')).props.onClick()
+  tree = harness.render(props)
+  await clientNodes(tree).find(node => node.children.includes('确认采用此报价')).props.onClick()
+  assert.deepEqual(writes.at(-1), { path: '/ce/packages/p1/quotes/q1/apply', body: { nodeId: 'node-1', pricingMode: 'PACKAGE', baseline: 'a'.repeat(64) } })
+  assert.equal(closed.length, 1)
+})
+test('new CE workflow routes are exact allowlists and preserve their HTTP methods', async () => {
+  const calls = []
+  const { routes } = await loadHost({ fetch: async (url, init) => { calls.push({ url: new URL(url), method: init.method }); return mcpJson({ nodes: [], baseline: 'a'.repeat(64) }) } })
+  for (const [method, path] of [['POST', '/ce/packages/p1/ebom/preview'], ['POST', '/ce/packages/p1/cost-excel'], ['PUT', '/ce/nodes/n1/ac-target'], ['PATCH', '/ce/nodes/n1/procurement'], ['POST', '/ce/packages/p1/quotes/q1/preview'], ['POST', '/ce/packages/p1/quotes/q1/apply']]) {
+    const result = await invokeRoute(routes.get(BASE), method, BASE + '/rest' + path, {}, { 'content-type': 'application/json' })
+    assert.equal(result.status, 200, path)
+    assert.equal(calls.at(-1).method, method)
+    assert.equal(calls.at(-1).url.pathname, '/api' + path)
+  }
+})
+
+test('CE upload body allowance stays limited to the exact EBOM routes', async () => {
+  const { routes } = await loadHost({ fetch: async () => mcpJson({ nodes: [] }) })
+  const body = { contentBase64: 'a'.repeat(300 * 1024) }
+  assert.equal((await invokeRoute(routes.get(BASE), 'POST', BASE + '/rest/ce/packages/p1/ebom/preview', body)).status, 200)
+  assert.equal((await invokeRoute(routes.get(BASE), 'POST', BASE + '/rest/ce/packages/p1/quotes', body)).status, 400)
+  assert.equal((await invokeRoute(routes.get(BASE), 'POST', BASE + '/rest/ce/packages/p1/ebom/unknown', body)).status, 404)
+})
+
+test('data asset sizes use service totals and unknown counts never become empty-page zeroes', async () => {
+  const source = (await Promise.all(['src/components.js', 'src/format.js', 'src/views/datacenter.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  const requested = [], navigated = []
+  let failed = false
+  const harness = clientHarness(source, 'FinanceDataAssets', { useFinanceResource: path => { requested.push(path); return path.includes('payment-plans') && failed ? { error: true, retry() {} } : { data: { list: [], total: 225 } } } })
+  const ctx = { revision: 0, orgs: [{ type: 'GROUP' }, { type: 'COMPANY' }], onNavigate: (...args) => navigated.push(args) }
+  let tree = harness.render({ ctx })
+  assert.ok(clientNodes(tree).some(node => node.children.includes('四大类合计：900 行')))
+  assert.ok(requested.every(path => path.includes('limit=1')))
+  assert.ok(!requested.find(path => path.includes('payment-plans')).includes('year='))
+  clientNodes(tree).find(node => node.children.includes('查看明细')).props.onClick()
+  assert.equal(navigated[0][0], 'budget')
+  failed = true; tree = harness.render({ ctx })
+  assert.ok(clientNodes(tree).some(node => node.children.includes('四大类合计：— 行')))
+  assert.ok(clientNodes(tree).some(node => node.props.role === 'alert'))
+})
+test('quality repair destinations preserve unassigned meaning and sources expose original amount units', async () => {
+  const source = await readFile(new URL('src/views/datacenter.js', root), 'utf8')
+  const destination = new Function(source + '\nreturn financeQualityDestination')()
+  assert.deepEqual(destination({ dataset: 'budget_line', label: '未分配主体' }), { tab: 'budget', params: { year: String(new Date().getFullYear()), orgId: '', view: 'lines', unassigned: true } })
+  const sources = await readFile(new URL('src/views/sources.js', root), 'utf8')
+  const harness = clientHarness(sources, 'SourcesView', { useFinanceResource: () => ({ data: { list: [{ id: 's1', financialAnalysis: { primaryAmount: { amount: 0, unit: '万元', currency: 'USD' } } }], total: 1 } }), financeRows: data => data?.list || [], financeColumns: () => [], financeDisplayValue: value => value, financeLabel: value => value, formatNumber: value => String(value), FinanceResource() {}, Card() {}, GhostButton() {}, Select() {}, Field() {}, Table() {}, Pager() {} })
+  const tree = harness.render({ ctx: { revision: 0 } })
+  const table = clientNodes(tree).find(node => node.props.tableId === 'finance-source-HEADQUARTERS')
+  assert.equal(table.props.columns.find(column => column.key === 'primaryAmount').render(table.props.rows[0]), '0 万元 · USD')
+})
+
+test('historical permission revocation stays separate from complete policies and requires a reason', async () => {
+  const source = (await Promise.all(['src/components.js', 'src/format.js', 'src/views/permissions.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  const grant = { id: 'g1', userId: 'u1', permission: 'cash.plan.read', scopeType: 'ORG', orgId: 'org-1', grantReason: '历史补充', expiresAt: null }
+  const writes = [], paths = []
+  const harness = clientHarness(source, 'FinancePermissionHistory', { FINANCE_PERMISSION_NAMES: { 'cash.plan.read': '查看资金计划' }, useFinanceResource: path => { paths.push(path); return { data: { list: [grant], total: 101 } } }, useFinanceAction: () => ({ revision: 0, run: async (...args) => writes.push(args) }), financeRows: data => data?.list || [], financeColumns: () => [], FinanceResource() {}, FinanceFormDialog() {}, Notice() {} })
+  const props = { ctx: { orgs: [{ id: 'org-1', name: '测试主体' }], departments: [] }, directory: { members: [{ userId: 'u1', name: '历史成员' }] } }
+  let tree = harness.render(props)
+  const table = clientNodes(tree).find(node => node.props.tableId === 'finance-historical-permission-ledger')
+  assert.equal(table.props.columns.find(column => column.key === 'scope').render(grant), '指定主体：测试主体')
+  assert.ok(clientNodes(tree).some(node => node.children.some(text => typeof text === 'string' && text.includes('不参与当前有效权限计算'))))
+  table.props.columns.find(column => column.key === 'actions').render(grant).props.onClick()
+  tree = harness.render(props)
+  const form = clientNodes(tree).find(node => node.type?.name === 'FinanceFormDialog')
+  await assert.rejects(form.props.onSubmit({ reason: '  ' }), /原因/)
+  await form.props.onSubmit({ reason: ' 历史记录清理 ' })
+  assert.deepEqual(writes, [['/finance/permissions/g1/revoke', { reason: '历史记录清理' }]])
+  const pager = clientNodes(harness.render(props)).find(node => node.type?.name === 'Pager')
+  pager.props.onPage(2); harness.render(props)
+  assert.ok(paths.at(-1).includes('page=2'))
 })

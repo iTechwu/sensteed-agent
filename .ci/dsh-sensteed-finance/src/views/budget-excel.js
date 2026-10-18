@@ -62,3 +62,27 @@ function BudgetFilingExcel({ card, costItems, onRefresh }) {
           h(PrimaryButton, { busy, disabled: !ready || !preview.rows.length, onClick: confirm }, `确认追加 ${preview.rows.length} 条本人草稿`),
           h(GhostButton, { disabled: busy, onClick: () => { setPreview(null); setFile(null) } }, '取消预览'))) : null)
 }
+
+function FilingExcelDraft({ assignmentId, disabled, onBusyChange, onApply }) {
+  const [preview, setPreview] = useState(null)
+  const [busy, setBusy] = useState(false), [error, setError] = useState('')
+  const lock = useRef(false)
+  const run = async operation => {
+    if (lock.current || disabled) return
+    lock.current = true; setBusy(true); onBusyChange?.(true); setError('')
+    try { await operation() } catch (cause) { setError(cause.message) }
+    finally { lock.current = false; setBusy(false); onBusyChange?.(false) }
+  }
+  return h('section', { className: 'sf-stack', 'aria-label': '填报 Excel 导入' },
+    h('p', { className: 'sf-note' }, 'Excel 先预览，再替换当前编辑内容；暂存或提交后才会保存，不直接写入正式数据。'),
+    h('div', { className: 'sf-row' },
+      h(GhostButton, { disabled: disabled || busy, onClick: () => run(async () => { const result = await financeRest(`/finance/filing/assignments/${assignmentId}/excel-template`, 'POST', {}); financeDownloadBudgetTemplate(result.data) }) }, '下载填报 Excel 模板'),
+      h(FormRow, { label: '选择填报 Excel 并预览' }, h('input', { type: 'file', accept: '.xlsx', 'aria-label': '选择填报 Excel 并预览', disabled: disabled || busy, onChange: event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void run(async () => { setPreview(null); const body = await financeBudgetExcelFile(file); const result = await financeRest(`/finance/filing/assignments/${assignmentId}/excel-preview`, 'POST', body); setPreview(result.data) }) } }))),
+    error ? h('p', { role: 'alert' }, error) : null,
+    preview ? h('div', { className: 'sf-stack' },
+      h('p', null, `预览 ${preview.rows.length} 条 · 合计 ${formatNumber(preview.totalAmount)} 元`),
+      ...(preview.errors || []).map(item => h('p', { key: item.row, role: 'alert' }, `第 ${item.row} 行：${item.message}`)),
+      h(Table, { tableId: 'filing-excel-preview', rows: preview.rows.slice(0, 20), columns: financeColumns([['month', '月份'], ['plannedAmount', '金额（元）'], ['description', '编制说明']]), empty: '暂无可导入内容' }),
+      preview.rows.length > 20 ? h('p', { className: 'sf-note' }, `当前预览前 20 条，确认后载入全部 ${preview.rows.length} 条。`) : null,
+      h(PrimaryButton, { disabled: disabled || busy || !preview.rows.length || preview.errors.length > 0, onClick: () => { onApply(preview.rows); setPreview(null) } }, '确认替换当前编辑内容')) : null)
+}

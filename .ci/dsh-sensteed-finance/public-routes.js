@@ -1,6 +1,15 @@
 // Datasource 公开财务契约白名单；新增接口须对照 packages/contracts/src/api 验证。
 // 明确方法与路径，禁止透传任意 URL、内部接口或客户端身份。
 export const PUBLIC_FINANCE_ROUTES = [
+  ["POST", "/ce/packages/:id/ebom/preview"],
+  ["POST", "/ce/packages/:id/cost-excel"],
+  ["PUT", "/ce/nodes/:nodeId/ac-target"],
+  ["PATCH", "/ce/nodes/:nodeId/procurement"],
+  ["POST", "/ce/packages/:id/quotes/:quoteId/preview"],
+  ["POST", "/ce/packages/:id/quotes/:quoteId/apply"],
+  ["POST", "/finance/filing/assignments/:id/excel-template"],
+  ["POST", "/finance/filing/assignments/:id/excel-preview"],
+  ["POST", "/finance/budget/versions"],
   ["GET", "/finance/permission-policies"],
   ["PUT", "/finance/permission-policies"],
   ["PUT", "/finance/permission-policies/batch"],
@@ -638,4 +647,4 @@ export const PUBLIC_FINANCE_ROUTES = [
   ]
 ]
 
-export const PUBLIC_QUERY_KEYS = new Set(["lineId", "year", "month", "page", "limit", "orgId", "departmentId", "expenseType", "project", "sortBy", "sortDirection", "versionId", "unassigned", "recordType", "planType", "severity", "status", "alertType", "days", "baseVersionId", "targetVersionId", "snapshotAId", "snapshotBId", "baseRunId", "targetRunId", "scope", "kind", "bizSystem", "transport", "runId", "search", "category", "unread", "userId", "permission", "activeOnly", "keyword", "onlyUnmapped", "systemUserId", "type", "taskId", "submittedByMe", "planId", "active", "q", "months", "direction", "currency", "baselineId", "executionId", "ruleId"])
+export const PUBLIC_QUERY_KEYS = new Set(["orgIds", "departmentIds", "expenseTypes", "lineId", "year", "month", "page", "limit", "orgId", "departmentId", "expenseType", "project", "sortBy", "sortDirection", "versionId", "unassigned", "recordType", "planType", "severity", "status", "alertType", "days", "baseVersionId", "targetVersionId", "snapshotAId", "snapshotBId", "baseRunId", "targetRunId", "scope", "kind", "bizSystem", "transport", "runId", "search", "category", "unread", "userId", "permission", "activeOnly", "keyword", "onlyUnmapped", "systemUserId", "type", "taskId", "submittedByMe", "planId", "active", "q", "months", "direction", "currency", "baselineId", "executionId", "ruleId"])

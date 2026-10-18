@@ -184,18 +184,18 @@
       "resolvedSha": "5117d35b1510bc0756948ac5b765ffb02b993dab"
     },
     {
-      "name": "finance-budget-version-health",
-      "kind": "dir",
-      "path": "finance-budget-version-health",
-      "repository": "https://github.com/iTechwu/helm.dofe.ai",
-      "resolvedSha": "5117d35b1510bc0756948ac5b765ffb02b993dab"
-    },
-    {
       "name": "finance-alert-rules-audit",
       "kind": "dir",
       "path": "finance-alert-rules-audit",
       "repository": "https://github.com/iTechwu/helm.dofe.ai",
       "resolvedSha": "5117d35b1510bc0756948ac5b765ffb02b993dab"
+    },
+    {
+      "name": "finance-budget-version-health",
+      "kind": "dir",
+      "path": "finance-budget-version-health",
+      "repository": "https://github.com/iTechwu/helm.dofe.ai",
+      "resolvedSha": "576edd33710233fe7d0a08b716a2868cc29d741b"
     }
   ]
 }

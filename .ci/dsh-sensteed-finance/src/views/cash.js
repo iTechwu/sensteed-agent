@@ -101,7 +101,7 @@ function CashView({ ctx, t, onDrill }) {
       notice ? h(Notice, null, notice) : null),
     filterBar ? h('div', { className: 'sf-row-between' }, filterBar) : null,
 
-    tab === 'summary' ? h(SummaryTab, { cash, t, year }) : null,
+    tab === 'summary' ? h(SummaryTab, { cash, t, year, onDrill }) : null,
     tab === 'plans' ? !currentPlans ? h('p', { role: 'status' }, t('loading')) : currentPlans.error ? h(CashPlanListError, { onRetry: retryList }) : h(PlansTab, { rows: planRows, total: currentPlans.value?.data?.total ?? currentPlans.value?.total, page, onPage: setPage, t, busy, act, canWrite, onDialog: setDialog }) : null,
     tab === 'revenue' ? !currentRevenues ? h('p', { role: 'status' }, t('loading')) : currentRevenues.error ? h(CashPlanListError, { onRetry: retryList }) : h(RevenueTab, { revenues: currentRevenues.value, page: revenuePage, onPage: setRevenuePage, t, canWrite, onBackfill: row => setDialog({ kind: 'backfill', row }), onLedger: row => setDialog({ kind: 'receiptLedger', row }) }) : null,
     tab === 'accuracy' ? h(CashAccuracyView, { ctx, t }) : null,
@@ -134,7 +134,7 @@ function cashSummaryModel(rows, selectedYear, now = new Date()) {
   return { year, month, isCurrentYear, rows: current, totals }
 }
 
-function SummaryTab({ cash, t, year, now }) {
+function SummaryTab({ cash, t, year, now, onDrill }) {
   if (cash?.error) return h(EmptyState, null, t('loadError'))
   const rows = cash?.data?.list || cash?.list || []
   const model = cashSummaryModel(rows, year, now)
@@ -142,7 +142,7 @@ function SummaryTab({ cash, t, year, now }) {
     model.isCurrentYear ? h(Card, { title: `${model.year}-${String(model.month).padStart(2, '0')} · ${t('cashMonthlyExecution')}`, unit: t('unitNote') },
       h('div', { className: 'sf-kpis' },
         ...[['actualBalance', 'cashBalance'], ['plannedIncome', 'plannedIncome'], ['plannedExpense', 'plannedExpense'], ['actualIncome', 'actualIncome'], ['actualExpense', 'actualExpense'], ['remainingPayment', 'remainingUnpaid']].map(([key, label]) =>
-          h(KpiCard, { key, icon: 'data', label: t(label), value: yuan(model.totals[key]) ?? '—', negative: model.totals[key] !== null && model.totals[key] < 0 }))),
+          h(KpiCard, { key, icon: 'data', label: t(label), value: yuan(model.totals[key]) ?? '—', negative: model.totals[key] !== null && model.totals[key] < 0, onClick: onDrill && key !== 'actualBalance' ? () => onDrill('cash', { view: /Income$/.test(key) ? 'revenue' : 'plans', year: String(model.year), month: String(model.month) }) : undefined }))),
       h('p', { className: 'sf-note' }, t('cashMissingMetrics'))) : null,
     h(Card, { title: t('cashSummaryTable'), unit: t('unitNote') }, h(CashSummaryTable, { rows, t })))
 }

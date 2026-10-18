@@ -10,7 +10,7 @@ function ReviewView({ ctx }) {
   const revision = `${ctx.revision}-${action.revision}`
   const summary = useFinanceResource('/finance/review/summary', revision)
   const paths = { filing: '/finance/filing/assignments?status=SUBMITTED', facts: '/data-source/fact-batches?status=PENDING_REVIEW', budget: '/finance/budget/adjustments?status=SUBMITTED', plans: '/finance/payment-plan-adjustments?status=SUBMITTED' }
-  const list = useFinanceResource(`${paths[section]}&page=${page}&limit=20`, revision)
+  const list = useFinanceResource(`${paths[section]}&page=${page}&limit=20${section === 'filing' && ctx.drillParams?.taskId ? `&taskId=${encodeURIComponent(ctx.drillParams.taskId)}` : ''}`, revision)
   const detailPath = dialog?.kind === 'detail' ? section === 'filing' ? `/finance/filing/assignments/${dialog.row.id}` : section === 'budget' ? `/finance/budget/adjustments/${dialog.row.id}` : section === 'plans' ? `/finance/payment-plan-adjustments/${dialog.row.id}` : null : null
   const detail = useFinanceResource(detailPath, revision)
   const batch = useFinanceResource(ctx.drillParams?.sourcePath?.match(/batch=([\w-]+)/)?.[1] ? `/finance/filing/batches/${ctx.drillParams.sourcePath.match(/batch=([\w-]+)/)[1]}` : null, revision)
@@ -21,7 +21,7 @@ function ReviewView({ ctx }) {
   const canVerify = ctx.permissions.includes(section === 'facts' ? 'finance.source.review' : section === 'budget' ? 'budget.adjustment.approve' : section === 'plans' ? 'cash.plan.verify' : 'budget.submission.verify') && ctx.financeWriter
   const act = async (target, body) => { const result = await action.run(target, body); if (result?.results) setReceipt(result); return result }
   return h('div', { className: 'sf-stack' },
-    h(Card, { title: '复核队列汇总' }, h(FinanceResource, { resource: summary }, h('div', { className: 'sf-kpis' }, ...(summary.data?.sources || []).map(row => h(KpiCard, { key: row.source, label: ({ FILING: '填报', FACT_BATCH: '事实批次', BUDGET_ADJUSTMENT: '预算调整', PLAN_ADJUSTMENT: '计划调整' })[row.source], value: row.pending }))))),
+    h(Card, { title: '复核队列汇总' }, h(FinanceResource, { resource: summary }, h('div', { className: 'sf-kpis' }, ...(summary.data?.sources || []).map(row => h(KpiCard, { key: row.source, label: ({ FILING: '填报', FACT_BATCH: '事实批次', BUDGET_ADJUSTMENT: '预算调整', PLAN_ADJUSTMENT: '计划调整' })[row.source], value: row.pending, onClick: () => { const next = ({ FILING: 'filing', FACT_BATCH: 'facts', BUDGET_ADJUSTMENT: 'budget', PLAN_ADJUSTMENT: 'plans' })[row.source]; if (next) { setSection(next); setPage(1); setDialog(null) } } }))))),
     h(Select, { 'aria-label': '复核类别', value: section, options: FINANCE_REVIEW_SOURCES, onChange: value => { setSection(value); setPage(1); setDialog(null) } }), h(Notice, null, action.notice),
     section === 'filing' && canVerify ? h(GhostButton, { disabled: !selected.length || mixedTasks || action.busy, onClick: () => setDialog({ kind: 'batch', title: `批量定稿（${selected.length} 条）` }) }, `批量定稿（已选 ${selected.length}${mixedTasks ? ' · 跨任务不可批量定稿' : ''}）`) : null,
     h(Card, { title: FINANCE_REVIEW_SOURCES.find(([id]) => id === section)[1], unit: '元' }, h(FinanceResource, { resource: list }, h(Table, { tableId: `finance-review-${section}`, rows, empty: '暂无待复核事项', columns: [

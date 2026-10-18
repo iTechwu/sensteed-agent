@@ -11,7 +11,7 @@ const datasource = resolve(process.argv[2] || resolve(root, '../../../datasource
 const navigation = await readFile(resolve(root, 'src/navigation.js'), 'utf8')
 const destination = new Function(navigation + '\nreturn financeBusinessDestination')()
 const paths = [
-  '/dashboard', '/budget', '/budget-engine', '/cash', '/operations', '/alerts', '/data-center',
+  '/data-center/cost-items', '/dashboard', '/budget', '/budget-engine', '/cash', '/operations', '/alerts', '/data-center',
   '/review', '/data-entry', '/assistant', '/cost-engineering', '/notifications',
   '/budget/comparison/monthly-roll', '/budget/comparison/yearly', '/budget/comparison/versions',
   '/filing/budget', '/filing/tasks', '/filing/department', '/filing/records', '/filing/activities',
