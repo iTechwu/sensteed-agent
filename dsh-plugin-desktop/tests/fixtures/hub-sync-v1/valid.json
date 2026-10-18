@@ -1,0 +1,72 @@
+{
+  "provenance": "Hub apps/api/db/hub-canonical.util.ts, ephemeral test Ed25519 key (private key discarded)",
+  "at": 1792281600000,
+  "expected": {
+    "origin": "https://ai.hozonauto.com/plugins/api",
+    "tenantId": "fb9f3bf4-c072-416b-ac95-3302f31db96f",
+    "actorRef": "sso:fixture",
+    "deviceId": "66970ea0-9587-4a66-ae09-5b8bc5ddb1e3",
+    "profileId": "7841f7fb-0f31-40eb-84de-6630c431936b",
+    "channel": "stable",
+    "observedStateDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "target": {
+      "sensteedVersion": "0.2.1-alpha.3",
+      "harnessVersion": "0.2.1-alpha.3",
+      "os": "darwin",
+      "arch": "arm64",
+      "nodeVersion": "22.0.0",
+      "cordisVersion": "4.0.5-alpha.2",
+      "libc": null,
+      "nodeAbi": "127",
+      "hostCapabilities": [
+        "credentials"
+      ]
+    },
+    "minimumPolicyRevision": 0
+  },
+  "trust": {
+    "schemaVersion": 1,
+    "keys": {
+      "hub-interop-test": "MCowBQYDK2VwAyEAwwnZwQ+B3pzGLCAhElggGqdp49nK73nyjSZ+7tcgqfw="
+    },
+    "revokedKeyIds": []
+  },
+  "value": {
+    "snapshot": {
+      "origin": "https://ai.hozonauto.com/plugins/api",
+      "tenantId": "fb9f3bf4-c072-416b-ac95-3302f31db96f",
+      "actorRef": "sso:fixture",
+      "deviceId": "66970ea0-9587-4a66-ae09-5b8bc5ddb1e3",
+      "profileId": "7841f7fb-0f31-40eb-84de-6630c431936b",
+      "channel": "stable",
+      "observedStateDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "target": {
+        "sensteedVersion": "0.2.1-alpha.3",
+        "harnessVersion": "0.2.1-alpha.3",
+        "os": "darwin",
+        "arch": "arm64",
+        "nodeVersion": "22.0.0",
+        "cordisVersion": "4.0.5-alpha.2",
+        "libc": null,
+        "nodeAbi": "127",
+        "hostCapabilities": [
+          "credentials"
+        ]
+      },
+      "schemaVersion": "hub-sync-v1",
+      "snapshotId": "07dde7ae-b6f0-42c4-a88f-df034183d1cb",
+      "policyRevision": 0,
+      "catalogDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "entries": [],
+      "issuedAt": "2026-10-18T00:00:00.000Z",
+      "expiresAt": "2026-10-18T00:05:00.000Z"
+    },
+    "signature": {
+      "algorithm": "Ed25519",
+      "canonicalization": "RFC8785",
+      "keyId": "hub-interop-test",
+      "payloadDigest": "e0b9c70156bd9ba3371268781a14970de98c9c314bba0038097eb16e3d374bc4",
+      "signature": "j6mzWutPgL7FbwiM3aYPhZbEfihblxEHz2UMHHNJMoQC5SZC3ngFJTwirtgj0ltByAYH0hIShM/I06YaPwaNBA=="
+    }
+  }
+}
