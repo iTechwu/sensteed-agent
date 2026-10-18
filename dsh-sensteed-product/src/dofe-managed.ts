@@ -73,7 +73,9 @@ export async function apply(ctx: Context): Promise<void> {
   observeLauncherRuntime(ctx, runtime => { launcher = runtime })
   const access = ctx.dofeAccessSettings
   let financeAuthorized = false
-  if(!ctx.get?.('dofeAccess'))ctx.provide('dofeAccess', () => {
+  // A starting Host owner already reserves this service. Availability remains
+  // strict for consumers; this lookup only avoids registering a second owner.
+  if(!ctx.get?.('dofeAccess', false))ctx.provide('dofeAccess', () => {
     const current = access.get()
     const granted = current.entitlements?.plugins.includes('knowledge') === true
     return {
