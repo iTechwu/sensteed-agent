@@ -50,7 +50,7 @@ describe('desktop L0 Hub catalog signature boundary', () => {
     expect(() => verifyHubSyncSnapshot(value, f.trust, f.expected, f.now)).toThrow('invalid signature')
     expect(() => verifyHubSyncSnapshot(f.signed(), f.trust, { ...f.expected, channel: 'beta' }, f.now)).toThrow('channel binding mismatch')
     expect(() => verifyHubSyncSnapshot({ ...f.signed(), surprise: true }, f.trust, f.expected, f.now)).toThrow()
-    expect(() => verifyHubSyncSnapshot(f.signed({ ...f.snapshot, target: { ...f.snapshot.target, surprise: true } }), f.trust, f.expected, f.now)).toThrow()
+    expect(() => verifyHubSyncSnapshot(f.signed({ ...f.snapshot, target: { ...f.snapshot.target, surprise: true } as typeof f.snapshot.target }), f.trust, f.expected, f.now)).toThrow()
   })
   it('rejects expired, future, overlong and policy rollback snapshots even when signed', () => {
     const f = fixture()
