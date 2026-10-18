@@ -38,6 +38,7 @@ const RESERVED_ROW_IDS = new Set([
   'ui-dsh-soup', 'dofe-sensteed-supplier-intelligence', 'dofe-sensteed-video-notes',
 ])
 const OWN_ROW_IDS = new Set([
+  'dofe-host-auth', 'dofe-host-capabilities', 'dofe-auth-routes',
   'dofe-managed', 'personal-knowledge-files', 'dofe-sensteed-finance',
   'personal-knowledge-management', 'openmontage-guidance', 'dofe-opencli',
   'sensteed-skill-manager',
