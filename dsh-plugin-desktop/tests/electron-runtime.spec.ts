@@ -1124,6 +1124,63 @@ describe('Electron desktop runtime', () => {
     await release()
   })
 
+  it('mounts a fresh generation and rejects previous or missing renderer challenges', async () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin')
+    const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
+    const runtime = new ElectronDesktopRuntime(async () => {})
+    const firstRelease = runtime.schedule(spec)
+    const first = runtime.beginRendererBootMonitoring({ commitHealthy: async () => {} })
+    await runtime.mountScheduled()
+    runtime.reportRendererBoot({ status: 'healthy' })
+    await first
+    await firstRelease()
+    const release = runtime.schedule(spec)
+    const commitHealthy = vi.fn(async () => {})
+    const challenge = '11111111-1111-4111-8111-111111111111'
+    const next = runtime.beginGenerationRendererBootMonitoring(challenge, { commitHealthy })
+    await runtime.mountScheduled()
+    expect(electron.loadURL.mock.calls.at(-1)?.[0]).toContain('_dsh_renderer_boot=' + challenge)
+    runtime.reportRendererBoot({ status: 'healthy' })
+    runtime.reportRendererBoot({ status: 'healthy', challenge: '22222222-2222-4222-8222-222222222222' })
+    await Promise.resolve()
+    expect(commitHealthy).not.toHaveBeenCalled()
+    runtime.reportRendererBoot({ status: 'healthy', challenge })
+    await expect(next).resolves.toEqual({ report: { status: 'healthy' } })
+    expect(commitHealthy).toHaveBeenCalledOnce()
+    await release()
+  })
+
+  it('times out a mounted replacement when only stale Client reports arrive', async () => {
+    vi.useFakeTimers()
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin')
+    const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
+    const runtime = new ElectronDesktopRuntime(async () => {})
+    const release = runtime.schedule(spec)
+    const commitHealthy = vi.fn(async () => {})
+    const next = runtime.beginGenerationRendererBootMonitoring('11111111-1111-4111-8111-111111111111', { commitHealthy }, 50)
+    await runtime.mountScheduled()
+    runtime.reportRendererBoot({ status: 'healthy', challenge: '22222222-2222-4222-8222-222222222222' })
+    await vi.advanceTimersByTimeAsync(50)
+    await expect(next).resolves.toMatchObject({ failureReason: 'renderer-timeout' })
+    expect(commitHealthy).not.toHaveBeenCalled()
+    await release()
+  })
+
+  it('a throwing Client after healthy startup prevents the replacement health commit', async () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin')
+    const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
+    const runtime = new ElectronDesktopRuntime(async () => {})
+    const release = runtime.schedule(spec)
+    const commitHealthy = vi.fn(async () => {})
+    const challenge = '11111111-1111-4111-8111-111111111111'
+    const next = runtime.beginGenerationRendererBootMonitoring(challenge, { commitHealthy })
+    await runtime.mountScheduled()
+    runtime.reportRendererBoot({ status: 'failed', plugins: ['updated-client'], error: 'Client apply failed', challenge })
+    await expect(next).resolves.toMatchObject({ failureReason: 'renderer-failed' })
+    expect(commitHealthy).not.toHaveBeenCalled()
+    await release()
+  })
+
   it('turns a pre-health renderer crash into one handled startup failure', async () => {
     vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
     const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')

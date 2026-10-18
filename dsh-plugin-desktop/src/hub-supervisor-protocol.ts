@@ -8,6 +8,6 @@ export const HubSupervisorRequestSchema=z.discriminatedUnion('kind',[
  z.strictObject({kind:z.literal('managed'),identity,generationDigest:z.string().regex(/^[a-f0-9]{64}$/u),lease:z.unknown()}),
 ])
 export type HubSupervisorRequest=z.infer<typeof HubSupervisorRequestSchema>
-export interface HubGenerationSupervisor{request(input:HubSupervisorRequest):Promise<void>}
-export function provideHubSupervisor(ctx:Context,request:HubGenerationSupervisor['request']){ctx.provide('hubGenerationSupervisor',{request})}
+export interface HubGenerationSupervisor{request(input:HubSupervisorRequest):Promise<void>;waitRendererHealthy(generationId:string):Promise<void>}
+export function provideHubSupervisor(ctx:Context,request:HubGenerationSupervisor['request'],waitRendererHealthy:HubGenerationSupervisor['waitRendererHealthy']=async()=>{throw new Error('Launcher renderer health unavailable')}){ctx.provide('hubGenerationSupervisor',{request,waitRendererHealthy})}
 declare module'@deepseek-ai/cordis'{interface Context{hubGenerationSupervisor:HubGenerationSupervisor}}

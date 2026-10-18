@@ -10,6 +10,7 @@ import { Context } from '@deepseek-ai/cordis'
 import * as Connection from '@deepseek-ai/dsh-client-connection'
 import Skills from '@deepseek-ai/dsh-skill'
 import { expect, it, vi } from 'vitest'
+import { bundledSkillRoot } from '../src/bundled-skill-root.ts'
 import { registerHubBootstrapSkillRoots } from '../src/hub-skill-roots.ts'
 import { registerHubGenerationRoutes } from '../src/hub-generation-routes.ts'
 
@@ -82,7 +83,13 @@ it('published thin Host leaves installation to owner-authenticated L0 generation
     expect(JSON.parse(accepted.state.body!)).toEqual({ channel: 'stable', entries: [], activeItems: [] })
     expect(check).toHaveBeenCalledOnce()
     expect(forbidden).not.toHaveBeenCalled()
-    expect(await ctx.skills.snapshot({})).toMatchObject({ complete: true, skills: [] })
+    const catalog = await ctx.skills.snapshot({})
+    expect(catalog.complete).toBe(true)
+    expect(catalog.skills.length).toBeGreaterThan(0)
+    const bundled = bundledSkillRoot()!
+    expect(catalog.skills.every(skill => skill.provider === 'hub-bootstrap' && skill.source === 'bundled' && skill.path?.startsWith(`${bundled}/`))).toBe(true)
+    expect(catalog.skills.find(skill => skill.name === 'humanizer')).toMatchObject({ path: join(bundled, 'humanizer/SKILL.md') })
+    expect(ctx.get('filesystemSkillRoots')).toMatchObject({ generationId: 'bootstrap', providerName: 'hub-bootstrap', roots: [{ path: bundled, source: 'bundled', rank: 600 }], userRoots: [join(home, 'skills')] })
     expect(await readdir(home)).toEqual([])
   } finally {
     await ctx.fiber.dispose()

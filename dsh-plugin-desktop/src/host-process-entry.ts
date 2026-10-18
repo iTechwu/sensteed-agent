@@ -112,7 +112,7 @@ rpc.handle('boot', async args => {
     inspectServices = await bootDesktopHost(options, runtime, browser, lan,
       hostCtx => {
         host = hostCtx
-        provideHubSupervisor(hostCtx as never,async request=>{await rpc.call('hubSwitch',[request])})
+        provideHubSupervisor(hostCtx as never,async request=>{await rpc.call('hubSwitch',[request])},async generationId=>{await rpc.call('hubRendererHealth',[generationId],undefined,180_000)})
         const injectable = hostCtx as unknown as {
           inject(names: readonly string[], wire: (scope: Record<string, never>) => void): void
         }

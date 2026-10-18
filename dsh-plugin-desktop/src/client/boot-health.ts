@@ -1,5 +1,6 @@
 import {
   RENDERER_BOOT_REPORT_PATH,
+  RENDERER_BOOT_CHALLENGE_PARAM,
   type RendererBootReport,
 } from '../renderer-boot-contract.ts'
 
@@ -84,12 +85,13 @@ async function postRendererBootReport(
   report: RendererBootReport,
   request: typeof globalThis.fetch,
 ): Promise<void> {
+  const challenge = typeof globalThis.location === 'object' ? new URL(globalThis.location.href).searchParams.get(RENDERER_BOOT_CHALLENGE_PARAM) : null
   const response = await request(RENDERER_BOOT_REPORT_PATH, {
     method: 'POST',
     cache: 'no-store',
     signal: AbortSignal.timeout(BOOT_REPORT_TIMEOUT_MS),
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(report),
+    body: JSON.stringify(challenge === null ? report : { ...report, challenge }),
   })
   if (!response.ok) {
     throw new Error(`dsh-plugin-desktop: renderer boot report failed with HTTP ${String(response.status)}`)

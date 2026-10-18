@@ -13,7 +13,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function parseReport(value: unknown): RendererBootReport | undefined {
   if (!isRecord(value)) return undefined
-  if (value.status === 'healthy') return { status: 'healthy' }
+  if (value.challenge !== undefined && (typeof value.challenge !== 'string' || !/^[a-f0-9-]{36}$/u.test(value.challenge))) return undefined
+  const challenge = typeof value.challenge === 'string' ? { challenge: value.challenge } : {}
+  if (value.status === 'healthy') return { status: 'healthy', ...challenge }
   if (value.status !== 'failed' || !Array.isArray(value.plugins) || value.plugins.length > MAX_FAILED_PLUGINS) {
     return undefined
   }
@@ -25,6 +27,7 @@ function parseReport(value: unknown): RendererBootReport | undefined {
   }
   return {
     status: 'failed',
+    ...challenge,
     plugins: [...value.plugins],
     ...(value.error === undefined ? {} : { error: value.error }),
   }

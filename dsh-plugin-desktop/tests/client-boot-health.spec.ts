@@ -8,7 +8,7 @@ import {
   startRendererBootReporter,
 } from '../src/client/boot-health.ts'
 
-afterEach(() => { vi.useRealTimers() })
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals() })
 
 describe('desktop renderer boot health', () => {
   it('reports the plugin whose Loader fiber failed', async () => {
@@ -237,4 +237,13 @@ describe('desktop renderer boot health', () => {
 
     expect(request).not.toHaveBeenCalled()
   })
+})
+
+
+it('posts only the fresh main-owned challenge read from the actual renderer URL', async () => {
+  const challenge = '11111111-1111-4111-8111-111111111111'
+  vi.stubGlobal('location', { href: `http://127.0.0.1:43120/?_dsh_renderer_boot=${challenge}#/conversation` })
+  const request = vi.fn<typeof fetch>(async () => new Response(null, { status: 204 }))
+  await sendRendererBootReport({ await: async () => {}, entries: () => [] }, request)
+  expect(JSON.parse(request.mock.calls[0]![1]!.body as string)).toEqual({ status: 'healthy', challenge })
 })

@@ -41,7 +41,7 @@ import type {
   DesktopTrayItemRegistration,
   DesktopUpdateAdapter,
 } from './runtime.ts'
-import type { RendererBootReport } from './renderer-boot-contract.ts'
+import { RENDERER_BOOT_CHALLENGE_PARAM, type RendererBootReport } from './renderer-boot-contract.ts'
 import {
   DesktopRendererHealthGate,
   type DesktopRendererHealthGateOptions,
@@ -181,6 +181,7 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
   private updateCleanupTask: Promise<void> | undefined
   private rendererHealthGate: DesktopRendererHealthGate | undefined
   private rendererBootHealthy = false
+  private rendererBootChallenge: string | undefined
   private profileCreateWindow: ProfileCreateWindow | undefined
   private openMontageWindow: OpenMontageWindow | undefined
   private bossWebWindow: BossWebWindow | undefined
@@ -274,6 +275,20 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
     })
   }
 
+  /** Main-only generation switch: a fresh window must report its own challenge. */
+  beginGenerationRendererBootMonitoring(challenge: string, options: DesktopRendererHealthGateOptions, timeoutMs = RENDERER_BOOT_TIMEOUT_MS): Promise<RendererHealthVerdict> {
+    if (!/^[a-f0-9-]{36}$/u.test(challenge)) throw new Error('Invalid renderer generation challenge')
+    this.rendererHealthGate?.stop()
+    this.rendererBootChallenge = challenge
+    this.rendererBootHealthy = false
+    const gate = new DesktopRendererHealthGate(options)
+    this.rendererHealthGate = gate
+    return gate.begin(timeoutMs).then(verdict => {
+      this.rendererBootHealthy = verdict.report.status === 'healthy'
+      return verdict
+    })
+  }
+
   /** Stop a pending deadline while startup is being torn down for another failure. */
   stopRendererBootMonitoring(): void {
     this.rendererHealthGate?.stop()
@@ -317,7 +332,17 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
 
   /** @inheritdoc */
   mountScheduled(beforeInteractive?: () => void): Promise<void> {
-    const spec = this.scheduled
+    const scheduledSpec = this.scheduled
+    const challenge = this.rendererBootChallenge
+    const bindChallenge = (value: string): string => {
+      const url = new URL(value)
+      url.searchParams.set(RENDERER_BOOT_CHALLENGE_PARAM, challenge!)
+      return url.href
+    }
+    const spec = scheduledSpec === undefined || challenge === undefined ? scheduledSpec : {
+      ...scheduledSpec, url: bindChallenge(scheduledSpec.url),
+      ...(scheduledSpec.rendererUrl === undefined ? {} : { rendererUrl: bindChallenge(scheduledSpec.rendererUrl) }),
+    }
     if (spec === undefined) {
       return Promise.reject(new Error('dsh-plugin-desktop: the Cordis shell plugin did not register a window'))
     }
@@ -347,6 +372,8 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
         canRecoverRenderer: () => this.rendererBootHealthy,
         rendererRecoveryCopy: () => rendererRecoveryCopy[this.currentLocale],
         reportRendererBoot: report => {
+          // Native surface recovery has no Client challenge and cannot prove a switched generation.
+          if (this.rendererBootChallenge !== undefined) return
           this.rendererBootHealthy = report.status === 'healthy'
           this.reportRendererBoot(report)
         },
@@ -668,6 +695,7 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
 
   /** @inheritdoc */
   reportRendererBoot(report: RendererBootReport): void {
+    if (this.rendererBootChallenge !== undefined && report.challenge !== this.rendererBootChallenge) return
     this.rendererHealthGate?.report(report)
     this.generation?.reportRendererRecovery(report)
   }

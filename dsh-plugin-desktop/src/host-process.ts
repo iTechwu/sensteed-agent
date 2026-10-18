@@ -24,6 +24,7 @@ export interface IsolatedHostOptions {
   registerQuitInspection(impl: (() => Promise<DesktopQuitInspectionAnswer>) | undefined): void
   /** Receive the Host-side download trigger for the mandatory target release. */
   registerMandatoryDownload(impl: (() => Promise<void>) | undefined): void
+  waitHubRendererHealthy?(generationId: string): Promise<void>
   registerHubHealth?(impl: (() => Promise<HubLoadedEvidence>) | undefined): void
   requestHubSwitch?(request: import('./hub-supervisor-protocol.ts').HubSupervisorRequest): void
   onFailure(error: Error, exit: IsolatedHostExit): void
@@ -90,6 +91,10 @@ export async function startIsolatedDesktopHost(options: IsolatedHostOptions): Pr
   const releaseNative = bindNativeRuntime(rpc, options.runtime)
   options.registerHubHealth?.(() => rpc.call<HubLoadedEvidence>('hubGenerationHealth', [], undefined, 30_000))
   rpc.handle('hubSwitch', ([request]) => { if(!options.requestHubSwitch)throw new Error('Hub supervisor unavailable');options.requestHubSwitch(request as import('./hub-supervisor-protocol.ts').HubSupervisorRequest);return{accepted:true} })
+  rpc.handle('hubRendererHealth', ([generationId]) => {
+    if (typeof generationId !== 'string' || !options.waitHubRendererHealthy) throw new Error('Launcher renderer health unavailable')
+    return options.waitHubRendererHealthy(generationId)
+  })
   rpc.handle('certificate', () => options.prepareCertificate())
   options.registerMandatoryDownload?.(async () => await Promise.race([
     rpc.call<{ available: boolean; error?: string }>('mandatoryUpdateDownload', [], undefined, 120_000),

@@ -6,6 +6,8 @@ import { HubExecutionJournal } from './hub-execution-journal.ts'
 import { hubGenerationBootReference } from './hub-generation-boot.ts'
 import { verifyHubBootAuthorization } from './hub-boot-authorization.ts'
 import { readSealedHubReleaseTrust } from './hub-release-trust.ts'
+import { verifyHubGenerationContent } from './hub-generation-content.ts'
+import { HubRendererHealth } from './hub-renderer-health.ts'
 /** Sensteed-Agent executable: minimal Electron bootstrap around the Host Cordis root. */
 
 // Tool subprocesses start the private Node runner through this Electron binary,
@@ -545,6 +547,10 @@ async function start(): Promise<void> {
   let recoveryTerminalAvailable = false
   let hubBoot: ReturnType<typeof prepareHubHostBoot> | undefined
   let inspectHubHealth: (() => Promise<import('./hub-generation-health.ts').HubLoadedEvidence>) | undefined
+  const hubRendererHealth = new HubRendererHealth()
+  let finishInitialRenderer!: () => void, failInitialRenderer!: (cause: unknown) => void
+  const initialRendererReady = new Promise<void>((resolve, reject) => { finishInitialRenderer = resolve; failInitialRenderer = reject })
+  void initialRendererReady.catch(() => {})
   let startupStage: DesktopStartupFailureStage = 'electron-ready'
   const desktopUserDataDir = app.getPath('userData')
   const appVersion = desktopProductVersion()
@@ -1833,6 +1839,7 @@ async function start(): Promise<void> {
         },
         requestHubSwitch: request=>{setImmediate(()=>{void handleHubSwitch(request).catch(cause=>electronLogger.errorCause(cause))})},
         registerHubHealth: impl => { inspectHubHealth = impl },
+        waitHubRendererHealthy: generationId => hubRendererHealth.wait(generationId),
         registerMandatoryDownload: impl => {
           mandatoryDownloadProbe = impl ?? undefined
         },
@@ -1851,35 +1858,69 @@ async function start(): Promise<void> {
         },
       })
     }
-    const handleHubSwitch=async(raw:HubSupervisorRequest):Promise<void>=>{
+    const bootSwitchedHost = async (nextPrepared: typeof prepared, bind: (host: import('./startup-generation.ts').DesktopStartupGenerationHost) => void, generationId?: string) => {
+      if (generationId !== undefined) hubRendererHealth.begin(generationId)
+      const verdictPromise = runtime.beginGenerationRendererBootMonitoring(randomUUID(), {
+        commitHealthy: async () => {
+          if (generationId === undefined) return
+          if (!inspectHubHealth) throw new Error('Hub managed health unavailable')
+          const evidence = await inspectHubHealth()
+          if (evidence.generationId !== generationId) throw new Error('Hub renderer health generation mismatch')
+        },
+      })
+      void verdictPromise.catch(() => {})
+      try {
+        await bootIsolatedHost(nextPrepared, bind)
+        await runtime.mountScheduled()
+        const verdict = await verdictPromise
+        if ('failureReason' in verdict) throw new RendererStartupFailure(verdict.failureReason, verdict.report)
+        if (generationId !== undefined) hubRendererHealth.healthy(generationId)
+        runtime.show()
+      } catch (cause) {
+        runtime.stopRendererBootMonitoring()
+        hubRendererHealth.fail(cause)
+        throw cause
+      }
+    }
+    let hubSwitchTail: Promise<void> = Promise.resolve()
+    const handleHubSwitch = (raw: HubSupervisorRequest): Promise<void> => {
+      const task = hubSwitchTail.then(() => performHubSwitch(raw))
+      hubSwitchTail = task.catch(() => {})
+      return task
+    }
+    const performHubSwitch=async(raw:HubSupervisorRequest):Promise<void>=>{
+      await initialRendererReady
       if(hubRuntimeTarget===undefined)throw new Error('Hub sealed target unavailable')
       const request=HubSupervisorRequestSchema.parse(raw)
-      if(request.kind==='base'){hubBoot=undefined;await hubSupervisor.replace(async()=>{},async bind=>{await bootIsolatedHost(hubBasePrepared,bind)});return}
+      if(request.kind==='base'){hubRendererHealth.fail(new Error('Hub generation closed'));hubBoot=undefined;await hubSupervisor.replace(async()=>{},async bind=>{await bootSwitchedHost(hubBasePrepared,bind)});return}
       const store=new HubGenerationStore(marketUserDataDir,request.identity)
       if(request.kind==='activate'){
         const record=new HubExecutionJournal(store).read(),state=store.readState()
         if(!record||record.operationId!==request.operationId||record.phase!=='STAGED'||record.pendingReceipt!==null||state.phase!=='prepared'||state.pending?.descriptorDigest!==record.descriptorDigest)throw new Error('Hub staged restart mismatch')
         inspectSavedHubPlan(record,request.identity,hubRuntimeTarget,readSealedHubReleaseTrust())
         try {
-          await hubSupervisor.replace(async()=>{hubBoot=undefined;await store.activate()},async bind=>{await bootIsolatedHost(hubBasePrepared,bind)})
+          await hubSupervisor.replace(async()=>{hubBoot=undefined;await store.activate()},async bind=>{await bootSwitchedHost(hubBasePrepared,bind)})
         } catch (cause) {
-          await hubSupervisor.replace(async()=>{if(store.readState().phase==='verifying')await store.rollback()},async bind=>{await bootIsolatedHost(hubBasePrepared,bind)})
+          await hubSupervisor.replace(async()=>{const state=store.readState();if(state.phase==='verifying'||state.phase==='stable'&&state.previous!==null)await store.rollback()},async bind=>{await bootSwitchedHost(hubBasePrepared,bind)})
           throw cause
         }
       }else{
         const journal=new HubExecutionJournal(store),pendingRecord=journal.read(),active=store.readState().active,record=pendingRecord?.descriptorDigest===active?.descriptorDigest?pendingRecord:journal.readHealthyInventory()
         if(!record||record.generationDigest!==request.generationDigest||record.phase!=='COMMITTED'&&record.phase!=='ACTIVATED')throw new Error('Hub managed restart mismatch')
-        verifyHubBootAuthorization(request.lease,readSealedHubReleaseTrust(),{...request.identity,target:hubRuntimeTarget,generationDigest:request.generationDigest,minimumPolicyRevision:inspectSavedHubPlan(record,request.identity,hubRuntimeTarget,readSealedHubReleaseTrust()).plan.policyRevision})
-        const reference=hubGenerationBootReference(store,prepared.profile.dir),input={reference,expectedIdentity:request.identity,skillProviderName:`hub-${reference.generationId}`}
+        const saved = inspectSavedHubPlan(record,request.identity,hubRuntimeTarget,readSealedHubReleaseTrust())
+        verifyHubBootAuthorization(request.lease,readSealedHubReleaseTrust(),{...request.identity,target:hubRuntimeTarget,generationDigest:request.generationDigest,minimumPolicyRevision:saved.plan.policyRevision})
         try{
+        verifyHubGenerationContent(store,saved.plan,readSealedHubReleaseTrust())
+        const reference=hubGenerationBootReference(store,prepared.profile.dir),input={reference,expectedIdentity:request.identity,skillProviderName:`hub-${reference.generationId}`}
         hubBoot=prepareHubHostBoot(input,prepared.profile.dir,hubBasePrepared.patches)
-        await hubSupervisor.replace(async()=>{},async bind=>{await bootIsolatedHost({...hubBasePrepared,hubGeneration:input},bind)})
+        await hubSupervisor.replace(async()=>{},async bind=>{await bootSwitchedHost({...hubBasePrepared,hubGeneration:input},bind,reference.generationId)})
         if(!inspectHubHealth)throw new Error('Hub managed health unavailable')
         const evidence=await inspectHubHealth()
         if(evidence.generationId!==reference.generationId)throw new Error('Hub managed health mismatch')
-        if(store.readState().phase==='verifying')await store.markHealthy(evidence.generationId)
         }catch(cause){
-          await hubSupervisor.replace(async()=>{if(store.readState().phase==='verifying')await store.rollback()},async bind=>{await bootIsolatedHost(hubBasePrepared,bind)})
+          hubRendererHealth.fail(cause)
+          hubBoot=undefined
+          await hubSupervisor.replace(async()=>{const state=store.readState();if(state.phase==='verifying'||state.phase==='stable'&&state.previous!==null)await store.rollback()},async bind=>{await bootSwitchedHost(hubBasePrepared,bind)})
           throw cause
         }
       }
@@ -1934,7 +1975,7 @@ async function start(): Promise<void> {
           // Keep Host imports and browser bundle discovery on the same public
           // profile-overlay resolver used by packaged Electron.
           hostCtx.loader.internal = undefined
-          provideHubSupervisor(hostCtx,async request=>{setImmediate(()=>{void handleHubSwitch(request).catch(cause=>electronLogger.errorCause(cause))})})
+          provideHubSupervisor(hostCtx,async request=>{setImmediate(()=>{void handleHubSwitch(request).catch(cause=>electronLogger.errorCause(cause))})},generationId=>hubRendererHealth.wait(generationId))
           if(hubRuntimeTarget!==undefined&&hubBoot===undefined)registerHubBootstrapSkillRoots(hostCtx,join(prepared.homeDir,'skills'))
           registerHubHostService(hostCtx)
           registerHubGenerationRoutes(hostCtx)
@@ -2148,7 +2189,6 @@ async function start(): Promise<void> {
           if (inspectHubHealth === undefined) throw new Error('Managed Hub health probe is unavailable')
           const evidence = await inspectHubHealth()
           if (evidence.generationId !== hubBoot.generationId) throw new Error('Managed Hub health generation mismatch')
-          if (hubBoot.store.readState().phase === 'verifying') await hubBoot.store.markHealthy(evidence.generationId)
         }
         lifecycleRecorder.finishRendererBoot({ status: 'healthy' }, 'renderer-failed')
         startupStage = 'health-commit'
@@ -2173,6 +2213,7 @@ async function start(): Promise<void> {
         rendererVerdict.report,
       )
     }
+    finishInitialRenderer()
     lifecycleRecorder.completeStartup(startupStage, rendererReport)
     setupWizardWindow?.closeStartupSurface()
     setupWizardWindow = undefined
@@ -2193,6 +2234,8 @@ async function start(): Promise<void> {
       notifySessionProjectionCacheRecovery(runtime, electronLogger, sessionProjectionCacheRecovery)
     }
   } catch (cause) {
+    failInitialRenderer(cause)
+    hubRendererHealth.fail(cause)
     setupWizardWindow?.closeStartupSurface()
     setupWizardWindow = undefined
     runtime.stopRendererBootMonitoring()
