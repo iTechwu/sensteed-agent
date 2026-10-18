@@ -1,8 +1,8 @@
 import { generateKeyPairSync, randomUUID, sign } from 'node:crypto'
-import { expect, it, vi } from 'vitest'
+import { expect, it } from 'vitest'
 import { generationPlanData, hubGenerationContentDigest, verifyHubGenerationPlan, type HubGenerationPlan, type HubGenerationPlanExpected } from '../src/hub-generation-verifier.ts'
 import { hubCanonicalJson, hubSyncDigest, type HubReleaseTrust } from '../src/hub-sync-verifier.ts'
-import { HubGenerationClient, hubGenerationConsumptionData } from '../src/hub-generation-client.ts'
+import { HubGenerationClient } from '../src/hub-generation-client.ts'
 import {verifyHubGenerationDownloads} from '../src/hub-generation-downloads.ts'
 function fixture() {
   const now = Date.now(), keys = generateKeyPairSync('ed25519')

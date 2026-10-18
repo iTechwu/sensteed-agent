@@ -25,6 +25,7 @@ export function verifyHubGenerationDownloads(value:unknown, plan:Readonly<HubGen
   }else{
    const manifest=row.envelope.manifest
    if(manifest.pluginId!==item.itemId || manifest.tarballDigest!==item.artifactDigest || manifest.lockGraphDigest!==item.lockGraphDigest || manifest.packSetDigest!==item.packSetDigest || locators.length!==manifest.artifacts.length)throw new Error('Hub plugin download mismatch')
+   if(hubSyncDigest(manifest.graph)!==manifest.lockGraphDigest || hubSyncDigest(manifest.graph.nodes.map(n=>({nodeId:n.nodeId,name:n.name,version:n.version,sha256:n.sha256,sri:n.sri,bytes:n.bytes,fileManifestDigest:n.fileManifestDigest})).sort((a,b)=>a.nodeId<b.nodeId?-1:a.nodeId>b.nodeId?1:0))!==manifest.packSetDigest)throw new Error('Hub closure digest mismatch')
    if(manifest.graph.nodes.some(n=>hubPackageIsHostOwned(n.name)))throw new Error('Hub closure contains Host-owned package')
    const nodes=new Set<string>()
    for(const a of manifest.artifacts){
