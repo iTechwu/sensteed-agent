@@ -1,3 +1,4 @@
+import{verifyHubPluginGraph}from'./hub-plugin-graph.ts'
 /** Verify complete signed manifest/locator coverage before any archive is downloaded. */
 import { HubGenerationDownloadsSchema } from './hub-artifact-schemas.ts'
 import { verifyHubReleaseSignature, hubSyncDigest, type HubReleaseTrust } from './hub-sync-verifier.ts'
@@ -25,6 +26,7 @@ export function verifyHubGenerationDownloads(value:unknown, plan:Readonly<HubGen
   }else{
    const manifest=row.envelope.manifest
    if(manifest.pluginId!==item.itemId || manifest.tarballDigest!==item.artifactDigest || manifest.lockGraphDigest!==item.lockGraphDigest || manifest.packSetDigest!==item.packSetDigest || locators.length!==manifest.artifacts.length)throw new Error('Hub plugin download mismatch')
+   verifyHubPluginGraph(manifest.graph)
    const target=manifest.graph.target
    if(target.os!==plan.target.os||target.cpu!==plan.target.arch||target.libc!==plan.target.libc||target.nodeVersion!==plan.target.nodeVersion||target.sensteedVersion!==plan.target.sensteedVersion||target.cordisVersion!==plan.target.cordisVersion||target.harnessVersion!==plan.target.harnessVersion)throw new Error('Hub closure target mismatch')
    if(hubSyncDigest(manifest.graph)!==manifest.lockGraphDigest || hubSyncDigest(manifest.graph.nodes.map(n=>({nodeId:n.nodeId,name:n.name,version:n.version,sha256:n.sha256,sri:n.sri,bytes:n.bytes,fileManifestDigest:n.fileManifestDigest})).sort((a,b)=>a.nodeId<b.nodeId?-1:a.nodeId>b.nodeId?1:0))!==manifest.packSetDigest)throw new Error('Hub closure digest mismatch')

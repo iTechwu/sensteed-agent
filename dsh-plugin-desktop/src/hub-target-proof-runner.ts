@@ -1,3 +1,4 @@
+import {hubNodeIncluded,verifyHubPluginGraph,verifyHubNodeMetadata,verifyHubNodeDependencies} from './hub-plugin-graph.ts'
 /** CI-only proof entry. Does not mint consumption or accept an injectable/mock loader. */
 import { readSealedHubReleaseTrust } from './hub-release-trust.ts'
 import { prepareTargetProofBase } from './hub-target-proof-base.ts'
@@ -34,7 +35,6 @@ function data(value:unknown,seen=new Set<object>(),depth=0):void {
  assert(typeof value==='object'&&!seen.has(value),'non-data activation');seen.add(value)
  for(const [key,child]of Object.entries(value)){assert(!['__proto__','prototype','constructor','__jsExpr'].includes(key),'executable activation');data(child,seen,depth+1)}
 }
-function parentInstance(value:string):string {const index=value.lastIndexOf('/node_modules/');return index<0?'':value.slice(0,index)}
 function activation(patch:Buffer|undefined,name:string):Composition['entries'] {
  if(!patch)return [{id:'proof-candidate',name,config:{}}]
  assert(patch.length<=262144,'patch too large');const value=load(patch.toString('utf8'),{schema:JSON_SCHEMA,json:false});data(value)
@@ -64,6 +64,7 @@ export function materializeProofInput(raw:unknown,trust:HubReleaseTrust,inputDir
  }else{
   assert('graph'in m&&m.tarballDigest===job.artifactDigest&&m.lockGraphDigest===job.lockGraphDigest&&m.packSetDigest===job.packSetDigest,'plugin envelope')
   assert(hubSyncDigest(m.graph)===m.lockGraphDigest&&hubSyncDigest(m.graph.nodes.map(n=>({nodeId:n.nodeId,name:n.name,version:n.version,sha256:n.sha256,sri:n.sri,bytes:n.bytes,fileManifestDigest:n.fileManifestDigest})).sort((a,b)=>a.nodeId<b.nodeId?-1:a.nodeId>b.nodeId?1:0))===m.packSetDigest,'closure digest')
+  verifyHubPluginGraph(m.graph)
   const nodes=new Map(m.graph.nodes.map(n=>[n.nodeId,n]));assert(nodes.size===m.graph.nodes.length&&nodes.has('')&&input.artifacts.length===nodes.size&&m.artifacts.length===nodes.size,'closure coverage')
   assert(Object.entries(m.graph.target).every(([key,value])=>value===job.target[key==='cpu'?'arch':key as keyof typeof job.target]),'closure target mismatch')
   const rootNode=nodes.get('')!;assert(rootNode.name===m.npmPackageName&&rootNode.version===m.exactVersion&&rootNode.sha256===m.tarballDigest&&rootNode.sri===m.sri,'root identity mismatch')
@@ -76,9 +77,8 @@ export function materializeProofInput(raw:unknown,trust:HubReleaseTrust,inputDir
    const files=readHubPluginArchive(bytes),list=[...files].map(([path,b])=>({path,bytes:b.length,sha256:sha(b)})).sort((a,b)=>a.path<b.path?-1:1)
    assert(hubSyncDigest(list)===node.fileManifestDigest,'node file manifest');const pkg=JSON.parse(files.get('package.json')!.toString('utf8')) as Record<string,unknown>;assert(pkg.name===node.name&&pkg.version===node.version,'node identity')
    const scripts=pkg.scripts as Record<string,unknown>|undefined;assert(!scripts||!['preinstall','install','postinstall'].some(k=>Object.hasOwn(scripts,k)),'install hooks prohibited')
-   for(const field of ['dependencies','peerDependencies']as const){const declared=pkg[field]??{};assert(declared&&typeof declared==='object'&&!Array.isArray(declared),'dependency declaration')
-    for(const [name,requested]of Object.entries(declared)){const edge=m.graph.edges.find(e=>e.from===node.nodeId&&e.name===name&&e.kind===(field==='dependencies'?'prod':'peer'));assert(edge&&edge.requested===requested&&nodes.has(edge.to),'missing closure edge');let from=field==='peerDependencies'&&node.nodeId?parentInstance(node.nodeId):node.nodeId,resolved:string|undefined;while(true){const candidate=from?`${from}/node_modules/${name}`:`node_modules/${name}`;if(nodes.has(candidate)){resolved=candidate;break}if(!from)break;from=parentInstance(from)}assert(resolved===edge.to,'closure topology mismatch')}
-   }
+   verifyHubNodeMetadata(node,pkg);if(!hubNodeIncluded(node))continue
+   verifyHubNodeDependencies(m.graph,node,pkg)
    for(const [path,b]of files)put(`${prefix}${node.nodeId?`/${node.nodeId}`:''}/${path}`,b)
    if(node.nodeId===''){assert(m.root.hostEntry&&files.has(m.root.hostEntry)&&hubSyncDigest(list)===m.root.fileManifestDigest,'root entry mismatch');assert(!m.root.bundlePatch||files.has(m.root.bundlePatch),'signed activation missing');composition.entries=activation(m.root.bundlePatch?files.get(m.root.bundlePatch):undefined,m.npmPackageName);composition.packageName=m.npmPackageName;composition.hostEntry=join(root,prefix,m.root.hostEntry)}
   }

@@ -97,7 +97,7 @@ export const PluginLockNodeSchema = z.strictObject({
   hostProvided: z.literal(false),
   lockedResolved: z.url().nullable(),
 });
-export const PluginLockGraphSchema = z.strictObject({
+const PluginLockGraphV1Schema = z.strictObject({
   schemaVersion: z.literal('plugin-lock-v1'),
   rootNodeId: z.literal(''),
   sourceLockDigest: HubDigestSchema,
@@ -119,6 +119,26 @@ export const PluginLockGraphSchema = z.strictObject({
     .max(PLUGIN_LIMITS.edges),
   hostRequirements: z.array(z.never()).max(0),
 });
+export const PluginOmissionReasonSchema = z.enum(['TARGET_OS_MISMATCH', 'TARGET_CPU_MISMATCH', 'TARGET_LIBC_MISMATCH']);
+const PluginLockGraphV2Schema = PluginLockGraphV1Schema.extend({
+  schemaVersion: z.literal('plugin-lock-v2'),
+  nodes: z.array(PluginLockNodeSchema.extend({
+    selection: z.enum(['included', 'omitted']), reason: PluginOmissionReasonSchema.nullable(),
+  }).superRefine((node, ctx) => {
+    if ((node.selection === 'included') !== (node.reason === null))
+      ctx.addIssue({ code: 'custom', message: 'selection reason must match' });
+  })).min(1).max(PLUGIN_LIMITS.nodes),
+  edges: z.array(z.strictObject({ from: z.string(), name: PluginPackageNameSchema,
+    requested: z.string().min(1), kind: z.enum(['prod', 'peer', 'optional']),
+    peerOptional: z.boolean(), to: z.string(), selection: z.enum(['included', 'omitted']),
+    reason: PluginOmissionReasonSchema.nullable(),
+  }).superRefine((edge, ctx) => {
+    if ((edge.selection === 'included') !== (edge.reason === null) ||
+        (edge.selection === 'omitted' && edge.kind !== 'optional'))
+      ctx.addIssue({ code: 'custom', message: 'only platform-excluded optional edges may be omitted' });
+  })).max(PLUGIN_LIMITS.edges),
+});
+export const PluginLockGraphSchema = z.discriminatedUnion('schemaVersion', [PluginLockGraphV1Schema, PluginLockGraphV2Schema]);
 export const PluginArtifactIndexEntrySchema = z.strictObject({
   nodeId: z.string(),
   artifactRef: z.uuid(),
