@@ -36,6 +36,7 @@ export default defineConfig([
       'windows-acl-runner': 'src/windows-acl-runner.ts',
       main: 'src/main.ts',
       'host-process-entry': 'src/host-process-entry.ts',
+      'hub-target-proof-runner': 'src/hub-target-proof-runner.ts',
     },
     outDir: 'lib',
     format: 'esm',
