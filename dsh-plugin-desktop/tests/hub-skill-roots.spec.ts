@@ -23,7 +23,7 @@ it('seals generation roots before mounting the sole Host provider', async () => 
       inject = () => callback({ plugin: mount })
     },
   }
-  registerHubSkillRoots(ctx as never, { generationId: 'g1', skillProviderName: 'hub-g1', skillsRoot: '/private/g1/skills' } as never)
+  registerHubSkillRoots(ctx as never, { generationId: 'g1', skillProviderName: 'hub-g1', skillsRoot: '/private/g1/skills', store: { activeDescriptor: () => ({ generationId: 'g1', files: {} }) } } as never)
   expect(order).toEqual(['seal'])
   await inject()
   expect(order).toEqual(['seal', 'mount'])

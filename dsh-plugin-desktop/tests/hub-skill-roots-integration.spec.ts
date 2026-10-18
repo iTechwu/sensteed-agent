@@ -20,7 +20,7 @@ it('the built Harness provider discovers only the Desktop sealed generation root
   await writeFile(join(root, 'safe.md'), '---\nname: safe\ndescription: trusted skill\n---\nTrusted')
   await writeFile(join(unrelated, 'forged.md'), '---\nname: forged\ndescription: untrusted skill\n---\nUntrusted')
   const ctx = new Context(); contexts.push(ctx)
-  registerHubSkillRoots(ctx, { generationId: 'g1', skillProviderName: 'hub-g1', skillsRoot: root } as never)
+  registerHubSkillRoots(ctx, { generationId: 'g1', skillProviderName: 'hub-g1', skillsRoot: root, store: { activeDescriptor: () => ({ generationId: 'g1', files: {} }) } } as never)
   await ctx.plugin(SkillRegistry)
   await ctx.plugin(filesystem, { providerName: 'ordinary', customSkillDirs: [unrelated], watch: false })
   const catalog = await ctx.skills.list()
@@ -32,6 +32,24 @@ it('the built Harness provider discovers only the Desktop sealed generation root
   expect(catalog.some(skill => skill.name === 'forged')).toBe(false)
   expect((await ctx.skills.get('safe'))?.content).toContain('Trusted')
   expect(await ctx.skills.get('forged')).toBeUndefined()
+})
+
+it('disabling a Hub skill hides its bundled fallback while other bundled and enabled Hub skills remain available', async () => {
+  const dir = await realpath(await mkdtemp(join(tmpdir(), 'desktop-disabled-skill-'))); dirs.push(dir)
+  const root = join(dir, 'skills')
+  await mkdir(root)
+  await writeFile(join(root, 'skill-creator.md'), '---\nname: skill-creator\ndescription: enabled signed replacement\n---\nEnabled Hub body')
+  const ctx = new Context(); contexts.push(ctx)
+  registerHubSkillRoots(ctx, { generationId: 'g1', skillProviderName: 'hub-g1', skillsRoot: root,
+    store: { activeDescriptor: () => ({ generationId: 'g1', files: { 'disabled-skills/humanizer/SKILL.md': 'a'.repeat(64) } }) } } as never)
+  await ctx.plugin(SkillRegistry)
+  const catalog = await ctx.skills.list()
+  expect(catalog.some(skill => skill.name === 'humanizer')).toBe(false)
+  expect(await ctx.skills.get('humanizer')).toBeUndefined()
+  expect(catalog.find(skill => skill.name === 'cad')).toMatchObject({ provider: 'hub-g1', source: 'bundled' })
+  expect(catalog.filter(skill => skill.name === 'skill-creator')).toHaveLength(1)
+  expect(catalog.find(skill => skill.name === 'skill-creator')).toMatchObject({ provider: 'hub-g1', source: 'hub', path: join(root, 'skill-creator.md') })
+  expect((await ctx.skills.get('skill-creator'))?.content).toContain('Enabled Hub body')
 })
 
 
