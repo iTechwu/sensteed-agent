@@ -1,3 +1,5 @@
+import { prepareHubHostBoot } from '../src/hub-host-boot.ts'
+import { hubGenerationBootReference } from '../src/hub-generation-boot.ts'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createHash } from 'node:crypto'
 import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
@@ -31,6 +33,13 @@ describe('Hub generation local loaded health', () => {
     expect(hubGenerationPatch(f.store)).toEqual({ insert: [{ id: 'example', name: 'example', config: {} }] })
     expect(await inspectHubGenerationLoaded(f.store, f.selection, f.profile, f.loader, f.skills, 'hub-g1', f.urls)).toEqual({ generationId: 'g1', entryIds: ['example'], skillNames: ['example'] })
     expect(f.store.readState().phase).toBe('verifying')
+  })
+  it('reconstructs the real Host boot patch and rejects collisions before loading', async () => {
+    const f = await fixture(), reference = hubGenerationBootReference(f.store, f.profile)
+    const boot = prepareHubHostBoot({ reference, expectedIdentity: f.store.identity }, f.profile, ['desktop-shell'])
+    expect(boot.patch.insert[0]?.name).toBe('example')
+    expect(boot.generationId).toBe('g1')
+    expect(() => prepareHubHostBoot({ reference, expectedIdentity: f.store.identity }, f.profile, ['example'])).toThrow('collides')
   })
   it('does not treat boot success, missing modules or the wrong skill provider as health', async () => {
     const f = await fixture()

@@ -1,6 +1,8 @@
 /** Headless bootstrap for the Beta isolated Host experiment. */
+import type { HubSkillObservation } from './hub-generation-health.ts'
+import { prepareHubHostBoot, type HubTrustedHostBootInput } from './hub-host-boot.ts'
 import { registerHubHostService } from './hub-host-service.ts'
-import { boot, resolveProfileDir } from '@deepseek-ai/dsh-app-boot'
+import { boot, composeEntries, resolveProfileDir } from '@deepseek-ai/dsh-app-boot'
 import { provideCmdline } from '@deepseek-ai/dsh-cmdline'
 import { createDesktopProfileBoot } from './profile-context.ts'
 import { logInactiveStartupEntries } from './startup-audit.ts'
@@ -41,6 +43,8 @@ function desktopProfileMarketSnapshot(market: DesktopMarketProvider): DesktopMar
 }
 
 export interface DesktopHostOptions {
+  /** Launcher supplies only after independent execution authorization; never a renderer input. */
+  hubGeneration?: HubTrustedHostBootInput
   prepared: PreparedDesktopProfile
   profilePreferences: DesktopProfilePreferences
   homeDir: string
@@ -117,8 +121,12 @@ export async function bootDesktopHost(options: DesktopHostOptions, runtime: Desk
       profilePreferencesStopping = true
       await profilePreferencesWriteTail
     }
-    const releasePackageResolver = installProfilePackageResolver(prepared.bareModuleBaseUrl)
-    const profileBoot = createDesktopProfileBoot(prepared, desktopPnpmBootstrap)
+    const trustedHubInput = options.hubGeneration ?? prepared.hubGeneration
+    const hubBoot = trustedHubInput === undefined ? undefined : prepareHubHostBoot(trustedHubInput, prepared.profile.dir,
+      [...composeEntries([prepared.patches])].map(entry => entry.id))
+    const hostPatches = hubBoot === undefined ? prepared.patches : [...prepared.patches, hubBoot.patch]
+    const releasePackageResolver = installProfilePackageResolver(prepared.bareModuleBaseUrl, hubBoot?.selection)
+    const profileBoot = createDesktopProfileBoot(prepared, desktopPnpmBootstrap, hubBoot?.selection, hubBoot === undefined ? [] : [hubBoot.patch])
     // dsh 0.2.0 judges every profile row through the pluginPackages service.
     // Without it the compatibility preflight falls back to Node's own lookup
     // and reads the Profile's registry-installed @deepseek-ai copies instead
@@ -127,9 +135,15 @@ export async function bootDesktopHost(options: DesktopHostOptions, runtime: Desk
     const ctx = await boot(
       BIN_NAME,
       prepared.rootConfig,
-      prepared.patches,
+      hostPatches,
       async (hostCtx) => {
         profileBoot.prepare(hostCtx)
+        if (hubBoot !== undefined) {
+          hostCtx.provide('hubGenerationBoot', {
+            generationId: hubBoot.generationId, skillsRoot: hubBoot.skillsRoot,
+            inspectLoaded: (skills: HubSkillObservation, providerName: string) => hubBoot.inspectLoaded(hostCtx.loader, skills, providerName),
+          })
+        }
         // Keep Host imports and browser bundle discovery on the same public
         // profile-overlay resolver used by packaged Electron.
         hostCtx.loader.internal = undefined

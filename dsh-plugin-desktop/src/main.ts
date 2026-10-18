@@ -7,6 +7,7 @@
 // before it could launch. The dsh-subprocess-local patch scopes the flag to the
 // runner child alone.
 
+import { prepareHubHostBoot } from './hub-host-boot.ts'
 import { registerHubHostService } from './hub-host-service.ts'
 import { formatUnexpectedHostExit, startIsolatedDesktopHost } from './host-process.ts'
 import * as desktopOffice from './desktop-office.ts'
@@ -21,6 +22,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   boot,
+  composeEntries,
   createRuntimeResolution,
   installFailLoud,
   loadLayeredEnv,
@@ -1787,7 +1789,10 @@ async function start(): Promise<void> {
     if (profilePreferences === undefined) {
       throw new Error(`${BIN_NAME}: active Profile preferences were not initialized`)
     }
-    const profileBoot = createDesktopProfileBoot(prepared, desktopPnpmBootstrap)
+    const hubBoot = prepared.hubGeneration === undefined ? undefined : prepareHubHostBoot(prepared.hubGeneration, prepared.profile.dir,
+      [...composeEntries([prepared.patches])].map(entry => entry.id))
+    const hostPatches = hubBoot === undefined ? prepared.patches : [...prepared.patches, hubBoot.patch]
+    const profileBoot = createDesktopProfileBoot(prepared, desktopPnpmBootstrap, hubBoot?.selection, hubBoot === undefined ? [] : [hubBoot.patch])
     if (process.env.DSH_DESKTOP_ISOLATED_HOST !== '0') {
       startupStage = 'host-boot'
       lifecycleRecorder.transitionStartupStage(startupStage)
@@ -1859,7 +1864,7 @@ async function start(): Promise<void> {
       }
       startupStage = 'host-boot'
       lifecycleRecorder.transitionStartupStage(startupStage)
-      const releasePackageResolver = installProfilePackageResolver(prepared.bareModuleBaseUrl)
+      const releasePackageResolver = installProfilePackageResolver(prepared.bareModuleBaseUrl, hubBoot?.selection)
       // Same pluginPackages contract as the isolated Host: the compatibility
       // preflight must judge rows against this installation's versions, not
       // the Profile's registry-installed @deepseek-ai copies.
@@ -1867,12 +1872,18 @@ async function start(): Promise<void> {
       const ctx = await boot(
         BIN_NAME,
         prepared.rootConfig,
-        prepared.patches,
+        hostPatches,
         async (hostCtx) => {
           // Keep Host imports and browser bundle discovery on the same public
           // profile-overlay resolver used by packaged Electron.
           hostCtx.loader.internal = undefined
           registerHubHostService(hostCtx)
+          if (hubBoot !== undefined) {
+            hostCtx.provide('hubGenerationBoot', {
+              generationId: hubBoot.generationId, skillsRoot: hubBoot.skillsRoot,
+              inspectLoaded: (skills: import('./hub-generation-health.ts').HubSkillObservation, providerName: string) => hubBoot.inspectLoaded(hostCtx.loader, skills, providerName),
+            })
+          }
           hostCtx.inject(['sensteedQuitInspection'], scope => {
             quitInspectionProbe = async () => ({
               source: 'ready' as const,

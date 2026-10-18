@@ -1,6 +1,7 @@
 /** Launcher facts shared by embedded and isolated Desktop Hosts. */
 import { delimiter, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import type { PatchOptions } from '@deepseek-ai/cordis-plugin-include'
 import type { Context } from '@deepseek-ai/cordis'
 
 import type { AppReady } from '@deepseek-ai/dsh-cmdline'
@@ -12,7 +13,7 @@ import { desktopPnpmStoreDir } from './profile-store-dir.ts'
 import { desktopInstallAnchor, prepareDesktopProfile, type PreparedDesktopProfile } from './profile.ts'
 
 /** Keep package operations and subsequent HMR on the launcher's actual Profile. */
-export function createDesktopProfileBoot(prepared: PreparedDesktopProfile, pnpm: DesktopPnpmBootstrap, managedSelection?: HubManagedPackageSelection) {
+export function createDesktopProfileBoot(prepared: PreparedDesktopProfile, pnpm: DesktopPnpmBootstrap, managedSelection?: HubManagedPackageSelection, managedPatches: readonly PatchOptions[] = []) {
   const options = prepared.reloadOptions
   if (pnpm.activeProfileName !== options.profileName || pnpm.activeProfileDir !== prepared.profile.dir
     || pnpm.homeDir !== prepared.homeDir) {
@@ -76,7 +77,7 @@ export function createDesktopProfileBoot(prepared: PreparedDesktopProfile, pnpm:
         generationMode: prepared.mode,
         ...(profilePatches === undefined ? {} : { profilePatches }),
       } as Parameters<typeof prepareDesktopProfile>[6],
-    ).patches, ...context.overlays],
+    ).patches, ...context.overlays, ...managedPatches],
   }
   let ready = false
   let disposed = false

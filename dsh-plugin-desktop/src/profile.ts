@@ -641,6 +641,8 @@ function requiredWebBundles(): string[] {
 
 /** Prepared profile inputs consumed by app-boot. */
 export interface PreparedDesktopProfile {
+  /** Launcher-owned verified execution input; never read from Profile/user configuration. */
+  hubGeneration?: import('./hub-host-boot.ts').HubTrustedHostBootInput
   /** Extra launcher-owned patches, also replayed after Profile HMR. */
   overlays?: PatchOptions[]
   /** Serializable inputs for the Desktop-owned alpha.2 Profile reload path. */
