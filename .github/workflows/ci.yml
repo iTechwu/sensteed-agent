@@ -86,6 +86,7 @@ jobs:
         run: |
           node --test scripts/ci/resolve-source.test.mjs scripts/release-contract.test.mjs
           node --test dsh-plugin-desktop/scripts/hub-target-proof-signature.spec.mjs
+          node --test dsh-plugin-desktop/scripts/hub-target-proof-sandbox.spec.mjs
           python3 -B -m unittest discover -s scripts/ci -p 'test_*.py'
       - name: Resolve one Harness commit for every platform
         if: steps.scope.outputs.product == 'true'

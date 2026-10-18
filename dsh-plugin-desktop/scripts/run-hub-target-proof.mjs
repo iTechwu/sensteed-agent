@@ -2,9 +2,10 @@
 /** CI boundary: prefetch private originals, execute only the sealed entry offline, sign outside Agent. */
 import { createHash, createPrivateKey } from 'node:crypto'
 import { canonicalProofJson as canonical, signHubTargetProofResult } from './hub-target-proof-signature.mjs'
+import { assertProofSecretsOutsideReadRoots } from './hub-target-proof-sandbox.mjs'
 import { spawnSync } from 'node:child_process'
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
-import { dirname, join, resolve, sep } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 const fail=message=>{throw Error(`Hub proof CI: ${message}`)}
 const sha=bytes=>createHash('sha256').update(bytes).digest('hex')
@@ -17,12 +18,13 @@ const origin='https://ai.hozonauto.com/plugins/api',resources=realpathSync(opts[
 if((process.platform==='darwin'?dirname(dirname(electron))!==dirname(resources):dirname(electron)!==dirname(resources)))fail('Electron must belong to the same packaged application')
 if(!existsSync(join(resources,'app.asar'))||!lstatSync(electron).isFile())fail('sealed package missing')
 const tokenPath=realpathSync(opts['--session-token-file'])
-if([keyPath,tokenPath].some(p=>p.startsWith(resources+sep)||p.startsWith(dirname(electron)+sep))||['/System/','/usr/','/bin/','/sbin/','/dev/','/private/etc/'].some(p=>keyPath.startsWith(p)))fail('signing key must remain outside sandbox read roots')
 const scratch=realpathSync(mkdtempSync(join(tmpdir(),'hub-proof-ci-')))
+const readRoots=[...new Set([resources,scratch,dirname(electron),...(process.platform==='darwin'?['/System','/usr','/bin','/sbin','/dev','/private/etc','/private/var/db/dyld']:['/usr','/bin','/sbin','/lib','/lib64'])].filter(existsSync).map(p=>realpathSync(p)))]
+try{
+assertProofSecretsOutsideReadRoots([keyPath,tokenPath],readRoots)
 const token=readFileSync(opts['--session-token-file'],'utf8').trim()
 if(!token||/[\r\n]/u.test(token))fail('invalid SSO token file')
 const request=async(path,body)=>{const response=await fetch(origin+path,{method:body?'POST':'GET',headers:{Authorization:`Bearer ${token}`,...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{}),redirect:'error',signal:AbortSignal.timeout(120000)});if(!response.ok)fail('admin artifact API denied request');return response}
-try{
  const run=opts['--run-id'],response=await request(`/skillhub/v1/target-proofs/runs/${run}/inputs`,{}),payload=await response.json(),input=payload.data
  if(input?.job?.runId!==run||!Array.isArray(input.artifacts)||!input.artifacts.length||input.artifacts.length>500)fail('invalid proof inputs')
  let total=0
@@ -40,7 +42,7 @@ try{
  let command,commandArgs
  if(process.platform==='darwin'){
   command='/usr/bin/sandbox-exec';if(!existsSync(command))fail('offline OS sandbox unavailable')
-  const literal=s=>JSON.stringify(s),readRoots=[resources,scratch,'/System','/usr','/bin','/sbin','/dev','/private/etc','/private/var/db/dyld',dirname(electron)]
+  const literal=s=>JSON.stringify(s)
   const policy=`(version 1)(deny default)(allow process*)(allow sysctl-read)(allow mach-lookup)(allow file-read* ${readRoots.map(p=>`(subpath ${literal(p)})`).join(' ')})(allow file-write* (subpath ${literal(scratch)}))(deny network*)(allow network-bind (local ip "127.0.0.1:*"))(allow network-inbound (local ip "127.0.0.1:*"))`
   commandArgs=['-p',policy,electron,...runnerArgs]
  }else if(process.platform==='linux'){
