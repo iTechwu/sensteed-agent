@@ -15,7 +15,7 @@ async function fixture(overrides: Partial<NextUpdateOptions> = {}) {
   const home = await mkdtemp(join(tmpdir(), 'next-updates-test-')); roots.push(home)
   const artifact = Buffer.alloc(1024); artifact.write('koly', 512)
   const request = vi.fn<UpdateRequest>(async url => url.includes('/version')
-    ? Response.json({ version: '2.0.18-next.1', channel: 'next' }) : new Response(artifact, { headers: { 'content-length': '1024' } }))
+    ? Response.json({ version: '2.0.19-next.1', channel: 'next' }) : new Response(artifact, { headers: { 'content-length': '1024' } }))
   const artifactRequest = vi.fn<UpdateArtifactRequest>(async (url, init) => ({ response: await request(url, init), finalUrl: url }))
   const options: NextUpdateOptions = { userData: home, version: '2.0.14-next', platform: 'darwin', packaged: true,
     request, artifactRequest, prepare: vi.fn(async path => { expect(await readFile(path)).toEqual(artifact) }), install: vi.fn(async () => {}),
@@ -38,7 +38,7 @@ it('checks without downloading; download completion waits for an explicit instal
   expect(updates.snapshot().phase).toBe('installing')
 })
 it('does not confuse an unpublished channel, invalid response or network failure with up to date', async () => {
-  for (const response of [new Response('', { status: 400 }), new Response('', { status: 503 }), Response.json({ version: '2.0.17', channel: 'stable' })]) {
+  for (const response of [new Response('', { status: 400 }), new Response('', { status: 503 }), Response.json({ version: '2.0.18', channel: 'stable' })]) {
     const { updates } = await fixture({ request: async () => response })
     await updates.check()
     expect(updates.snapshot()).toMatchObject({ phase: 'error', error: 'service' })
@@ -74,21 +74,21 @@ it('shows progress and an actionable downloaded state in both languages', () => 
 it('downloads a Next installer through the injected artifact transport', async () => {
   const cdn = 'https://cdn-lfs-cn-1.modelscope.cn/prod/lfs-objects/next.dmg'
   const artifact = Buffer.alloc(1024); artifact.write('koly', 512)
-  const request = vi.fn<UpdateRequest>(async () => Response.json({ version: '2.0.18-next.1', channel: 'next' }))
+  const request = vi.fn<UpdateRequest>(async () => Response.json({ version: '2.0.19-next.1', channel: 'next' }))
   const artifactRequest = vi.fn<UpdateArtifactRequest>(async () => ({ response: new Response(artifact), finalUrl: cdn }))
   const { updates, options } = await fixture({ request, artifactRequest })
   await updates.download()
-  expect(updates.snapshot()).toMatchObject({ phase: 'ready', version: '2.0.18-next.1' })
+  expect(updates.snapshot()).toMatchObject({ phase: 'ready', version: '2.0.19-next.1' })
   expect(artifactRequest).toHaveBeenCalledOnce()
   expect(options.prepare).toHaveBeenCalledOnce()
 })
 it('serves only the private archive to the native updater and closes its loopback listener', async () => {
   const root = await mkdtemp(join(tmpdir(), 'next-feed-test-')); roots.push(root)
   const path = join(root, 'update.zip'); await writeFile(path, 'test archive')
-  const feed = await serveMacUpdate(path, '2.0.18-next.1')
+  const feed = await serveMacUpdate(path, '2.0.19-next.1')
   try {
     const metadata = await (await fetch(feed.url)).json() as { url: string; name: string }
-    expect(metadata.name).toBe('2.0.18-next.1')
+    expect(metadata.name).toBe('2.0.19-next.1')
     expect(await (await fetch(metadata.url)).text()).toBe('test archive')
     expect((await fetch(new URL('/update.zip', feed.url))).status).toBe(404)
     expect((await fetch(feed.url, { method: 'POST' })).status).toBe(404)
@@ -96,7 +96,7 @@ it('serves only the private archive to the native updater and closes its loopbac
   await expect(fetch(feed.url)).rejects.toThrow()
 })
 it('notifies once per newly discovered background update version and persists notifiedVersion across restarts', async () => {
-  let latestVersion = '2.0.18-next.1'
+  let latestVersion = '2.0.19-next.1'
   const available = vi.fn()
   const { updates, options } = await fixture({
     available,
@@ -104,7 +104,7 @@ it('notifies once per newly discovered background update version and persists no
   })
   await updates.check(true)
   expect(available).toHaveBeenCalledTimes(1)
-  expect(available).toHaveBeenCalledWith('2.0.18-next.1')
+  expect(available).toHaveBeenCalledWith('2.0.19-next.1')
 
   // Subsequent background poll of the same version does not re-notify.
   await updates.check(true)
@@ -118,8 +118,8 @@ it('notifies once per newly discovered background update version and persists no
   expect(secondAvailable).not.toHaveBeenCalled()
 
   // When a newer version is published, background check notifies once for the new version.
-  latestVersion = '2.0.19-next.1'
+  latestVersion = '2.0.20-next.1'
   await restarted.check(true)
   expect(secondAvailable).toHaveBeenCalledTimes(1)
-  expect(secondAvailable).toHaveBeenCalledWith('2.0.19-next.1')
+  expect(secondAvailable).toHaveBeenCalledWith('2.0.20-next.1')
 })

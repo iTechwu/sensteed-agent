@@ -28,7 +28,15 @@ import {
   WINDOWS_CAPTION_CONTROLS_WIDTH,
 } from '../src/window-chrome.ts'
 
-vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({ Switch: () => null }))
+vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
+  Button: () => null,
+  IconWarningOutlineRegular: () => null,
+  Modal: () => null,
+  PluginArtworkDefault: () => null,
+  StateDot: () => null,
+  Switch: () => null,
+  Tag: () => null,
+}))
 
 describe('desktop client environment', () => {
   it.each(['darwin', 'win32', 'linux'])('keeps compatibility chrome out of the %s client slot tree', platform => {
@@ -95,7 +103,8 @@ describe('desktop client environment', () => {
     ['?sensteed-agent-mode=advanced&sensteed-agent-platform=android', 'sensteed-agent-platform'],
     ['?sensteed-agent-mode=advanced&sensteed-agent-platform=darwin', 'sensteed-agent-material'],
     ['?sensteed-agent-mode=advanced&sensteed-agent-platform=darwin&sensteed-agent-material=off', 'sensteed-agent-version'],
-  ])('fails loud for malformed marker %s', (search, field) => {
+    ['?sensteed-agent-mode=advanced&sensteed-agent-platform=win32&sensteed-agent-version=2.0.3&sensteed-agent-material=transparent', 'incompatible'],
+    ['?sensteed-agent-mode=advanced&sensteed-agent-platform=darwin&sensteed-agent-version=2.0.3&sensteed-agent-material=mica', 'incompatible'],  ])('fails loud for malformed marker %s', (search, field) => {
     expect(() => parseDesktopClientEnvironment(search)).toThrow(field)
   })
 })

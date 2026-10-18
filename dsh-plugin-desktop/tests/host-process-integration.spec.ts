@@ -1,6 +1,6 @@
 import { execSync, fork, type Serializable } from 'node:child_process'
 import { once } from 'node:events'
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync } from 'node:fs'
+import {mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -83,11 +83,15 @@ it.each(['disabled', 'installed'] as const)('boots a separate Web Host with clie
       // seam; the production supervisor (src/host-process.ts) passes the same
       // flag, and the boot-time settings import depends on the HMR entry to
       // reconcile profile patches without dropping the web server.
-      execArgv: ['--expose-internals'], stdio: ['ignore', 'pipe', 'pipe', 'ipc'], serialization: 'advanced',
-    })
+      execArgv: ['--expose-internals'], stdio: ['ignore', 'pipe', 'pipe', 'ipc'], serialization: 'advanced',    })
     child.stdout?.on('data', data => { stdoutLog += String(data) })
     child.stderr?.on('data', data => { stderr += String(data) })
-    const [ready] = await once(child, 'message')
+    const [ready] = await Promise.race([
+      once(child, 'message'),
+      once(child, 'exit').then(([code, signal]) => {
+        throw new Error(`worker exited before ready (${String(code ?? signal)})`)
+      }),
+    ])
     expect(ready).toEqual({ ready: true })
     const worker = child
     // The child boots a real pnpm-managed profile; on a loaded machine that
@@ -111,6 +115,7 @@ it.each(['disabled', 'installed'] as const)('boots a separate Web Host with clie
     releaseNative = bindNativeRuntime(rpc, runtime)
     rpc.handle('certificate', () => ({ failureCode: 'test-disabled' }))
     rpc.handle('quit', () => {})
+    const logDirectory = join(home, 'logs')
     const result = await rpc.call<{ pid: number; services: { aaRuntime: boolean; aaOnboarding: boolean } }>('boot', [{
       prepared, profilePreferences: { mode: 'advanced', openBrowser: false, networkExposure: 'loopback',
         macosMaterial: 'auto', windowsMaterial: 'auto', market: 'disabled', notifications: { enabled: false }, aaEnabled: aaRequested },
@@ -125,7 +130,7 @@ it.each(['disabled', 'installed'] as const)('boots a separate Web Host with clie
         appExecutable: process.execPath, pnpmBinPath, electronVersion, nodeBinDir: pnpm.nodeBinDir,
         nodeShimPath: pnpm.nodeShimPath, clearEnvironmentPath: pnpm.clearEnvironmentPath,
         dshBootstrapPath: fileURLToPath(new URL('../lib/desktop-cli.js', import.meta.url)) },
-      logDirectory: join(home, 'logs'),
+      logDirectory,
     }, runtimeSnapshot(runtime), token])
     expect(result.pid).toBe(child.pid)
     expect(result.pid).not.toBe(process.pid)

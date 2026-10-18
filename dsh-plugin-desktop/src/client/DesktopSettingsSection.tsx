@@ -63,6 +63,7 @@ export interface DesktopSettingsSectionInjected {
     readonly updates?: boolean
     readonly logging?: boolean
   }
+  readonly openPlugins?: () => void
   readonly introNotice?: ReactNode
   readonly browserActions?: ReactNode
   readonly extraSections?: ReactNode
@@ -356,6 +357,7 @@ function DesktopBrowserUrl({ url, api, t, onOpen }: {
 /** Render the Desktop settings page. */
 export function DesktopSettingsSection({
   t,
+  close,
   api,
   platform,
   version,
@@ -364,10 +366,11 @@ export function DesktopSettingsSection({
   desktopSettings,
   notificationSettings,
   capabilities,
+  openPlugins,
   introNotice,
   browserActions,
   extraSections,
-}: DesktopSettingsSectionInjected & Pick<PropsLocale<'desktop.settings'>, 't'>) {
+}: DesktopSettingsSectionInjected & Pick<PropsLocale<'desktop.settings'>, 't'> & Partial<PropsRuntime<'settings.section'>>) {
   const desktop = useScope(desktopSettings)
   const notifications = useScope(notificationSettings)
   const [view, setView] = useState<DesktopSettingsView>()
@@ -573,9 +576,19 @@ export function DesktopSettingsSection({
         <p>{t('intro')}</p>
       </header>
 
-      {introNotice}
-      {operationFailed && aaStatus !== 'failed' && <p className="sensteedAgentSettingsError" role="alert">{t('operationFailed')}</p>}
-      {restart !== 'none' && (
+      {introNotice ?? (capabilities?.pluginSelectors === false && openPlugins !== undefined && (
+        <div className="sensteedAgentSettingsNotice sensteedAgentNextPluginSettingsNotice" data-next-plugin-settings-notice>
+          <span>{t('pluginSettingsMovedNotice')}</span>
+          <button
+            type="button"
+            className="sensteedAgentSettingsButton sensteedAgentSettingsButtonSecondary"
+            onClick={() => { openPlugins(); close?.() }}
+          >
+            {t('goToPlugins')}
+          </button>
+        </div>
+      ))}
+      {operationFailed && aaStatus !== 'failed' && <p className="dshDesktopSettingsError" role="alert">{t('operationFailed')}</p>}      {restart !== 'none' && (
         <p className="sensteedAgentSettingsSuccess sensteedAgentSettingsRestartStatus" role="status">
           {t(restart === 'restarting' ? 'restarting' : 'restartRequired')}
         </p>

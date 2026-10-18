@@ -55,6 +55,8 @@ const IMMUTABLE_BUNDLES = new Set([
   'dsh-community-market',
   // The launcher-owned product layer is not user-toggleable.
   '@dofe/dsh-sensteed-product',
+  'dshmarket',
+  '@agents-anywhere/dsh-bridge-next',
 ])
 
 /** One direct bundle declared by the active profile. */

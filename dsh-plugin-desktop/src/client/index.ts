@@ -12,6 +12,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 // Type-only service convergence for the launch-folder bridge's scoped inject.
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
+
 import { applyAdvancedShell } from './advanced-shell.ts'
 import { applyDesktopAutomation } from './automation.tsx'
 import { applyDesktopBrand } from './brand.tsx'
@@ -149,6 +150,7 @@ export function apply(ctx: ClientContext): void {
     'dsh-plugin-desktop: native window geometry service',
   )
   const desktopSettings = applyDesktopSettings(ctx, environment)
+
   // Every mode shares the footer seat: upstream's row flex would otherwise let
   // two launchers crush each other, and compatibility mode installs no frame styles.
   ctx.effect(

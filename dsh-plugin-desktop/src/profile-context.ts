@@ -4,19 +4,43 @@ import { pathToFileURL } from 'node:url'
 import type { Context } from '@deepseek-ai/cordis'
 
 import type { AppReady } from '@deepseek-ai/dsh-cmdline'
+import type { DesktopMarketProvider } from './desktop-market.ts'
 import type { DesktopPnpmBootstrap } from './pnpm.ts'
 import { findOverlayPackage } from './package-overlay.ts'
 import { withDesktopPnpmPolicy, withDesktopPnpmStoreDir } from './pnpm-policy.ts'
 import { desktopPnpmStoreDir } from './profile-store-dir.ts'
-import { desktopInstallAnchor, prepareDesktopProfile, type PreparedDesktopProfile } from './profile.ts'
+import {
+  desktopInstallAnchor,
+  prepareDesktopProfile,
+  readDesktopManagedProfileBundles,
+  syncDesktopManagedProfileBundles,
+  type PreparedDesktopProfile,
+} from './profile.ts'
+
+export interface DesktopProfileBootHooks {
+  onManagedBundlesChanged?: (state: {
+    requestedMarket: DesktopMarketProvider
+    effectiveMarket: DesktopMarketProvider
+    requestedAa: boolean
+    effectiveAa: boolean
+  }) => void
+}
 
 /** Keep package operations and subsequent HMR on the launcher's actual Profile. */
-export function createDesktopProfileBoot(prepared: PreparedDesktopProfile, pnpm: DesktopPnpmBootstrap) {
+export function createDesktopProfileBoot(
+  prepared: PreparedDesktopProfile,
+  pnpm: DesktopPnpmBootstrap,
+  hooks?: DesktopProfileBootHooks,
+) {
   const options = prepared.reloadOptions
   if (pnpm.activeProfileName !== options.profileName || pnpm.activeProfileDir !== prepared.profile.dir
     || pnpm.homeDir !== prepared.homeDir) {
     throw new Error('Desktop Profile context and package-manager identity disagree')
   }
+  syncDesktopManagedProfileBundles(prepared.profile.dir, {
+    market: prepared.market.effective,
+    aaEnabled: prepared.aaEnabled,
+  })
   const inheritedPath = Object.entries(process.env).find(([key]) => key.toUpperCase() === 'PATH')?.[1]
   // `readPatches` tracks a newer harness `ProfileContext`; alpha.2 has no such
   // field, so the literal is typed through a local structural superset.
@@ -65,16 +89,51 @@ export function createDesktopProfileBoot(prepared: PreparedDesktopProfile, pnpm:
     // replaces only the profile layer; everything else above stays ours. When
     // absent (HMR, package operations) preparation reads the document from disk
     // as before.
-    readPatches: (profilePatches?: unknown) => [...prepareDesktopProfile(
-      options.telemetryDisabled ?? '', prepared.homeDir, options.platform, options.profileName,
-      options.pluginStatePath, options.marketSelection,
-      {
-        aaEnabled: options.aaEnabled,
-        lanAddresses: prepared.lanAddresses,
-        generationMode: prepared.mode,
-        ...(profilePatches === undefined ? {} : { profilePatches }),
-      } as Parameters<typeof prepareDesktopProfile>[6],
-    ).patches, ...context.overlays],
+    readPatches: (profilePatches?: unknown) => {
+      let managedChanged = false
+      if (profilePatches === undefined) {
+        const managed = readDesktopManagedProfileBundles(prepared.profile.dir)
+        if (managed.market !== options.marketSelection.effective || managed.aaEnabled !== options.aaEnabled) {
+          options.marketSelection = Object.freeze({
+            requested: managed.market,
+            effective: managed.market,
+            legacyDefaulted: false,
+          })
+          options.aaEnabled = managed.aaEnabled
+          managedChanged = true
+        }
+      }
+      const next = prepareDesktopProfile(
+        options.telemetryDisabled ?? '', prepared.homeDir, options.platform, options.profileName,
+        options.pluginStatePath, options.marketSelection,
+        {
+          aaEnabled: options.aaEnabled,
+          lanAddresses: prepared.lanAddresses,
+          generationMode: prepared.mode,
+          ...(profilePatches === undefined ? {} : { profilePatches }),
+        } as Parameters<typeof prepareDesktopProfile>[6],
+      )
+      if (managedChanged) {
+        const requestedMarket = options.marketSelection.requested
+        const requestedAa = options.aaEnabled
+        options.marketSelection = next.market
+        options.aaEnabled = next.aaEnabled
+        if (next.market.effective !== requestedMarket || next.aaEnabled !== requestedAa) {
+          syncDesktopManagedProfileBundles(prepared.profile.dir, {
+            market: next.market.effective,
+            aaEnabled: next.aaEnabled,
+          })
+        }
+        hooks?.onManagedBundlesChanged?.({
+          requestedMarket,
+          effectiveMarket: next.market.effective,
+          requestedAa,
+          effectiveAa: next.aaEnabled,
+        })
+      }
+      return [...next.patches, ...context.overlays]
+    },
+
   }
   let ready = false
   let disposed = false

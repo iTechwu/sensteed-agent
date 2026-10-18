@@ -20,8 +20,10 @@ it('prepares request inventory for Desktop-owned entries and private-manifest pl
     try {
       writeFileSync(join(root, 'package.json'), '{"type":"module"}');
       const baseUrl = pathToFileURL(join(root, 'package.json')).href;
+      let warnings = [];
       const collect = async names => {
         let provider;
+        warnings = [];
         const tree = { ctx: { baseUrl }, entries: () => names.map(name => ({
           options: { name }, fiber: { state: 2 }, parent: { tree }
         })) };
@@ -43,8 +45,7 @@ it('prepares request inventory for Desktop-owned entries and private-manifest pl
         } };
         // upstream 8e1dbdf88c 起 inventory 在 identity 不可读时走 ctx.logger.warn,
         // 假 ctx 按真实插件契约提供 logger。
-        apply({ baseUrl, loader: tree, logger: { warn() {}, debug() {}, error() {}, info() {} }, get: (key) => key === 'pluginPackages' ? pluginPackages : undefined, deepseekLlmApiExtensions: {
-          register: (key, value) => { assert.equal(key, 'dsh_plugin_packages'); provider = value; }
+        apply({ baseUrl, loader: tree, logger: { warn() {}, debug() {}, error() {}, info() {} }, get: (key) => key === 'pluginPackages' ? pluginPackages : undefined, deepseekLlmApiExtensions: {          register: (key, value) => { assert.equal(key, 'dsh_plugin_packages'); provider = value; }
         } }, {});
         return (await provider.prepare({})).value.packages;
       };
@@ -56,8 +57,7 @@ it('prepares request inventory for Desktop-owned entries and private-manifest pl
       writeFileSync(join(staleDesktop, 'package.json'), JSON.stringify({
         name: desktop.name, version: '0.0.1', exports: './index.js'
       }));
-      writeFileSync(join(staleDesktop, 'index.js'), 'throw new Error("inventory evaluated stale plugin")');
-      release = installProfilePackageResolver(baseUrl);
+      writeFileSync(join(staleDesktop, 'index.js'), 'throw new Error("inventory evaluated stale plugin")');      release = installProfilePackageResolver(baseUrl);
       assert.equal(JSON.parse(readFileSync(createRequire(baseUrl).resolve(desktop.name + '/package.json'), 'utf8')).version, desktop.version);
       assert.deepEqual(await collect([
         desktop.name, desktop.name + '/terminal', desktop.name + '/pnpm',
@@ -82,8 +82,7 @@ it('prepares request inventory for Desktop-owned entries and private-manifest pl
       // era identity stays cached while the stale profile copy stays inert
       // (its index.js would throw if the inventory ever evaluated plugin code).
       assert.deepEqual(await collect([desktop.name]), [{ name: desktop.name, version: desktop.version }]);
-      assert.equal(JSON.parse(readFileSync(join(staleDesktop, 'package.json'), 'utf8')).version, '0.0.1');
-      console.log('request inventory passed');
+      assert.equal(JSON.parse(readFileSync(join(staleDesktop, 'package.json'), 'utf8')).version, '0.0.1');      console.log('request inventory passed');
     } finally { release?.(); rmSync(root, { recursive: true, force: true }); }
   `
   const output = execFileSync(process.execPath, [
