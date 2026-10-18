@@ -9,6 +9,7 @@
 
 import { prepareHubHostBoot } from './hub-host-boot.ts'
 import { registerHubHostService } from './hub-host-service.ts'
+import { registerHubSkillRoots } from './hub-skill-roots.ts'
 import { formatUnexpectedHostExit, startIsolatedDesktopHost } from './host-process.ts'
 import * as desktopOffice from './desktop-office.ts'
 import { desktopPrimaryRuntime, resolveDesktopOfficeConfig } from './desktop-office.ts'
@@ -1883,6 +1884,7 @@ async function start(): Promise<void> {
           registerHubHostService(hostCtx)
           if (hubBoot !== undefined) {
             const managedBoot = hubBoot
+            registerHubSkillRoots(hostCtx, managedBoot)
             hostCtx.provide('hubGenerationBoot', {
               generationId: hubBoot.generationId, skillsRoot: hubBoot.skillsRoot,
               inspectLoaded: (skills: import('./hub-generation-health.ts').HubSkillObservation, providerName: string) => managedBoot.inspectLoaded(hostCtx.loader, skills, providerName),

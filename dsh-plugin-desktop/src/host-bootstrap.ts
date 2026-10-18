@@ -2,6 +2,7 @@
 import type { HubSkillObservation } from './hub-generation-health.ts'
 import { prepareHubHostBoot, type HubTrustedHostBootInput } from './hub-host-boot.ts'
 import { registerHubHostService } from './hub-host-service.ts'
+import { registerHubSkillRoots } from './hub-skill-roots.ts'
 import { boot, composeEntries, resolveProfileDir } from '@deepseek-ai/dsh-app-boot'
 import { provideCmdline } from '@deepseek-ai/dsh-cmdline'
 import { createDesktopProfileBoot } from './profile-context.ts'
@@ -139,6 +140,7 @@ export async function bootDesktopHost(options: DesktopHostOptions, runtime: Desk
       async (hostCtx) => {
         profileBoot.prepare(hostCtx)
         if (hubBoot !== undefined) {
+          registerHubSkillRoots(hostCtx, hubBoot)
           hostCtx.provide('hubGenerationBoot', {
             generationId: hubBoot.generationId, skillsRoot: hubBoot.skillsRoot,
             inspectLoaded: (skills: HubSkillObservation, providerName: string) => hubBoot.inspectLoaded(hostCtx.loader, skills, providerName),
