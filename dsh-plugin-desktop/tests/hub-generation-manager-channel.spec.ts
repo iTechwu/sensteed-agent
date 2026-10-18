@@ -30,7 +30,7 @@ function fixture(active:boolean){
   const snapshot={...binding,schemaVersion:'hub-sync-v1',snapshotId:randomUUID(),policyRevision:1,catalogDigest:'d'.repeat(64),entries:[],issuedAt:new Date(now).toISOString(),expiresAt:new Date(now+300000).toISOString()}
   return verifyHubSyncSnapshot({snapshot,signature:{algorithm:'Ed25519',canonicalization:'RFC8785',keyId:'test',payloadDigest:hubSyncDigest(snapshot),signature:sign(null,Buffer.from(hubCanonicalJson(snapshot)),keys.privateKey).toString('base64')}},trust,expected)
  })
- const client={context:async()=>({tenantId:identity.tenantId,actorRef:identity.actorRef}),check,bootAuthorization:vi.fn(async()=>({})),watchInvalidation:()=>()=>{}}
+ const client={context:async()=>({tenantId:identity.tenantId,actorRef:identity.actorRef}),check,bootAuthorization:vi.fn(async()=>({})),watchInvalidation:()=>()=>{},watchOfflineDenial:()=>()=>{}}
  let manager!:{check(input:unknown):Promise<{channel:'stable'|'beta'}>;preview(input:unknown):Promise<unknown>}
  const scope={hubHostClient:client,provide:(_name:string,value:unknown)=>{manager=value as typeof manager},effect:()=>{},inject:()=>{}}
  registerHubGenerationManager({inject:(_keys:string[],fn:(v:unknown)=>void)=>fn(scope)} as never,{target,userData:root,profileDirectory:root})

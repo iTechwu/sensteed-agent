@@ -8,6 +8,17 @@ import{HUB_GENERATION_ORIGIN,type HubGenerationIdentity}from'./hub-generation-st
 import type{HubHostClient,HubHostContext}from'./hub-host-client.ts'
 const record=z.strictObject({schemaVersion:z.literal(1),origin:z.literal(HUB_GENERATION_ORIGIN),tenantId:z.uuid(),actorRef:z.string().min(1).max(128),deviceId:z.uuid(),profileId:z.uuid(),profilePath:z.string().min(1)})
 function privateEntry(path:string,directory:boolean){const s=lstatSync(path);if(s.isSymbolicLink()||(directory?!s.isDirectory():!s.isFile()||s.nlink!==1)||typeof process.getuid==='function'&&s.uid!==process.getuid()||process.platform!=='win32'&&(s.mode&0o077)!==0)throw new Error('Unsafe Hub identity storage')}
+/** Read-only identity lookup for a previously authenticated, signed healthy boot. Never binds a device. */
+export function readHubHostIdentity(userData:string,profileDirectory:string,owner:{tenantId:string;actorRef:string}):HubGenerationIdentity|undefined{
+ if(realpathSync(userData)!==userData||realpathSync(profileDirectory)!==profileDirectory)throw new Error('Hub identity requires canonical roots')
+ const root=join(userData,'hub-identities');if(!existsSync(root))return undefined;privateEntry(root,true)
+ const scope=createHash('sha256').update(JSON.stringify([owner.tenantId,owner.actorRef,profileDirectory])).digest('hex'),path=join(root,`${scope}.json`)
+ if(!existsSync(path))return undefined
+ privateEntry(path,false);if(lstatSync(path).size>4096)throw new Error('Oversized Hub identity')
+ const value=record.parse(JSON.parse(readFileSync(path,'utf8')))
+ if(value.tenantId!==owner.tenantId||value.actorRef!==owner.actorRef||value.profilePath!==profileDirectory)throw new Error('Hub identity scope mismatch')
+ const{schemaVersion:_version,profilePath:_path,...identity}=value;return Object.freeze(identity)
+}
 export async function resolveHubHostIdentity(userData:string,profileDirectory:string,client:HubHostClient,context:HubHostContext):Promise<HubGenerationIdentity>{
  if(realpathSync(userData)!==userData||realpathSync(profileDirectory)!==profileDirectory)throw new Error('Hub identity requires canonical roots')
  const root=join(userData,'hub-identities');if(!existsSync(root))mkdirSync(root,{mode:0o700});privateEntry(root,true)

@@ -3,10 +3,11 @@ import{inspectSavedHubPlan}from'./hub-saved-plan.ts'
 import{verifyHubBootAuthorization}from'./hub-boot-authorization.ts'
 import{randomUUID}from'node:crypto'
 import type{Context}from'@deepseek-ai/cordis'
-import type{HubHostClient}from'./hub-host-client.ts'
+import{HubHostError,type HubHostClient}from'./hub-host-client.ts'
+import{loadHubOfflineBoot,saveHubOfflineBoot,clearHubOfflineBoot}from'./hub-offline-boot.ts'
 import{resolveHubHostIdentity}from'./hub-host-identity.ts'
 import{HubGenerationStore}from'./hub-generation-store.ts'
-import{HubGenerationClient}from'./hub-generation-client.ts'
+import{HubGenerationClient,HubRecoveryAuthorizationUnavailable}from'./hub-generation-client.ts'
 import{HubGenerationExecution}from'./hub-generation-execution.ts'
 import{HubExecutionJournal}from'./hub-execution-journal.ts'
 import{readSealedHubReleaseTrust}from'./hub-release-trust.ts'
@@ -23,10 +24,13 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
   async function closeManaged(){if(!options.managed||closing)return;closing=true;await scope.hubGenerationSupervisor.request({kind:'base'})}
   const unwatch=client.watchInvalidation(()=>{intents.clear();if(options.managed){void closeManaged().catch(()=>{})}else{setImmediate(()=>{void resume().catch(()=>{})})}})
   scope.effect(()=>()=>unwatch(),'Hub identity fence')
-  async function environment(requestedChannel?:'stable'|'beta'){
+  const undeny=client.watchOfflineDenial(()=>{intents.clear();clearHubOfflineBoot(options);void closeManaged().catch(()=>{})})
+  scope.effect(()=>()=>undeny(),'Hub explicit refusal fence')
+  async function environment(requestedChannel?:'stable'|'beta',requireIdle=false){
    const context=await client.context(),identity=await resolveHubHostIdentity(options.userData,options.profileDirectory,client,context)
    const store=new HubGenerationStore(options.userData,identity);lastStore=store
    const state=store.readState(),journal=new HubExecutionJournal(store),pendingRecord=journal.read(),record=pendingRecord?.descriptorDigest===state.active?.descriptorDigest?pendingRecord:journal.readHealthyInventory()
+   if(requireIdle&&pendingRecord&&(pendingRecord.pendingReceipt!=null||pendingRecord.phase!=='ACTIVATED'&&pendingRecord.phase!=='ROLLED_BACK'))throw new Error('HUB_OPERATION_PENDING')
    let activeGenerationDigest:string|null=null,minimumPolicyRevision=0,channel=requestedChannel??'stable'
    let installed:Parameters<HubHostClient['check']>[1]['installed']=[]
    if(state.active!==null){
@@ -49,9 +53,9 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
     return{channel:env.snapshot.channel,profileId:env.identity.profileId,activeGenerationDigest:env.activeGenerationDigest,entries:env.snapshot.entries,activeItems:env.installed.filter(i=>!i.userRemoved).map(i=>({kind:i.kind,itemId:i.itemId,enabled:i.enabled})),operation:summary(env.store)}
    },
    async preview(input:unknown){
-    const{channel,requested}=z.strictObject({channel:z.enum(['stable','beta']),requested:requestedSchema}).parse(input),env=await environment(channel)
+    const{channel,requested}=z.strictObject({channel:z.enum(['stable','beta']),requested:requestedSchema}).parse(input),env=await environment(channel,true)
     const pending=new HubExecutionJournal(env.store).read()
-    if(pending&&pending.phase!=='ACTIVATED'&&pending.phase!=='ROLLED_BACK')throw new Error('HUB_OPERATION_PENDING')
+    if(pending&&(pending.pendingReceipt!==null||pending.phase!=='ACTIVATED'&&pending.phase!=='ROLLED_BACK'))throw new Error('HUB_OPERATION_PENDING')
     const executionClient=new HubGenerationClient(client,env.context),expected:HubGenerationPlanExpected={...env.expected,snapshotId:env.snapshot.snapshotId,snapshotDigest:hubSyncDigest(env.snapshot),expectedActiveGenerationDigest:env.activeGenerationDigest,requested}
     const cap=await executionClient.prepare(expected,trust,randomUUID()),plan=generationPlanData(cap),intentId=randomUUID(),confirmationNonce=randomUUID()
     intents.clear();intents.set(intentId,{nonce:confirmationNonce,cap,client:executionClient,execution:new HubGenerationExecution(env.store,executionClient,client,env.context,trust),store:env.store})
@@ -84,24 +88,56 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
    },
   }
   let recovery:Promise<void>|undefined
-  function resume():Promise<void>{if(recovery)return recovery;const pending=resumeOnce();recovery=pending;void pending.finally(()=>{if(recovery===pending)recovery=undefined}).catch(()=>{});return pending}
+  async function recoverBoot(){
+   try{await resumeOnce()}
+   catch(error){
+    // Only transport loss or a cold SSO restore may reuse bounded healthy authority.
+    // Explicit Hub 401/403 fences offlineOwner(), so it cannot enter this branch.
+    if(error instanceof HubHostError&&(error.code==='HUB_UNAVAILABLE'||error.code==='HUB_SSO_REQUIRED')){
+     const cached=await loadHubOfflineBoot({...options,client,trust,recoverUnconfirmed:!options.managed}).catch(()=>undefined)
+     if(cached){if(!options.managed)await scope.hubGenerationSupervisor.request({kind:'managed',...cached});return}
+    }
+    if(error instanceof HubHostError&&(error.code==='HUB_ACCESS_DENIED'||error.code==='HUB_SSO_REQUIRED'&&!await client.offlineOwner()))clearHubOfflineBoot(options)
+    throw error
+   }
+  }
+  function resume():Promise<void>{if(recovery)return recovery;const pending=recoverBoot();recovery=pending;void pending.finally(()=>{if(recovery===pending)recovery=undefined}).catch(()=>{});return pending}
   async function resumeOnce(){
    const context=await client.context(),identity=await resolveHubHostIdentity(options.userData,options.profileDirectory,client,context),store=new HubGenerationStore(options.userData,identity),journal=new HubExecutionJournal(store)
    let record=journal.read();if(!record)return
-   const active=store.readState().active
-   if(record.phase==='COMMITTED'&&active?.descriptorDigest!==record.descriptorDigest){
+   const state=store.readState(),active=state.active
+   // A prepared candidate is still awaiting restart consent. Otherwise an
+   // offline-restored checkpoint must reconcile the failed execution first.
+   const awaitingRestart=record.phase==='STAGED'&&state.phase==='prepared'&&state.pending?.descriptorDigest===record.descriptorDigest
+   if(active?.descriptorDigest!==record.descriptorDigest
+    &&(record.phase==='STAGED'||record.phase==='COMMITTED'||record.phase==='ACTIVATED'||record.phase==='ROLLED_BACK'&&record.pendingReceipt!==null)){
     const failed=inspectSavedHubPlan(record,identity,options.target,trust),executionClient=new HubGenerationClient(client,context)
-    const recovered=await executionClient.consumptionForRecovery(failed.envelope,trust,failed.expected,record.operationId)
-    record=await journal.advance(record,'ROLLED_BACK')
-    record=await journal.queueReceipt(record,{phase:'ROLLED_BACK',evidenceDigest:hubSyncDigest({activeDescriptorDigest:active?.descriptorDigest??null}),occurredAt:new Date().toISOString(),errorCode:'HUB_BOOT_FAILED'})
-    await executionClient.receipt(recovered.proof,record.pendingReceipt!);record=await journal.acknowledgeReceipt(record)
+    let failureOnly=!awaitingRestart&&(!record.pendingReceipt||record.pendingReceipt.phase==='ROLLED_BACK'||record.pendingReceipt.phase==='NEEDS_ATTENTION')
+    const recover=()=>executionClient.failureConsumptionForRecovery(failed.envelope,trust,failed.expected,record!.operationId)
+    const recovered=await(failureOnly?recover():executionClient.consumptionForRecovery(failed.envelope,trust,failed.expected,record.operationId).catch(async error=>{
+     if(!(error instanceof HubRecoveryAuthorizationUnavailable))throw error
+     failureOnly=true;return await recover()
+    }))
+    if(awaitingRestart&&failureOnly){client.assertCurrent(context);await store.discardPrepared(state.revision,record.descriptorDigest!)}
+    // Ambiguous sends retain their original sequence, timestamp and evidence.
+    // Expired positive sends can only be superseded by a later failure sequence.
+    if(record.pendingReceipt&&(!failureOnly||record.pendingReceipt.phase==='ROLLED_BACK'||record.pendingReceipt.phase==='NEEDS_ATTENTION')){await executionClient.receipt(recovered.proof,record.pendingReceipt);record=await journal.acknowledgeReceipt(record)}
+    if(record.phase!=='ROLLED_BACK'&&(!awaitingRestart||failureOnly)){
+     record=await journal.queueRollbackReceipt(record,{evidenceDigest:hubSyncDigest({activeDescriptorDigest:active?.descriptorDigest??null}),occurredAt:new Date().toISOString(),errorCode:failureOnly&&awaitingRestart?'HUB_EXECUTION_EXPIRED':'HUB_BOOT_FAILED'},failureOnly)
+     await executionClient.receipt(recovered.proof,record.pendingReceipt!);record=await journal.acknowledgeReceipt(record)
+    }
    }
    if(!active)return
    if(record.descriptorDigest!==active.descriptorDigest){record=journal.readHealthyInventory();if(!record||record.descriptorDigest!==active.descriptorDigest)return}
 
    const saved=inspectSavedHubPlan(record,identity,options.target,trust),executionClient=new HubGenerationClient(client,context)
    if(record.phase==='STAGED'&&store.readState().phase==='verifying'){
-    const recovered=await executionClient.consumptionForRecovery(saved.envelope,trust,saved.expected,record.operationId)
+    const recovered=await executionClient.consumptionForRecovery(saved.envelope,trust,saved.expected,record.operationId).catch(async error=>{
+     if(options.managed||!(error instanceof HubRecoveryAuthorizationUnavailable))throw error
+     client.assertCurrent(context);await store.rollback(state.revision);return undefined
+    })
+    if(!recovered){await resumeOnce();return}
+    if(record.pendingReceipt){await executionClient.receipt(recovered.proof,record.pendingReceipt);record=await journal.acknowledgeReceipt(record)}
     record=await journal.advance(record,'COMMITTED')
     record=await journal.queueReceipt(record,{phase:'COMMITTED',evidenceDigest:hubSyncDigest({descriptorDigest:record.descriptorDigest,generationDigest:record.generationDigest}),occurredAt:new Date().toISOString(),errorCode:null})
     await executionClient.receipt(recovered.proof,record.pendingReceipt!);record=await journal.acknowledgeReceipt(record)
@@ -114,14 +150,19 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
    const lease=await client.bootAuthorization(context,{deviceId:identity.deviceId,profileId:identity.profileId,generationDigest:record.generationDigest,target:options.target})
    verifyHubBootAuthorization(lease,trust,{...identity,target:options.target,generationDigest:record.generationDigest,minimumPolicyRevision:saved.plan.policyRevision})
    client.assertCurrent(context)
+   if(record.phase==='ACTIVATED')await saveHubOfflineBoot({...options,client,trust,store,lease})
    if(!options.managed){await scope.hubGenerationSupervisor.request({kind:'managed',identity,generationDigest:record.generationDigest,lease});return}
    if(record.phase==='COMMITTED'){
     const evidence=await scope.hubGenerationBoot.inspectLoaded(scope.skills,`hub-${store.readState().active!.generationId}`)
+    await scope.hubGenerationSupervisor.waitRendererHealthy(evidence.generationId)
+    client.assertCurrent(context)
+    verifyHubBootAuthorization(lease,trust,{...identity,target:options.target,generationDigest:record.generationDigest,minimumPolicyRevision:saved.plan.policyRevision})
     const recovered=await executionClient.consumptionForRecovery(saved.envelope,trust,saved.expected,record.operationId)
     if(store.readState().phase==='verifying')await store.markHealthy(evidence.generationId)
     record=await journal.advance(record,'ACTIVATED')
     record=await journal.queueReceipt(record,{phase:'ACTIVATED',evidenceDigest:hubSyncDigest(evidence),occurredAt:new Date().toISOString(),errorCode:null})
     await executionClient.receipt(recovered.proof,record.pendingReceipt!);await journal.acknowledgeReceipt(record);await journal.saveHealthyInventory()
+    await saveHubOfflineBoot({...options,client,trust,store,lease})
    }
   }
   if(options.managed){const timer=setInterval(()=>{void resume().catch(()=>{void closeManaged().catch(()=>{})})},60_000);timer.unref();scope.effect(()=>()=>clearInterval(timer),'Hub managed lease renewal')}

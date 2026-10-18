@@ -11,6 +11,7 @@ export interface HubSsoSession { readonly accessToken: string; readonly tenantId
 /** Structural L0 SSO seam; no product or extension runtime imports and no second refresh-token writer. */
 export interface HubSsoSource {
   getDatasourceSession(): HubSsoSession | undefined
+  getOfflineIdentity?(): Promise<{ readonly operator: string; readonly tenantId: string } | undefined>
   watchBinding(listener: () => void): () => void
 }
 export interface HubHostContext {
@@ -37,7 +38,8 @@ async function responseJson(response: Response): Promise<unknown> {
   const reader = response.body.getReader(); const chunks: Uint8Array[] = []; let count = 0
   try {
     while (true) {
-      const part = await reader.read()
+      let part: ReadableStreamReadResult<Uint8Array>
+      try { part = await reader.read() } catch { fail('HUB_UNAVAILABLE') }
       if (part.done) break
       if ((count += part.value.byteLength) > MAX_RESPONSE_BYTES) fail('HUB_INVALID_RESPONSE')
       chunks.push(part.value)
@@ -48,12 +50,16 @@ async function responseJson(response: Response): Promise<unknown> {
 /** Tokens are sampled inside each Host call and never included in returned context or diagnostics. */
 export class HubHostClient {
   private readonly invalidationListeners = new Set<()=>void>()
+  private readonly denialListeners = new Set<()=>void>()
   watchInvalidation(listener:()=>void):()=>void { this.invalidationListeners.add(listener); return ()=>{this.invalidationListeners.delete(listener)} }
+  watchOfflineDenial(listener:()=>void):()=>void { this.denialListeners.add(listener); return ()=>{this.denialListeners.delete(listener)} }
+  private denyOffline():void { this.offlineBlocked=true;for(const listener of this.denialListeners)listener() }
   private revision = 0
   private owner: string | undefined
   private selection: string | undefined
   private controller = new AbortController()
   private disposed = false
+  private offlineBlocked = false
   private readonly unwatch: () => void
   constructor(private readonly auth: HubSsoSource, private readonly fetcher: typeof fetch = globalThis.fetch) {
     this.unwatch = auth.watchBinding(() => this.invalidate())
@@ -63,6 +69,14 @@ export class HubHostClient {
     if(notify) for(const listener of this.invalidationListeners) listener()
   }
   dispose(): void { this.disposed = true; this.controller.abort(); this.unwatch() }
+  /** Owner observation only; signed, healthy boot authority is checked separately. No API bearer is returned. */
+  async offlineOwner(): Promise<{ readonly operator: string; readonly tenantId: string } | undefined> {
+    if (this.disposed || this.offlineBlocked) return undefined
+    const revision = this.revision, session = this.auth.getDatasourceSession()
+    const owner = session ?? await this.auth.getOfflineIdentity?.()
+    if (this.disposed || this.offlineBlocked || revision !== this.revision || !owner?.operator || !UUID.test(owner.tenantId)) return undefined
+    return Object.freeze({ operator: owner.operator, tenantId: owner.tenantId })
+  }
   private current(): { session: HubSsoSession; revision: number } {
     const session = this.auth.getDatasourceSession()
     if (this.disposed || !session?.accessToken || !session.operator || !UUID.test(session.tenantId)) fail('HUB_SSO_REQUIRED')
@@ -88,10 +102,13 @@ export class HubHostClient {
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       })
     } catch { if (cancellation.aborted) fail('HUB_CONTEXT_CHANGED'); fail('HUB_UNAVAILABLE') }
-    if (response.status === 401) fail('HUB_SSO_REQUIRED')
-    if (response.status === 403) fail('HUB_ACCESS_DENIED')
-    if (!response.ok) fail('HUB_UNAVAILABLE')
-    const envelope = object(await responseJson(response)), data = object(envelope.data)
+    if (response.status === 401) { this.denyOffline(); fail('HUB_SSO_REQUIRED') }
+    if (response.status === 403) { this.denyOffline(); fail('HUB_ACCESS_DENIED') }
+    if (!response.ok) { if(response.status>=500)fail('HUB_UNAVAILABLE');fail('HUB_INVALID_RESPONSE') }
+    let payload:unknown
+    try { payload=await responseJson(response) }
+    catch(error){if(cancellation.aborted||current.revision!==this.revision)fail('HUB_CONTEXT_CHANGED');throw error}
+    const envelope = object(payload), data = object(envelope.data)
     if (envelope.code !== 200 && envelope.code !== 201) fail('HUB_INVALID_RESPONSE')
     const latest = this.current()
     if (current.revision !== latest.revision || cancellation.aborted) fail('HUB_CONTEXT_CHANGED')
@@ -110,6 +127,7 @@ export class HubHostClient {
     const context = Object.freeze({ tenantId: result.data.tenantId, workspaceId: team.id, actorRef: result.actorRef,
       permissions: Object.freeze([...result.data.permissions] as string[]), revision: result.revision })
     this.assertCurrent(context)
+    this.offlineBlocked = false
     return context
   }
   async bindDevice(context:HubHostContext,hostDescriptor:Readonly<Record<string,unknown>>):Promise<string>{
@@ -169,7 +187,7 @@ export class HubHostClient {
       method:'GET',redirect:'error',credentials:'omit',cache:'no-store',signal:AbortSignal.any([cancellation,AbortSignal.timeout(60_000)]),
       headers:{accept:expected.contentType,authorization:`Bearer ${current.session.accessToken}`,'x-current-tenant':context.workspaceId},
     }) } catch { if(cancellation.aborted)fail('HUB_CONTEXT_CHANGED');fail('HUB_UNAVAILABLE') }
-    if(response.status===401)fail('HUB_SSO_REQUIRED');if(response.status===403)fail('HUB_ACCESS_DENIED')
+    if(response.status===401){this.denyOffline();fail('HUB_SSO_REQUIRED')}if(response.status===403){this.denyOffline();fail('HUB_ACCESS_DENIED')}
     if(!response.ok || !response.body || response.headers.get('content-type')?.split(';')[0]!==expected.contentType)fail('HUB_INVALID_RESPONSE')
     const length=response.headers.get('content-length')
     if(length!==null && length!==String(expected.bytes))fail('HUB_INVALID_RESPONSE')

@@ -52,7 +52,7 @@ export interface HubGenerationState {
   readonly phase: 'stable' | 'prepared' | 'verifying'
   readonly active: Pointer | null
   readonly pending: Pointer | null
-  /** Last healthy generation while a candidate is being verified. */
+  /** Durable prior checkpoint, retained until a later activation replaces it. */
   readonly previous: Pointer | null
 }
 declare const managedSelectionBrand: unique symbol
@@ -256,11 +256,12 @@ export class HubGenerationStore {
     keys(item, ['schemaVersion', 'scope', 'revision', 'phase', 'active', 'pending', 'previous'])
     if (item.schemaVersion !== 1 || item.scope !== this.scope || !Number.isSafeInteger(item.revision) || (item.revision as number) < 1) fail('invalid state identity/revision')
     const active = pointer(item.active), pending = pointer(item.pending), previous = pointer(item.previous)
-    if (item.phase === 'stable' ? pending !== null || previous !== null
-      : item.phase === 'prepared' ? pending === null || previous !== null
+    if (item.phase === 'stable' ? pending !== null
+      : item.phase === 'prepared' ? pending === null
       : item.phase === 'verifying' ? active === null || pending !== null
       : true) fail('invalid state transition record')
     if (active !== null && (active.generationId === pending?.generationId || active.generationId === previous?.generationId)) fail('generation pointers collide')
+    if(previous!==null&&active===null)fail('previous checkpoint requires an active generation')
     return { schemaVersion: 1, scope: this.scope, revision: item.revision as number, phase: item.phase as HubGenerationState['phase'], active, pending, previous }
   }
   private verifyFiles(value: HubGenerationDescriptor): void {
@@ -345,6 +346,13 @@ export class HubGenerationStore {
     })
   }
   /** Must run only after old writers/processes have stopped, and after fresh external authorization checks. */
+  async discardPrepared(expectedRevision: number, descriptorDigest: string): Promise<HubGenerationState> {
+    return await this.update(state => {
+      if(state.revision!==expectedRevision || state.phase!=='prepared' || state.pending?.descriptorDigest!==descriptorDigest) fail('prepared recovery state changed')
+      return {...state,phase:'stable',pending:null}
+    })
+  }
+  /** Must run only after old writers/processes have stopped, and after fresh external authorization checks. */
   async activate(): Promise<HubGenerationState> {
     return await this.update(state => {
       if (state.phase !== 'prepared' || state.pending === null) fail('no prepared generation')
@@ -358,13 +366,15 @@ export class HubGenerationStore {
     return await this.update(state => {
       if (state.phase !== 'verifying' || state.active?.generationId !== generationId) fail('health does not match activating generation')
       this.load(state.active)
-      return { ...state, phase: 'stable', previous: null }
+      // The execution journal and offline lease are committed after this file.
+      // Keep the prior checkpoint so a crash between those commits is recoverable.
+      return { ...state, phase: 'stable' }
     })
   }
   /** Startup crash recovery is explicit: an unconfirmed activation returns to the last healthy generation. */
   async rollback(expectedRevision?: number): Promise<HubGenerationState> {
     return await this.update(state => {
-      if (state.phase !== 'verifying') fail('no unconfirmed activation to roll back')
+      if (state.phase !== 'verifying' && !(state.phase === 'stable' && state.previous !== null)) fail('no unconfirmed activation to roll back')
       if (expectedRevision !== undefined && state.revision !== expectedRevision) fail('recovery state changed')
       if (state.previous !== null) this.load(state.previous)
       return { ...state, phase: 'stable', active: state.previous, previous: null, pending: null }

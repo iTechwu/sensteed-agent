@@ -64,3 +64,21 @@ it('recovers an expired signed plan only with fresh consumed operation authority
  assertCurrent.mockImplementation(()=>undefined);status.authorized=false
  await expect(client.consumptionForRecovery(envelope,f.trust,f.expected,operationId)).rejects.toThrow('not authorized')
 })
+it('recovers an expired consumed operation only as failure reporting authority', async () => {
+ const f=fixture(),operationId=randomUUID(),envelope=f.signed(),cap=verifyHubGenerationPlan(envelope,f.trust,f.expected)
+ const status={planId:f.plan.planId,operationId,state:'consumed',authorized:false,executionGeneration:'9',executionExpiresAt:new Date(Date.now()-1000).toISOString(),proposedGenerationDigest:f.plan.proposedGenerationDigest}
+ const wire=vi.fn(async(_context:unknown,op:{kind:string})=>op.kind==='receipt'?{ack:true}:status),assertCurrent=vi.fn()
+ const client=new HubGenerationClient({assertCurrent,generationRequest:wire} as never,{tenantId:f.expected.tenantId,actorRef:f.expected.actorRef} as never)
+ await expect(client.consumptionForRecovery(envelope,f.trust,f.expected,operationId)).rejects.toThrow('not authorized')
+ const {proof}=await client.failureConsumptionForRecovery(envelope,f.trust,f.expected,operationId)
+ expect(()=>hubGenerationConsumptionData(proof)).toThrow('cannot authorize execution')
+ await expect(client.downloads(cap,proof)).rejects.toThrow('cannot authorize execution')
+ const receipt={seq:0,previousGenerationDigest:null,evidenceDigest:'a'.repeat(64),occurredAt:new Date().toISOString(),errorCode:null}
+ for(const phase of ['STAGED','COMMITTED','ACTIVATED'] as const)await expect(client.receipt(proof,{...receipt,phase})).rejects.toThrow('cannot report successful execution')
+ await expect(client.receipt(proof,{...receipt,phase:'ROLLED_BACK'})).resolves.toBeUndefined()
+ await expect(client.receipt(proof,{...receipt,phase:'NEEDS_ATTENTION'})).resolves.toBeUndefined()
+ status.operationId=randomUUID()
+ await expect(client.failureConsumptionForRecovery(envelope,f.trust,f.expected,operationId)).rejects.toThrow('not authorized')
+ status.operationId=operationId;assertCurrent.mockImplementation(()=>{throw Error('identity changed')})
+ await expect(client.receipt(proof,{...receipt,phase:'ROLLED_BACK'})).rejects.toThrow('identity changed')
+})

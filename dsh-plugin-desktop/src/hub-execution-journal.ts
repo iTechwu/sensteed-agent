@@ -19,11 +19,17 @@ const recordSchema = z.strictObject({
   descriptorDigest: digest.nullable(), pendingReceipt: receiptSchema.nullable(),
 })
 export type HubExecutionRecord = Readonly<z.infer<typeof recordSchema>>
+/** Local observation only; callers still verify signed inventory and boot authority. */
+export function parseHubHealthyInventory(input:unknown,scope:string):HubExecutionRecord{
+ const value=recordSchema.parse(input)
+ if(value.scope!==scope||value.phase!=='ACTIVATED'||value.pendingReceipt!==null)throw new Error('Invalid healthy Hub inventory')
+ return Object.freeze(value)
+}
 const transitions: Record<HubExecutionRecord['phase'], readonly HubExecutionRecord['phase'][]> = {
   PLANNED: ['CONSUMING', 'NEEDS_ATTENTION'], CONSUMING: ['AUTHORIZED', 'NEEDS_ATTENTION'],
   AUTHORIZED: ['STAGED', 'NEEDS_ATTENTION', 'ROLLED_BACK'], STAGED: ['COMMITTED', 'NEEDS_ATTENTION', 'ROLLED_BACK'],
   COMMITTED: ['ACTIVATED', 'NEEDS_ATTENTION', 'ROLLED_BACK'], NEEDS_ATTENTION: ['NEEDS_ATTENTION', 'ROLLED_BACK'],
-  ACTIVATED: [], ROLLED_BACK: [],
+  ACTIVATED: ['ROLLED_BACK'], ROLLED_BACK: [],
 }
 function privateEntry(path: string, directory: boolean): void {
   const s = lstatSync(path)
@@ -68,7 +74,7 @@ export class HubExecutionJournal {
     }
     return await withFileLock(this.path, async () => {
       const old = this.read()
-      if (old && old.phase !== 'ACTIVATED' && old.phase !== 'ROLLED_BACK') throw new Error('Hub execution is already pending')
+      if (old && (old.pendingReceipt!==null || old.phase !== 'ACTIVATED' && old.phase !== 'ROLLED_BACK')) throw new Error('Hub execution is already pending')
       const value = recordSchema.parse({ schemaVersion: 1, scope: this.store.scope, planId: plan.planId, planDigest: plan.planDigest,
         operationId, previousGenerationDigest: plan.expectedActiveGenerationDigest, generationDigest: plan.proposedGenerationDigest,
         phase: 'PLANNED', revision: (old?.revision ?? -1) + 1, receiptSeq: 0, executionGeneration: null, executionExpiresAt: null, signedPlan, descriptorDigest: null, pendingReceipt:null })
@@ -88,6 +94,29 @@ export class HubExecutionJournal {
       const record=this.read(),active=this.store.readState().active
       if(!record||record.phase!=='ACTIVATED'||record.pendingReceipt!==null||!active||active.descriptorDigest!==record.descriptorDigest)throw new Error('Hub inventory is not healthy')
       this.write(record,join(this.store.directory,'healthy-inventory.json'))
+    })
+  }
+  /** Restore only the observation for an already recovered active checkpoint. */
+  async restoreHealthyInventory(input:unknown):Promise<void>{
+    const value=parseHubHealthyInventory(input,this.store.scope)
+    await withFileLock(this.path,async()=>{
+      this.check()
+      if(this.store.readState().active?.descriptorDigest!==value.descriptorDigest)throw new Error('Hub recovered inventory is not active')
+      this.write(value,join(this.store.directory,'healthy-inventory.json'))
+    })
+  }
+  /** Atomically terminalize and persist failure; expired positive sends may be superseded only by failure. */
+  async queueRollbackReceipt(expected: Pick<HubExecutionRecord, 'operationId'|'revision'>, receipt: Omit<z.infer<typeof receiptSchema>, 'seq'|'previousGenerationDigest'|'phase'>, supersedePending=false): Promise<HubExecutionRecord> {
+    this.check()
+    return await withFileLock(this.path, async () => {
+      const old=this.read()
+      if(!old || old.operationId!==expected.operationId || old.revision!==expected.revision) throw new Error('Stale Hub execution worker')
+      if(old.pendingReceipt!==null&&(!supersedePending||!['STAGED','COMMITTED','ACTIVATED'].includes(old.pendingReceipt.phase))) throw new Error('Hub receipt acknowledgment is pending')
+      if(!transitions[old.phase].includes('ROLLED_BACK') || old.executionGeneration===null) throw new Error('Invalid Hub rollback receipt transition')
+      // A crash must never expose ROLLED_BACK without its durable unsent receipt.
+      const receiptSeq=old.receiptSeq+(old.pendingReceipt===null?0:1)
+      const value=recordSchema.parse({...old,phase:'ROLLED_BACK',revision:old.revision+1,receiptSeq,pendingReceipt:receiptSchema.parse({...receipt,phase:'ROLLED_BACK',seq:receiptSeq,previousGenerationDigest:old.previousGenerationDigest})})
+      this.write(value);return Object.freeze(value)
     })
   }
   /** Persist the exact timestamp and payload before sending; ambiguous sends retry byte-equivalent data. */

@@ -4,6 +4,9 @@ import { HubHostClient, type HubHostContext } from './hub-host-client.ts'
 import { generationPlanData, verifyHubGenerationPlan, inspectHubGenerationPlanForRecovery, type VerifiedHubGenerationPlan, type HubGenerationPlanExpected } from './hub-generation-verifier.ts'
 import type { HubReleaseTrust } from './hub-sync-verifier.ts'
 const grantSchema = z.strictObject({ executionGrant: z.uuid(), expiresAt: z.iso.datetime() })
+export class HubRecoveryAuthorizationUnavailable extends Error {
+  constructor(){super('Hub recovery operation is not authorized')}
+}
 const statusSchema = z.strictObject({
   planId: z.uuid(), operationId: z.uuid(), state: z.enum(['unconsumed', 'consumed', 'expired']), authorized: z.boolean(),
   executionGeneration: z.string().regex(/^[1-9][0-9]*$/u).nullable(), executionExpiresAt: z.iso.datetime().nullable(),
@@ -15,11 +18,13 @@ export interface VerifiedHubGenerationConsumption { readonly [consumptionBrand]:
 const consumptions = new WeakMap<VerifiedHubGenerationConsumption, Readonly<{ planId: string; planDigest: string; operationId: string; tenantId: string; actorRef: string; deviceId: string; profileId: string; executionGeneration: string; executionExpiresAt: string; proposedGenerationDigest: string; previousGenerationDigest: string | null }>>()
 export function hubGenerationConsumptionData(cap: VerifiedHubGenerationConsumption) {
   const proof = consumptions.get(cap)
+  if (failureOnlyConsumptions.has(cap)) throw new Error('Hub failure recovery cannot authorize execution')
   if (!proof || Date.parse(proof.executionExpiresAt) <= Date.now()) throw new Error('Invalid or expired Hub consumption capability')
   consumptionOwners.get(cap)!()
   return proof
 }
 const consumptionOwners = new WeakMap<VerifiedHubGenerationConsumption, () => void>()
+const failureOnlyConsumptions = new WeakSet<VerifiedHubGenerationConsumption>()
 const envelopes = new WeakMap<VerifiedHubGenerationPlan, unknown>()
 export function generationPlanEnvelope(cap: VerifiedHubGenerationPlan): unknown {
   generationPlanData(cap)
@@ -79,6 +84,13 @@ export class HubGenerationClient {
   }
   /** Cryptographic observation alone cannot execute. Fresh operation status is always required. */
   async consumptionForRecovery(envelope: unknown, trust: HubReleaseTrust, expected: HubGenerationPlanExpected, operationId: string) {
+    return await this.recoverConsumption(envelope, trust, expected, operationId, false)
+  }
+  /** An expired consumed operation can report failure, never install or report successful health. */
+  async failureConsumptionForRecovery(envelope: unknown, trust: HubReleaseTrust, expected: HubGenerationPlanExpected, operationId: string) {
+    return await this.recoverConsumption(envelope, trust, expected, operationId, true)
+  }
+  private async recoverConsumption(envelope: unknown, trust: HubReleaseTrust, expected: HubGenerationPlanExpected, operationId: string, failureOnly: boolean) {
     this.client.assertCurrent(this.context)
     if (expected.tenantId !== this.context.tenantId || expected.actorRef !== this.context.actorRef) throw new Error('Hub execution identity changed')
     z.uuid().parse(operationId)
@@ -88,13 +100,14 @@ export class HubGenerationClient {
         expectedActiveGenerationDigest: plan.expectedActiveGenerationDigest, operationId } })
     const status = statusSchema.parse(value)
     if (status.planId !== plan.planId || status.operationId !== operationId || status.proposedGenerationDigest !== plan.proposedGenerationDigest
-      || status.state !== 'consumed' || !status.authorized || !status.executionGeneration || !status.executionExpiresAt
-      || Date.parse(status.executionExpiresAt) <= Date.now()) throw new Error('Hub recovery operation is not authorized')
+      || status.state !== 'consumed' || !status.executionGeneration || !status.executionExpiresAt) throw new Error('Hub recovery operation is not authorized')
+    if (!failureOnly && (!status.authorized || Date.parse(status.executionExpiresAt) <= Date.now())) throw new HubRecoveryAuthorizationUnavailable()
     const proof = Object.freeze({}) as VerifiedHubGenerationConsumption
     consumptions.set(proof, Object.freeze({ planId: plan.planId, planDigest: plan.planDigest, operationId,
       tenantId: plan.tenantId, actorRef: plan.actorRef, deviceId: plan.deviceId, profileId: plan.profileId,
       executionGeneration: status.executionGeneration, executionExpiresAt: status.executionExpiresAt, proposedGenerationDigest: plan.proposedGenerationDigest, previousGenerationDigest: plan.expectedActiveGenerationDigest }))
     consumptionOwners.set(proof, () => this.client.assertCurrent(this.context))
+    if (failureOnly) failureOnlyConsumptions.add(proof)
     return Object.freeze({ plan, proof })
   }
   async downloads(cap: VerifiedHubGenerationPlan, proof: VerifiedHubGenerationConsumption): Promise<unknown> {
@@ -108,6 +121,7 @@ export class HubGenerationClient {
   }): Promise<void> {
     const authority = consumptions.get(proof)
     if (!authority) throw new Error('Invalid Hub consumption capability')
+    if (failureOnlyConsumptions.has(proof) && receipt.phase !== 'ROLLED_BACK' && receipt.phase !== 'NEEDS_ATTENTION') throw new Error('Hub failure recovery cannot report successful execution')
     consumptionOwners.get(proof)!()
     if (receipt.previousGenerationDigest !== authority.previousGenerationDigest) throw new Error('Hub receipt previous generation mismatch')
     if (authority.tenantId !== this.context.tenantId || authority.actorRef !== this.context.actorRef) throw new Error('Hub receipt identity changed')

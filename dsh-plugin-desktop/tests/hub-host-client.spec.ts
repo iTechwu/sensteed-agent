@@ -42,6 +42,14 @@ describe('Desktop L0 fixed Hub client', () => {
     const f = fixture(); f.fetcher.mockRejectedValue(new Error('secret-url-and-token'))
     await expect(f.client.context()).rejects.toMatchObject({ message: 'HUB_UNAVAILABLE' }); f.client.dispose()
   })
+  it('classifies a body connection reset as transport loss while malformed JSON stays invalid',async()=>{
+    const f=fixture()
+    f.fetcher.mockResolvedValueOnce(new Response(new ReadableStream({start(controller){controller.error(new TypeError('socket reset'))}})))
+    await expect(f.client.context()).rejects.toMatchObject({code:'HUB_UNAVAILABLE'})
+    f.fetcher.mockResolvedValueOnce(new Response('{broken'))
+    await expect(f.client.context()).rejects.toMatchObject({code:'HUB_INVALID_RESPONSE'})
+    f.client.dispose()
+  })
   it('checks an authenticated signed snapshot without consuming or activating anything', async () => {
     const f = fixture(), context = await f.client.context(), now = Date.now(), pair = generateKeyPairSync('ed25519')
     const expected: HubSyncExpected = { origin: 'https://ai.hozonauto.com/plugins/api', tenantId: tenant, actorRef: 'test-actor', deviceId: randomUUID(), profileId: randomUUID(), channel: 'stable', observedStateDigest: 'a'.repeat(64), minimumPolicyRevision: 0,
