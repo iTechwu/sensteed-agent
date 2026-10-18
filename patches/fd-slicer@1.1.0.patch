@@ -1,0 +1,62 @@
+diff --git a/index.js b/index.js
+index 65d32a3ecb7d22329f5465cb2ef127f70e54be43..6e6290d8e53cd6e6a7dcfb5532e6ee059211f90c 100644
+--- a/index.js
++++ b/index.js
+@@ -79,6 +79,6 @@ util.inherits(ReadStream, Readable);
+ function ReadStream(context, options) {
+   options = options || {};
+-  Readable.call(this, options);
++  Readable.call(this, Object.assign({}, options, { autoDestroy: false }));
+ 
+   this.context = context;
+   this.context.ref();
+@@ -87,31 +87,33 @@ function ReadStream(context, options) {
+   this.start = options.start || 0;
+   this.endOffset = options.end;
+   this.pos = this.start;
+-  this.destroyed = false;
++  // Keep the legacy EOF/unref guard separate from Readable.destroyed. Setting
++  // that public state before push(null) prevents modern Node from draining pipes.
++  this._fdSlicerDestroyed = false;
+ }
+ 
+ ReadStream.prototype._read = function(n) {
+   var self = this;
+-  if (self.destroyed) return;
++  if (self._fdSlicerDestroyed) return;
+ 
+   var toRead = Math.min(self._readableState.highWaterMark, n);
+   if (self.endOffset != null) {
+     toRead = Math.min(toRead, self.endOffset - self.pos);
+   }
+   if (toRead <= 0) {
+-    self.destroyed = true;
++    self._fdSlicerDestroyed = true;
+     self.push(null);
+     self.context.unref();
+     return;
+   }
+   self.context.pend.go(function(cb) {
+-    if (self.destroyed) return cb();
++    if (self._fdSlicerDestroyed) return cb();
+     var buffer = new Buffer(toRead);
+     fs.read(self.context.fd, buffer, 0, toRead, self.pos, function(err, bytesRead) {
+       if (err) {
+         self.destroy(err);
+       } else if (bytesRead === 0) {
+-        self.destroyed = true;
++        self._fdSlicerDestroyed = true;
+         self.push(null);
+         self.context.unref();
+       } else {
+@@ -124,8 +126,9 @@ ReadStream.prototype._read = function(n) {
+ };
+ 
+ ReadStream.prototype.destroy = function(err) {
+-  if (this.destroyed) return;
++  if (this._fdSlicerDestroyed) return;
+   err = err || new Error("stream destroyed");
++  this._fdSlicerDestroyed = true;
+   this.destroyed = true;
+   this.emit('error', err);
+   this.context.unref();

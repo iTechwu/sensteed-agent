@@ -56,6 +56,7 @@ patchedDependencies:
   '@electron/universal@2.0.3': patches/@electron__universal@2.0.3.patch
   app-builder-lib@26.17.0: patches/app-builder-lib@26.17.0.patch
   dshmarket@1.39.0: patches/dshmarket@1.39.0.patch
+  fd-slicer@1.1.0: patches/fd-slicer@1.1.0.patch
   open@11.0.1: patches/open@11.0.1.patch
 
 # 0.2.0 迁移期:AA 桥接等最新发布包要即刻可用,发布年龄门整体关闭;
