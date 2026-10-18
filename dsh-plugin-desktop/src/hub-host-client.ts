@@ -5,7 +5,7 @@ import { HUB_GENERATION_ORIGIN } from './hub-generation-store.ts'
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 type HubRequestPath = '/skillhub/v1/me' | '/skillhub/v1/devices/bind' | '/skillhub/v1/sync/resolve'
-  | '/skillhub/v1/generations/plans' | '/skillhub/v1/generations/installation-reports'
+  | '/skillhub/v1/generations/boot-authorization' | '/skillhub/v1/generations/plans' | '/skillhub/v1/generations/installation-reports'
   | `/skillhub/v1/generations/plans/${string}/${'authorize' | 'consume' | 'consume-status' | 'downloads'}`
 export interface HubSsoSession { readonly accessToken: string; readonly tenantId: string; readonly operator: string }
 /** Structural L0 SSO seam; no product or extension runtime imports and no second refresh-token writer. */
@@ -108,6 +108,18 @@ export class HubHostClient {
       permissions: Object.freeze([...result.data.permissions] as string[]), revision: result.revision })
     this.assertCurrent(context)
     return context
+  }
+  async bindDevice(context:HubHostContext,hostDescriptor:Readonly<Record<string,unknown>>):Promise<string>{
+    this.assertCurrent(context)
+    const result=await this.request('/skillhub/v1/devices/bind',context.workspaceId,{hostDescriptor})
+    this.assertCurrent(context)
+    if(typeof result.data.deviceId!=='string'||!UUID.test(result.data.deviceId)||result.data.ownerRef!==context.actorRef)fail('HUB_INVALID_RESPONSE')
+    return result.data.deviceId
+  }
+  async bootAuthorization(context:HubHostContext,input:{readonly deviceId:string;readonly profileId:string;readonly generationDigest:string;readonly target:HubSyncExpected['target']}):Promise<unknown>{
+    this.assertCurrent(context)
+    if(!UUID.test(input.deviceId)||!UUID.test(input.profileId)||!/^[a-f0-9]{64}$/u.test(input.generationDigest))fail('HUB_INVALID_REQUEST')
+    return (await this.request('/skillhub/v1/generations/boot-authorization',context.workspaceId,input)).data
   }
   /** Read-only signed update check; never calls prepare/consume/activate. */
   async check(context: HubHostContext, request: {

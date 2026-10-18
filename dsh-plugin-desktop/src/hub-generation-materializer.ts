@@ -1,7 +1,7 @@
 /** Private, link-free materialization. Never executes install hooks or uses a public registry. */
 import { createHash } from 'node:crypto'
 import { mkdirSync, writeFileSync, existsSync, openSync, fsyncSync, closeSync } from 'node:fs'
-import { join, posix } from 'node:path'
+import { join } from 'node:path'
 import { load, JSON_SCHEMA } from 'js-yaml'
 import { HubGenerationStore, type HubGenerationDescriptor } from './hub-generation-store.ts'
 import type { HubGenerationPlan } from './hub-generation-verifier.ts'
@@ -16,6 +16,7 @@ const sha=(b:Uint8Array)=>createHash('sha256').update(b).digest('hex')
 function path(value:string):void {
  if(!value || value.length>1000 || value!==value.normalize('NFC') || value.split('/').some(p=>!p||p==='.'||p==='..'||/[\\<>:"|?*\x00-\x1f\x7f]/u.test(p)||/[. ]$/u.test(p)||/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/iu.test(p)))throw new Error('Unsafe materialized path')
 }
+function parentInstance(value:string):string {const index=value.lastIndexOf('/node_modules/');return index<0?'':value.slice(0,index)}
 function dataOnly(value:unknown,seen=new Set<object>(),depth=0):void {
  if(depth>32)throw new Error('Activation configuration is too deep')
  if(value===null||typeof value==='string'||typeof value==='boolean'||typeof value==='number'&&Number.isFinite(value))return
@@ -84,8 +85,8 @@ export async function materializeHubGeneration(options:{
      for(const [name,requested]of Object.entries(declared)){
       const edge=manifest.graph.edges.find(e=>e.from===node.nodeId&&e.name===name&&e.kind===(field==='dependencies'?'prod':'peer'))
       if(!edge||edge.requested!==requested||!nodeIds.has(edge.to))throw new Error('Closure dependency edge missing')
-      let from=node.nodeId, resolved:string|undefined
-      while(true){const candidate=from?`${from}/node_modules/${name}`:`node_modules/${name}`;if(nodeIds.has(candidate)){resolved=candidate;break}if(!from)break;from=posix.dirname(from);if(from==='.')from='';if(from.endsWith('/node_modules'))from=posix.dirname(from)}
+      let from=field==='peerDependencies'&&node.nodeId?parentInstance(node.nodeId):node.nodeId, resolved:string|undefined
+      while(true){const candidate=from?`${from}/node_modules/${name}`:`node_modules/${name}`;if(nodeIds.has(candidate)){resolved=candidate;break}if(!from)break;from=parentInstance(from)}
       if(resolved!==edge.to)throw new Error('Closure dependency topology mismatch')
      }
     }
