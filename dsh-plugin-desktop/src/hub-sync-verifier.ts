@@ -21,7 +21,7 @@ const entry = z.strictObject({
   disposition: z.enum(['CURRENT', 'INSTALL', 'UPDATE', 'AVAILABLE', 'USER_REMOVED', 'UNPUBLISHED',
     'INCOMPATIBLE', 'UNVERIFIED_TARGET', 'ACCESS_DENIED', 'REVOKED', 'EVIDENCE_UNAVAILABLE', 'CHANNEL_ROLLBACK_BLOCKED']),
   reason: z.string().max(500).nullable(),
-  accessDeclaration: z.strictObject({ containsScripts: z.boolean(), networkHosts: z.array(z.string().max(253)).max(50), fileAccess: z.enum(['none', 'user-selected', 'workspace', 'system']) }).nullable().optional(),
+  accessDeclaration: z.strictObject({ containsScripts: z.boolean(), networkHosts: z.array(z.string().max(253)).max(50), fileAccess: z.enum(['none', 'user-selected', 'workspace', 'system']), localPreview: z.strictObject({ scope: z.enum(['loopback', 'private-lan']), protocols: z.array(z.enum(['http', 'https'])).min(1).max(2).refine(values => new Set(values).size === values.length) }).optional() }).nullable().optional(),
 })
 export const HubSyncSnapshotSchema = z.strictObject({
   schemaVersion: z.literal('hub-sync-v1'), snapshotId: z.uuid(), origin: z.literal(HUB_SYNC_ORIGIN),

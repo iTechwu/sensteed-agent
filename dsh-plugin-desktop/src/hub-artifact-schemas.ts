@@ -2,7 +2,7 @@
 import { z } from 'zod'
 import { HubReleaseSignatureSchema } from './hub-sync-verifier.ts'
 const HubDigestSchema=z.string().regex(/^[a-f0-9]{64}$/u)
-const AccessDeclarationSchema=z.strictObject({containsScripts:z.boolean(),networkHosts:z.array(z.string().max(253)).max(50),fileAccess:z.enum(['none','user-selected','workspace','system'])})
+const AccessDeclarationSchema=z.strictObject({containsScripts:z.boolean(),networkHosts:z.array(z.string().max(253)).max(50),fileAccess:z.enum(['none','user-selected','workspace','system']), localPreview: z.strictObject({ scope: z.enum(['loopback', 'private-lan']), protocols: z.array(z.enum(['http', 'https'])).min(1).max(2).refine(values => new Set(values).size === values.length) }).optional()})
 const CompatibilitySchema=z.strictObject({sensteed:z.string().min(1).max(120),testedTargets:z.array(z.string().max(120)).max(50)})
 export const PLUGIN_LIMITS = Object.freeze({
   compressed: 52428800,
