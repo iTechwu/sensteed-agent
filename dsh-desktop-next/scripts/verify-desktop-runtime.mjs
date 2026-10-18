@@ -149,6 +149,8 @@ try {
   const auth = runtime.auth
   await runtime.close()
   await assert.rejects(fetch(new URL(auth.url).origin))
+  assert.doesNotMatch(runtime.diagnostics.snapshot(), /serviceVersion missing required value|desktop-product-telemetry[^\n]*ValidationError/,
+    'Disabled telemetry must remain schema-valid through actual Host restarts and HMR')
   console.log('Next Desktop runtime passed: native-only HTTP/WebSocket gate, hot browser enable/disable with existing browser-stream revocation and native-stream preservation, per-Host credentials, corrupt-manifest recovery, isolated safe mode, separate global repair, and full process shutdown.')
 } finally {
   await runtime.close()

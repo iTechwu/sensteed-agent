@@ -14,6 +14,15 @@ import { removeLinkProjectionsSafely } from '../../dsh-plugin-desktop/src/link-p
 import { insideArchive, unpackedPath } from './asar-archive-policy.ts'
 
 export const NEXT_PACKAGE = fileURLToPath(new URL('../package.json', import.meta.url))
+const NEXT_VERSION: string = JSON.parse(readFileSync(NEXT_PACKAGE, 'utf8')).version
+
+// Disabled rows are still schema-validated by the Loader during HMR. Supply the
+// owning application's version without enabling upstream analytics or collectors.
+function nextBundlePatches() {
+  return [...loadOverlayPatches('dsh-desktop-next', NEXT_BUNDLE_PATCH),
+    { id: 'desktop-product-telemetry', config: { serviceVersion: NEXT_VERSION } }]
+}
+
 export const WEB_BUNDLES = [...PROFILE_TEMPLATES.web!.bundles]
 const NEXT_BUNDLE_PATCH = fileURLToPath(new URL('../cordis.patch.yml', import.meta.url))
 export const AA_PACKAGE = '@agents-anywhere/dsh-bridge-next'
@@ -298,7 +307,7 @@ export function loadNextProfile(projectDir: string, home: string, installAnchor 
   if (linkTarget !== undefined && !lstatSync(link, { throwIfNoEntry: false })) symlinkSync(linkTarget, link, 'junction')
   const profile = loadProfileDirectory('dsh-desktop-next', projectDir, installAnchor)
   profile.layers.push({ packageName: 'dsh-desktop-next', packageDir: target,
-    patchPaths: [NEXT_BUNDLE_PATCH], patches: loadOverlayPatches('dsh-desktop-next', NEXT_BUNDLE_PATCH) })
+    patchPaths: [NEXT_BUNDLE_PATCH], patches: nextBundlePatches() })
   const overlay = [
     { id: 'agents-anywhere-bridge-next', config: {
       dshHome: home,
@@ -335,7 +344,7 @@ function archivedAgentsAnywhereConfig(installAnchor: string): { connectorSourceD
 export function readNextProfilePatches(projectDir: string, home: string, overlays: readonly string[], profilePatches?: readonly Profile['patches'][number][]) {
   const profile = loadProfileDirectory('dsh-desktop-next', projectDir, NEXT_PACKAGE, { userLayer: false })
   profile.layers.push({ packageName: 'dsh-desktop-next', packageDir: dirname(NEXT_PACKAGE),
-    patchPaths: [NEXT_BUNDLE_PATCH], patches: loadOverlayPatches('dsh-desktop-next', NEXT_BUNDLE_PATCH) })
+    patchPaths: [NEXT_BUNDLE_PATCH], patches: nextBundlePatches() })
   profile.patches = profilePatches === undefined
     ? existsSync(profile.patchPath) ? loadOverlayPatches('dsh-desktop-next', profile.patchPath) : []
     : [...profilePatches]

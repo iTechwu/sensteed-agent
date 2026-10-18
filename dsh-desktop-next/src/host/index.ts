@@ -3,6 +3,7 @@ import { auditHostPlugins, configureHostLogging, hostLog, hostOperation } from '
 import { basename, delimiter, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { inspect } from 'node:util'
+import { readFileSync } from 'node:fs'
 import { loadLayeredEnv } from '@deepseek-ai/dsh-app-boot'
 import { runProfile } from '@deepseek-ai/dsh/profile-boot'
 import type {} from '@deepseek-ai/dsh-client-connection'
@@ -26,6 +27,10 @@ import * as desktopOffice from './office.ts'
 import { resolveOfficeConfig } from './office.ts'
 
 export async function main(): Promise<void> {
+  // Upstream HMR re-evaluates its own bundle expressions outside Next's overlay.
+  // This child belongs to Next, not the upstream Electron shell or caller env.
+  process.env.DSH_CLIENT_VERSION = JSON.parse(readFileSync(NEXT_PACKAGE, 'utf8')).version
+
   // The Host lists and reads user workspaces; see asar-archive-policy.ts.
   disableAsarArchiveView(import.meta.url)
   const runtimeDir = process.argv[2]
