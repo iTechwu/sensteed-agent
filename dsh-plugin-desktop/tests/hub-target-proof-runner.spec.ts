@@ -47,7 +47,7 @@ it('verifies exact signed original ZIP before real filesystem loading and reject
 })
 it('constructs actual private L0 auth, settings, tools, attachments and web services without logged-in credentials',async()=>{
  const r=root()
- const result=await loadProofComposition({root:r,entries:[],files:{}},['dofeAuth','dofeAccessSettings','credentials','settings','tools','systemPrompt','attachments','webServer'],true)
+ const result=await loadProofComposition({root:r,entries:[],files:{}},['dofeAuth','dofeAccessSettings','credentials','settings','tools','systemPrompt','attachments','webServer','sensteedAudit'],true)
  expect(result.entryIds).toEqual([])
 })
 it('loads a candidate that injects real sealed services and refuses absent capabilities',async()=>{

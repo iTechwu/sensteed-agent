@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 export async function prepareTargetProofBase(ctx:Context,root:string):Promise<void>{
  const home=join(root,'host-home'),profile=join(home,'profiles','proof');mkdirSync(profile,{recursive:true,mode:0o700})
+ ctx.set('dshHomePath',(...segments:string[])=>join(home,...segments))
  const patchPath=join(profile,'cordis.patch.yml');writeFileSync(patchPath,'[]\n',{flag:'wx',mode:0o600})
  // These are actual private launcher paths, consumed by the production config editor/settings.
  ctx.provide('profileContext',{name:'proof',dir:profile,patchPath,installAnchor:fileURLToPath(new URL('../package.json',import.meta.url)),cwd:root,home,startedBundles:[],overlays:[],telemetryDisabledEnv:'1',readPatches:()=>[]})
@@ -19,4 +20,5 @@ export async function prepareTargetProofBase(ctx:Context,root:string):Promise<vo
  const auth=await import('@dofe/dsh-sensteed-product/dofe-host-auth');await ctx.plugin(auth)
  const capabilities=await import('@dofe/dsh-sensteed-product/dofe-host-capabilities');await ctx.plugin(capabilities)
  const authRoutes=await import('@dofe/dsh-sensteed-product/dofe-auth-routes');await ctx.plugin(authRoutes)
+ const routes=await import('@dofe/dsh-sensteed-product/routes');await ctx.plugin(routes,{auditSyncEnabled:true})
 }
