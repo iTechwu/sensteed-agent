@@ -159,7 +159,7 @@ export const SkillManifestSchema = z.strictObject({
   skillId: z.uuid(),
   releaseId: z.uuid(),
   kind: z.literal('skill'),
-  installName: z.string().min(1).max(80).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/u),
+  installName: z.string().min(1).max(80).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/u).refine(name => !name.startsWith('user-local-'), 'device-local skill namespace is reserved'),
   version: PluginExactVersionSchema,
   artifact: z.strictObject({
     sha256: HubDigestSchema,
