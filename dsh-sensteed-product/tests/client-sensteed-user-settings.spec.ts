@@ -68,11 +68,12 @@ it('registers user settings before General so each normal settings open defaults
   const sections = register.mock.calls.filter(([options]) => options.name === 'settings.section').map(([options]) => ({ id: options.id, order: options.order, label: options.label() }))
   expect(sections).toEqual([
     { id: 'dofe-access', order: -100, label: '用户设置' },
+    { id: 'hub-setup', order: -90, label: '插件与技能安装' },
     { id: 'models', order: 10, label: '模型设置' },
     { id: 'dofe-capabilities', order: 12, label: '内置能力' },
   ])
   // General is 0, Built-in plugins is 15, and Agent presets is 20.
-  expect(sections[1]!.order).toBeGreaterThan(0)
-  expect(sections[2]!.order).toBeLessThan(15)
+  expect(sections.find(s => s.id === 'models')!.order).toBeGreaterThan(0)
+  expect(sections.find(s => s.id === 'dofe-capabilities')!.order).toBeLessThan(15)
   expect(trigger.priority).toBeLessThan(0)
 })
