@@ -23,7 +23,7 @@ interface ManifestTransformer {
 
 // electron-builder publishes no declarations for its manifest transformer. It runs the same
 // function again while copying the payload, so applying it first keeps the sealed bytes final.
-const { createTransformer } = createRequire(import.meta.url)('app-builder-lib/out/fileTransformer.js') as ManifestTransformer
+const { createTransformer } = createRequire(createRequire(import.meta.url).resolve('electron-builder/package.json'))('app-builder-lib/out/fileTransformer.js') as ManifestTransformer
 
 interface PackageManifest {
   readonly name?: string

@@ -1,5 +1,5 @@
 /** Locate the complete installed Office package closure used by standalone CLI processes; ported from upstream. */
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
 
@@ -53,7 +53,7 @@ export function officePackageDirectories(root: string, target: OfficeTarget): st
   const packages = new Set<string>()
 
   function visit(packageDirectory: string): void {
-    const manifestPath = join(packageDirectory, 'package.json')
+    const manifestPath = join(realpathSync(packageDirectory), 'package.json')
     const manifest = readManifest(manifestPath)
     if (manifest.name === undefined) throw new Error(`Office dependency at ${packageDirectory} has no package name.`)
     packages.add(manifest.name)
@@ -84,7 +84,7 @@ export function officePackageDirectories(root: string, target: OfficeTarget): st
   visit(entry)
   // pnpm 按 os/cpu 守卫安装 optional 引擎：host 匹配的引擎缺失是打包硬错误；
   // 跨主机引擎只在对应平台的安装树中存在，开发树上跳过（打包期由 runtime 校验兜底）。
-  const engineDirectory = (createRequire(join(entry, 'package.json')).resolve.paths(engineName) ?? [])
+  const engineDirectory = (createRequire(join(realpathSync(entry), 'package.json')).resolve.paths(engineName) ?? [])
     .map(directory => join(directory, engineName))
     .find(directory => existsSync(directory))
   if (engineDirectory === undefined) {

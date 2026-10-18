@@ -288,7 +288,11 @@ export interface MergeRewriteTolerance {
 interface PlistParser { parse(xml: string): unknown }
 
 // The parser @electron/universal itself writes the merged plists with.
-const plistParser = (): PlistParser => createRequire(createRequire(import.meta.url).resolve('@electron/universal/package.json'))('plist') as PlistParser
+const plistParser = (): PlistParser => {
+  const builder = createRequire(createRequire(import.meta.url).resolve('electron-builder/package.json'))
+  const appBuilder = createRequire(builder.resolve('app-builder-lib/package.json'))
+  return createRequire(appBuilder.resolve('@electron/universal/package.json'))('plist') as PlistParser
+}
 
 /**
  * The one rewrite a universal macOS build makes inside the payload: @electron/universal parses
