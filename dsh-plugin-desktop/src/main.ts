@@ -7,6 +7,7 @@
 // before it could launch. The dsh-subprocess-local patch scopes the flag to the
 // runner child alone.
 
+import { registerHubHostService } from './hub-host-service.ts'
 import { formatUnexpectedHostExit, startIsolatedDesktopHost } from './host-process.ts'
 import * as desktopOffice from './desktop-office.ts'
 import { desktopPrimaryRuntime, resolveDesktopOfficeConfig } from './desktop-office.ts'
@@ -1871,6 +1872,7 @@ async function start(): Promise<void> {
           // Keep Host imports and browser bundle discovery on the same public
           // profile-overlay resolver used by packaged Electron.
           hostCtx.loader.internal = undefined
+          registerHubHostService(hostCtx)
           hostCtx.inject(['sensteedQuitInspection'], scope => {
             quitInspectionProbe = async () => ({
               source: 'ready' as const,

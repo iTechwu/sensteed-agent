@@ -1,4 +1,5 @@
 /** Headless bootstrap for the Beta isolated Host experiment. */
+import { registerHubHostService } from './hub-host-service.ts'
 import { boot, resolveProfileDir } from '@deepseek-ai/dsh-app-boot'
 import { provideCmdline } from '@deepseek-ai/dsh-cmdline'
 import { createDesktopProfileBoot } from './profile-context.ts'
@@ -132,6 +133,7 @@ export async function bootDesktopHost(options: DesktopHostOptions, runtime: Desk
         // Keep Host imports and browser bundle discovery on the same public
         // profile-overlay resolver used by packaged Electron.
         hostCtx.loader.internal = undefined
+        registerHubHostService(hostCtx)
         bindHost(hostCtx)
         hostCtx.effect(() => () => logSink.close(), 'dsh-plugin-desktop: Host log sink')
         hostCtx.effect(
