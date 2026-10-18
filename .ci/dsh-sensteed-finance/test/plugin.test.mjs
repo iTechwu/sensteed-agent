@@ -2922,3 +2922,65 @@ test('revenue remaining receipts preserve missing values, over-receipt and sourc
   assert.equal(variance({ plannedAmount: 100, actualAmount: 120, varianceAmount: null }), -20)
   assert.equal(variance({ plannedAmount: 100, actualAmount: null, varianceAmount: 0 }), 0)
 })
+
+test('filing stages filter before pagination and distinguish submission versions from confirmed facts', async () => {
+  const source = (await Promise.all(['src/components.js', 'src/format.js', 'src/views/filing.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  const paths = [], harness = clientHarness(source, 'FilingParityView', { useFinanceResource: path => { paths.push(path); return { data: { list: [], total: 45 } } }, useFinanceAction: () => ({ revision: 0 }), financeRows: data => data?.list || [], financeColumns: () => [], FinanceResource() {}, Notice() {} })
+  const props = { ctx: { year: 2026, permissions: [], departments: [], drillParams: { section: 'assignments' } }, t: key => key }
+  let tree = harness.render(props)
+  let request = new URL('https://test.invalid' + paths.find(path => path?.includes('/assignments?')))
+  assert.ok(!JSON.parse(request.searchParams.get('statuses')).includes('VOIDED'))
+  clientNodes(tree).find(node => node.children.includes('待修改')).props.onClick()
+  harness.render(props)
+  request = new URL('https://test.invalid' + paths.filter(path => path?.includes('/assignments?')).at(-1))
+  assert.deepEqual(JSON.parse(request.searchParams.get('statuses')), ['REJECTED'])
+  assert.equal(request.searchParams.get('page'), '1')
+  const history = clientHarness(source, 'FinanceFilingHistory', { financeRows: data => data.list, financeColumns: () => [], FinanceResource() {} })
+  tree = history.render({ resource: { data: { list: [{ submissionNo: 1 }, { submissionNo: 3 }], total: 30 } }, assignment: { submissionNo: 3 }, page: 1 })
+  const table = clientNodes(tree).find(node => node.props.tableId === 'finance-filing-submission-history')
+  const status = table.props.columns.find(column => column.key === 'validity').render
+  assert.equal(status({ submissionNo: 1 }), '已被新版本替代，不进入统计')
+  assert.match(status({ submissionNo: 3 }), /入库以确认状态为准/)
+  const window = new Function(source + '\nreturn financeFilingWindow')()
+  assert.equal(window({ status: 'DRAFT', task: { status: 'OPEN', dueAt: '2020-01-01T00:00:00Z' } }), '已截止，不可编辑')
+})
+
+test('saved filter refresh failures retain the dialog and retry without creating a duplicate view', async () => {
+  const source = (await Promise.all(['src/components.js', 'src/views/budget.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  let writes = 0, reads = 0, closes = 0
+  const harness = clientHarness(source, 'SaveViewDialog', { post: async () => { writes++ }, api: async () => { if (++reads === 1) throw new Error('列表暂不可用'); return { data: { list: [{ id: 'saved' }] } } } })
+  const props = { view: 'lines', filters: {}, t: key => key, onClose: () => closes++, onSaved() {} }
+  let tree = harness.render(props)
+  clientNodes(tree).find(node => node.type?.name === 'Field').props.onChange('年度跟踪')
+  tree = harness.render(props)
+  await tree.props.footer.find(node => node.children.includes('submit')).props.onClick()
+  tree = harness.render(props)
+  assert.equal(closes, 0); assert.equal(writes, 1)
+  assert.equal(clientNodes(tree).find(node => node.type?.name === 'Field').props.value, '年度跟踪')
+  await tree.props.footer.find(node => node.children.includes('重试刷新视图列表')).props.onClick()
+  assert.equal(writes, 1); assert.equal(reads, 2); assert.equal(closes, 1)
+})
+
+test('adjustment budget line options load independently and preserve selection across pages and filters', async () => {
+  const source = (await Promise.all(['src/components.js', 'src/views/budget.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  const paths = [], changes = []
+  const harness = clientHarness(source, 'FinanceAdjustmentLinePicker', { useFinanceResource: path => { paths.push(path); return { data: { list: [{ id: 'line-1', orgName: '测试主体', costItemName: '试验费用' }], total: 45 } } }, financeRows: data => data.list, FinanceResource() {} })
+  const props = { year: 2027, orgs: [{ id: 'org-1', name: '测试主体' }], departments: [], value: '', allowNew: false, t: key => key, onChange: id => changes.push(id) }
+  let tree = harness.render(props)
+  let request = new URL('https://test.invalid' + paths.at(-1))
+  assert.equal(request.searchParams.get('year'), '2027')
+  assert.equal(request.searchParams.get('limit'), '20')
+  clientNodes(tree).find(node => node.props.placeholder?.startsWith('本页预算行')).props.onChange('line-1')
+  props.value = 'line-1'
+  tree = harness.render(props)
+  clientNodes(tree).find(node => node.type?.name === 'Pager').props.onPage(2)
+  tree = harness.render(props)
+  assert.match(paths.at(-1), /page=2/)
+  assert.match(clientNodes(tree).find(node => node.props.placeholder?.startsWith('本页预算行')).props.selectedLabel, /试验费用/)
+  clientNodes(tree).find(node => node.props.placeholder === '筛选预算行主体').props.onChange('org-1')
+  harness.render(props)
+  request = new URL('https://test.invalid' + paths.at(-1))
+  assert.equal(request.searchParams.get('page'), '1')
+  assert.equal(request.searchParams.get('orgId'), 'org-1')
+  assert.deepEqual(changes, ['line-1'])
+})

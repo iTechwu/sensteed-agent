@@ -143,7 +143,10 @@ function SummaryTab({ cash, t, year, now, onDrill }) {
   if (cash?.error) return h(EmptyState, null, t('loadError'))
   const rows = cash?.data?.list || cash?.list || []
   const model = cashSummaryModel(rows, year, now)
+  const caliber = cash?.data?.caliber || cash?.caliber
   return h('div', { className: 'sf-stack' },
+    h('p', { className: 'sf-note' }, caliber === 'PUBLISHED_FACTS' ? '按已生效财务代录及已审核发布的付款/收入计划汇总，仅含年度、月份齐全的行；未知金额保留为空，余额及来源剩余金额暂不可用。' : caliber === 'IMPORTED' ? '每行是主体×月份导入快照，未经拆分；余额不跨月累加。' : '来源口径暂未返回，请核对服务版本与导入发布状态；未知金额不按零处理。'),
+    !rows.length ? h('p', { role: 'status' }, '当前年度与主体暂无资金汇总记录，可切换范围或到数据中心核查导入与发布状态。') : null,
     model.isCurrentYear ? h(Card, { title: `${model.year}-${String(model.month).padStart(2, '0')} · ${t('cashMonthlyExecution')}`, unit: t('unitNote') },
       h('div', { className: 'sf-kpis' },
         ...[['actualBalance', 'cashBalance'], ['plannedIncome', 'plannedIncome'], ['plannedExpense', 'plannedExpense'], ['actualIncome', 'actualIncome'], ['actualExpense', 'actualExpense'], ['remainingPayment', 'remainingUnpaid']].map(([key, label]) =>

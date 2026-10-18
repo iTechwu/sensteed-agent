@@ -1803,10 +1803,11 @@ window.__ModuleLoader__.load({
           h(KpiCard, { icon: 'clock', label: t('kpiPrEstimated'), value: yuan(m.prEstimatedAmount), onClick: () => onDrill('budget', { view: 'ledger', recordType: 'ESTIMATED' }) }),
           h(KpiCard, { icon: 'goal', label: t('kpiPaid'), value: yuan(m.paidAmount), hint: `${t('kpiPaid')}/${t('kpiPrSubmitted')} ${ratio(m.paidAmount, m.prSubmittedAmount) ?? '—'}`, onClick: () => onDrill('budget', { view: 'lines' }) }),
           h(KpiCard, {
-            icon: 'warning', label: t('kpiAlerts'), value: alertsSummary.total ?? 0,
-            hint: `${t('sevCritical')} ${alertsSummary.critical ?? 0} · ${t('sevWarn')} ${alertsSummary.warn ?? 0}`,
-            hintTone: alertsSummary.critical > 0 ? 'down' : alertsSummary.warn > 0 ? 'warn' : 'up',
-            negative: alertsSummary.critical > 0, onClick: () => onDrill('alerts'),
+            icon: orgId ? 'goal' : 'plan', label: orgId ? '预算健康度' : 'PR台账',
+            value: orgId ? data.budget?.budgetVersionId == null || exec == null ? '待核对' : exec > 1 ? '已超支' : exec >= 0.8 ? '需关注' : '正常' : yuan(overview.prLedger?.submittedAmount) ?? '—',
+            hint: orgId ? exec == null ? '正式预算不足以判断' : `预算剩余比例 ${ratio(Math.max(0, 1 - exec), 1)}` : `独立台账口径，不计入预算执行 · ${overview.prLedger?.submittedCount ?? '—'}笔`,
+            hintTone: orgId && exec > 1 ? 'down' : undefined,
+            negative: orgId && exec > 1, onClick: () => onDrill('budget', { view: orgId ? 'variance' : 'ledger', ...(orgId ? {} : { recordType: 'SUBMITTED' }) }),
           })),
         h('div', { className: 'sf-overview-grid' },
           h(Card, { title: t('trendTitle'), unit: t('unitNote') },
@@ -1859,7 +1860,7 @@ window.__ModuleLoader__.load({
             })))))
     }
 
-    // 片段 5/7 视图：预算（八子视图：汇总矩阵/月度/明细行/PR 台账/差异分析/调整审批/PR 分配/版本管理）
+    // 预算执行七子视图；版本维护与比较使用独立入口。
     // 筛选：费用类别/部门/版本/月份/待分配 + 保存视图；写操作走宿主代理 POST 路由。
 
     const BUDGET_VIEWS = [
@@ -2007,7 +2008,7 @@ window.__ModuleLoader__.load({
 
         dialog?.kind === 'saveView' ? h(SaveViewDialog, { view, filters, t, onClose: () => setDialog(null), onSaved: value => setSavedViews(value) }) : null,
         dialog?.kind === 'lineDetail' ? h(LineDetailDialog, { line: dialog.line, t, onClose: () => setDialog(null) }) : null,
-        dialog?.kind === 'adjCreate' ? h(AdjustCreateDialog, { year, orgs, departments, lines: budget?.lines?.list || [], busy, t, onClose: () => setDialog(null), act }) : null,
+        dialog?.kind === 'adjCreate' ? h(AdjustCreateDialog, { year, orgs, departments, busy, t, onClose: () => setDialog(null), act }) : null,
         dialog?.kind === 'reason' ? h(ReasonDialog, { title: dialog.title, required: dialog.required, t, onClose: () => setDialog(null), onSubmit: reason => { setDialog(null); return dialog.run(reason) } }) : null,
         dialog?.kind === 'adjDetail' ? h(AdjustDetailDialog, { id: dialog.id, t, onClose: () => setDialog(null) }) : null,
         dialog?.kind === 'allocPick' ? h(AllocPickDialog, { entry: dialog.entry, availability: dialog.availability, t, onClose: () => setDialog(null), act }) : null,
@@ -2255,7 +2256,7 @@ window.__ModuleLoader__.load({
     }
 
     /** 发起调整 Dialog：类型 + 原因 + 多行明细（调拨守恒校验） */
-    function AdjustCreateDialog({ year, orgs, departments, lines, busy, t, onClose, act }) {
+    function AdjustCreateDialog({ year, orgs, departments, busy, t, onClose, act }) {
       const [type, setType] = useState('NEW_BUDGET')
       const [reason, setReason] = useState('')
       const [rows, setRows] = useState([
@@ -2287,8 +2288,8 @@ window.__ModuleLoader__.load({
         if (!canSubmit || !payloadLines.length) return
         if (await act('/budget-adjustments', { type, year: Number(year), reason: reason.trim(), lines: payloadLines })) onClose()
       }
-      return h(Dialog, { title: t('adjCreate'), width: 'lg', onClose, footer: [
-        h(GhostButton, { key: 'cancel', onClick: onClose }, t('cancel')),
+      return h(Dialog, { title: t('adjCreate'), width: 'lg', onClose: busy ? () => {} : onClose, footer: [
+        h(GhostButton, { key: 'cancel', disabled: busy, onClick: onClose }, t('cancel')),
         h(PrimaryButton, { key: 'ok', disabled: busy || !canSubmit, busy, onClick: submit }, t('submit')),
       ] },
         h('div', { className: 'sf-stack' },
@@ -2304,12 +2305,33 @@ window.__ModuleLoader__.load({
               h('div', { className: 'sf-filters' },
                 h(PillTabs, { tabs: [['IN', 'lineIn'], ['OUT', 'lineOut']], value: row.side, onChange: value => updateRow(index, { side: value }), t }),
                 h(FormRow, { label: t('adjAmount') }, h(Field, { type: 'number', min: '0.01', step: '0.01', value: row.amount, onChange: value => updateRow(index, { amount: value }) })),
-              h(FormRow, { label: t('adjLineBudget') }, h(SearchSelect, { value: row.budgetLineId || (row.side === 'IN' ? '__new__' : ''), onChange: value => updateRow(index, { budgetLineId: value === '__new__' ? '' : value }), options: [...(row.side === 'IN' ? [['__new__', '新建预算行']] : []), ...lines.map(line => [line.id, lineLabel(line)])], placeholder: row.side === 'OUT' ? t('required') : t('adjLineBudget') })),
+              h(FormRow, { label: t('adjLineBudget'), wide: true }, h(FinanceAdjustmentLinePicker, { year, orgs, departments, value: row.budgetLineId, allowNew: row.side === 'IN', busy, t, onChange: budgetLineId => updateRow(index, { budgetLineId }) })),
               row.side === 'IN' && !row.budgetLineId ? h(FormRow, { label: t('adjTargetOrg') }, h(SearchSelect, { value: row.targetOrgId, onChange: value => updateRow(index, { targetOrgId: value }), options: (orgs || []).map(org => [org.id, org.name]), placeholder: t('org') })) : null,
               row.side === 'IN' && !row.budgetLineId ? h(FormRow, { label: t('adjTargetDept') }, h(SearchSelect, { value: row.targetDepartmentId, onChange: value => updateRow(index, { targetDepartmentId: value }), options: (departments || []).map(department => [department.id, department.name]), placeholder: t('department') })) : null,
               row.side === 'IN' && !row.budgetLineId ? h(FormRow, { label: t('adjTargetMonth') }, h(Select, { value: row.targetMonth, onChange: value => updateRow(index, { targetMonth: value }), options: [...Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1} 月`]), ['0', '全年']], placeholder: t('adjTargetMonth') })) : null,
                 h(LinkButton, { onClick: () => setRows(current => current.filter((_, i) => i !== index)) }, h(Glyph, { name: 'trash', size: 13 })))),
             isTransfer ? h(Notice, { tone: guardBad ? 'rose' : null }, guardBad ? `${t('adjGuardBad')}（IN ${wan(sumIn / 100)} ≠ OUT ${wan(sumOut / 100)}）` : `${t('adjGuard')}：IN ${wan(sumIn / 100)} = OUT ${wan(sumOut / 100)}`) : null))))
+    }
+
+    /** 每条调整独立读取可访问预算行，不依赖预算执行页的历史加载状态。 */
+    function FinanceAdjustmentLinePicker({ year, orgs, departments, value, allowNew, busy, t, onChange }) {
+      const [page, setPage] = useState(1)
+      const [orgId, setOrgId] = useState('')
+      const [departmentId, setDepartmentId] = useState('')
+      const [chosenLabel, setChosenLabel] = useState('')
+      const query = new URLSearchParams({ year, page, limit: 20 })
+      if (orgId) query.set('orgId', orgId)
+      if (departmentId) query.set('departmentId', departmentId)
+      const resource = useFinanceResource(`/finance/budget/lines?${query}`, 0)
+      const lines = financeRows(resource.data)
+      return h('div', { className: 'sf-stack' },
+        h('div', { className: 'sf-filters' },
+          h(SearchSelect, { value: orgId, disabled: busy, onChange: id => { setOrgId(id); setPage(1) }, options: (orgs || []).filter(org => org.type !== 'GROUP').map(org => [org.id, org.name]), placeholder: '筛选预算行主体' }),
+          h(SearchSelect, { value: departmentId, disabled: busy, onChange: id => { setDepartmentId(id); setPage(1) }, options: (departments || []).map(department => [department.id, department.name]), placeholder: '筛选预算行部门' })),
+        h(FinanceResource, { resource },
+          h(SearchSelect, { value: value || (allowNew ? '__new__' : ''), disabled: busy || resource.loading || Boolean(resource.error), selectedLabel: value ? chosenLabel || undefined : allowNew ? '新建预算行' : undefined, onChange: id => { setChosenLabel(lineLabel(lines.find(line => line.id === id) || {})); onChange(id === '__new__' ? '' : id) }, options: [...(allowNew ? [['__new__', '新建预算行']] : []), ...lines.map(line => [line.id, lineLabel(line)])], placeholder: '本页预算行；可筛选或翻页查找' }),
+          h('p', { className: 'sf-note' }, '当前年度、可访问的正式预算行，每页 20 条；翻页保留已选记录。'),
+          h(Pager, { page, total: resource.data?.total, limit: 20, onPage: busy ? () => {} : setPage })))
     }
 
     function AdjustDetailDialog({ id, t, onClose }) {
@@ -2512,22 +2534,25 @@ window.__ModuleLoader__.load({
     }
 
     function SaveViewDialog({ view, filters, t, onClose, onSaved }) {
-      const [name, setName] = useState('')
-      const submit = () => {
-        if (!name.trim()) return
-        const query = financeBudgetSavedQuery(view, filters)
-        post('/saved-views', { name: name.trim(), query })
-          .then(() => api('/saved-views'))
-          .then(value => { onSaved(value.data ?? { list: [] }); onClose() })
-          .catch(() => onClose())
+      const [name, setName] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState(''), [saved, setSaved] = useState(false)
+      const lock = useRef(false)
+      const submit = async () => {
+        if (!name.trim() || lock.current) return
+        lock.current = true; setBusy(true); setError('')
+        try {
+          if (!saved) { await post('/saved-views', { name: name.trim(), query: financeBudgetSavedQuery(view, filters) }); setSaved(true) }
+          const value = await api('/saved-views'); onSaved(value.data ?? { list: [] }); onClose()
+        } catch (cause) { setError(cause.message || '保存失败，名称与筛选已保留，请重试') }
+        finally { lock.current = false; setBusy(false) }
       }
-      return h(Dialog, { title: t('saveView'), width: 'sm', onClose, footer: [
-        h(GhostButton, { key: 'cancel', onClick: onClose }, t('cancel')),
-        h(PrimaryButton, { key: 'ok', disabled: !name.trim(), onClick: submit }, t('submit')),
+      return h(Dialog, { title: t('saveView'), width: 'sm', dismissDisabled: busy, onClose: busy ? undefined : onClose, footer: [
+        h(GhostButton, { key: 'cancel', disabled: busy, onClick: onClose }, saved ? '关闭' : t('cancel')),
+        h(PrimaryButton, { key: 'ok', busy, disabled: !name.trim(), onClick: submit }, saved ? '重试刷新视图列表' : t('submit')),
       ] },
         h('div', { className: 'sf-stack' },
-          h('p', { className: 'sf-note' }, t('saveViewFirst')),
-          h(FormRow, { label: t('viewName') }, h(Field, { value: name, onChange: setName, maxLength: 60, autoFocus: true }))))
+          h('p', { className: 'sf-note' }, saved ? '筛选视图已保存，列表暂未刷新；重试仅刷新列表，不重复新增。' : t('saveViewFirst')),
+          error ? h('p', { role: 'alert' }, error) : null,
+          h(FormRow, { label: t('viewName') }, h(Field, { value: name, onChange: setName, disabled: busy || saved, maxLength: 60, autoFocus: true }))))
     }
 
     function ReasonDialog({ title, required, t, onClose, onSubmit }) {
@@ -2742,7 +2767,10 @@ window.__ModuleLoader__.load({
       if (cash?.error) return h(EmptyState, null, t('loadError'))
       const rows = cash?.data?.list || cash?.list || []
       const model = cashSummaryModel(rows, year, now)
+      const caliber = cash?.data?.caliber || cash?.caliber
       return h('div', { className: 'sf-stack' },
+        h('p', { className: 'sf-note' }, caliber === 'PUBLISHED_FACTS' ? '按已生效财务代录及已审核发布的付款/收入计划汇总，仅含年度、月份齐全的行；未知金额保留为空，余额及来源剩余金额暂不可用。' : caliber === 'IMPORTED' ? '每行是主体×月份导入快照，未经拆分；余额不跨月累加。' : '来源口径暂未返回，请核对服务版本与导入发布状态；未知金额不按零处理。'),
+        !rows.length ? h('p', { role: 'status' }, '当前年度与主体暂无资金汇总记录，可切换范围或到数据中心核查导入与发布状态。') : null,
         model.isCurrentYear ? h(Card, { title: `${model.year}-${String(model.month).padStart(2, '0')} · ${t('cashMonthlyExecution')}`, unit: t('unitNote') },
           h('div', { className: 'sf-kpis' },
             ...[['actualBalance', 'cashBalance'], ['plannedIncome', 'plannedIncome'], ['plannedExpense', 'plannedExpense'], ['actualIncome', 'actualIncome'], ['actualExpense', 'actualExpense'], ['remainingPayment', 'remainingUnpaid']].map(([key, label]) =>
@@ -5187,8 +5215,8 @@ window.__ModuleLoader__.load({
         ] })), h(Pager, { page, total: list.data?.total, limit: 20, onPage: setPage })),
         receipt ? h(Card, { title: `批量回执：已确认 ${receipt.committed} · 失败 ${receipt.failed}` }, h(Table, { tableId: 'finance-review-receipt', rows: receipt.results || [], columns: financeColumns([['id', '填报'], ['ok', '结果'], ['error', '失败原因']]), empty: '暂无回执' })) : null,
         batch.data ? h(Card, { title: '通知关联的批量确认回执' }, h(FinanceEvidence, { value: batch.data })) : null,
-        dialog?.kind === 'detail' ? h(Dialog, { title: dialog.title, onClose: () => setDialog(null) }, detailPath ? h(FinanceResource, { resource: detail }, h(FinanceEvidence, { value: detail.data })) : h(FinanceEvidence, { value: dialog.row })) : null,
-        dialog && dialog.kind !== 'detail' ? h(FinanceFormDialog, { title: dialog.title, fields: dialog.kind === 'batch' ? [] : [{ key: section === 'filing' ? 'reason' : 'note', label: '复核说明', type: 'textarea', required: dialog.kind === 'reject' }], onClose: () => setDialog(null), onSubmit: async body => {
+        dialog?.kind === 'detail' ? h(Dialog, { title: dialog.title, onClose: () => setDialog(null) }, detailPath ? h(FinanceResource, { resource: detail }, h(FinanceReviewEvidence, { value: detail.data, section, ctx })) : h(FinanceEvidence, { value: dialog.row })) : null,
+        dialog && dialog.kind !== 'detail' ? h(FinanceFormDialog, { title: dialog.title, description: dialog.kind === 'batch' ? `当前选中${selected.length}份同活动填报。定稿后计入正式数据，请先逐项核对详情。` : `${dialog.row.task?.title || dialog.row.taskTitle || dialog.row.code || dialog.row.batchKey || '当前事项'} · ${financeDisplayValue(dialog.row.status, 'status')}。${section === 'facts' ? '发布后进入正式事实；金额须按来源币种核对。' : section === 'filing' ? '定稿后进入正式数据；预算逐条审核请在预算填报与审核完成。' : '审批通过不等于已过账，以服务端流程状态为准。'}`, fields: dialog.kind === 'batch' ? [] : [{ key: section === 'filing' ? 'reason' : 'note', label: '复核说明', type: 'textarea', required: dialog.kind === 'reject' }], onClose: () => setDialog(null), onSubmit: async body => {
           if (dialog.kind === 'batch') {
             if (!selectedRows.length || mixedTasks) throw new Error('请选择同一填报任务内的指派')
             return act('/finance/filing/assignments/batch-commit', { ids: selected })
@@ -5198,6 +5226,30 @@ window.__ModuleLoader__.load({
           if (section === 'facts') return act(`/data-source/fact-batches/${id}/review`, { ...body, decision: dialog.kind === 'approve' ? 'PUBLISH' : 'REJECT' })
           return act(`${section === 'budget' ? '/finance/budget/adjustments' : '/finance/payment-plan-adjustments'}/${id}/${dialog.kind === 'approve' ? 'approve' : 'reject'}`, body)
         } }) : null)
+    }
+
+    function FinanceReviewEvidence({ value, section, ctx }) {
+      if (!value) return null
+      const department = ctx.departments?.find(row => row.id === value.departmentId)?.name || value.departmentName || '部门待核对'
+      const org = ctx.orgs?.find(row => row.id === value.orgId)?.name || value.orgName || '主体待核对'
+      return h('div', { className: 'sf-stack' },
+        h('p', null, `${value.task?.title || value.code || '当前事项'} · ${financeDisplayValue(value.status, 'status')} · ${org} · ${department}`),
+        section === 'filing' ? h('div', null,
+          h('p', { className: 'sf-note' }, `截止 ${value.task?.dueAt || '待核对'} · 第${value.submissionNo ?? '—'}次提交。提交并不代表已确认入库。`),
+          value.task?.type === 'BUDGET' ? h(GhostButton, { onClick: () => ctx.onNavigate('budget-filing', { year: String(value.task.year), taskId: value.taskId || value.task.id }) }, '进入预算逐条核对与审核')
+            : h(Table, { tableId: 'finance-review-filing-rows', rows: value.rows || [], empty: '当前未提供填报行，请刷新详情核对', columns: [
+              { key: 'costItemId', label: '费用项', render: row => row.costItemName || row.costItemId || '未指定' }, ...financeColumns([['expenseType', '费用类别'], ['month', '月份'], ['plannedAmount', '填报金额（元）'], ['description', '说明']]),
+            ] })) : null,
+        section === 'budget' ? h('div', null, h('p', null, `申请总额 ${formatNumber(value.totalAmount) ?? '—'} 元 · 原因：${value.reason || '未提供'}`),
+          h(Table, { tableId: 'finance-review-adjustment-lines', rows: value.lines || [], empty: '未返回调整分录，请刷新核对后审批', columns: [
+            ...financeColumns([['side', '调整方向'], ['amount', '调整金额（元）'], ['targetYear', '目标年度'], ['targetMonth', '目标月份'], ['targetExpenseType', '费用类别'], ['note', '说明']]),
+            { key: 'targetOrgId', label: '目标主体', render: row => ctx.orgs?.find(org => org.id === row.targetOrgId)?.name || row.targetOrgId || '沿用原预算行' },
+            { key: 'targetDepartmentId', label: '目标部门', render: row => ctx.departments?.find(dept => dept.id === row.targetDepartmentId)?.name || row.targetDepartmentId || '沿用原预算行' },
+          ] })) : null,
+        section === 'plans' ? h('div', null, h('p', null, `计划金额：${formatNumber(value.oldAmount) ?? '—'} → ${formatNumber(value.newAmount) ?? '—'} 元`), h('p', null, `原因：${value.reason || '未提供'}`),
+          h(GhostButton, { onClick: () => ctx.onNavigate('cash', { view: 'plans' }) }, '前往付款计划核对')) : null,
+        value.logs?.length ? h(Table, { tableId: 'finance-review-action-history', rows: value.logs, empty: '暂无操作记录', columns: financeColumns([['action', '操作'], ['fromStatus', '原状态'], ['toStatus', '新状态'], ['actorName', '操作者'], ['note', '复核说明'], ['createdAt', '时间']]) }) : null,
+        h('details', null, h('summary', null, '查看原始业务证据与追溯编号'), h(FinanceEvidence, { value })))
     }
 
     function SourcesView({ ctx }) {
@@ -5423,6 +5475,8 @@ window.__ModuleLoader__.load({
       const section = ctx.drillParams?.section || 'assignments'
       const [page, setPage] = useState(1)
       const [status, setStatus] = useState('')
+      const [stage, setStage] = useState('all')
+      const [historyPage, setHistoryPage] = useState(1)
       const [taskId, setTaskId] = useState(ctx.drillParams?.taskId || '')
       const [departmentId, setDepartmentId] = useState('')
       const [dialog, setDialog] = useState(null)
@@ -5438,12 +5492,13 @@ window.__ModuleLoader__.load({
       const assignmentParams = new URLSearchParams({ year: ctx.year, page: String(page), limit: '20' })
       if (taskId) assignmentParams.set('taskId', taskId)
       if (departmentId) assignmentParams.set('departmentId', departmentId)
-      if (status && section !== 'tasks') assignmentParams.set('status', status)
+      if (section === 'assignments') assignmentParams.set('statuses', JSON.stringify(FINANCE_FILING_STAGES.find(item => item.id === stage).statuses))
+      else if (status && section !== 'tasks') assignmentParams.set('status', status)
       if (section === 'mine') assignmentParams.set('submittedByMe', 'true')
       const assignments = useFinanceResource(section !== 'tasks' ? `/finance/filing/assignments?${assignmentParams}` : null, revision)
       const members = useFinanceResource(ctx.role === 'FINANCE_OWNER' ? '/finance/members' : null, revision)
       const summary = useFinanceResource(`/finance/filing/assignments/summary?year=${ctx.year}`, revision)
-      const history = useFinanceResource(dialog?.kind === 'history' ? `/finance/filing/assignments/${dialog.id}/submissions` : null, revision)
+      const history = useFinanceResource(dialog?.kind === 'history' ? `/finance/filing/assignments/${dialog.id}/submissions?page=${historyPage}&limit=20` : null, revision)
       const detail = useFinanceResource(dialog?.kind === 'assignment' ? `/finance/filing/assignments/${dialog.id}` : null, revision)
       const act = async (path, payload, message) => {
         try { await post(path, payload); action.invalidate(); return true }
@@ -5452,17 +5507,22 @@ window.__ModuleLoader__.load({
       const run = async (path, body) => { const result = await action.run(path, body); if (result?.results) setReceipt(result); return result }
       const resource = section === 'tasks' ? tasks : assignments
       const rows = financeRows(resource.data)
+      const departments = ctx.departments || []
+      const departmentName = row => row.departmentName || departments.find(department => department.id === row.departmentId)?.name || '部门待核对'
       return h('div', { className: 'sf-stack' },
         h(GhostButton, { onClick: () => ctx.onNavigate?.('budget-filing', { year: ctx.year, ...(taskId ? { taskId } : {}) }) }, '预算填报与审核'),
-        h(FinanceResource, { resource: summary }, h('div', { className: 'sf-kpis' }, ...[['fillablePending', '待填写'], ['fillableDraft', '草稿'], ['fillableRejected', '退回待改'], ['submitted', '待复核']].map(([key, label]) => h(KpiCard, { key, label, value: summary.data?.[key] })))),
+        h('p', { className: 'sf-note' }, '以下待办计数为当前年度全部可见活动；可填写计数仅含开放且未截止窗口，列表保留可查历史。'),
+        h(FinanceResource, { resource: summary }, h('div', { className: 'sf-kpis' }, ...[['fillablePending', '窗口内待填写'], ['fillableDraft', '窗口内草稿'], ['fillableRejected', '窗口内退回待改'], ['submitted', '待复核']].map(([key, label]) => h(KpiCard, { key, label, value: summary.data?.[key] })))),
         h('div', { className: 'sf-row' },
-          h(Select, { 'aria-label': '填报状态', value: status, placeholder: '全部状态', options: section === 'tasks' ? [['DRAFT', '草稿活动'], ['OPEN', '开放活动'], ['CLOSED', '已关闭活动']] : [['PENDING', '待填写'], ['DRAFT', '草稿'], ['SUBMITTED', '已提交'], ['REJECTED', '已退回'], ['CONFIRMED', '已确认'], ['LOCKED', '已锁定'], ['VOIDED', '已作废']], onChange: value => { setStatus(value); setPage(1) } }),
+          section === 'assignments' ? h('div', { className: 'sf-row', 'aria-label': '填报任务阶段' }, ...FINANCE_FILING_STAGES.map(item => h(GhostButton, { key: item.id, 'aria-pressed': stage === item.id, onClick: () => { setStage(item.id); setPage(1) } }, item.label))) : h(Select, { 'aria-label': '填报状态', value: status, placeholder: '全部状态', options: section === 'tasks' ? [['DRAFT', '草稿活动'], ['OPEN', '开放活动'], ['CLOSED', '已关闭活动']] : [['PENDING', '待填写'], ['DRAFT', '草稿'], ['SUBMITTED', '已提交'], ['REJECTED', '已退回'], ['CONFIRMED', '已确认'], ['LOCKED', '已锁定'], ['VOIDED', '已作废']], onChange: value => { setStatus(value); setPage(1) } }),
           section === 'department' ? h(Select, { 'aria-label': '填报部门', value: departmentId, options: ctx.departments.map(row => [row.id, row.name]), placeholder: '全部可见部门', onChange: value => { setDepartmentId(value); setPage(1) } }) : null,
           manage && section === 'tasks' ? h(GhostButton, { onClick: () => setDialog({ kind: 'create' }) }, t('createTask')) : null),
+        section === 'assignments' ? h('p', { className: 'sf-note' }, `当前阶段共 ${resource.data?.total ?? '—'} 项，每页20项；作废记录可在部门填报按状态查阅。提交后须财务确认才计入正式数据。`) : null,
         taskId ? h('p', null, `正在查看活动 ${taskId}`, h(GhostButton, { onClick: () => { setTaskId(''); setPage(1); ctx.onNavigate?.('filing', { section, year: ctx.year }) } }, '清除活动筛选')) : null,
         h(Notice, null, action.notice),
         h(Card, { title: section === 'tasks' ? '填报活动' : section === 'mine' ? '我的记录' : section === 'department' ? '部门填报' : '待填报任务' }, h(FinanceResource, { resource }, h(Table, { tableId: `finance-filing-${section}`, rows, empty: '暂无记录', columns: [
-          ...financeColumns(section === 'tasks' ? [['title', '活动'], ['year', '年度'], ['type', '类型'], ['status', '状态'], ['dueAt', '截止时间']] : [['taskTitle', '活动'], ['departmentName', '部门'], ['assigneeName', '填报人'], ['status', '状态'], ['submittedAt', '提交时间']]),
+          ...financeColumns(section === 'tasks' ? [['title', '活动'], ['year', '年度'], ['type', '类型'], ['status', '状态'], ['dueAt', '截止时间']] : [['taskTitle', '活动'], ['assigneeName', '填报人'], ['status', '状态'], ['submissionNo', '当前提交版本'], ['submittedAt', '提交时间']]),
+          ...(section === 'tasks' ? [{ key: 'allowModify', label: '窗口内修改', render: row => row.allowModify ? '允许（确认前）' : '不允许' }] : [{ key: 'departmentName', label: '部门', render: departmentName }, { key: 'dueAt', label: '截止时间', render: row => row.task?.dueAt ? new Date(row.task.dueAt).toLocaleString('zh-CN', { hour12: false }) : '—' }, { key: 'editability', label: '填写窗口', render: row => financeFilingWindow(row) }, { key: 'rejectReason', label: '退回 / 作废原因', render: row => row.rejectReason || row.voidReason || '—' }]),
           { key: 'actions', label: '操作', sortable: false, render: row => h('div', { className: 'sf-row' },
             section === 'tasks' ? h(React.Fragment, null,
               h(GhostButton, { onClick: () => ctx.onNavigate?.('filing', { section: 'department', taskId: row.id, year: row.year ?? ctx.year }) }, '查看部门进度'),
@@ -5472,7 +5532,7 @@ window.__ModuleLoader__.load({
               verify && row.status === 'OPEN' ? h(GhostButton, { onClick: () => setDialog({ kind: 'confirmAll', title: '确认活动内全部已提交填报', row }) }, '全部定稿') : null)
               : h(React.Fragment, null,
                 h(GhostButton, { onClick: () => setDialog({ kind: 'assignment', id: row.id }) }, '查看 / 填写'),
-                h(GhostButton, { onClick: () => setDialog({ kind: 'history', id: row.id, title: '提交版本历史' }) }, '提交历史'),
+                h(GhostButton, { onClick: () => { setHistoryPage(1); setDialog({ kind: 'history', id: row.id, row, title: '提交版本历史' }) } }, '提交历史'),
                 manage ? h(GhostButton, { onClick: () => setDialog({ kind: 'assignee', title: '指定填报人', row }) }, '指定填报人') : null,
                 verify && row.status === 'SUBMITTED' ? h(GhostButton, { onClick: () => setDialog({ kind: 'reopenAssignment', title: '重开已提交填报', row }) }, '重开填报') : null,
                 verify && row.status === 'CONFIRMED' ? h(GhostButton, { onClick: () => setDialog({ kind: 'lock', title: '锁定已确认填报', row }) }, '锁定填报') : null,
@@ -5480,14 +5540,39 @@ window.__ModuleLoader__.load({
         ] })), h(Pager, { page, total: resource.data?.total, limit: 20, onPage: setPage })),
         dialog?.kind === 'create' ? h(CreateTaskDialog, { year: ctx.year, orgs: ctx.orgs, departments: ctx.departments, members: members.error ? { error: true } : members.data, busy: action.busy, t, act, onClose: () => { setDialog(null); tasks.retry() } }) : null,
         dialog?.kind === 'assignment' ? detail.error || detail.loading ? h(Dialog, { title: '填报详情', onClose: () => setDialog(null) }, h(FinanceResource, { resource: detail })) : detail.data ? detail.data.task?.type === 'BUDGET' ? h(Dialog, { title: '预算填报与审核', onClose: () => setDialog(null) }, h('p', null, '预算按条目填报，经对接人初审和负责人终审后整体提交。'), h(PrimaryButton, { onClick: () => ctx.onNavigate?.('budget-filing', { year: String(detail.data.task.year), taskId: detail.data.taskId || detail.data.task.id }) }, '进入预算填报与审核')) : h(AssignmentDialog, { key: detail.data.id, assignment: detail.data, canEdit: ctx.permissions.includes('budget.submission.edit'), canVerify: verify, busy: action.busy, t, act, onClose: () => { setDialog(null); assignments.retry() } }) : null : null,
-        dialog?.kind === 'history' ? h(Dialog, { title: dialog.title, onClose: () => setDialog(null) }, h(FinanceResource, { resource: history }, h(FinanceEvidence, { value: history.data }))) : null,
-        dialog && !['create', 'assignment', 'history'].includes(dialog.kind) ? h(FinanceFormDialog, { title: dialog.title, description: `${dialog.row.title || dialog.row.taskTitle || dialog.row.task?.title || '当前填报'} · ${dialog.row.departmentName || ''} · ${financeDisplayValue(dialog.row.status, 'status')}。操作仅作用于此活动或填报，请核对后确认。`, onClose: () => setDialog(null), fields: dialog.kind === 'assignee' ? [{ key: 'assigneeUserId', label: '填报人（留空清除指定）', options: financeRows(members.data).map(row => [row.userId, row.name || row.userId]) }] : dialog.kind === 'publish' || dialog.kind === 'confirmAll' || dialog.kind === 'lock' ? [] : [{ key: 'reason', label: '原因', required: ['reopenTask', 'reopenAssignment', 'void'].includes(dialog.kind), type: 'textarea' }, ...(dialog.kind === 'reopenTask' ? [{ key: 'newDueAt', label: '新的截止时间', type: 'datetime-local' }] : [])], onSubmit: body => {
+        dialog?.kind === 'history' ? h(Dialog, { title: dialog.title, onClose: () => setDialog(null) }, h(FinanceFilingHistory, { resource: history, assignment: dialog.row, page: historyPage, onPage: setHistoryPage })) : null,
+        dialog && !['create', 'assignment', 'history'].includes(dialog.kind) ? h(FinanceFormDialog, { title: dialog.title, description: `${dialog.row.title || dialog.row.taskTitle || dialog.row.task?.title || '当前填报'} · ${dialog.row.year || dialog.row.task?.year || ctx.year}年 · ${financeDisplayValue(dialog.row.type || dialog.row.task?.type, 'type')} · ${departmentName(dialog.row)} · ${financeDisplayValue(dialog.row.status, 'status')} · 截止 ${dialog.row.dueAt || dialog.row.task?.dueAt || '待核对'} · 窗口内修改${(dialog.row.allowModify ?? dialog.row.task?.allowModify) ? '允许（确认前）' : '不允许'}。请核对后确认。`, onClose: () => setDialog(null), fields: dialog.kind === 'assignee' ? [{ key: 'assigneeUserId', label: '填报人（留空清除指定）', options: financeRows(members.data).map(row => [row.userId, row.name || row.userId]) }] : dialog.kind === 'publish' || dialog.kind === 'confirmAll' || dialog.kind === 'lock' ? [] : [{ key: 'reason', label: '原因', required: ['reopenTask', 'reopenAssignment', 'void'].includes(dialog.kind), type: 'textarea' }, ...(dialog.kind === 'reopenTask' ? [{ key: 'newDueAt', label: '新的截止时间', type: 'datetime-local' }] : [])], onSubmit: body => {
           const id = dialog.row.id
           if (dialog.kind === 'assignee') return run(`/finance/filing/assignments/${id}/assignee`, { assigneeUserId: body.assigneeUserId || null, assigneeName: financeRows(members.data).find(row => row.userId === body.assigneeUserId)?.name || null })
           if (dialog.kind === 'reopenAssignment' || dialog.kind === 'lock' || dialog.kind === 'void') return run(`/finance/filing/assignments/${id}/${dialog.kind === 'reopenAssignment' ? 'reopen' : dialog.kind}`, body)
           return run(`/finance/filing/tasks/${id}/${dialog.kind === 'reopenTask' ? 'reopen' : dialog.kind === 'confirmAll' ? 'confirm-all' : dialog.kind}`, body)
         } }) : null,
         receipt ? h(Card, { title: '批量定稿回执' }, h(FinanceEvidence, { value: receipt })) : null)
+    }
+
+    const FINANCE_FILING_STAGES = [
+      { id: 'all', label: '全部有效任务', statuses: ['PENDING', 'DRAFT', 'REJECTED', 'SUBMITTED', 'CONFIRMED', 'LOCKED'] },
+      { id: 'todo', label: '待填写', statuses: ['PENDING', 'DRAFT'] },
+      { id: 'rejected', label: '待修改', statuses: ['REJECTED'] },
+      { id: 'submitted', label: '待财务验证', statuses: ['SUBMITTED'] },
+      { id: 'done', label: '已确认', statuses: ['CONFIRMED', 'LOCKED'] },
+    ]
+    function financeFilingWindow(row, now = Date.now()) {
+      if (['CONFIRMED', 'LOCKED', 'VOIDED'].includes(row.status)) return '已收口，不可编辑'
+      if (row.task?.status !== 'OPEN') return '活动未开放 / 已关闭'
+      if (!row.task?.dueAt || !Number.isFinite(Date.parse(row.task.dueAt))) return '截止待核对，以详情校验为准'
+      if (Date.parse(row.task.dueAt) < now) return '已截止，不可编辑'
+      return row.status === 'SUBMITTED' ? row.task.allowModify ? '确认前可修改并重新提交' : '等待财务验证，不可修改' : '窗口开放，按本人归属填写'
+    }
+    function FinanceFilingHistory({ resource, assignment, page, onPage }) {
+      const rows = financeRows(resource.data), current = assignment?.submissionNo
+      return h('div', { className: 'sf-stack' }, h('p', { className: 'sf-note' }, '每次重新提交保留独立版本。当前提交版本只有经财务确认后才进入正式数据，历史版本不重复计入。'),
+        h(FinanceResource, { resource }, h(Table, { tableId: 'finance-filing-submission-history', rows, empty: '暂无提交版本', columns: [
+          { key: 'submissionNo', label: '提交版本', render: row => `第${row.submissionNo}版` },
+          { key: 'validity', label: '版本状态', render: row => current == null ? '已提交版本，当前版本待核对' : row.submissionNo < current ? '已被新版本替代，不进入统计' : row.submissionNo === current ? '当前提交版本（入库以确认状态为准）' : '版本已变化，请刷新核对' },
+          ...financeColumns([['rowCount', '行数'], ['totalAmount', '合计（元）'], ['submittedByName', '提交人'], ['submittedAt', '提交时间']]),
+          { key: 'changeSummary', label: '变更说明', render: row => row.changeSummary ? h(FinanceEvidence, { value: row.changeSummary }) : '未提供差异摘要' },
+        ] }), h(Pager, { page, total: resource.data?.total, limit: 20, onPage })))
     }
 
     // 与网页 /filing/budget 共用逐条审核契约；动作完全来自服务端，不根据本地角色推断审批权。

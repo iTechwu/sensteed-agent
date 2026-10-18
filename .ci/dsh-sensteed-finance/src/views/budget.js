@@ -1,4 +1,4 @@
-// 片段 5/7 视图：预算（八子视图：汇总矩阵/月度/明细行/PR 台账/差异分析/调整审批/PR 分配/版本管理）
+// 预算执行七子视图；版本维护与比较使用独立入口。
 // 筛选：费用类别/部门/版本/月份/待分配 + 保存视图；写操作走宿主代理 POST 路由。
 
 const BUDGET_VIEWS = [
@@ -146,7 +146,7 @@ function BudgetView({ ctx, t }) {
 
     dialog?.kind === 'saveView' ? h(SaveViewDialog, { view, filters, t, onClose: () => setDialog(null), onSaved: value => setSavedViews(value) }) : null,
     dialog?.kind === 'lineDetail' ? h(LineDetailDialog, { line: dialog.line, t, onClose: () => setDialog(null) }) : null,
-    dialog?.kind === 'adjCreate' ? h(AdjustCreateDialog, { year, orgs, departments, lines: budget?.lines?.list || [], busy, t, onClose: () => setDialog(null), act }) : null,
+    dialog?.kind === 'adjCreate' ? h(AdjustCreateDialog, { year, orgs, departments, busy, t, onClose: () => setDialog(null), act }) : null,
     dialog?.kind === 'reason' ? h(ReasonDialog, { title: dialog.title, required: dialog.required, t, onClose: () => setDialog(null), onSubmit: reason => { setDialog(null); return dialog.run(reason) } }) : null,
     dialog?.kind === 'adjDetail' ? h(AdjustDetailDialog, { id: dialog.id, t, onClose: () => setDialog(null) }) : null,
     dialog?.kind === 'allocPick' ? h(AllocPickDialog, { entry: dialog.entry, availability: dialog.availability, t, onClose: () => setDialog(null), act }) : null,
@@ -394,7 +394,7 @@ function AdjustmentsView({ page, onPage, t, busy, revision, reloadTick, act, onD
 }
 
 /** 发起调整 Dialog：类型 + 原因 + 多行明细（调拨守恒校验） */
-function AdjustCreateDialog({ year, orgs, departments, lines, busy, t, onClose, act }) {
+function AdjustCreateDialog({ year, orgs, departments, busy, t, onClose, act }) {
   const [type, setType] = useState('NEW_BUDGET')
   const [reason, setReason] = useState('')
   const [rows, setRows] = useState([
@@ -426,8 +426,8 @@ function AdjustCreateDialog({ year, orgs, departments, lines, busy, t, onClose, 
     if (!canSubmit || !payloadLines.length) return
     if (await act('/budget-adjustments', { type, year: Number(year), reason: reason.trim(), lines: payloadLines })) onClose()
   }
-  return h(Dialog, { title: t('adjCreate'), width: 'lg', onClose, footer: [
-    h(GhostButton, { key: 'cancel', onClick: onClose }, t('cancel')),
+  return h(Dialog, { title: t('adjCreate'), width: 'lg', onClose: busy ? () => {} : onClose, footer: [
+    h(GhostButton, { key: 'cancel', disabled: busy, onClick: onClose }, t('cancel')),
     h(PrimaryButton, { key: 'ok', disabled: busy || !canSubmit, busy, onClick: submit }, t('submit')),
   ] },
     h('div', { className: 'sf-stack' },
@@ -443,12 +443,33 @@ function AdjustCreateDialog({ year, orgs, departments, lines, busy, t, onClose, 
           h('div', { className: 'sf-filters' },
             h(PillTabs, { tabs: [['IN', 'lineIn'], ['OUT', 'lineOut']], value: row.side, onChange: value => updateRow(index, { side: value }), t }),
             h(FormRow, { label: t('adjAmount') }, h(Field, { type: 'number', min: '0.01', step: '0.01', value: row.amount, onChange: value => updateRow(index, { amount: value }) })),
-          h(FormRow, { label: t('adjLineBudget') }, h(SearchSelect, { value: row.budgetLineId || (row.side === 'IN' ? '__new__' : ''), onChange: value => updateRow(index, { budgetLineId: value === '__new__' ? '' : value }), options: [...(row.side === 'IN' ? [['__new__', '新建预算行']] : []), ...lines.map(line => [line.id, lineLabel(line)])], placeholder: row.side === 'OUT' ? t('required') : t('adjLineBudget') })),
+          h(FormRow, { label: t('adjLineBudget'), wide: true }, h(FinanceAdjustmentLinePicker, { year, orgs, departments, value: row.budgetLineId, allowNew: row.side === 'IN', busy, t, onChange: budgetLineId => updateRow(index, { budgetLineId }) })),
           row.side === 'IN' && !row.budgetLineId ? h(FormRow, { label: t('adjTargetOrg') }, h(SearchSelect, { value: row.targetOrgId, onChange: value => updateRow(index, { targetOrgId: value }), options: (orgs || []).map(org => [org.id, org.name]), placeholder: t('org') })) : null,
           row.side === 'IN' && !row.budgetLineId ? h(FormRow, { label: t('adjTargetDept') }, h(SearchSelect, { value: row.targetDepartmentId, onChange: value => updateRow(index, { targetDepartmentId: value }), options: (departments || []).map(department => [department.id, department.name]), placeholder: t('department') })) : null,
           row.side === 'IN' && !row.budgetLineId ? h(FormRow, { label: t('adjTargetMonth') }, h(Select, { value: row.targetMonth, onChange: value => updateRow(index, { targetMonth: value }), options: [...Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1} 月`]), ['0', '全年']], placeholder: t('adjTargetMonth') })) : null,
             h(LinkButton, { onClick: () => setRows(current => current.filter((_, i) => i !== index)) }, h(Glyph, { name: 'trash', size: 13 })))),
         isTransfer ? h(Notice, { tone: guardBad ? 'rose' : null }, guardBad ? `${t('adjGuardBad')}（IN ${wan(sumIn / 100)} ≠ OUT ${wan(sumOut / 100)}）` : `${t('adjGuard')}：IN ${wan(sumIn / 100)} = OUT ${wan(sumOut / 100)}`) : null))))
+}
+
+/** 每条调整独立读取可访问预算行，不依赖预算执行页的历史加载状态。 */
+function FinanceAdjustmentLinePicker({ year, orgs, departments, value, allowNew, busy, t, onChange }) {
+  const [page, setPage] = useState(1)
+  const [orgId, setOrgId] = useState('')
+  const [departmentId, setDepartmentId] = useState('')
+  const [chosenLabel, setChosenLabel] = useState('')
+  const query = new URLSearchParams({ year, page, limit: 20 })
+  if (orgId) query.set('orgId', orgId)
+  if (departmentId) query.set('departmentId', departmentId)
+  const resource = useFinanceResource(`/finance/budget/lines?${query}`, 0)
+  const lines = financeRows(resource.data)
+  return h('div', { className: 'sf-stack' },
+    h('div', { className: 'sf-filters' },
+      h(SearchSelect, { value: orgId, disabled: busy, onChange: id => { setOrgId(id); setPage(1) }, options: (orgs || []).filter(org => org.type !== 'GROUP').map(org => [org.id, org.name]), placeholder: '筛选预算行主体' }),
+      h(SearchSelect, { value: departmentId, disabled: busy, onChange: id => { setDepartmentId(id); setPage(1) }, options: (departments || []).map(department => [department.id, department.name]), placeholder: '筛选预算行部门' })),
+    h(FinanceResource, { resource },
+      h(SearchSelect, { value: value || (allowNew ? '__new__' : ''), disabled: busy || resource.loading || Boolean(resource.error), selectedLabel: value ? chosenLabel || undefined : allowNew ? '新建预算行' : undefined, onChange: id => { setChosenLabel(lineLabel(lines.find(line => line.id === id) || {})); onChange(id === '__new__' ? '' : id) }, options: [...(allowNew ? [['__new__', '新建预算行']] : []), ...lines.map(line => [line.id, lineLabel(line)])], placeholder: '本页预算行；可筛选或翻页查找' }),
+      h('p', { className: 'sf-note' }, '当前年度、可访问的正式预算行，每页 20 条；翻页保留已选记录。'),
+      h(Pager, { page, total: resource.data?.total, limit: 20, onPage: busy ? () => {} : setPage })))
 }
 
 function AdjustDetailDialog({ id, t, onClose }) {
@@ -651,22 +672,25 @@ function VersionDiffDialog({ versions, year, t, onClose }) {
 }
 
 function SaveViewDialog({ view, filters, t, onClose, onSaved }) {
-  const [name, setName] = useState('')
-  const submit = () => {
-    if (!name.trim()) return
-    const query = financeBudgetSavedQuery(view, filters)
-    post('/saved-views', { name: name.trim(), query })
-      .then(() => api('/saved-views'))
-      .then(value => { onSaved(value.data ?? { list: [] }); onClose() })
-      .catch(() => onClose())
+  const [name, setName] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState(''), [saved, setSaved] = useState(false)
+  const lock = useRef(false)
+  const submit = async () => {
+    if (!name.trim() || lock.current) return
+    lock.current = true; setBusy(true); setError('')
+    try {
+      if (!saved) { await post('/saved-views', { name: name.trim(), query: financeBudgetSavedQuery(view, filters) }); setSaved(true) }
+      const value = await api('/saved-views'); onSaved(value.data ?? { list: [] }); onClose()
+    } catch (cause) { setError(cause.message || '保存失败，名称与筛选已保留，请重试') }
+    finally { lock.current = false; setBusy(false) }
   }
-  return h(Dialog, { title: t('saveView'), width: 'sm', onClose, footer: [
-    h(GhostButton, { key: 'cancel', onClick: onClose }, t('cancel')),
-    h(PrimaryButton, { key: 'ok', disabled: !name.trim(), onClick: submit }, t('submit')),
+  return h(Dialog, { title: t('saveView'), width: 'sm', dismissDisabled: busy, onClose: busy ? undefined : onClose, footer: [
+    h(GhostButton, { key: 'cancel', disabled: busy, onClick: onClose }, saved ? '关闭' : t('cancel')),
+    h(PrimaryButton, { key: 'ok', busy, disabled: !name.trim(), onClick: submit }, saved ? '重试刷新视图列表' : t('submit')),
   ] },
     h('div', { className: 'sf-stack' },
-      h('p', { className: 'sf-note' }, t('saveViewFirst')),
-      h(FormRow, { label: t('viewName') }, h(Field, { value: name, onChange: setName, maxLength: 60, autoFocus: true }))))
+      h('p', { className: 'sf-note' }, saved ? '筛选视图已保存，列表暂未刷新；重试仅刷新列表，不重复新增。' : t('saveViewFirst')),
+      error ? h('p', { role: 'alert' }, error) : null,
+      h(FormRow, { label: t('viewName') }, h(Field, { value: name, onChange: setName, disabled: busy || saved, maxLength: 60, autoFocus: true }))))
 }
 
 function ReasonDialog({ title, required, t, onClose, onSubmit }) {
