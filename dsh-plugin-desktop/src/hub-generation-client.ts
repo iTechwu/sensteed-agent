@@ -1,7 +1,7 @@
 /** Fixed-origin aggregate execution transport. Catalog capabilities never authorize mutation. */
 import { z } from 'zod'
 import { HubHostClient, type HubHostContext } from './hub-host-client.ts'
-import { generationPlanData, verifyHubGenerationPlan, type VerifiedHubGenerationPlan, type HubGenerationPlanExpected } from './hub-generation-verifier.ts'
+import { generationPlanData, verifyHubGenerationPlan, inspectHubGenerationPlanForRecovery, type VerifiedHubGenerationPlan, type HubGenerationPlanExpected } from './hub-generation-verifier.ts'
 import type { HubReleaseTrust } from './hub-sync-verifier.ts'
 const grantSchema = z.strictObject({ executionGrant: z.uuid(), expiresAt: z.iso.datetime() })
 const statusSchema = z.strictObject({
@@ -12,7 +12,7 @@ const statusSchema = z.strictObject({
 export type HubExecutionStatus = z.infer<typeof statusSchema>
 declare const consumptionBrand: unique symbol
 export interface VerifiedHubGenerationConsumption { readonly [consumptionBrand]: true }
-const consumptions = new WeakMap<VerifiedHubGenerationConsumption, Readonly<{ planId: string; planDigest: string; operationId: string; tenantId: string; actorRef: string; deviceId: string; profileId: string; executionGeneration: string; executionExpiresAt: string; proposedGenerationDigest: string }>>()
+const consumptions = new WeakMap<VerifiedHubGenerationConsumption, Readonly<{ planId: string; planDigest: string; operationId: string; tenantId: string; actorRef: string; deviceId: string; profileId: string; executionGeneration: string; executionExpiresAt: string; proposedGenerationDigest: string; previousGenerationDigest: string | null }>>()
 export function hubGenerationConsumptionData(cap: VerifiedHubGenerationConsumption) {
   const proof = consumptions.get(cap)
   if (!proof || Date.parse(proof.executionExpiresAt) <= Date.now()) throw new Error('Invalid or expired Hub consumption capability')
@@ -73,9 +73,46 @@ export class HubGenerationClient {
     const capability = Object.freeze({}) as VerifiedHubGenerationConsumption
     consumptions.set(capability, Object.freeze({ planId: plan.planId, planDigest: plan.planDigest, operationId,
       tenantId: plan.tenantId, actorRef: plan.actorRef, deviceId: plan.deviceId, profileId: plan.profileId,
-      executionGeneration: status.executionGeneration, executionExpiresAt: status.executionExpiresAt, proposedGenerationDigest: plan.proposedGenerationDigest }))
+      executionGeneration: status.executionGeneration, executionExpiresAt: status.executionExpiresAt, proposedGenerationDigest: plan.proposedGenerationDigest, previousGenerationDigest: plan.expectedActiveGenerationDigest }))
     consumptionOwners.set(capability, () => this.client.assertCurrent(this.context))
     return capability
+  }
+  /** Cryptographic observation alone cannot execute. Fresh operation status is always required. */
+  async consumptionForRecovery(envelope: unknown, trust: HubReleaseTrust, expected: HubGenerationPlanExpected, operationId: string) {
+    this.client.assertCurrent(this.context)
+    if (expected.tenantId !== this.context.tenantId || expected.actorRef !== this.context.actorRef) throw new Error('Hub execution identity changed')
+    z.uuid().parse(operationId)
+    const plan = inspectHubGenerationPlanForRecovery(envelope, trust, expected)
+    const value = await this.client.generationRequest(this.context, { kind: 'consume-status', planId: plan.planId,
+      body: { deviceId: plan.deviceId, profileId: plan.profileId, planDigest: plan.planDigest,
+        expectedActiveGenerationDigest: plan.expectedActiveGenerationDigest, operationId } })
+    const status = statusSchema.parse(value)
+    if (status.planId !== plan.planId || status.operationId !== operationId || status.proposedGenerationDigest !== plan.proposedGenerationDigest
+      || status.state !== 'consumed' || !status.authorized || !status.executionGeneration || !status.executionExpiresAt
+      || Date.parse(status.executionExpiresAt) <= Date.now()) throw new Error('Hub recovery operation is not authorized')
+    const proof = Object.freeze({}) as VerifiedHubGenerationConsumption
+    consumptions.set(proof, Object.freeze({ planId: plan.planId, planDigest: plan.planDigest, operationId,
+      tenantId: plan.tenantId, actorRef: plan.actorRef, deviceId: plan.deviceId, profileId: plan.profileId,
+      executionGeneration: status.executionGeneration, executionExpiresAt: status.executionExpiresAt, proposedGenerationDigest: plan.proposedGenerationDigest, previousGenerationDigest: plan.expectedActiveGenerationDigest }))
+    consumptionOwners.set(proof, () => this.client.assertCurrent(this.context))
+    return Object.freeze({ plan, proof })
+  }
+  async receipt(proof: VerifiedHubGenerationConsumption, receipt: {
+    readonly seq: number; readonly previousGenerationDigest: string | null; readonly phase: 'STAGED' | 'COMMITTED' | 'ACTIVATED' | 'ROLLED_BACK' | 'NEEDS_ATTENTION';
+    readonly evidenceDigest: string; readonly occurredAt: string; readonly errorCode: string | null
+  }): Promise<void> {
+    const authority = consumptions.get(proof)
+    if (!authority) throw new Error('Invalid Hub consumption capability')
+    consumptionOwners.get(proof)!()
+    if (receipt.previousGenerationDigest !== authority.previousGenerationDigest) throw new Error('Hub receipt previous generation mismatch')
+    if (authority.tenantId !== this.context.tenantId || authority.actorRef !== this.context.actorRef) throw new Error('Hub receipt identity changed')
+    z.strictObject({ seq:z.number().int().nonnegative(),previousGenerationDigest:z.string().regex(/^[a-f0-9]{64}$/u).nullable(),
+      phase:z.enum(['STAGED','COMMITTED','ACTIVATED','ROLLED_BACK','NEEDS_ATTENTION']),evidenceDigest:z.string().regex(/^[a-f0-9]{64}$/u),
+      occurredAt:z.iso.datetime(),errorCode:z.string().max(120).nullable() }).parse(receipt)
+    const result = await this.client.generationRequest(this.context, { kind:'receipt', body:{ ...receipt,
+      deviceId:authority.deviceId,profileId:authority.profileId,planId:authority.planId,planDigest:authority.planDigest,
+      operationId:authority.operationId,executionGeneration:authority.executionGeneration,generationDigest:authority.proposedGenerationDigest } })
+    z.strictObject({ack:z.literal(true)}).parse(result)
   }
   private statusReply(cap: VerifiedHubGenerationPlan, operationId: string, value: unknown): Readonly<HubExecutionStatus> {
     const plan = generationPlanData(cap), status = statusSchema.parse(value)

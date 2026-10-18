@@ -50,3 +50,17 @@ it('rejects another operation and an authorized expired status', async () => {
  status.operationId=operationId;status.executionExpiresAt=new Date(Date.now()-1000).toISOString()
  await expect(client.status(cap,operationId)).rejects.toThrow('status invalid')
 })
+it('recovers an expired signed plan only with fresh consumed operation authority', async () => {
+ const f=fixture(),operationId=randomUUID(),now=Date.now()
+ const envelope=f.signed({...f.plan,issuedAt:new Date(now-600000).toISOString(),expiresAt:new Date(now-300000).toISOString()})
+ const status={planId:f.plan.planId,operationId,state:'consumed',authorized:true,executionGeneration:'9',executionExpiresAt:new Date(now+1800000).toISOString(),proposedGenerationDigest:f.plan.proposedGenerationDigest}
+ const wire=vi.fn(async()=>status),assertCurrent=vi.fn()
+ const client=new HubGenerationClient({assertCurrent,generationRequest:wire} as never,{tenantId:f.expected.tenantId,actorRef:f.expected.actorRef} as never)
+ const recovery=await client.consumptionForRecovery(envelope,f.trust,f.expected,operationId)
+ expect(hubGenerationConsumptionData(recovery.proof).executionGeneration).toBe('9')
+ expect(()=>generationPlanData(recovery.plan as never)).toThrow('capability')
+ assertCurrent.mockImplementation(()=>{throw new Error('identity changed')})
+ expect(()=>hubGenerationConsumptionData(recovery.proof)).toThrow('identity changed')
+ assertCurrent.mockImplementation(()=>undefined);status.authorized=false
+ await expect(client.consumptionForRecovery(envelope,f.trust,f.expected,operationId)).rejects.toThrow('not authorized')
+})
