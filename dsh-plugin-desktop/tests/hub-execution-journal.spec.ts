@@ -1,3 +1,4 @@
+import{inspectSavedHubPlan}from'../src/hub-saved-plan.ts'
 import { generateKeyPairSync, randomUUID, sign } from 'node:crypto'
 import { afterEach, expect, it } from 'vitest'
 import { mkdtempSync, realpathSync, rmSync, readFileSync, writeFileSync } from 'node:fs'
@@ -56,3 +57,5 @@ it('rejects forged plan capability and journal identity tampering', async () => 
  writeFileSync(join(store.directory,'execution.json'),JSON.stringify({...value,scope:'f'.repeat(64)}),{mode:0o600})
  expect(()=>journal.read()).toThrow('identity mismatch')
 })
+
+it('retains the signed inventory for identity and target-bound recovery without granting execution',async()=>{const f=fixture(),root=realpathSync(mkdtempSync(join(tmpdir(),'hub-inventory-')));roots.push(root);const identity={origin:f.expected.origin,tenantId:f.expected.tenantId,actorRef:f.expected.actorRef,deviceId:f.expected.deviceId,profileId:f.expected.profileId},store=new HubGenerationStore(root,identity),journal=new HubExecutionJournal(store),envelope=f.signed();const record=await journal.begin(verifyHubGenerationPlan(envelope,f.trust,f.expected),randomUUID(),envelope);expect(inspectSavedHubPlan(record,identity,f.expected.target,f.trust).plan.planId).toBe(f.plan.planId);expect(()=>inspectSavedHubPlan(record,{...identity,actorRef:'other'},f.expected.target,f.trust)).toThrow();expect(()=>inspectSavedHubPlan(record,identity,{...f.expected.target,hostBuildDigest:'a'.repeat(64)},f.trust)).toThrow();await expect(journal.saveHealthyInventory()).rejects.toThrow('not healthy');expect(journal.readHealthyInventory()).toBeUndefined()})

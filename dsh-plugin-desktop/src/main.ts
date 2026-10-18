@@ -1,3 +1,11 @@
+import{registerHubGenerationRoutes}from'./hub-generation-routes.ts'
+import{inspectSavedHubPlan}from'./hub-saved-plan.ts'
+import { HubSupervisorRequestSchema,provideHubSupervisor,type HubSupervisorRequest } from './hub-supervisor-protocol.ts'
+import { HubGenerationStore } from './hub-generation-store.ts'
+import { HubExecutionJournal } from './hub-execution-journal.ts'
+import { hubGenerationBootReference } from './hub-generation-boot.ts'
+import { verifyHubBootAuthorization } from './hub-boot-authorization.ts'
+import { readSealedHubReleaseTrust } from './hub-release-trust.ts'
 /** Sensteed-Agent executable: minimal Electron bootstrap around the Host Cordis root. */
 
 // Tool subprocesses start the private Node runner through this Electron binary,
@@ -1799,16 +1807,15 @@ async function start(): Promise<void> {
     hubBoot = prepared.hubGeneration === undefined ? undefined : prepareHubHostBoot(prepared.hubGeneration, prepared.profile.dir,
       [...composeEntries([prepared.patches])].map(entry => entry.id))
     const hubRuntimeTarget=await readHubRuntimeTarget({isPackaged:app.isPackaged,appPath:app.getAppPath(),resourcesPath:process.resourcesPath,sensteedVersion:appVersion})
-    if(hubRuntimeTarget!==undefined)prepared={...prepared,patches:hubBaseComposition(prepared.patches)}
+    if(hubRuntimeTarget!==undefined){const{hubGeneration:_untrustedBoot,...base}=prepared;prepared={...base,patches:hubBaseComposition(prepared.patches)};hubBoot=undefined}
     const hostPatches = hubBoot === undefined ? prepared.patches : [...prepared.patches, hubBoot.patch]
     const profileBoot = createDesktopProfileBoot(prepared, desktopPnpmBootstrap, hubBoot?.selection, hubBoot === undefined ? [] : [hubBoot.patch],hubRuntimeTarget===undefined?undefined:hubBaseComposition)
     const hubSupervisor=new HubHostSupervisor()
     generation.bindHost({fiber:{dispose:()=>hubSupervisor.dispose()}})
-    if (process.env.DSH_DESKTOP_ISOLATED_HOST !== '0') {
-      startupStage = 'host-boot'
-      lifecycleRecorder.transitionStartupStage(startupStage)
+    const hubBasePrepared=prepared
+    const bootIsolatedHost=async(nextPrepared:typeof prepared,bindNext:(host:import('./startup-generation.ts').DesktopStartupGenerationHost)=>void)=>{
       await startIsolatedDesktopHost({
-        host: { ...(hubRuntimeTarget===undefined?{}:{hubRuntimeTarget}), prepared, profilePreferences, homeDir, activeProfileName, pluginManagementStatePath,
+        host: { ...(hubRuntimeTarget===undefined?{}:{hubRuntimeTarget}), prepared:nextPrepared, profilePreferences:profilePreferences!, homeDir, activeProfileName, pluginManagementStatePath,
           selectionStatePath, marketUserDataDir, releaseUserDataLocations, desktopLaunchEnvironment,
           desktopProxyOverlay: proxyResolution.overlay,
           desktopPnpmBootstrap, primaryRuntime, logDirectory: join(desktopUserDataDir, 'logs', 'host') },
@@ -1819,12 +1826,13 @@ async function start(): Promise<void> {
         // only binds the generation's minimal lifetime object here — it is
         // `{ fiber: { dispose } }`, never a Context, and must not be handed
         // to `profileBoot.prepare`.
-        bindHost: host => { hubSupervisor.bind(host) }, requestQuit,
+        bindHost: bindNext, requestQuit,
         registerQuitInspection: impl => {
           quitInspectionProbe = impl === undefined
             ? undefined
             : async () => ({ source: 'ready' as const, ...(await impl()) })
         },
+        requestHubSwitch: request=>{setImmediate(()=>{void handleHubSwitch(request).catch(cause=>electronLogger.errorCause(cause))})},
         registerHubHealth: impl => { inspectHubHealth = impl },
         registerMandatoryDownload: impl => {
           mandatoryDownloadProbe = impl ?? undefined
@@ -1843,6 +1851,39 @@ async function start(): Promise<void> {
             .catch((cause: unknown) => { electronLogger.errorCause(cause) })
         },
       })
+    }
+    const handleHubSwitch=async(raw:HubSupervisorRequest):Promise<void>=>{
+      if(hubRuntimeTarget===undefined)throw new Error('Hub sealed target unavailable')
+      const request=HubSupervisorRequestSchema.parse(raw)
+      if(request.kind==='base'){hubBoot=undefined;await hubSupervisor.replace(async()=>{},async bind=>{await bootIsolatedHost(hubBasePrepared,bind)});return}
+      const store=new HubGenerationStore(marketUserDataDir,request.identity)
+      if(request.kind==='activate'){
+        const record=new HubExecutionJournal(store).read(),state=store.readState()
+        if(!record||record.operationId!==request.operationId||record.phase!=='STAGED'||record.pendingReceipt!==null||state.phase!=='prepared'||state.pending?.descriptorDigest!==record.descriptorDigest)throw new Error('Hub staged restart mismatch')
+        inspectSavedHubPlan(record,request.identity,hubRuntimeTarget,readSealedHubReleaseTrust())
+        await hubSupervisor.replace(async()=>{hubBoot=undefined;await store.activate()},async bind=>{await bootIsolatedHost(hubBasePrepared,bind)})
+      }else{
+        const journal=new HubExecutionJournal(store),pendingRecord=journal.read(),active=store.readState().active,record=pendingRecord?.descriptorDigest===active?.descriptorDigest?pendingRecord:journal.readHealthyInventory()
+        if(!record||record.generationDigest!==request.generationDigest||record.phase!=='COMMITTED'&&record.phase!=='ACTIVATED')throw new Error('Hub managed restart mismatch')
+        verifyHubBootAuthorization(request.lease,readSealedHubReleaseTrust(),{...request.identity,target:hubRuntimeTarget,generationDigest:request.generationDigest,minimumPolicyRevision:inspectSavedHubPlan(record,request.identity,hubRuntimeTarget,readSealedHubReleaseTrust()).plan.policyRevision})
+        const reference=hubGenerationBootReference(store,prepared.profile.dir),input={reference,expectedIdentity:request.identity,skillProviderName:`hub-${reference.generationId}`}
+        hubBoot=prepareHubHostBoot(input,prepared.profile.dir,[...composeEntries([hubBasePrepared.patches])].map(row=>row.id))
+        try{
+        await hubSupervisor.replace(async()=>{},async bind=>{await bootIsolatedHost({...hubBasePrepared,hubGeneration:input},bind)})
+        if(!inspectHubHealth)throw new Error('Hub managed health unavailable')
+        const evidence=await inspectHubHealth()
+        if(evidence.generationId!==reference.generationId)throw new Error('Hub managed health mismatch')
+        if(store.readState().phase==='verifying')await store.markHealthy(evidence.generationId)
+        }catch(cause){
+          await hubSupervisor.replace(async()=>{if(store.readState().phase==='verifying')await store.rollback()},async bind=>{await bootIsolatedHost(hubBasePrepared,bind)})
+          throw cause
+        }
+      }
+    }
+    if (process.env.DSH_DESKTOP_ISOLATED_HOST !== '0') {
+      startupStage = 'host-boot'
+      lifecycleRecorder.transitionStartupStage(startupStage)
+      await bootIsolatedHost(prepared,host=>hubSupervisor.bind(host))
     } else {
       // Same bundled-skills contract as the isolated Host entry: the legacy
       // in-process boot must announce the app-bundled skill root too.
@@ -1889,8 +1930,10 @@ async function start(): Promise<void> {
           // Keep Host imports and browser bundle discovery on the same public
           // profile-overlay resolver used by packaged Electron.
           hostCtx.loader.internal = undefined
+          provideHubSupervisor(hostCtx,async request=>{setImmediate(()=>{void handleHubSwitch(request).catch(cause=>electronLogger.errorCause(cause))})})
           registerHubHostService(hostCtx)
-          if(hubRuntimeTarget!==undefined)registerHubGenerationManager(hostCtx,{target:hubRuntimeTarget,userData:marketUserDataDir,profileDirectory:prepared.profile.dir})
+          registerHubGenerationRoutes(hostCtx)
+          if(hubRuntimeTarget!==undefined)registerHubGenerationManager(hostCtx,{target:hubRuntimeTarget,userData:marketUserDataDir,profileDirectory:prepared.profile.dir,managed:hubBoot!==undefined})
           if (hubBoot !== undefined) {
             const managedBoot = hubBoot
             registerHubSkillRoots(hostCtx, managedBoot)

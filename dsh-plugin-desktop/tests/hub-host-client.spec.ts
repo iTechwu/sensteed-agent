@@ -82,3 +82,5 @@ it('downloads only aggregate UUID content and checks exact streamed signed bytes
  await expect(f.client.generationBytes(context,id,expected)).rejects.toMatchObject({code:'HUB_INVALID_RESPONSE'})
  f.client.dispose()
 })
+
+it('notifies the running managed Host only for binding changes, not its first context sample',async()=>{const f=fixture(),listener=vi.fn();const stop=f.client.watchInvalidation(listener);await f.client.context();expect(listener).not.toHaveBeenCalled();f.logout();expect(listener).toHaveBeenCalledOnce();stop();f.change();expect(listener).toHaveBeenCalledOnce();f.client.dispose()})

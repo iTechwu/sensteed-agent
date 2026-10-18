@@ -1,3 +1,4 @@
+import{registerHubGenerationRoutes}from'./hub-generation-routes.ts'
 import { hubBaseComposition } from './hub-base-composition.ts'
 /** Headless bootstrap for the Beta isolated Host experiment. */
 import type { HubSkillObservation } from './hub-generation-health.ts'
@@ -155,7 +156,8 @@ export async function bootDesktopHost(options: DesktopHostOptions, runtime: Desk
         // profile-overlay resolver used by packaged Electron.
         hostCtx.loader.internal = undefined
         registerHubHostService(hostCtx)
-        if(options.hubRuntimeTarget!==undefined)registerHubGenerationManager(hostCtx,{target:options.hubRuntimeTarget,userData:marketUserDataDir,profileDirectory:prepared.profile.dir})
+          registerHubGenerationRoutes(hostCtx)
+        if(options.hubRuntimeTarget!==undefined)registerHubGenerationManager(hostCtx,{target:options.hubRuntimeTarget,userData:marketUserDataDir,profileDirectory:prepared.profile.dir,managed:hubBoot!==undefined})
         bindHost(hostCtx)
         hostCtx.effect(() => () => logSink.close(), 'dsh-plugin-desktop: Host log sink')
         hostCtx.effect(

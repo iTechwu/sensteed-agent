@@ -1,3 +1,4 @@
+import { provideHubSupervisor } from './hub-supervisor-protocol.ts'
 /** Utility-process entrypoint. No BrowserWindow or Electron main APIs are imported here. */
 import { installFailLoud } from '@deepseek-ai/dsh-app-boot'
 import { installProxyFromEnvironment } from '@deepseek-ai/dsh-http-proxy'
@@ -111,6 +112,7 @@ rpc.handle('boot', async args => {
     inspectServices = await bootDesktopHost(options, runtime, browser, lan,
       hostCtx => {
         host = hostCtx
+        provideHubSupervisor(hostCtx as never,async request=>{await rpc.call('hubSwitch',[request])})
         const injectable = hostCtx as unknown as {
           inject(names: readonly string[], wire: (scope: Record<string, never>) => void): void
         }

@@ -47,6 +47,8 @@ async function responseJson(response: Response): Promise<unknown> {
 }
 /** Tokens are sampled inside each Host call and never included in returned context or diagnostics. */
 export class HubHostClient {
+  private readonly invalidationListeners = new Set<()=>void>()
+  watchInvalidation(listener:()=>void):()=>void { this.invalidationListeners.add(listener); return ()=>{this.invalidationListeners.delete(listener)} }
   private revision = 0
   private owner: string | undefined
   private selection: string | undefined
@@ -56,15 +58,16 @@ export class HubHostClient {
   constructor(private readonly auth: HubSsoSource, private readonly fetcher: typeof fetch = globalThis.fetch) {
     this.unwatch = auth.watchBinding(() => this.invalidate())
   }
-  private invalidate(): void {
+  private invalidate(notify = true): void {
     this.revision += 1; this.controller.abort(); this.controller = new AbortController(); this.selection = undefined
+    if(notify) for(const listener of this.invalidationListeners) listener()
   }
   dispose(): void { this.disposed = true; this.controller.abort(); this.unwatch() }
   private current(): { session: HubSsoSession; revision: number } {
     const session = this.auth.getDatasourceSession()
     if (this.disposed || !session?.accessToken || !session.operator || !UUID.test(session.tenantId)) fail('HUB_SSO_REQUIRED')
     const owner = JSON.stringify([session.operator, session.tenantId])
-    if (this.owner !== owner) { this.owner = owner; this.invalidate() }
+    if (this.owner !== owner) { const changed=this.owner!==undefined; this.owner = owner; this.invalidate(changed) }
     return { session, revision: this.revision }
   }
   assertCurrent(context: HubHostContext): void {

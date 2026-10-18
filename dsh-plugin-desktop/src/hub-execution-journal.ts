@@ -50,12 +50,13 @@ export class HubExecutionJournal {
       return Object.freeze(value)
     } finally { closeSync(fd) }
   }
-  private write(value: HubExecutionRecord): void {
-    const temp = `${this.path}.${randomUUID()}.tmp`
+  private write(value: HubExecutionRecord, destination=this.path): void {
+    if(existsSync(destination))privateEntry(destination,false)
+    const temp = `${destination}.${randomUUID()}.tmp`
     const fd = openSync(temp, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL, 0o600)
     try { writeFileSync(fd, JSON.stringify(recordSchema.parse(value))); fsyncSync(fd) } finally { closeSync(fd) }
     try {
-      this.check(); renameSync(temp, this.path)
+      this.check(); renameSync(temp, destination)
       if (process.platform !== 'win32') { const dir = openSync(this.store.directory, constants.O_RDONLY); try { fsyncSync(dir) } finally { closeSync(dir) } }
     } finally { if (existsSync(temp)) unlinkSync(temp) }
   }
@@ -72,6 +73,21 @@ export class HubExecutionJournal {
         operationId, previousGenerationDigest: plan.expectedActiveGenerationDigest, generationDigest: plan.proposedGenerationDigest,
         phase: 'PLANNED', revision: (old?.revision ?? -1) + 1, receiptSeq: 0, executionGeneration: null, executionExpiresAt: null, signedPlan, descriptorDigest: null, pendingReceipt:null })
       this.write(value); return Object.freeze(value)
+    })
+  }
+  readHealthyInventory():HubExecutionRecord|undefined{
+    this.check();const path=join(this.store.directory,'healthy-inventory.json')
+    if(!existsSync(path))return undefined
+    privateEntry(path,false)
+    const fd=openSync(path,constants.O_RDONLY|(constants.O_NOFOLLOW??0))
+    try{if(fstatSync(fd).size>1024*1024)throw new Error('Oversized Hub inventory');const value=recordSchema.parse(JSON.parse(readFileSync(fd,'utf8')));if(value.scope!==this.store.scope||value.phase!=='ACTIVATED'||value.pendingReceipt!==null)throw new Error('Invalid healthy Hub inventory');return Object.freeze(value)}finally{closeSync(fd)}
+  }
+  async saveHealthyInventory():Promise<void>{
+    this.check()
+    await withFileLock(this.path,async()=>{
+      const record=this.read(),active=this.store.readState().active
+      if(!record||record.phase!=='ACTIVATED'||record.pendingReceipt!==null||!active||active.descriptorDigest!==record.descriptorDigest)throw new Error('Hub inventory is not healthy')
+      this.write(record,join(this.store.directory,'healthy-inventory.json'))
     })
   }
   /** Persist the exact timestamp and payload before sending; ambiguous sends retry byte-equivalent data. */
