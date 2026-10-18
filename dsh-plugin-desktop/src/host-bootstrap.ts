@@ -79,6 +79,7 @@ export interface DesktopHostOptions {
 
 export async function bootDesktopHost(options: DesktopHostOptions, runtime: DesktopRuntime,
   browserAccess: DesktopBrowserAccess, lanHttps: DesktopLanHttpsRuntime,
+  // Called once before composed plugins mount, so required supervisor services exist at boot.
   bindHost: (host: DesktopStartupGenerationHost) => void, requestQuit: (code: number) => void,
 ): Promise<() => { aaRuntime: boolean; aaOnboarding: boolean }> {
   const { prepared, profilePreferences, homeDir, activeProfileName, pluginManagementStatePath,
@@ -337,7 +338,6 @@ export async function bootDesktopHost(options: DesktopHostOptions, runtime: Desk
       releasePackageResolver()
       throw cause
     })
-    bindHost(ctx)
     profileBoot.markReady()
     observeDesktopPreferenceSettings(ctx, fileExporter, enqueueProfilePreferencesWrite)
     void logInactiveStartupEntries(ctx, BIN_NAME)
