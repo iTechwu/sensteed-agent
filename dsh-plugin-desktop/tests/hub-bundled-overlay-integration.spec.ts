@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
 
-it('boots one exact Host and resolves Client, icon and static assets from its generation', () => {
+it.each([true,false])('boots exact generation ownership and resources without activating a disabled plugin (enabled=%s)', enabled => {
   const script = `
     import assert from 'node:assert/strict';
     import { mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync,realpathSync } from 'node:fs';
@@ -26,21 +26,21 @@ it('boots one exact Host and resolves Client, icon and static assets from its ge
         'static.txt':'exact static', 'icon.svg':'exact icon'
       }, files={};
       for(const [path,body]of Object.entries(payload)){writeFileSync(join(gen,prefix,path),body,{mode:0o600});files[prefix+'/'+path]=createHash('sha256').update(body).digest('hex')}
-      await store.prepare({schemaVersion:2,identity,generationId:'exact',packages:[{name,manifest:prefix+'/package.json',releaseId:'r',payloadDigest:'a'.repeat(64)}],skillsRoot:'skills',files,verifiedComposition:{entries:[{id:'exact-host',packageName:name,config:{}}],skills:[]}});await store.activate();
+      await store.prepare({schemaVersion:2,identity,generationId:'exact',packages:[{name,manifest:prefix+'/package.json',releaseId:'r',payloadDigest:'a'.repeat(64)}],skillsRoot:'skills',files,verifiedComposition:{entries:${enabled ? "[{id:'exact-host',packageName:name,config:{}}]" : '[]'},skills:[]}});await store.activate();
       const base=[{insert:[{id:'bundled-host',name},{id:'bundled-client',name:name+'/client'}]}];
       const selected=prepareHubHostBoot({reference:hubGenerationBootReference(store,logical),expectedIdentity:identity,skillProviderName:'hub-exact'},logical,base);
       const baseUrl=pathToFileURL(join(logical,'package.json')).href;
       release=installProfilePackageResolver(baseUrl,selected.selection,true);
       ctx=await boot('overlay-integration',join(logical,'root.yml'),selected.patches,async ctx=>{ctx.loader.internal=undefined;await ctx.plugin(DesktopPluginPackages)},baseUrl);
-      assert.equal(globalThis.exactHostCount,1);
-      assert.deepEqual([...ctx.loader.entries()].filter(e=>e.options.name.startsWith(name)).map(e=>e.options.id),['exact-host']);
+      assert.equal(globalThis.exactHostCount??0,${enabled ? 1 : 0});
+      assert.deepEqual([...ctx.loader.entries()].filter(e=>e.options.name.startsWith(name)).map(e=>e.options.id),${enabled ? "['exact-host']" : '[]'});
       const selectedPackage=ctx.pluginPackages.packageOf(name,baseUrl);
       assert.equal(selectedPackage.dir,join(gen,prefix));
       const client=await import(pathToFileURL(createRequire(baseUrl).resolve(name+'/client')).href);
       assert.equal(client.version,'exact');assert.equal(readFileSync(client.asset,'utf8'),'exact static');
       assert.equal(readFileSync(join(selectedPackage.dir,selectedPackage.manifest.icon),'utf8'),'exact icon');
       assert.deepEqual(selected.compose(base),selected.patches);
-      await ctx.fiber.dispose();ctx=undefined;assert.equal(globalThis.exactHostCount,0);
+      await ctx.fiber.dispose();ctx=undefined;assert.equal(globalThis.exactHostCount??0,0);
       console.log('exact Host/Client/resources passed');
     } finally {await ctx?.fiber.dispose();release?.();rmSync(root,{recursive:true,force:true})}
   `
