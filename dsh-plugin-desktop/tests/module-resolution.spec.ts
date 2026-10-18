@@ -546,12 +546,12 @@ describe('installProfilePackageResolver', () => {
       '@deepseek-ai/dsh-client-modules/package.json',
       { filename: profileManifestPath },
       false,
-    )).toMatch(/(node_modules[\\/]@deepseek-ai[\\/]dsh-client-modules[\\/]package\.json|deepseek-harness[\\/]packages[\\/]client[\\/]modules[\\/]package\.json)$/u)
+    )).toMatch(/(node_modules[\\/]@deepseek-ai[\\/]dsh-client-modules[\\/]package\.json|(?:deepseek-harness|harness-hub)[\\/]packages[\\/]client[\\/]modules[\\/]package\.json)$/u)
     expect(resolveFilename(
       '@deepseek-ai/dsh-client-modules/package.json',
       { filename: profileConfigPath },
       false,
-    )).toMatch(/(node_modules[\\/]@deepseek-ai[\\/]dsh-client-modules[\\/]package\.json|deepseek-harness[\\/]packages[\\/]client[\\/]modules[\\/]package\.json)$/u)
+    )).toMatch(/(node_modules[\\/]@deepseek-ai[\\/]dsh-client-modules[\\/]package\.json|(?:deepseek-harness|harness-hub)[\\/]packages[\\/]client[\\/]modules[\\/]package\.json)$/u)
     expect(resolveFilename(
       '@deepseek-ai/dsh-client-modules/package.json',
       { filename: join(tmpdir(), 'another-profile', 'package.json') },

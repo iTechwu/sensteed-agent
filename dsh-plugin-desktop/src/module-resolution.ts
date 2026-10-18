@@ -33,6 +33,7 @@ type ModuleSource = 'install' | 'profile'
 interface ProfileResolverRegistration {
   readonly profileBaseUrl: string
   readonly profileDirectory: string
+  readonly hostOwnedOnly?: boolean
   readonly managedSelection?: HubManagedPackageSelection
   readonly sharedFallbackDirectory: string
   readonly moduleSources: Map<string, ModuleSource>
@@ -370,6 +371,7 @@ function selectedOverlayCandidate(
   const overlay = findOverlayPackage(packageName, {
     installPackageUrl: DESKTOP_PACKAGE_URL,
     profilePackageUrl: registration.profileBaseUrl,
+    ...(registration.hostOwnedOnly===true?{hostOwnedOnly:true}:{}),
     ...(registration.managedSelection === undefined ? {} : { managedSelection: registration.managedSelection }),
   })
   // Missing packages are intentionally not cached: Market/HMR can publish one
@@ -717,7 +719,7 @@ function ensureResolverState(): ProcessResolverState {
  * @param profileBaseUrl - file URL for the Profile package.json.
  * @returns an idempotent registration disposer.
  */
-export function installProfilePackageResolver(profileBaseUrl: string, managedSelection?: HubManagedPackageSelection): () => void {
+export function installProfilePackageResolver(profileBaseUrl: string, managedSelection?: HubManagedPackageSelection, hostOwnedOnly=false): () => void {
   const parsed = new URL(profileBaseUrl)
   if (parsed.protocol !== 'file:' || parsed.search.length > 0 || parsed.hash.length > 0) {
     throw new Error('dsh-plugin-desktop: Profile package resolver requires a plain file URL')
@@ -733,6 +735,7 @@ export function installProfilePackageResolver(profileBaseUrl: string, managedSel
   if (registration === undefined) {
     registration = {
       profileBaseUrl: normalizedBaseUrl,
+      hostOwnedOnly,
       ...(managedSelection === undefined ? {} : { managedSelection }),
       profileDirectory,
       sharedFallbackDirectory: join(dirname(profileDirectory), 'node_modules'),
@@ -748,7 +751,7 @@ export function installProfilePackageResolver(profileBaseUrl: string, managedSel
     state.registrations.set(normalizedBaseUrl, registration)
     refreshCanonicalProfilePath(registration)
   } else {
-    if (registration.managedSelection !== managedSelection) throw new Error('Profile resolver generation authority changed while retained')
+    if (registration.managedSelection !== managedSelection||registration.hostOwnedOnly!==hostOwnedOnly) throw new Error('Profile resolver generation authority changed while retained')
     // A retain denotes a new Loader/HMR generation.
     invalidatePackageSelections(registration)
   }

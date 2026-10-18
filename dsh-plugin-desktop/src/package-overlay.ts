@@ -35,6 +35,7 @@ export interface PackageOverlayOptions {
   /** File URL for the active Profile package.json. */
   readonly profilePackageUrl: string
   /** Store-issued exact generation authority; omitted for existing ordinary Profiles. */
+  readonly hostOwnedOnly?: boolean
   readonly managedSelection?: HubManagedPackageSelection
 }
 
@@ -160,6 +161,7 @@ export function findOverlayPackage(
   if (packageNameFromSpecifier(packageName) !== packageName) {
     throw new Error(`${BIN_NAME}: package overlay requires one exact npm package name`)
   }
+  if(options.hostOwnedOnly===true&&hubPackageIsHostOwned(packageName)){const install=readCandidate(packageName,options.installPackageUrl,'install');return install===undefined?undefined:{packageName,selected:install,install}}
   if (options.managedSelection !== undefined) {
     const manifestPath = hubManagedPackageManifest(options.managedSelection, packageName, dirname(fileURLToPath(options.profilePackageUrl)))
     if (hubPackageIsHostOwned(packageName)) {

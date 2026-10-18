@@ -1,3 +1,4 @@
+import{join}from'node:path'
 import{registerHubGenerationRoutes}from'./hub-generation-routes.ts'
 import { hubBaseComposition } from './hub-base-composition.ts'
 /** Headless bootstrap for the Beta isolated Host experiment. */
@@ -5,7 +6,7 @@ import type { HubSkillObservation } from './hub-generation-health.ts'
 import { prepareHubHostBoot, type HubTrustedHostBootInput } from './hub-host-boot.ts'
 import { registerHubHostService } from './hub-host-service.ts'
 import { registerHubGenerationManager } from './hub-generation-manager.ts'
-import { registerHubSkillRoots } from './hub-skill-roots.ts'
+import { registerHubBootstrapSkillRoots, registerHubSkillRoots } from './hub-skill-roots.ts'
 import { boot, composeEntries, resolveProfileDir } from '@deepseek-ai/dsh-app-boot'
 import { provideCmdline } from '@deepseek-ai/dsh-cmdline'
 import { createDesktopProfileBoot } from './profile-context.ts'
@@ -132,8 +133,8 @@ export async function bootDesktopHost(options: DesktopHostOptions, runtime: Desk
       [...composeEntries([prepared.patches])].map(entry => entry.id))
     const basePatches=options.hubRuntimeTarget===undefined?prepared.patches:hubBaseComposition(prepared.patches)
     const hostPatches = hubBoot === undefined ? basePatches : [...basePatches, hubBoot.patch]
-    const releasePackageResolver = installProfilePackageResolver(prepared.bareModuleBaseUrl, hubBoot?.selection)
-    const profileBoot = createDesktopProfileBoot(prepared, desktopPnpmBootstrap, hubBoot?.selection, hubBoot === undefined ? [] : [hubBoot.patch],options.hubRuntimeTarget===undefined?undefined:hubBaseComposition)
+    const releasePackageResolver = installProfilePackageResolver(prepared.bareModuleBaseUrl, hubBoot?.selection,options.hubRuntimeTarget!==undefined)
+    const profileBoot = createDesktopProfileBoot(prepared, desktopPnpmBootstrap, hubBoot?.selection, hubBoot === undefined ? [] : [hubBoot.patch],options.hubRuntimeTarget===undefined?undefined:hubBaseComposition,options.hubRuntimeTarget!==undefined)
     // dsh 0.2.0 judges every profile row through the pluginPackages service.
     // Without it the compatibility preflight falls back to Node's own lookup
     // and reads the Profile's registry-installed @deepseek-ai copies instead
@@ -145,8 +146,9 @@ export async function bootDesktopHost(options: DesktopHostOptions, runtime: Desk
       hostPatches,
       async (hostCtx) => {
         profileBoot.prepare(hostCtx)
+        if(options.hubRuntimeTarget!==undefined&&hubBoot===undefined)registerHubBootstrapSkillRoots(hostCtx,join(prepared.homeDir,'skills'))
         if (hubBoot !== undefined) {
-          registerHubSkillRoots(hostCtx, hubBoot)
+          registerHubSkillRoots(hostCtx, hubBoot,options.hubRuntimeTarget===undefined?undefined:join(prepared.homeDir,'skills'))
           hostCtx.provide('hubGenerationBoot', {
             generationId: hubBoot.generationId, skillsRoot: hubBoot.skillsRoot,
             inspectLoaded: (skills: HubSkillObservation, providerName: string) => hubBoot.inspectLoaded(hostCtx.loader, skills, providerName),

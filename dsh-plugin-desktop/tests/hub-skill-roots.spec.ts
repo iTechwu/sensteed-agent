@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest'
 const calls = vi.hoisted(() => ({ policy: vi.fn<(ctx: unknown, policy: unknown) => () => void>(() => () => undefined) }))
 vi.mock('@deepseek-ai/dsh-skill-filesystem', () => ({ installFilesystemSkillRootPolicy: calls.policy }))
-import { registerHubSkillRoots } from '../src/hub-skill-roots.ts'
+import { registerHubBootstrapSkillRoots, registerHubSkillRoots } from '../src/hub-skill-roots.ts'
 
 it('seals generation roots before mounting the sole Host provider', async () => {
   const order: string[] = []
@@ -28,3 +28,7 @@ it('seals generation roots before mounting the sole Host provider', async () => 
   expect(order).toEqual(['seal', 'mount'])
   expect(ctx.effect).toHaveBeenCalledOnce()
 })
+
+it('seals empty enterprise roots before bootstrap providers can read bundled or custom settings',()=>{calls.policy.mockImplementation((_ctx,policy)=>{expect(policy).toEqual({generationId:'bootstrap',providerName:'hub-bootstrap',roots:[]});return()=>{}});const effect=vi.fn();registerHubBootstrapSkillRoots({effect}as never);expect(effect).toHaveBeenCalledOnce()})
+
+it('adds the explicit user-local provider without extending enterprise roots',async()=>{calls.policy.mockImplementation((_ctx,policy)=>{expect(policy).toEqual({generationId:'bootstrap',providerName:'hub-bootstrap',roots:[],userRoots:['/private/home/skills']});return()=>{}});const configs:unknown[]=[];let mount!:()=>Promise<void>;registerHubBootstrapSkillRoots({effect:vi.fn(),inject:(_keys:string[],fn:(scope:unknown)=>Promise<void>)=>{mount=()=>fn({plugin:async(_p:unknown,c:unknown)=>{configs.push(c)}})}}as never,'/private/home/skills');await mount();expect(configs).toEqual([{providerName:'user-local',includeDefaultRoots:false,watch:false}])})

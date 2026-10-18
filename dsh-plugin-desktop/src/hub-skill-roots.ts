@@ -3,13 +3,23 @@ import type { Context } from '@deepseek-ai/cordis'
 import * as filesystemSkills from '@deepseek-ai/dsh-skill-filesystem'
 import type { prepareHubHostBoot } from './hub-host-boot.ts'
 
-export function registerHubSkillRoots(ctx: Context, boot: ReturnType<typeof prepareHubHostBoot>): void {
+export function registerHubBootstrapSkillRoots(ctx:Context,userRoot?:string):void {
+ const dispose=filesystemSkills.installFilesystemSkillRootPolicy(ctx,{generationId:'bootstrap',providerName:'hub-bootstrap',roots:[],...(userRoot?{userRoots:[userRoot]}:{})})
+ ctx.effect(()=>dispose,'Desktop empty enterprise bootstrap skill roots')
+ if(userRoot)registerUserSkillProvider(ctx)
+}
+
+function registerUserSkillProvider(ctx:Context):void {ctx.inject(['skills'],async scope=>{await scope.plugin(filesystemSkills,{providerName:'user-local',includeDefaultRoots:false,watch:false})})}
+
+export function registerHubSkillRoots(ctx: Context, boot: ReturnType<typeof prepareHubHostBoot>,userRoot?:string): void {
   const dispose = filesystemSkills.installFilesystemSkillRootPolicy(ctx, {
+    ...(userRoot?{userRoots:[userRoot]}:{}),
     generationId: boot.generationId,
     providerName: boot.skillProviderName,
     roots: [{ path: boot.skillsRoot, source: 'hub', rank: 100 }],
   })
   ctx.effect(() => dispose, 'Desktop immutable Hub skill roots')
+  if(userRoot)registerUserSkillProvider(ctx)
   ctx.inject(['skills'], async scope => {
     await scope.plugin(filesystemSkills, {
       providerName: boot.skillProviderName,

@@ -21,7 +21,7 @@ import { hubBaseComposition } from './hub-base-composition.ts'
 import { HubHostSupervisor } from './hub-host-supervisor.ts'
 import { readHubRuntimeTarget } from './hub-runtime-target.ts'
 import { registerHubGenerationManager } from './hub-generation-manager.ts'
-import { registerHubSkillRoots } from './hub-skill-roots.ts'
+import { registerHubBootstrapSkillRoots, registerHubSkillRoots } from './hub-skill-roots.ts'
 import { formatUnexpectedHostExit, startIsolatedDesktopHost } from './host-process.ts'
 import * as desktopOffice from './desktop-office.ts'
 import { desktopPrimaryRuntime, resolveDesktopOfficeConfig } from './desktop-office.ts'
@@ -1809,7 +1809,7 @@ async function start(): Promise<void> {
     const hubRuntimeTarget=await readHubRuntimeTarget({isPackaged:app.isPackaged,appPath:app.getAppPath(),resourcesPath:process.resourcesPath,sensteedVersion:appVersion})
     if(hubRuntimeTarget!==undefined){const{hubGeneration:_untrustedBoot,...base}=prepared;prepared={...base,patches:hubBaseComposition(prepared.patches)};hubBoot=undefined}
     const hostPatches = hubBoot === undefined ? prepared.patches : [...prepared.patches, hubBoot.patch]
-    const profileBoot = createDesktopProfileBoot(prepared, desktopPnpmBootstrap, hubBoot?.selection, hubBoot === undefined ? [] : [hubBoot.patch],hubRuntimeTarget===undefined?undefined:hubBaseComposition)
+    const profileBoot = createDesktopProfileBoot(prepared, desktopPnpmBootstrap, hubBoot?.selection, hubBoot === undefined ? [] : [hubBoot.patch],hubRuntimeTarget===undefined?undefined:hubBaseComposition,hubRuntimeTarget!==undefined)
     const hubSupervisor=new HubHostSupervisor()
     generation.bindHost({fiber:{dispose:()=>hubSupervisor.dispose()}})
     const hubBasePrepared=prepared
@@ -1917,7 +1917,7 @@ async function start(): Promise<void> {
       }
       startupStage = 'host-boot'
       lifecycleRecorder.transitionStartupStage(startupStage)
-      const releasePackageResolver = installProfilePackageResolver(prepared.bareModuleBaseUrl, hubBoot?.selection)
+      const releasePackageResolver = installProfilePackageResolver(prepared.bareModuleBaseUrl, hubBoot?.selection,hubRuntimeTarget!==undefined)
       // Same pluginPackages contract as the isolated Host: the compatibility
       // preflight must judge rows against this installation's versions, not
       // the Profile's registry-installed @deepseek-ai copies.
@@ -1931,12 +1931,13 @@ async function start(): Promise<void> {
           // profile-overlay resolver used by packaged Electron.
           hostCtx.loader.internal = undefined
           provideHubSupervisor(hostCtx,async request=>{setImmediate(()=>{void handleHubSwitch(request).catch(cause=>electronLogger.errorCause(cause))})})
+          if(hubRuntimeTarget!==undefined&&hubBoot===undefined)registerHubBootstrapSkillRoots(hostCtx,join(prepared.homeDir,'skills'))
           registerHubHostService(hostCtx)
           registerHubGenerationRoutes(hostCtx)
           if(hubRuntimeTarget!==undefined)registerHubGenerationManager(hostCtx,{target:hubRuntimeTarget,userData:marketUserDataDir,profileDirectory:prepared.profile.dir,managed:hubBoot!==undefined})
           if (hubBoot !== undefined) {
             const managedBoot = hubBoot
-            registerHubSkillRoots(hostCtx, managedBoot)
+            registerHubSkillRoots(hostCtx, managedBoot,join(prepared.homeDir,'skills'))
             hostCtx.provide('hubGenerationBoot', {
               generationId: hubBoot.generationId, skillsRoot: hubBoot.skillsRoot,
               inspectLoaded: (skills: import('./hub-generation-health.ts').HubSkillObservation, providerName: string) => managedBoot.inspectLoaded(hostCtx.loader, skills, providerName),

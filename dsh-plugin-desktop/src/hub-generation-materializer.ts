@@ -52,7 +52,9 @@ export async function materializeHubGeneration(options:{
   hubGenerationConsumptionData(proof)
   const locators=downloads.descriptors.filter(d=>d.kind===row.kind&&d.itemId===row.itemId)
   if(row.kind==='skill'){
-   const manifest=row.envelope.manifest,d=locators[0]!,bytes=await options.client.generationBytes(options.context,d.downloadId,{bytes:d.bytes,sha256:d.artifactDigest,contentType:d.contentType})
+   const manifest=row.envelope.manifest
+   if(manifest.installName.startsWith('user-local-'))throw new Error('Reserved user skill namespace')
+   const d=locators[0]!,bytes=await options.client.generationBytes(options.context,d.downloadId,{bytes:d.bytes,sha256:d.artifactDigest,contentType:d.contentType})
    const unpacked=unpackSkillArchive(bytes)
    if(fileManifestDigest(unpacked)!==manifest.fileManifestDigest)throw new Error('Skill file manifest mismatch')
    const enabled=plan.items.find(i=>i.kind==='skill'&&i.itemId===row.itemId)!.enabled
