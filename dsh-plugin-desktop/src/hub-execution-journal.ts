@@ -7,13 +7,15 @@ import { withFileLock } from '@deepseek-ai/dsh-atomic-write'
 import { HubGenerationStore } from './hub-generation-store.ts'
 import { generationPlanData, type VerifiedHubGenerationPlan } from './hub-generation-verifier.ts'
 const digest = z.string().regex(/^[a-f0-9]{64}$/u)
+const receiptSchema = z.strictObject({ seq:z.number().int().nonnegative(),previousGenerationDigest:digest.nullable(),
+  phase:z.enum(['STAGED','COMMITTED','ACTIVATED','ROLLED_BACK','NEEDS_ATTENTION']),evidenceDigest:digest,occurredAt:z.iso.datetime(),errorCode:z.string().max(120).nullable() })
 const recordSchema = z.strictObject({
   schemaVersion: z.literal(1), scope: digest, planId: z.uuid(), planDigest: digest, operationId: z.uuid(),
   previousGenerationDigest: digest.nullable(), generationDigest: digest,
   phase: z.enum(['DOWNLOADING', 'CONSUMING', 'AUTHORIZED', 'STAGED', 'COMMITTED', 'ACTIVATED', 'ROLLED_BACK', 'NEEDS_ATTENTION']),
   revision: z.number().int().nonnegative(), receiptSeq: z.number().int().nonnegative(),
   executionGeneration: z.string().regex(/^[1-9][0-9]*$/u).nullable(), executionExpiresAt: z.iso.datetime().nullable(),
-  descriptorDigest: digest.nullable(),
+  descriptorDigest: digest.nullable(), pendingReceipt: receiptSchema.nullable(),
 })
 export type HubExecutionRecord = Readonly<z.infer<typeof recordSchema>>
 const transitions: Record<HubExecutionRecord['phase'], readonly HubExecutionRecord['phase'][]> = {
@@ -67,21 +69,43 @@ export class HubExecutionJournal {
       if (old && old.phase !== 'ACTIVATED' && old.phase !== 'ROLLED_BACK') throw new Error('Hub execution is already pending')
       const value = recordSchema.parse({ schemaVersion: 1, scope: this.store.scope, planId: plan.planId, planDigest: plan.planDigest,
         operationId, previousGenerationDigest: plan.expectedActiveGenerationDigest, generationDigest: plan.proposedGenerationDigest,
-        phase: 'DOWNLOADING', revision: (old?.revision ?? -1) + 1, receiptSeq: 0, executionGeneration: null, executionExpiresAt: null, descriptorDigest: null })
+        phase: 'DOWNLOADING', revision: (old?.revision ?? -1) + 1, receiptSeq: 0, executionGeneration: null, executionExpiresAt: null, descriptorDigest: null, pendingReceipt:null })
       this.write(value); return Object.freeze(value)
+    })
+  }
+  /** Persist the exact timestamp and payload before sending; ambiguous sends retry byte-equivalent data. */
+  async queueReceipt(expected: Pick<HubExecutionRecord, 'operationId'|'revision'>, receipt: Omit<z.infer<typeof receiptSchema>, 'seq'|'previousGenerationDigest'>): Promise<HubExecutionRecord> {
+    this.check()
+    return await withFileLock(this.path, async () => {
+      const old=this.read()
+      if(!old || old.operationId!==expected.operationId || old.revision!==expected.revision) throw new Error('Stale Hub execution worker')
+      if(old.pendingReceipt!==null) throw new Error('Hub receipt is already pending')
+      if(old.executionGeneration===null || receipt.phase!==old.phase) throw new Error('Hub receipt phase mismatch')
+      const value=recordSchema.parse({...old,revision:old.revision+1,pendingReceipt:receiptSchema.parse({...receipt,seq:old.receiptSeq,previousGenerationDigest:old.previousGenerationDigest})})
+      this.write(value);return Object.freeze(value)
+    })
+  }
+  async acknowledgeReceipt(expected: Pick<HubExecutionRecord, 'operationId'|'revision'>): Promise<HubExecutionRecord> {
+    this.check()
+    return await withFileLock(this.path, async () => {
+      const old=this.read()
+      if(!old || old.operationId!==expected.operationId || old.revision!==expected.revision || old.pendingReceipt===null) throw new Error('Stale Hub receipt acknowledgment')
+      const value=recordSchema.parse({...old,revision:old.revision+1,receiptSeq:old.receiptSeq+1,pendingReceipt:null})
+      this.write(value);return Object.freeze(value)
     })
   }
   /** Revision compare prevents stale workers from committing a different operation or phase. */
   async advance(expected: Pick<HubExecutionRecord, 'operationId' | 'revision'>, phase: HubExecutionRecord['phase'], update: {
-    readonly executionGeneration?: string; readonly executionExpiresAt?: string; readonly descriptorDigest?: string; readonly receiptSeq?: number
+    readonly executionGeneration?: string; readonly executionExpiresAt?: string; readonly descriptorDigest?: string
   } = {}): Promise<HubExecutionRecord> {
     this.check()
     return await withFileLock(this.path, async () => {
       const old = this.read()
       if (!old || old.operationId !== expected.operationId || old.revision !== expected.revision) throw new Error('Stale Hub execution worker')
+      if (old.pendingReceipt!==null) throw new Error('Hub receipt acknowledgment is pending')
       if (!transitions[old.phase].includes(phase)) throw new Error('Invalid Hub execution phase transition')
       const value = recordSchema.parse({ ...old, ...update, phase, revision: old.revision + 1 })
-      if (value.receiptSeq < old.receiptSeq || value.receiptSeq > old.receiptSeq + 1) throw new Error('Invalid Hub receipt sequence')
+      if (value.receiptSeq !== old.receiptSeq) throw new Error('Invalid Hub receipt sequence')
       if (old.executionGeneration !== null && value.executionGeneration !== old.executionGeneration) throw new Error('Hub execution generation changed')
       if (phase === 'AUTHORIZED' && (!value.executionGeneration || !value.executionExpiresAt || Date.parse(value.executionExpiresAt) <= Date.now())) throw new Error('Hub execution authorization missing')
       this.write(value); return Object.freeze(value)
