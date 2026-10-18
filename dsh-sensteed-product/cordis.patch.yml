@@ -11,6 +11,8 @@
       name: '@dofe/dsh-sensteed-product'
     - id: dofe-host-auth
       name: '@dofe/dsh-sensteed-product/dofe-host-auth'
+    - id: dofe-host-capabilities
+      name: '@dofe/dsh-sensteed-product/dofe-host-capabilities'
     - id: dofe-auth-routes
       name: '@dofe/dsh-sensteed-product/dofe-auth-routes'
     - id: dofe-managed

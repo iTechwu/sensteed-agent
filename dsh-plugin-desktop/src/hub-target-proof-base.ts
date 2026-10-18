@@ -17,5 +17,6 @@ export async function prepareTargetProofBase(ctx:Context,root:string):Promise<vo
  const webServer=await import('@deepseek-ai/dsh-host-webserver');await ctx.plugin(webServer.default,{host:'127.0.0.1',port:0})
  const connection=await import('@deepseek-ai/dsh-client-connection');await ctx.plugin(connection,{trustedHosts:[]})
  const auth=await import('@dofe/dsh-sensteed-product/dofe-host-auth');await ctx.plugin(auth)
+ const capabilities=await import('@dofe/dsh-sensteed-product/dofe-host-capabilities');await ctx.plugin(capabilities)
  const authRoutes=await import('@dofe/dsh-sensteed-product/dofe-auth-routes');await ctx.plugin(authRoutes)
 }

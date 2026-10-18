@@ -73,7 +73,7 @@ export async function apply(ctx: Context): Promise<void> {
   observeLauncherRuntime(ctx, runtime => { launcher = runtime })
   const access = ctx.dofeAccessSettings
   let financeAuthorized = false
-  ctx.provide('dofeAccess', () => {
+  if(!ctx.get?.('dofeAccess'))ctx.provide('dofeAccess', () => {
     const current = access.get()
     const granted = current.entitlements?.plugins.includes('knowledge') === true
     return {
