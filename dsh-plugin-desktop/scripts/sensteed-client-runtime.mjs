@@ -12,8 +12,27 @@ function createElement(tagName, elementsById) {
     dataset: {},
     style: {},
     children: [],
-    appendChild(child) { this.children.push(child); return child },
+    parentNode: null,
+    appendChild(child) {
+      child.remove()
+      this.children.push(child)
+      child.parentNode = this
+      if (child.id) elementsById.set(child.id, child)
+      return child
+    },
+    append(...children) {
+      for (const child of children) {
+        const node = typeof child === 'string' ? createElement('#text', elementsById) : child
+        if (typeof child === 'string') node.textContent = child
+        this.appendChild(node)
+      }
+    },
     remove() {
+      if (this.parentNode) {
+        const siblings = this.parentNode.children
+        siblings.splice(siblings.indexOf(this), 1)
+        this.parentNode = null
+      }
       if (this.id) elementsById.delete(this.id)
     },
     setAttribute() {},
@@ -35,11 +54,13 @@ function createBrowserHarness(pluginId) {
   const effects = []
   const slots = []
   const styles = []
+  const roots = []
   const elementsById = new Map()
   const listeners = new Map()
   const head = createElement('head', elementsById)
   const body = createElement('body', elementsById)
-  head.appendChild = (element) => { head.children.push(element); styles.push(element); return element }
+  const appendHead = head.appendChild.bind(head)
+  head.appendChild = element => { appendHead(element); styles.push(element); return element }
 
   const document = {
     activeElement: null,
@@ -91,7 +112,15 @@ function createBrowserHarness(pluginId) {
     if (name === 'react') return React
     if (name === 'react/jsx-runtime') return { jsx: noopComponent, jsxs: noopComponent, Fragment: 'Fragment' }
     if (name === 'react-dom/client') {
-      return { createRoot: () => ({ render() {}, unmount() {} }) }
+      return { createRoot: node => {
+        if (!node.parentNode) throw new Error('React root must be attached before rendering')
+        const root = { node, rendered: false, unmounted: false,
+          render(tree) { this.rendered = true; this.tree = tree },
+          unmount() { this.unmounted = true; this.tree = undefined },
+        }
+        roots.push(root)
+        return root
+      } }
     }
     if (name === '@deepseek-ai/dsh-client-ui-primitives') return primitives
     throw new Error(`${pluginId}: unexpected client dependency ${name}`)
@@ -165,7 +194,7 @@ function createBrowserHarness(pluginId) {
     setTimeout,
     window,
   })
-  return { context, ctx, effects, registrations, require, slots, styles }
+  return { context, ctx, effects, registrations, require, slots, styles, roots }
 }
 
 export async function smokeSensteedClientBundle({ pluginId, clientPath, source }) {
@@ -200,7 +229,11 @@ export async function smokeSensteedClientBundle({ pluginId, clientPath, source }
   for (const effect of [...harness.effects].reverse()) {
     if (typeof effect.dispose === 'function') effect.dispose()
   }
+  if (harness.roots.some(root => !root.rendered || !root.unmounted || root.node.parentNode !== null)) {
+    throw new Error(`${pluginId}: client React root was not rendered, unmounted and detached`)
+  }
   return {
+    roots: harness.roots.length,
     effects: harness.effects.map(effect => effect.label),
     slots: harness.slots.map(slot => slot.name),
     styles: harness.styles.map(style => style.textContent ?? ''),
