@@ -1,7 +1,7 @@
 import{inspectSavedHubPlan}from'../src/hub-saved-plan.ts'
 import { generateKeyPairSync, randomUUID, sign } from 'node:crypto'
 import { afterEach, expect, it } from 'vitest'
-import { mkdtempSync, realpathSync, rmSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, realpathSync, rmSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { hubGenerationContentDigest, verifyHubGenerationPlan, type HubGenerationPlan, type HubGenerationPlanExpected } from '../src/hub-generation-verifier.ts'
@@ -59,3 +59,16 @@ it('rejects forged plan capability and journal identity tampering', async () => 
 })
 
 it('retains the signed inventory for identity and target-bound recovery without granting execution',async()=>{const f=fixture(),root=realpathSync(mkdtempSync(join(tmpdir(),'hub-inventory-')));roots.push(root);const identity={origin:f.expected.origin,tenantId:f.expected.tenantId,actorRef:f.expected.actorRef,deviceId:f.expected.deviceId,profileId:f.expected.profileId},store=new HubGenerationStore(root,identity),journal=new HubExecutionJournal(store),envelope=f.signed();const record=await journal.begin(verifyHubGenerationPlan(envelope,f.trust,f.expected),randomUUID(),envelope);expect(inspectSavedHubPlan(record,identity,f.expected.target,f.trust).plan.planId).toBe(f.plan.planId);expect(()=>inspectSavedHubPlan(record,{...identity,actorRef:'other'},f.expected.target,f.trust)).toThrow();expect(()=>inspectSavedHubPlan(record,identity,{...f.expected.target,hostBuildDigest:'a'.repeat(64)},f.trust)).toThrow();await expect(journal.saveHealthyInventory()).rejects.toThrow('not healthy');expect(journal.readHealthyInventory()).toBeUndefined()})
+
+it('preserves the acknowledged healthy inventory when the next execution replaces its journal',async()=>{
+ const f=fixture(),root=realpathSync(mkdtempSync(join(tmpdir(),'hub-healthy-')));roots.push(root)
+ const identity={origin:f.expected.origin,tenantId:f.expected.tenantId,actorRef:f.expected.actorRef,deviceId:f.expected.deviceId,profileId:f.expected.profileId},store=new HubGenerationStore(root,identity),journal=new HubExecutionJournal(store),envelope=f.signed(),cap=verifyHubGenerationPlan(envelope,f.trust,f.expected)
+ const stage=store.generationDirectory('g1');mkdirSync(stage,{mode:0o700});mkdirSync(join(stage,'skills'),{mode:0o700})
+ await store.prepare({schemaVersion:1,identity,generationId:'g1',packages:[],skillsRoot:'skills',files:{}});await store.activate();await store.markHealthy('g1')
+ let record=await journal.begin(cap,randomUUID(),envelope);record=await journal.advance(record,'CONSUMING');record=await journal.advance(record,'AUTHORIZED',{executionGeneration:'1',executionExpiresAt:new Date(Date.now()+1800000).toISOString()});record=await journal.advance(record,'STAGED',{descriptorDigest:store.readState().active!.descriptorDigest});record=await journal.advance(record,'COMMITTED');record=await journal.advance(record,'ACTIVATED')
+ record=await journal.queueReceipt(record,{phase:'ACTIVATED',evidenceDigest:'a'.repeat(64),occurredAt:new Date().toISOString(),errorCode:null})
+ await expect(journal.saveHealthyInventory()).rejects.toThrow('not healthy');record=await journal.acknowledgeReceipt(record);await journal.saveHealthyInventory()
+ expect(journal.readHealthyInventory()).toEqual(record)
+ const next=await journal.begin(cap,randomUUID(),envelope);expect(next.operationId).not.toBe(record.operationId);expect(journal.readHealthyInventory()?.operationId).toBe(record.operationId)
+ writeFileSync(join(store.directory,'healthy-inventory.json'),JSON.stringify({...record,scope:'f'.repeat(64)}),{mode:0o600});expect(()=>journal.readHealthyInventory()).toThrow('Invalid healthy')
+})
