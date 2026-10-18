@@ -1,4 +1,4 @@
-// 片段 5/7 视图：资金（四子视图：资金汇总/排款工作台/调整审批/收入计划；排款/调整/详情 Dialog）
+// 片段 5/7 视图：资金（资金汇总/排款工作台/收入计划/准确率；排款/调整/详情 Dialog）
 
 // 实付日期按财务业务时区展示，避免中国本地零点保存为 UTC 后退一天。
 function actualPaymentDate(value) {
@@ -8,6 +8,11 @@ function actualPaymentDate(value) {
 }
 
 const PRIORITIES = [['HIGH', 'priHigh'], ['MEDIUM', 'priMid'], ['LOW', 'priLow']]
+
+function normalizePaymentPriority(value) {
+  const aliases = { 高: 'HIGH', 中: 'MEDIUM', 低: 'LOW', priHigh: 'HIGH', priMid: 'MEDIUM', priLow: 'LOW' }
+  return value ? (aliases[value] ?? value) : ''
+}
 
 function CashView({ ctx, t, onDrill }) {
   const { year, orgId, departments, revision } = ctx
@@ -170,8 +175,8 @@ function PlansTab({ rows, total, page, onPage, t, busy, act, canWrite = true, on
         { label: t('remaining'), key: 'remainingAmount', render: row => wan(row.remainingAmount) ?? '—', num: true },
         { label: t('actualPaidDate'), key: 'actualPaidAt', render: row => actualPaymentDate(row.actualPaidAt) ?? '—', num: true },
         { label: t('statusCol'), key: 'status', render: row => financeDisplayValue(row.status, 'status') },
-        { label: t('scheduleDate'), key: 'scheduleDate', render: row => shortDate(row.scheduleDate) ?? '—', num: true },
-        { label: t('priority'), key: 'priority', render: row => row.priority ? h(Pill, { tone: row.priority === 'HIGH' ? 'rose' : row.priority === 'MEDIUM' ? 'amber' : 'muted' }, financeEnumLabel(row.priority, t, Object.fromEntries(PRIORITIES))) : '—' },
+        { label: t('scheduleDate'), key: 'scheduleDate', render: row => actualPaymentDate(row.scheduleDate) ?? '—', num: true },
+        { label: t('priority'), key: 'priority', render: row => { const priority = normalizePaymentPriority(row.priority); return priority ? h(Pill, { tone: priority === 'HIGH' ? 'rose' : priority === 'MEDIUM' ? 'amber' : 'muted' }, financeEnumLabel(priority, t, Object.fromEntries(PRIORITIES))) : '—' } },
         {
           label: t('actions'), key: 'actions', sortable: false,
           render: row => h('div', { className: 'sf-row', style: { flexWrap: 'nowrap', justifyContent: 'flex-end' } },
@@ -204,67 +209,95 @@ function CloseRemainingDialog({ plan, t, onClose, act, busy }) {
 }
 
 function ScheduleDialog({ plan, t, onClose, act }) {
-  const [scheduleDate, setScheduleDate] = useState(plan.scheduleDate?.slice(0, 10) ?? '')
-  const [priority, setPriority] = useState(plan.priority ?? '')
-  const [accepts, setAccepts] = useState(Boolean(plan.acceptsAcceptance))
+  const [scheduleDate, setScheduleDate] = useState(actualPaymentDate(plan.scheduleDate) ?? '')
+  const [priority, setPriority] = useState(normalizePaymentPriority(plan.priority))
+  const [accepts, setAccepts] = useState(plan.acceptsAcceptance == null ? '' : plan.acceptsAcceptance ? 'yes' : 'no')
   const [cashAmount, setCashAmount] = useState(plan.plannedCashAmount != null ? String(plan.plannedCashAmount) : '')
   const [acceptanceAmount, setAcceptanceAmount] = useState(plan.plannedAcceptanceAmount != null ? String(plan.plannedAcceptanceAmount) : '')
   const [planMonth, setPlanMonth] = useState('')
   const [splitTouched, setSplitTouched] = useState(false)
   const [formError, setFormError] = useState(null)
+  const [pending, setPending] = useState(false)
+  const lock = useRef(false)
+  const close = () => { if (!lock.current) onClose() }
   const totalCents = finite(plan.plannedAmount) !== null ? Math.round(Number(plan.plannedAmount) * 100) : null
+  const ratio = value => totalCents !== null && totalCents > 0 && value != null ? ((Number(value) * 100 / totalCents) * 100).toFixed(2) : ''
+  const [cashPercent, setCashPercent] = useState(() => ratio(plan.plannedCashAmount))
+  const [acceptancePercent, setAcceptancePercent] = useState(() => ratio(plan.plannedAcceptanceAmount))
+  const [ratioError, setRatioError] = useState(false)
+  const validDecimal = value => /^\d+(\.\d{1,2})?$/.test(value.trim())
   // 与网页一致：改一边自动补另一边（分单位计算），保留正在输入字段的原文。
   const updateSplit = (field, value) => {
+    setSplitTouched(true); setFormError(null); setRatioError(false)
+    if (field === 'cash') setCashAmount(value)
+    else setAcceptanceAmount(value)
+    const cents = Math.round(Number(value) * 100)
+    if (!validDecimal(value) || totalCents === null || cents > totalCents) return
+    const cash = field === 'cash' ? cents : totalCents - cents
+    const acceptance = totalCents - cash
+    if (field === 'cash') setAcceptanceAmount((acceptance / 100).toFixed(2))
+    else setCashAmount((cash / 100).toFixed(2))
+    setCashPercent(ratio(cash / 100)); setAcceptancePercent(ratio(acceptance / 100))
+  }
+  const updatePercent = (field, value) => {
     setSplitTouched(true); setFormError(null)
-    if (field === 'cash') {
-      setCashAmount(value)
-      if (totalCents !== null && /^\d+(\.\d{1,2})?$/.test(value.trim())) {
-        const cash = Math.round(Number(value) * 100)
-        setAcceptanceAmount(((totalCents - cash) / 100).toFixed(2))
-      }
-    } else {
-      setAcceptanceAmount(value)
-      if (totalCents !== null && /^\d+(\.\d{1,2})?$/.test(value.trim())) {
-        const acceptance = Math.round(Number(value) * 100)
-        setCashAmount(((totalCents - acceptance) / 100).toFixed(2))
-      }
-    }
+    if (field === 'cash') setCashPercent(value)
+    else setAcceptancePercent(value)
+    const percent = Number(value), invalid = !validDecimal(value) || percent < 0 || percent > 100
+    setRatioError(invalid)
+    if (invalid || totalCents === null || totalCents <= 0) return
+    updateSplit(field, (Math.round(totalCents * percent / 100) / 100).toFixed(2))
+    if (field === 'cash') setCashPercent(value)
+    else setAcceptancePercent(value)
   }
   const submit = async () => {
+    if (lock.current) return
     const cash = cashAmount.trim() ? Number(cashAmount) : undefined
     const acceptance = acceptanceAmount.trim() ? Number(acceptanceAmount) : undefined
     if (cash !== undefined && (!Number.isFinite(cash) || cash < 0)) { setFormError(t('scheduleCashBad')); return }
     if (acceptance !== undefined && (!Number.isFinite(acceptance) || acceptance < 0)) { setFormError(t('scheduleAcceptanceBad')); return }
+    if (ratioError) { setFormError('比例需填写 0 到 100 之间、最多两位小数的数字。'); return }
     if (plan.planMonth == null && !planMonth) { setFormError(t('scheduleMonthMissing')); return }
     if (splitTouched) {
       if (totalCents == null) { setFormError(t('scheduleNoPlanAmount')); return }
       if (!/^\d+(\.\d{1,2})?$/.test(cashAmount.trim()) || !/^\d+(\.\d{1,2})?$/.test(acceptanceAmount.trim())) { setFormError(t('scheduleSplitBad')); return }
       if (Math.round(Number(cashAmount) * 100) + Math.round(Number(acceptanceAmount) * 100) !== totalCents) { setFormError(t('scheduleSumBad')); return }
-      if (!accepts && Number(acceptanceAmount) > 0) { setFormError(t('scheduleNoAcceptance')); return }
+      if (accepts === 'no' && Number(acceptanceAmount) > 0) { setFormError(t('scheduleNoAcceptance')); return }
     }
     setFormError(null)
-    const saved = await act(`/payment-plans/${plan.id}/schedule`, {
-      ...(scheduleDate ? { scheduleDate: new Date(`${scheduleDate}T00:00:00`).toISOString() } : {}),
-      ...(priority ? { priority } : { priority: null }),
-      acceptsAcceptance: accepts,
-      ...(plan.planMonth == null && planMonth ? { planMonth: Number(planMonth) } : {}),
-      ...(cashAmount ? { plannedCashAmount: Number(cashAmount) } : {}),
-      ...(acceptanceAmount ? { plannedAcceptanceAmount: Number(acceptanceAmount) } : {}),
-    })
-    if (saved !== false) onClose()
+    lock.current = true; setPending(true)
+    try {
+      const saved = await act(`/payment-plans/${plan.id}/schedule`, {
+        ...(scheduleDate ? { scheduleDate: new Date(`${scheduleDate}T00:00:00+08:00`).toISOString() } : {}),
+        ...(priority ? { priority } : {}),
+        ...(accepts ? { acceptsAcceptance: accepts === 'yes' } : {}),
+        ...(plan.planMonth == null && planMonth ? { planMonth: Number(planMonth) } : {}),
+        ...(splitTouched ? { plannedCashAmount: cash, plannedAcceptanceAmount: acceptance } : {}),
+      })
+      if (saved !== false) onClose()
+      else setFormError('排款更新失败，请刷新核对计划金额与权限后重试；本次输入已保留。')
+    } catch {
+      setFormError('排款更新失败，请刷新核对计划金额与权限后重试；本次输入已保留。')
+    } finally { lock.current = false; setPending(false) }
   }
-  return h(Dialog, { title: `${t('schedule')} · ${plan.description ?? ''}`, onClose, footer: [
-    h(GhostButton, { key: 'cancel', onClick: onClose }, t('cancel')),
-    h(PrimaryButton, { key: 'ok', onClick: submit }, t('submit')),
+  const priorityOptions = PRIORITIES.map(([id, label]) => [id, t(label)])
+  if (priority && !priorityOptions.some(([id]) => id === priority)) priorityOptions.push([priority, priority])
+  return h(Dialog, { title: t('schedule'), onClose: close, footer: [
+    h(GhostButton, { key: 'cancel', disabled: pending, onClick: close }, t('cancel')),
+    h(PrimaryButton, { key: 'ok', disabled: pending, onClick: submit }, '保存排款'),
   ] },
-    h('div', { className: 'sf-stack' },
+    h('fieldset', { className: 'sf-stack sf-fieldset', disabled: pending, 'aria-busy': pending },
+      h('p', { className: 'sf-note' }, `${plan.description ?? '—'} · 计划 ${yuan(plan.plannedAmount) ?? '—'} · ${plan.planMonth ? plan.planMonth + '月' : '待排'}`),
       formError ? h('p', { role: 'alert', className: 'sf-neg' }, formError) : null,
       plan.planMonth == null ? h(FormRow, { label: `${t('scheduleMonthBackfill')} *` }, h(Select, { value: planMonth, onChange: setPlanMonth, options: Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1} ${t('monthCol')}`]), placeholder: t('monthCol') })) : null,
       h(FormRow, { label: t('scheduleDate') }, h(Field, { type: 'date', value: scheduleDate, onChange: setScheduleDate })),
-      h(FormRow, { label: t('priority') }, h(Select, { value: priority, onChange: setPriority, options: PRIORITIES.map(([id, label]) => [id, t(label)]), placeholder: '—' })),
-      h(FormRow, { label: t('acceptAcceptance') }, h(Switch, { checked: accepts, onChange: setAccepts, label: t('acceptAcceptance') })),
-      accepts ? h(FormRow, { label: t('cashAmount') }, h(Field, { type: 'number', min: '0', step: '0.01', value: cashAmount, onChange: value => updateSplit('cash', value) })) : null,
-      accepts ? h(FormRow, { label: t('acceptanceAmount') }, h(Field, { type: 'number', min: '0', step: '0.01', value: acceptanceAmount, onChange: value => updateSplit('acceptance', value) })) : null))
+      h(FormRow, { label: '排款优先级' }, h(Select, { value: priority, onChange: setPriority, options: priorityOptions, placeholder: '未设置' })),
+      h(FormRow, { label: '是否接受承兑' }, h(Select, { value: accepts, onChange: value => { setAccepts(value); if (value === 'no' && totalCents !== null) updateSplit('acceptance', '0') }, options: [['yes', '接受'], ['no', '不接受']], placeholder: '未设置' })),
+      h(FormRow, { label: t('cashAmount') }, h(Field, { inputMode: 'decimal', value: cashAmount, onChange: value => updateSplit('cash', value) })),
+      h(FormRow, { label: t('acceptanceAmount') }, h(Field, { inputMode: 'decimal', value: acceptanceAmount, onChange: value => updateSplit('acceptance', value) })),
+      h(FormRow, { label: '现汇比例（%）' }, h(Field, { inputMode: 'decimal', disabled: totalCents === null || totalCents <= 0, value: cashPercent, onChange: value => updatePercent('cash', value) })),
+      h(FormRow, { label: '承兑比例（%）' }, h(Field, { inputMode: 'decimal', disabled: totalCents === null || totalCents <= 0, value: acceptancePercent, onChange: value => updatePercent('acceptance', value) })),
+      h('p', { className: 'sf-note' }, '编辑比例或金额将同步另一通道，金额按分舍入；两通道合计须等于计划金额。未提供的来源拆分保留为空。')))
 }
 
 function validPlanAdjustment(plan, value, reason) {
@@ -343,7 +376,7 @@ function PlanDetailDialog({ plan, ctx, t, onClose }) {
     [t('org'), plan.orgName], [t('planType'), financeEnumLabel(plan.planType, t, PLAN_LABELS)], [t('description'), plan.description],
     [t('department'), plan.departmentName], [t('costItem'), plan.costItemName], [t('planMonth'), plan.planMonth ? `${plan.planMonth} 月` : '—'],
     [t('planned'), wan(plan.plannedAmount)], [t('actual'), wan(plan.actualAmount)], [t('variance'), wan(plan.varianceAmount)],
-    [t('remaining'), wan(plan.remainingAmount)], [t('actualPaidDate'), actualPaymentDate(plan.actualPaidAt)], [t('scheduleDate'), shortDate(plan.scheduleDate)], [t('priority'), plan.priority ? financeEnumLabel(plan.priority, t, Object.fromEntries(PRIORITIES)) : '—'],
+    [t('remaining'), wan(plan.remainingAmount)], [t('actualPaidDate'), actualPaymentDate(plan.actualPaidAt)], [t('scheduleDate'), actualPaymentDate(plan.scheduleDate)], [t('priority'), plan.priority ? financeEnumLabel(normalizePaymentPriority(plan.priority), t, Object.fromEntries(PRIORITIES)) : '—'],
     [t('acceptAcceptance'), plan.acceptsAcceptance ? '✓' : '—'], [t('cashAmount'), wan(plan.plannedCashAmount)], [t('acceptanceAmount'), wan(plan.plannedAcceptanceAmount)],
     [t('payee'), plan.payeeName], [t('statusCol'), financeDisplayValue(plan.status, 'status')],
   ]
@@ -386,20 +419,34 @@ function RevenueTab({ revenues, page, onPage, t, canWrite = true, onBackfill, on
 
 function BackfillDialog({ row, t, onClose, act }) {
   const [amount, setAmount] = useState(row.actualAmount != null ? String(row.actualAmount) : '')
-  const [date, setDate] = useState(row.actualPaidAt?.slice(0, 10) ?? '')
+  const [date, setDate] = useState(actualPaymentDate(row.actualPaidAt) ?? '')
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState(null)
+  const lock = useRef(false)
+  const valid = finite(amount) !== null && Number(amount) >= 0
+  const close = () => { if (!lock.current) onClose() }
   const submit = async event => {
     event.preventDefault()
-    const saved = await act(`/revenue-plans/${row.id}/actuals`, {
-      actualAmount: Number(amount),
-      ...(date ? { actualPaidAt: new Date(`${date}T00:00:00`).toISOString() } : {}),
-    })
-    if (saved !== false) onClose()
+    if (!valid || lock.current) return
+    lock.current = true; setPending(true); setError(null)
+    try {
+      const saved = await act(`/revenue-plans/${row.id}/actuals`, {
+        actualAmount: Number(amount),
+        ...(date ? { actualPaidAt: new Date(`${date}T00:00:00+08:00`).toISOString() } : {}),
+      })
+      if (saved !== false) onClose()
+      else setError('实际数回填失败，请核对后重试；本次输入已保留。')
+    } catch {
+      setError('实际数回填失败，请核对后重试；本次输入已保留。')
+    } finally { lock.current = false; setPending(false) }
   }
-  return h(Dialog, { title: `${t('backfill')} · ${row.itemName ?? ''}`, width: 'sm', onClose, footer: [
-    h(GhostButton, { key: 'cancel', onClick: onClose }, t('cancel')),
-    h(PrimaryButton, { key: 'ok', onClick: submit, disabled: finite(amount) === null }, t('submit')),
+  return h(Dialog, { title: `${t('backfill')} · ${row.itemName ?? ''}`, width: 'sm', onClose: close, footer: [
+    h(GhostButton, { key: 'cancel', onClick: close, disabled: pending }, t('cancel')),
+    h(PrimaryButton, { key: 'ok', onClick: submit, disabled: !valid || pending }, t('submit')),
   ] },
     h('form', { onSubmit: submit, className: 'sf-stack' },
+      error ? h('p', { role: 'alert' }, error) : null,
+      h('fieldset', { className: 'sf-stack sf-fieldset', disabled: pending, 'aria-busy': pending },
       h(FormRow, { label: t('actualAmountL') }, h(Field, { type: 'number', min: '0', step: '0.01', value: amount, onChange: setAmount, required: true })),
-      h(FormRow, { label: t('actualDateL') }, h(Field, { type: 'date', value: date, onChange: setDate }))))
+      h(FormRow, { label: t('actualDateL') }, h(Field, { type: 'date', value: date, onChange: setDate })))))
 }

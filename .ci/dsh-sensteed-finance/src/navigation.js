@@ -62,6 +62,7 @@ function financeBusinessDestination(path) {
     '/filing/activities': ['filing', { section: 'tasks' }],
   }
   let route = routes[pathname]
+  if (pathname === '/data-center' && url.hash === '#source-records') route = ['sources']
   // 资金页签的调整审批已移到审核队列（网页 /cash 审批同样移至工作台），旧链接保留入口不落空。
   if (pathname === '/cash' && url.searchParams.get('tab') === 'adjustments') route = ['review', { section: 'plans' }]
   // 兼容旧通知/书签，代录不再承担填报和人员管理。

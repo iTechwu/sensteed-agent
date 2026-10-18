@@ -32,9 +32,10 @@ async function copyFallback(prompt, setNotice, t, reason) {
   } catch { setNotice(t('copyFailed')) }
 }
 
-function analysisPrompt(entry, year, orgName) {
-  const context = typeof entry.prompt === 'function' ? entry.prompt(year, orgName) : entry.prompt
-  return `/${entry.skill}\n${context}`
+function analysisPrompt(entry, year, orgName, orgId) {
+  const context = typeof entry.prompt === 'function' ? entry.prompt(year, orgName || (orgId ? '所选主体' : '')) : entry.prompt
+  const scope = orgId ? `所选主体 ID：${orgId}；名称：${orgName || '待核实'}。请通过 bootstrap 与主体列表核对，不得扩大为全部主体。` : '全部授权主体。'
+  return `/${entry.skill}\n${context}\n分析范围：${year} 年；${scope}租户级统计须单独标注范围。`
 }
 
 function AnalyzeView({ ctx, t }) {
@@ -48,7 +49,7 @@ function AnalyzeView({ ctx, t }) {
     startingRef.current = true
     setStarting(entry.id)
     setNotice(null)
-    try { await sendToAgent(analysisPrompt(entry, year, orgName), setNotice, t) }
+    try { await sendToAgent(analysisPrompt(entry, year, orgName, orgId), setNotice, t) }
     finally { startingRef.current = false; setStarting(null) }
   }
   return h('div', { className: 'sf-view' },

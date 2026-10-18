@@ -126,19 +126,19 @@ window.__ModuleLoader__.load({
         dsConfigs: '数据源配置', dsScope: '范围', scopeHq: '总部', scopeHezhong: '合众', dsKind: '类型', kindDss: 'DSS', kindFeishu: '飞书', dsEndpoint: '端点', dsEnabled: '启用', dsEnable: '启用', dsDisable: '停用', dsRuns: '同步批次', dsFallback: '回退原因', dsManualSync: '手动同步', dsRouteHint: 'DSS 优先、飞书兜底', dsSyncHint: '失败原因会写入批次留痕，成功不代表已发布财务事实。', syncNow: '触发同步', syncDone: '同步已完成', syncFetched: '采集', dsTransport: '实际通道', dsMetrics: '可观测性指标', last7Days: '近 7 天', successRate: '成功率', fallbackRate: '回退率', emptyRate: '空结果率', avgDuration: '平均时长', updatedAt: '更新时间', processingStage: '处理阶段', batchId: '批次', dataSummary: '数据摘要', errorSummary: '失败摘要', dsAdd: '新增配置', dsEdit: '编辑数据源配置', edit: '编辑', save: '保存', secretRef: '凭证引用', secretRefHint: '仅保存引用名，不存明文凭证。', tableMappings: '表映射（JSON，可选）', tableMapping: '表映射键', bizSystem: '业务系统', docType: '单据类型', dsNamePlaceholder: '如：总部 DSS 采购流程', dsEndpointPlaceholder: 'https://…（飞书可留空）', docPurchase: '采购', docReimbursement: '报销', docIncome: '收入',
         datasetScale: '数据集入库规模', qualityTitle: '数据质量清单', batchesTitle: '导入批次', issue: '问题', dataset: '数据集', count: '数量', sourceFile: '来源文件', rows: '行数', successRows: '成功', failedRows: '失败', batchStatus: '状态', startedAt: '开始时间', runAt: '批次时间', bizType: '业务类型',
         // 录入
-        filingTasks: '任务管理（财务）', myFiling: '我的填报（部门）', createTask: '发起任务', taskTitle: '任务名称', taskType: '类型', typeBudget: '预算', typePlan: '排款', taskYear: '年度', taskMonth: '月份', taskDue: '截止时间', taskDepartments: '指派部门（可多选）', selectAll: '全选', taskInstructions: '填报说明', taskOwner: '负责人', taskReviewer: '财务审核人', taskAllowModify: '允许窗口内修改', taskFreezeMonth: '冻结当前自然月', taskStartDraft: '存为草稿（发布前部门不可见）', taskPublish: '创建并发布', taskProgress: '任务进度', closeTask: '关闭任务', taskClosed: '已关闭', departmentCol: '部门', progressCol: '进度', dueCol: '截止', assignmentTitle: '填报明细', rowsEditor: '行编辑（月份 / 说明 / 金额）', addRow: '加一行', saveDraft: '暂存草稿', submitFiling: '提交', commitFiling: '复核定稿', reopenFiling: '重开', reopenReason: '重开原因（必填，并入审计）', overdue: '已超期', assignee: '填报人',
+        filingTasks: '任务管理（财务）', myFiling: '我的填报（部门）', createTask: '新建填报活动', taskTitle: '活动名称', taskType: '类型', typeBudget: '预算填报', typePlan: '资金计划填报', taskYear: '年度', taskMonth: '月份', taskDue: '截止时间', taskDepartments: '指派部门（可多选）', selectAll: '全选', taskInstructions: '填报说明', taskOwner: '负责人', taskReviewer: '财务审核人', taskAllowModify: '允许窗口内修改', taskFreezeMonth: '冻结当前自然月', taskStartDraft: '存为草稿（发布前部门不可见）', taskPublish: '创建并发布', taskProgress: '任务进度', closeTask: '关闭任务', taskClosed: '已关闭', departmentCol: '部门', progressCol: '进度', dueCol: '截止', assignmentTitle: '填报明细', rowsEditor: '行编辑（月份 / 说明 / 金额）', addRow: '加一行', saveDraft: '暂存草稿', submitFiling: '提交', commitFiling: '复核定稿', reopenFiling: '重开', reopenReason: '重开原因（必填，并入审计）', overdue: '已超期', assignee: '填报人',
         directory: '飞书通讯录', dirSync: '同步通讯录', dirSearch: '搜索姓名/手机/邮箱', mapUser: '绑定用户', systemUserId: '系统用户 ID', unmappedOnly: '只看未绑定', employmentRecords: '归属记录（调岗切分）', empCreate: '登记归属', empUser: '系统用户', empDept: '归属部门', empStart: '起始日期', membersTitle: '成员与角色', role: '角色', roleNameDEPT_FILLER: '部门填报人', roleNameDEPT_LEADER: '部门负责人', roleNameDEPT_COLLABORATOR: '信息协同人', roleNameBOSS: '老板', roleNameFINANCE_STAFF: '财务专员', roleNameFINANCE_OWNER: '财务负责人', roleNameMANAGEMENT: '管理层', removeMember: '移除', memberUser: '用户', memberDept: '部门', enabledCol: '启用',
         entryPlanMonth: '计划支付月份', entryPayee: '收款供应商 / 收款人', entryDepartment: '申请部门', entryRevenueMonth: '到账月份', entryPayer: '付款主体', entryDiscardTitle: '放弃未保存的录入？', entryDiscardDescription: '当前内容尚未保存。继续将清空本次填写；也可以返回继续填写。', entryKeepEditing: '继续填写', entryDiscardContinue: '放弃并继续', entryDescriptionRequired: '请填写付款描述', entryTextTooLong: '文字超过字段长度限制，请缩短后重试。', entryHistoryScope: '历史建议来自所选主体、当前年度前 200 条计划；未命中可确认本次自定义值。', entryCostFailed: '费用科目建议加载失败，仍可填写本次自定义值。', entryTitle: '财务数据录入', entryPaymentPlan: '付款计划', entryRevenuePlan: '收入计划', entryBudgetLine: '预算行', entryBackfill: '回填实际', description: '付款描述', planType: '付款类型', note: '备注', itemName: '收入项目', payer: '付款方', incomeType: '收入类型', recordType: 'PR 类型', prSubmittedL: '已打 PR', prEstimatedL: '预计 PR', selectPlan: '选择计划记录', actualAmountL: '实际金额（元）', actualDateL: '实际日期（可空）', entryHint: '单条数据直接写入财务数据中心；保存前请核对主体、年度、金额与期间。', entryRules: '录入规则', entryRulesList: '金额一律为元；排款月份必填；预算代填进入草稿审核；回填实际自动重算差额与剩余。', preCheck: '录入前检查', preCheckOk: '数据质量正常，可以录入', preCheckBad: '存在未分配主体记录 {n} 条，建议先完成分配再录入',
         // 深度分析
         analysis_risk: '月度风险预判', analysis_risk_desc: '按预算超支/执行偏慢/资金缺口/数据质量四类输出风险清单，附影响金额与建议动作。',
-        analysis_cost: '成本结构分析', analysis_cost_desc: '三类费用与主体维度拆解成本占比，识别集中度风险并预判下季度成本。',
+        analysis_cost: '成本结构分析', analysis_cost_desc: '按费用类别与主体拆解预算、PR和付款结构，识别集中度与同口径变化。',
         analysis_cash: '资金流压力评估', analysis_cash_desc: '梳理各月资金余缺，预判未来 1-3 个月资金缺口与头寸安排。',
         analysis_budget: '预算执行复盘', analysis_budget_desc: '各主体执行率排名与偏离归因，输出预算调整建议。',
         analysis_revenue: '收入达成分析', analysis_revenue_desc: '计划 vs 实际到账逐项比对，归因差额并评估对资金平衡的影响。',
         analysis_quality: '数据质量影响评估', analysis_quality_desc: '列出质量问题清单，说明哪些分析结论会失真及补数优先级。',
-        analysis_forecast: '成本与资金预判', analysis_forecast_desc: '按近 3 个月外推未来支出与月末资金余额区间，标注置信度。',
-        analysis_version: '版本健康检查', analysis_version_desc: '主版本与调整稿差异、未推进草稿与版本推进建议。',
-        analysis_rules: '预警规则核查', analysis_rules_desc: '规则集生效状态、默认阈值与近 30 天告警量核对。',
+        analysis_forecast: '成本与资金预判', analysis_forecast_desc: '结合完整月份样本与收付款计划预测支出；有可靠期初时推演余额。',
+        analysis_version: '版本健康检查', analysis_version_desc: '核对主版本与候选调整稿差异、冻结约束和版本推进所需依据。',
+        analysis_rules: '预警规则核查', analysis_rules_desc: '核对生效规则、阈值与当前未关闭预警，说明历史统计的覆盖范围。',
         analyzeTitle: '深度分析入口', analyzeHint: '每个入口都会创建新会话并调用对应财务分析 skill，由 Agent 调用财务数据中心 MCP（mcp__finance__*）完成分析。', send: '开始分析', analysisStarting: '正在开启新会话…', sent: '已在新会话开始分析', sendFail: '发送失败，指令已复制到剪贴板', sendFailReason: '发送失败（{reason}），指令已复制到剪贴板', analyzingNote: '分析会读取真实账面数据；录入/回填类操作 Agent 会先与你确认再执行。审批与过账由财务本人执行，Agent 不代批。',
         // 通用动作
         submit: '提交', cancel: '取消', submitted: '已提交', saved: '已保存', deleted: '已删除', confirm: '确认', close: '关闭', actions: '操作', runEngine: '触发预警引擎', running: '执行中', runDone: '已触发：新建 {created} · 更新 {updated} · 关闭 {resolved}', backfill: '回填', backfillActual: '回填实际值', submitConfirm: '确认提交？', opFailed: '操作失败', refreshed: '已刷新', required: '必填', invalidJson: '表映射必须是合法 JSON。',
@@ -198,18 +198,18 @@ window.__ModuleLoader__.load({
         rulesUnconfirmed: 'Alert rule set is not confirmed yet: no formal alerts are generated. Confirm with built-in defaults to start the engine.', rulesConfirmed: 'Alert rule set v{v} active (confirmed {date})', confirmDefaultRules: 'Confirm with built-in defaults', confirmRulesTitle: 'Confirm alert rules', alertDetail: 'Alert detail', evidence: 'Evidence', viewSource: 'View source data', sourceBudget: 'Budget', sourceCash: 'Cash', sourceQuality: 'Data quality',
         dsConfigs: 'Data source configs', dsScope: 'Scope', scopeHq: 'HQ', scopeHezhong: 'Hezhong', dsKind: 'Kind', kindDss: 'DSS', kindFeishu: 'Feishu', dsEndpoint: 'Endpoint', dsEnabled: 'Enabled', dsEnable: 'Enable', dsDisable: 'Disable', dsRuns: 'Sync runs', dsFallback: 'Fallback', dsManualSync: 'Manual sync', dsRouteHint: 'DSS first, Feishu fallback', dsSyncHint: 'Failures are recorded in the run; success does not mean financial facts are published.', syncNow: 'Run sync', syncDone: 'Sync completed', syncFetched: 'Fetched', dsTransport: 'Transport', dsMetrics: 'Observability', last7Days: 'Last 7 days', successRate: 'Success rate', fallbackRate: 'Fallback rate', emptyRate: 'Empty rate', avgDuration: 'Avg duration', updatedAt: 'Updated', processingStage: 'Processing stage', batchId: 'Batch', dataSummary: 'Data summary', errorSummary: 'Error summary', dsAdd: 'Add config', dsEdit: 'Edit data source', edit: 'Edit', save: 'Save', secretRef: 'Credential ref', secretRefHint: 'Store a reference only; never enter a plaintext credential.', tableMappings: 'Table mappings (JSON, optional)', tableMapping: 'Table mapping key', bizSystem: 'Business system', docType: 'Document type', dsNamePlaceholder: 'e.g. HQ DSS procurement', dsEndpointPlaceholder: 'https://… (optional for Feishu)', docPurchase: 'Purchase', docReimbursement: 'Reimbursement', docIncome: 'Income',
         datasetScale: 'Dataset scale', qualityTitle: 'Data quality', batchesTitle: 'Import batches', issue: 'Issue', dataset: 'Dataset', count: 'Count', sourceFile: 'Source file', rows: 'Rows', successRows: 'OK', failedRows: 'Failed', batchStatus: 'Status', startedAt: 'Started', runAt: 'Run at', bizType: 'Biz type',
-        filingTasks: 'Tasks (finance)', myFiling: 'My filing (dept)', createTask: 'New task', taskTitle: 'Title', taskType: 'Type', typeBudget: 'Budget', typePlan: 'Payment plan', taskYear: 'Year', taskMonth: 'Month', taskDue: 'Due', taskDepartments: 'Departments', selectAll: 'Select all', taskInstructions: 'Filing instructions', taskOwner: 'Owner', taskReviewer: 'Finance reviewer', taskAllowModify: 'Allow changes while open', taskFreezeMonth: 'Freeze the current month', taskStartDraft: 'Save as draft (hidden until published)', taskPublish: 'Create and publish', taskProgress: 'Progress', closeTask: 'Close task', taskClosed: 'Closed', departmentCol: 'Department', progressCol: 'Progress', dueCol: 'Due', assignmentTitle: 'Assignment detail', rowsEditor: 'Rows (month / note / amount)', addRow: 'Add row', saveDraft: 'Save draft', submitFiling: 'Submit', commitFiling: 'Finalize', reopenFiling: 'Reopen', reopenReason: 'Reopen reason (required, audited)', overdue: 'Overdue', assignee: 'Assignee',
+        filingTasks: 'Tasks (finance)', myFiling: 'My filing (dept)', createTask: 'New filing activity', taskTitle: 'Activity name', taskType: 'Type', typeBudget: 'Budget filing', typePlan: 'Cash plan filing', taskYear: 'Year', taskMonth: 'Month', taskDue: 'Due', taskDepartments: 'Departments', selectAll: 'Select all', taskInstructions: 'Filing instructions', taskOwner: 'Owner', taskReviewer: 'Finance reviewer', taskAllowModify: 'Allow changes while open', taskFreezeMonth: 'Freeze the current month', taskStartDraft: 'Save as draft (hidden until published)', taskPublish: 'Create and publish', taskProgress: 'Progress', closeTask: 'Close task', taskClosed: 'Closed', departmentCol: 'Department', progressCol: 'Progress', dueCol: 'Due', assignmentTitle: 'Assignment detail', rowsEditor: 'Rows (month / note / amount)', addRow: 'Add row', saveDraft: 'Save draft', submitFiling: 'Submit', commitFiling: 'Finalize', reopenFiling: 'Reopen', reopenReason: 'Reopen reason (required, audited)', overdue: 'Overdue', assignee: 'Assignee',
         directory: 'Feishu directory', dirSync: 'Sync directory', dirSearch: 'Search name/phone/email', mapUser: 'Map user', systemUserId: 'System user ID', unmappedOnly: 'Unmapped only', employmentRecords: 'Employment records', empCreate: 'Add record', empUser: 'User', empDept: 'Department', empStart: 'Start date', membersTitle: 'Members & roles', role: 'Role', roleNameDEPT_FILLER: 'Dept filler', roleNameDEPT_LEADER: 'Dept leader', roleNameDEPT_COLLABORATOR: 'Collaborator', roleNameBOSS: 'Boss', roleNameFINANCE_STAFF: 'Finance staff', roleNameFINANCE_OWNER: 'Finance owner', roleNameMANAGEMENT: 'Management', removeMember: 'Remove', memberUser: 'User', memberDept: 'Dept', enabledCol: 'Enabled',
         entryPlanMonth: 'Planned payment month', entryPayee: 'Payee / supplier', entryDepartment: 'Requesting department', entryRevenueMonth: 'Receipt month', entryPayer: 'Payer entity', entryDiscardTitle: 'Discard unsaved entry?', entryDiscardDescription: 'This entry has not been saved. Continuing clears the current input; you can return to keep editing.', entryKeepEditing: 'Keep editing', entryDiscardContinue: 'Discard and continue', entryDescriptionRequired: 'Enter a payment description', entryTextTooLong: 'Text exceeds the field limit. Shorten it and retry.', entryHistoryScope: 'Suggestions use the first 200 plans for the selected entity and year. Confirm a custom value when needed.', entryCostFailed: 'Cost-item suggestions failed to load. You can still confirm a custom value.', entryTitle: 'Finance data entry', entryPaymentPlan: 'Payment plan', entryRevenuePlan: 'Revenue plan', entryBudgetLine: 'Budget line', entryBackfill: 'Backfill actuals', description: 'Description', planType: 'Plan type', note: 'Note', itemName: 'Item', payer: 'Payer', incomeType: 'Income type', recordType: 'PR type', prSubmittedL: 'Submitted', prEstimatedL: 'Estimated', selectPlan: 'Pick a plan', actualAmountL: 'Actual amount (CNY)', actualDateL: 'Actual date (optional)', entryHint: 'Entries write to the finance data center directly. Verify amounts and periods before submitting; run the alert engine afterwards.', entryRules: 'Entry rules', entryRulesList: 'Amounts in CNY; plan month required; budget entries follow draft review; backfill recalculates variance and remaining.', preCheck: 'Pre-check', preCheckOk: 'Data quality OK, safe to enter', preCheckBad: '{n} unassigned-org records; assign them first',
         analysis_risk: 'Risk forecast', analysis_risk_desc: 'Risk list across overrun / slow execution / cash gap / data quality, with impact and actions.',
-        analysis_cost: 'Cost structure', analysis_cost_desc: 'Cost mix by expense type and org, concentration risks, next-quarter cost forecast.',
+        analysis_cost: 'Cost structure', analysis_cost_desc: 'Budget, PR and payment mix by expense type and org, with concentration and comparable changes.',
         analysis_cash: 'Cash pressure', analysis_cash_desc: 'Monthly cash surplus/deficit and 1-3 month gap forecast.',
         analysis_budget: 'Budget review', analysis_budget_desc: 'Execution-rate ranking by org with deviation attribution and adjustment advice.',
         analysis_revenue: 'Revenue attainment', analysis_revenue_desc: 'Plan vs actual receipts with variance attribution.',
         analysis_quality: 'Data quality impact', analysis_quality_desc: 'Issue list, which conclusions are distorted, and remediation priorities.',
-        analysis_forecast: 'Cost & cash forecast', analysis_forecast_desc: '3-month-average extrapolation with confidence labels.',
-        analysis_version: 'Version health', analysis_version_desc: 'Primary vs adjusted diff, stale drafts, and version progression advice.',
-        analysis_rules: 'Alert rules check', analysis_rules_desc: 'Rule set status, default thresholds, and 30-day alert volume check.',
+        analysis_forecast: 'Cost & cash forecast', analysis_forecast_desc: 'Cash-outflow scenarios from complete months and plans; balance forecasts require a reliable opening balance.',
+        analysis_version: 'Version health', analysis_version_desc: 'Primary and candidate version differences, frozen periods and evidence for progression.',
+        analysis_rules: 'Alert rules check', analysis_rules_desc: 'Effective rules, thresholds and open alerts, with explicit coverage for historical counts.',
         analyzeTitle: 'Deep analysis entries', analyzeHint: 'Each entry creates a new session and invokes its finance skill; the agent calls finance MCP tools (mcp__finance__*) for the analysis.', send: 'Analyze', analysisStarting: 'Starting a new session…', sent: 'Started in a new session', sendFail: 'Send failed; copied to clipboard', sendFailReason: 'Send failed ({reason}); copied to clipboard', analyzingNote: 'Analysis reads real ledger data; write actions always require your confirmation first. Approvals and posting are done by finance users, never the agent.',
         submit: 'Submit', cancel: 'Cancel', submitted: 'Submitted', saved: 'Saved', deleted: 'Deleted', confirm: 'Confirm', close: 'Close', actions: 'Actions', runEngine: 'Run alert engine', running: 'Running...', runDone: 'Done: created {created} · updated {updated} · resolved {resolved}', backfill: 'Backfill', backfillActual: 'Backfill actuals', submitConfirm: 'Confirm submit?', opFailed: 'Operation failed', refreshed: 'Refreshed', required: 'required', invalidJson: 'Table mappings must be valid JSON.',
         scheduleMonthBackfill: 'Add plan month', scheduleMonthMissing: 'Add the plan month before saving.', scheduleCashBad: 'Cash amount must be a number ≥ 0.', scheduleAcceptanceBad: 'Acceptance amount must be a number ≥ 0.', scheduleSplitBad: 'Cash and acceptance amounts are both required, at most two decimals.', scheduleSumBad: 'Cash plus acceptance must equal the plan amount.', scheduleNoAcceptance: 'Acceptance amount must be zero when acceptance is not accepted.', scheduleNoPlanAmount: 'Plan amount is missing; the cash/acceptance split cannot be edited.',
@@ -1477,6 +1477,7 @@ window.__ModuleLoader__.load({
         '/filing/activities': ['filing', { section: 'tasks' }],
       }
       let route = routes[pathname]
+      if (pathname === '/data-center' && url.hash === '#source-records') route = ['sources']
       // 资金页签的调整审批已移到审核队列（网页 /cash 审批同样移至工作台），旧链接保留入口不落空。
       if (pathname === '/cash' && url.searchParams.get('tab') === 'adjustments') route = ['review', { section: 'plans' }]
       // 兼容旧通知/书签，代录不再承担填报和人员管理。
@@ -2576,7 +2577,7 @@ window.__ModuleLoader__.load({
         h(Card, { title: t('netFlowTitle'), unit: t('unitNote') }, h(NetBars, { data: netData })))
     }
 
-    // 片段 5/7 视图：资金（四子视图：资金汇总/排款工作台/调整审批/收入计划；排款/调整/详情 Dialog）
+    // 片段 5/7 视图：资金（资金汇总/排款工作台/收入计划/准确率；排款/调整/详情 Dialog）
 
     // 实付日期按财务业务时区展示，避免中国本地零点保存为 UTC 后退一天。
     function actualPaymentDate(value) {
@@ -2586,6 +2587,11 @@ window.__ModuleLoader__.load({
     }
 
     const PRIORITIES = [['HIGH', 'priHigh'], ['MEDIUM', 'priMid'], ['LOW', 'priLow']]
+
+    function normalizePaymentPriority(value) {
+      const aliases = { 高: 'HIGH', 中: 'MEDIUM', 低: 'LOW', priHigh: 'HIGH', priMid: 'MEDIUM', priLow: 'LOW' }
+      return value ? (aliases[value] ?? value) : ''
+    }
 
     function CashView({ ctx, t, onDrill }) {
       const { year, orgId, departments, revision } = ctx
@@ -2748,8 +2754,8 @@ window.__ModuleLoader__.load({
             { label: t('remaining'), key: 'remainingAmount', render: row => wan(row.remainingAmount) ?? '—', num: true },
             { label: t('actualPaidDate'), key: 'actualPaidAt', render: row => actualPaymentDate(row.actualPaidAt) ?? '—', num: true },
             { label: t('statusCol'), key: 'status', render: row => financeDisplayValue(row.status, 'status') },
-            { label: t('scheduleDate'), key: 'scheduleDate', render: row => shortDate(row.scheduleDate) ?? '—', num: true },
-            { label: t('priority'), key: 'priority', render: row => row.priority ? h(Pill, { tone: row.priority === 'HIGH' ? 'rose' : row.priority === 'MEDIUM' ? 'amber' : 'muted' }, financeEnumLabel(row.priority, t, Object.fromEntries(PRIORITIES))) : '—' },
+            { label: t('scheduleDate'), key: 'scheduleDate', render: row => actualPaymentDate(row.scheduleDate) ?? '—', num: true },
+            { label: t('priority'), key: 'priority', render: row => { const priority = normalizePaymentPriority(row.priority); return priority ? h(Pill, { tone: priority === 'HIGH' ? 'rose' : priority === 'MEDIUM' ? 'amber' : 'muted' }, financeEnumLabel(priority, t, Object.fromEntries(PRIORITIES))) : '—' } },
             {
               label: t('actions'), key: 'actions', sortable: false,
               render: row => h('div', { className: 'sf-row', style: { flexWrap: 'nowrap', justifyContent: 'flex-end' } },
@@ -2782,67 +2788,95 @@ window.__ModuleLoader__.load({
     }
 
     function ScheduleDialog({ plan, t, onClose, act }) {
-      const [scheduleDate, setScheduleDate] = useState(plan.scheduleDate?.slice(0, 10) ?? '')
-      const [priority, setPriority] = useState(plan.priority ?? '')
-      const [accepts, setAccepts] = useState(Boolean(plan.acceptsAcceptance))
+      const [scheduleDate, setScheduleDate] = useState(actualPaymentDate(plan.scheduleDate) ?? '')
+      const [priority, setPriority] = useState(normalizePaymentPriority(plan.priority))
+      const [accepts, setAccepts] = useState(plan.acceptsAcceptance == null ? '' : plan.acceptsAcceptance ? 'yes' : 'no')
       const [cashAmount, setCashAmount] = useState(plan.plannedCashAmount != null ? String(plan.plannedCashAmount) : '')
       const [acceptanceAmount, setAcceptanceAmount] = useState(plan.plannedAcceptanceAmount != null ? String(plan.plannedAcceptanceAmount) : '')
       const [planMonth, setPlanMonth] = useState('')
       const [splitTouched, setSplitTouched] = useState(false)
       const [formError, setFormError] = useState(null)
+      const [pending, setPending] = useState(false)
+      const lock = useRef(false)
+      const close = () => { if (!lock.current) onClose() }
       const totalCents = finite(plan.plannedAmount) !== null ? Math.round(Number(plan.plannedAmount) * 100) : null
+      const ratio = value => totalCents !== null && totalCents > 0 && value != null ? ((Number(value) * 100 / totalCents) * 100).toFixed(2) : ''
+      const [cashPercent, setCashPercent] = useState(() => ratio(plan.plannedCashAmount))
+      const [acceptancePercent, setAcceptancePercent] = useState(() => ratio(plan.plannedAcceptanceAmount))
+      const [ratioError, setRatioError] = useState(false)
+      const validDecimal = value => /^\d+(\.\d{1,2})?$/.test(value.trim())
       // 与网页一致：改一边自动补另一边（分单位计算），保留正在输入字段的原文。
       const updateSplit = (field, value) => {
+        setSplitTouched(true); setFormError(null); setRatioError(false)
+        if (field === 'cash') setCashAmount(value)
+        else setAcceptanceAmount(value)
+        const cents = Math.round(Number(value) * 100)
+        if (!validDecimal(value) || totalCents === null || cents > totalCents) return
+        const cash = field === 'cash' ? cents : totalCents - cents
+        const acceptance = totalCents - cash
+        if (field === 'cash') setAcceptanceAmount((acceptance / 100).toFixed(2))
+        else setCashAmount((cash / 100).toFixed(2))
+        setCashPercent(ratio(cash / 100)); setAcceptancePercent(ratio(acceptance / 100))
+      }
+      const updatePercent = (field, value) => {
         setSplitTouched(true); setFormError(null)
-        if (field === 'cash') {
-          setCashAmount(value)
-          if (totalCents !== null && /^\d+(\.\d{1,2})?$/.test(value.trim())) {
-            const cash = Math.round(Number(value) * 100)
-            setAcceptanceAmount(((totalCents - cash) / 100).toFixed(2))
-          }
-        } else {
-          setAcceptanceAmount(value)
-          if (totalCents !== null && /^\d+(\.\d{1,2})?$/.test(value.trim())) {
-            const acceptance = Math.round(Number(value) * 100)
-            setCashAmount(((totalCents - acceptance) / 100).toFixed(2))
-          }
-        }
+        if (field === 'cash') setCashPercent(value)
+        else setAcceptancePercent(value)
+        const percent = Number(value), invalid = !validDecimal(value) || percent < 0 || percent > 100
+        setRatioError(invalid)
+        if (invalid || totalCents === null || totalCents <= 0) return
+        updateSplit(field, (Math.round(totalCents * percent / 100) / 100).toFixed(2))
+        if (field === 'cash') setCashPercent(value)
+        else setAcceptancePercent(value)
       }
       const submit = async () => {
+        if (lock.current) return
         const cash = cashAmount.trim() ? Number(cashAmount) : undefined
         const acceptance = acceptanceAmount.trim() ? Number(acceptanceAmount) : undefined
         if (cash !== undefined && (!Number.isFinite(cash) || cash < 0)) { setFormError(t('scheduleCashBad')); return }
         if (acceptance !== undefined && (!Number.isFinite(acceptance) || acceptance < 0)) { setFormError(t('scheduleAcceptanceBad')); return }
+        if (ratioError) { setFormError('比例需填写 0 到 100 之间、最多两位小数的数字。'); return }
         if (plan.planMonth == null && !planMonth) { setFormError(t('scheduleMonthMissing')); return }
         if (splitTouched) {
           if (totalCents == null) { setFormError(t('scheduleNoPlanAmount')); return }
           if (!/^\d+(\.\d{1,2})?$/.test(cashAmount.trim()) || !/^\d+(\.\d{1,2})?$/.test(acceptanceAmount.trim())) { setFormError(t('scheduleSplitBad')); return }
           if (Math.round(Number(cashAmount) * 100) + Math.round(Number(acceptanceAmount) * 100) !== totalCents) { setFormError(t('scheduleSumBad')); return }
-          if (!accepts && Number(acceptanceAmount) > 0) { setFormError(t('scheduleNoAcceptance')); return }
+          if (accepts === 'no' && Number(acceptanceAmount) > 0) { setFormError(t('scheduleNoAcceptance')); return }
         }
         setFormError(null)
-        const saved = await act(`/payment-plans/${plan.id}/schedule`, {
-          ...(scheduleDate ? { scheduleDate: new Date(`${scheduleDate}T00:00:00`).toISOString() } : {}),
-          ...(priority ? { priority } : { priority: null }),
-          acceptsAcceptance: accepts,
-          ...(plan.planMonth == null && planMonth ? { planMonth: Number(planMonth) } : {}),
-          ...(cashAmount ? { plannedCashAmount: Number(cashAmount) } : {}),
-          ...(acceptanceAmount ? { plannedAcceptanceAmount: Number(acceptanceAmount) } : {}),
-        })
-        if (saved !== false) onClose()
+        lock.current = true; setPending(true)
+        try {
+          const saved = await act(`/payment-plans/${plan.id}/schedule`, {
+            ...(scheduleDate ? { scheduleDate: new Date(`${scheduleDate}T00:00:00+08:00`).toISOString() } : {}),
+            ...(priority ? { priority } : {}),
+            ...(accepts ? { acceptsAcceptance: accepts === 'yes' } : {}),
+            ...(plan.planMonth == null && planMonth ? { planMonth: Number(planMonth) } : {}),
+            ...(splitTouched ? { plannedCashAmount: cash, plannedAcceptanceAmount: acceptance } : {}),
+          })
+          if (saved !== false) onClose()
+          else setFormError('排款更新失败，请刷新核对计划金额与权限后重试；本次输入已保留。')
+        } catch {
+          setFormError('排款更新失败，请刷新核对计划金额与权限后重试；本次输入已保留。')
+        } finally { lock.current = false; setPending(false) }
       }
-      return h(Dialog, { title: `${t('schedule')} · ${plan.description ?? ''}`, onClose, footer: [
-        h(GhostButton, { key: 'cancel', onClick: onClose }, t('cancel')),
-        h(PrimaryButton, { key: 'ok', onClick: submit }, t('submit')),
+      const priorityOptions = PRIORITIES.map(([id, label]) => [id, t(label)])
+      if (priority && !priorityOptions.some(([id]) => id === priority)) priorityOptions.push([priority, priority])
+      return h(Dialog, { title: t('schedule'), onClose: close, footer: [
+        h(GhostButton, { key: 'cancel', disabled: pending, onClick: close }, t('cancel')),
+        h(PrimaryButton, { key: 'ok', disabled: pending, onClick: submit }, '保存排款'),
       ] },
-        h('div', { className: 'sf-stack' },
+        h('fieldset', { className: 'sf-stack sf-fieldset', disabled: pending, 'aria-busy': pending },
+          h('p', { className: 'sf-note' }, `${plan.description ?? '—'} · 计划 ${yuan(plan.plannedAmount) ?? '—'} · ${plan.planMonth ? plan.planMonth + '月' : '待排'}`),
           formError ? h('p', { role: 'alert', className: 'sf-neg' }, formError) : null,
           plan.planMonth == null ? h(FormRow, { label: `${t('scheduleMonthBackfill')} *` }, h(Select, { value: planMonth, onChange: setPlanMonth, options: Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1} ${t('monthCol')}`]), placeholder: t('monthCol') })) : null,
           h(FormRow, { label: t('scheduleDate') }, h(Field, { type: 'date', value: scheduleDate, onChange: setScheduleDate })),
-          h(FormRow, { label: t('priority') }, h(Select, { value: priority, onChange: setPriority, options: PRIORITIES.map(([id, label]) => [id, t(label)]), placeholder: '—' })),
-          h(FormRow, { label: t('acceptAcceptance') }, h(Switch, { checked: accepts, onChange: setAccepts, label: t('acceptAcceptance') })),
-          accepts ? h(FormRow, { label: t('cashAmount') }, h(Field, { type: 'number', min: '0', step: '0.01', value: cashAmount, onChange: value => updateSplit('cash', value) })) : null,
-          accepts ? h(FormRow, { label: t('acceptanceAmount') }, h(Field, { type: 'number', min: '0', step: '0.01', value: acceptanceAmount, onChange: value => updateSplit('acceptance', value) })) : null))
+          h(FormRow, { label: '排款优先级' }, h(Select, { value: priority, onChange: setPriority, options: priorityOptions, placeholder: '未设置' })),
+          h(FormRow, { label: '是否接受承兑' }, h(Select, { value: accepts, onChange: value => { setAccepts(value); if (value === 'no' && totalCents !== null) updateSplit('acceptance', '0') }, options: [['yes', '接受'], ['no', '不接受']], placeholder: '未设置' })),
+          h(FormRow, { label: t('cashAmount') }, h(Field, { inputMode: 'decimal', value: cashAmount, onChange: value => updateSplit('cash', value) })),
+          h(FormRow, { label: t('acceptanceAmount') }, h(Field, { inputMode: 'decimal', value: acceptanceAmount, onChange: value => updateSplit('acceptance', value) })),
+          h(FormRow, { label: '现汇比例（%）' }, h(Field, { inputMode: 'decimal', disabled: totalCents === null || totalCents <= 0, value: cashPercent, onChange: value => updatePercent('cash', value) })),
+          h(FormRow, { label: '承兑比例（%）' }, h(Field, { inputMode: 'decimal', disabled: totalCents === null || totalCents <= 0, value: acceptancePercent, onChange: value => updatePercent('acceptance', value) })),
+          h('p', { className: 'sf-note' }, '编辑比例或金额将同步另一通道，金额按分舍入；两通道合计须等于计划金额。未提供的来源拆分保留为空。')))
     }
 
     function validPlanAdjustment(plan, value, reason) {
@@ -2921,7 +2955,7 @@ window.__ModuleLoader__.load({
         [t('org'), plan.orgName], [t('planType'), financeEnumLabel(plan.planType, t, PLAN_LABELS)], [t('description'), plan.description],
         [t('department'), plan.departmentName], [t('costItem'), plan.costItemName], [t('planMonth'), plan.planMonth ? `${plan.planMonth} 月` : '—'],
         [t('planned'), wan(plan.plannedAmount)], [t('actual'), wan(plan.actualAmount)], [t('variance'), wan(plan.varianceAmount)],
-        [t('remaining'), wan(plan.remainingAmount)], [t('actualPaidDate'), actualPaymentDate(plan.actualPaidAt)], [t('scheduleDate'), shortDate(plan.scheduleDate)], [t('priority'), plan.priority ? financeEnumLabel(plan.priority, t, Object.fromEntries(PRIORITIES)) : '—'],
+        [t('remaining'), wan(plan.remainingAmount)], [t('actualPaidDate'), actualPaymentDate(plan.actualPaidAt)], [t('scheduleDate'), actualPaymentDate(plan.scheduleDate)], [t('priority'), plan.priority ? financeEnumLabel(normalizePaymentPriority(plan.priority), t, Object.fromEntries(PRIORITIES)) : '—'],
         [t('acceptAcceptance'), plan.acceptsAcceptance ? '✓' : '—'], [t('cashAmount'), wan(plan.plannedCashAmount)], [t('acceptanceAmount'), wan(plan.plannedAcceptanceAmount)],
         [t('payee'), plan.payeeName], [t('statusCol'), financeDisplayValue(plan.status, 'status')],
       ]
@@ -2964,22 +2998,36 @@ window.__ModuleLoader__.load({
 
     function BackfillDialog({ row, t, onClose, act }) {
       const [amount, setAmount] = useState(row.actualAmount != null ? String(row.actualAmount) : '')
-      const [date, setDate] = useState(row.actualPaidAt?.slice(0, 10) ?? '')
+      const [date, setDate] = useState(actualPaymentDate(row.actualPaidAt) ?? '')
+      const [pending, setPending] = useState(false)
+      const [error, setError] = useState(null)
+      const lock = useRef(false)
+      const valid = finite(amount) !== null && Number(amount) >= 0
+      const close = () => { if (!lock.current) onClose() }
       const submit = async event => {
         event.preventDefault()
-        const saved = await act(`/revenue-plans/${row.id}/actuals`, {
-          actualAmount: Number(amount),
-          ...(date ? { actualPaidAt: new Date(`${date}T00:00:00`).toISOString() } : {}),
-        })
-        if (saved !== false) onClose()
+        if (!valid || lock.current) return
+        lock.current = true; setPending(true); setError(null)
+        try {
+          const saved = await act(`/revenue-plans/${row.id}/actuals`, {
+            actualAmount: Number(amount),
+            ...(date ? { actualPaidAt: new Date(`${date}T00:00:00+08:00`).toISOString() } : {}),
+          })
+          if (saved !== false) onClose()
+          else setError('实际数回填失败，请核对后重试；本次输入已保留。')
+        } catch {
+          setError('实际数回填失败，请核对后重试；本次输入已保留。')
+        } finally { lock.current = false; setPending(false) }
       }
-      return h(Dialog, { title: `${t('backfill')} · ${row.itemName ?? ''}`, width: 'sm', onClose, footer: [
-        h(GhostButton, { key: 'cancel', onClick: onClose }, t('cancel')),
-        h(PrimaryButton, { key: 'ok', onClick: submit, disabled: finite(amount) === null }, t('submit')),
+      return h(Dialog, { title: `${t('backfill')} · ${row.itemName ?? ''}`, width: 'sm', onClose: close, footer: [
+        h(GhostButton, { key: 'cancel', onClick: close, disabled: pending }, t('cancel')),
+        h(PrimaryButton, { key: 'ok', onClick: submit, disabled: !valid || pending }, t('submit')),
       ] },
         h('form', { onSubmit: submit, className: 'sf-stack' },
+          error ? h('p', { role: 'alert' }, error) : null,
+          h('fieldset', { className: 'sf-stack sf-fieldset', disabled: pending, 'aria-busy': pending },
           h(FormRow, { label: t('actualAmountL') }, h(Field, { type: 'number', min: '0', step: '0.01', value: amount, onChange: setAmount, required: true })),
-          h(FormRow, { label: t('actualDateL') }, h(Field, { type: 'date', value: date, onChange: setDate }))))
+          h(FormRow, { label: t('actualDateL') }, h(Field, { type: 'date', value: date, onChange: setDate })))))
     }
 
     // 片段 5/7 视图：资金证据（逐笔付款/到账登记 + 计划准确率；契约以 Datasource cash-evidence.contract.ts 为唯一权威）
@@ -3720,7 +3768,7 @@ window.__ModuleLoader__.load({
 
     function CreateTaskDialog({ year, orgs, departments, members, busy, t, onClose, act }) {
       const [title, setTitle] = useState('')
-      const [orgId, setOrgId] = useState('')
+      const [selectedOrgId, setOrgId] = useState('')
       const [type, setType] = useState('PAYMENT_PLAN')
       const [month, setMonth] = useState(String(Math.min(12, new Date().getMonth() + 2)))
       const [versionId, setVersionId] = useState('')
@@ -3736,6 +3784,12 @@ window.__ModuleLoader__.load({
       const [departmentSelectionReady, setDepartmentSelectionReady] = useState(Boolean(departments?.length))
       const [versionError, setVersionError] = useState(false)
       const [versionRetry, setVersionRetry] = useState(0)
+      const [submitting, setSubmitting] = useState(false)
+      const [submitError, setSubmitError] = useState(null)
+      const submitLock = useRef(false)
+      const locked = busy || submitting
+      const close = () => { if (!submitLock.current && !busy) onClose() }
+      const orgId = selectedOrgId || (orgs?.length === 1 ? orgs[0].id : '')
       const personOptions = [...new Set((members?.list || []).filter(member => member.enabled !== false).map(member => member.name?.trim()).filter(Boolean))]
         .sort((left, right) => left.localeCompare(right, 'zh-CN')).map(name => [name, name])
       const validDepartmentIds = selectedDepartmentIds.filter(id => (departments || []).some(department => department.id === id))
@@ -3754,41 +3808,48 @@ window.__ModuleLoader__.load({
         setVersionError(false)
         setVersionId('')
         api(`/budget-versions?year=${year}`).then(value => {
-          if (!cancelled) setVersions((value.data?.list || []).filter(version => version.status !== 'LOCKED'))
+          if (!cancelled) setVersions((value.data?.list || []).filter(version => version.status === 'DRAFT'))
         }).catch(() => { if (!cancelled) { setVersions([]); setVersionError(true) } })
         return () => { cancelled = true }
       }, [year, versionRetry])
       const months = Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1}月`])
-      const canSubmit = !busy && title.trim() && validOrg && dueAt && Number.isFinite(new Date(dueAt).getTime()) && validDepartmentIds.length &&
+      const canSubmit = !locked && title.trim() && validOrg && dueAt && Number.isFinite(new Date(dueAt).getTime()) && validDepartmentIds.length &&
         (type !== 'BUDGET' || (!versionError && versions?.some(version => version.id === versionId))) &&
         (type !== 'PAYMENT_PLAN' || (Number(month) >= 1 && Number(month) <= 12))
       const submit = async () => {
-        if (!canSubmit) return
-        const created = await act('/filing-tasks', {
-          title: title.trim(), type, year: Number(year), dueAt: new Date(dueAt).toISOString(),
-          ...(type === 'PAYMENT_PLAN' ? { month: Number(month) } : { versionId }),
-          departments: validDepartmentIds.map(departmentId => ({ departmentId, orgId })),
-          ...(instructions.trim() ? { instructions: instructions.trim() } : {}),
-          ...(ownerName.trim() ? { ownerName: ownerName.trim() } : {}),
-          ...(reviewerName.trim() ? { reviewerName: reviewerName.trim() } : {}),
-          allowModify, freezeCurrentMonth, startAsDraft,
-        })
-        if (created) onClose()
+        if (!canSubmit || submitLock.current) return
+        submitLock.current = true; setSubmitting(true); setSubmitError(null)
+        try {
+          const created = await act('/filing-tasks', {
+            title: title.trim(), type, year: Number(year), dueAt: new Date(dueAt).toISOString(),
+            ...(type === 'PAYMENT_PLAN' ? { month: Number(month) } : { versionId }),
+            departments: validDepartmentIds.map(departmentId => ({ departmentId, orgId })),
+            ...(instructions.trim() ? { instructions: instructions.trim() } : {}),
+            ...(ownerName.trim() ? { ownerName: ownerName.trim() } : {}),
+            ...(reviewerName.trim() ? { reviewerName: reviewerName.trim() } : {}),
+            allowModify, freezeCurrentMonth, startAsDraft,
+          })
+          if (created) onClose()
+          else setSubmitError('发起失败，请检查字段与权限后重试；本次输入已保留。')
+        } catch {
+          setSubmitError('发起失败，请检查字段与权限后重试；本次输入已保留。')
+        } finally { submitLock.current = false; setSubmitting(false) }
       }
-      return h(Dialog, { title: t('createTask'), onClose, footer: [
-        h(GhostButton, { key: 'cancel', onClick: onClose }, t('cancel')),
-        h(PrimaryButton, { key: 'ok', disabled: !canSubmit, busy, onClick: submit }, t(startAsDraft ? 'taskStartDraft' : 'taskPublish')),
+      return h(Dialog, { title: t('createTask'), onClose: close, footer: [
+        h(GhostButton, { key: 'cancel', disabled: locked, onClick: close }, t('cancel')),
+        h(PrimaryButton, { key: 'ok', disabled: !canSubmit, busy: locked, onClick: submit }, t(startAsDraft ? 'taskStartDraft' : 'taskPublish')),
       ] },
-        h('fieldset', { className: 'sf-stack sf-fieldset', disabled: busy, 'aria-busy': busy },
+        submitError ? h('p', { role: 'alert', className: 'sf-neg' }, submitError) : null,
+        h('fieldset', { className: 'sf-stack sf-fieldset', disabled: locked, 'aria-busy': locked },
           h(FormRow, { label: t('taskTitle') }, h(Field, { value: title, onChange: setTitle, maxLength: 150 })),
           h(FormRow, { label: t('taskType') }, h(Select, { value: type, onChange: setType, options: [['PAYMENT_PLAN', t('typePlan')], ['BUDGET', t('typeBudget')]] })),
           type === 'PAYMENT_PLAN'
             ? h(FormRow, { label: t('taskMonth') }, h(Select, { value: month, onChange: setMonth, options: months, placeholder: t('taskMonth') }))
-            : h(FormRow, { label: t('version') }, h(SearchSelect, { value: versionId, onChange: setVersionId, options: (versions || []).map(version => [version.id, budgetVersionLabel(version)]), placeholder: t('version'), disabled: busy || !versions?.length })),
+            : h(FormRow, { label: t('version') }, h(SearchSelect, { value: versionId, onChange: setVersionId, options: (versions || []).map(version => [version.id, budgetVersionLabel(version)]), placeholder: t('version'), disabled: locked || !versions?.length })),
           type === 'BUDGET' && versionError ? h('div', { className: 'sf-row', role: 'alert' }, '预算版本加载失败', h(LinkButton, { onClick: () => setVersionRetry(value => value + 1) }, '重新加载版本')) : null,
           type === 'BUDGET' && !versionError && versions && !versions.length ? h('p', { className: 'sf-note' }, `${t('empty')} · ${t('version')}`) : null,
           h(FormRow, { label: `${t('taskOrg')} *` },
-            h(SearchSelect, { buttonTrigger: true, value: orgId, onChange: setOrgId, options: orgOptions, placeholder: t('taskOrg'), disabled: busy || !orgOptions.length })),
+            h(SearchSelect, { buttonTrigger: true, value: orgId, onChange: setOrgId, options: orgOptions, placeholder: t('taskOrg'), disabled: locked || !orgOptions.length })),
           !validOrg ? h('p', { role: 'alert', className: 'sf-note' }, t('taskOrgMissing')) : null,
           h('div', { className: 'sf-inline-form' },
             h('div', { className: 'sf-row-between' }, h('strong', null, `${t('taskDepartments')}（${validDepartmentIds.length}/${departments?.length || 0}）`),
@@ -3800,13 +3861,13 @@ window.__ModuleLoader__.load({
               onChange: setSelectedDepartmentIds,
               options: (departments || []).map(department => [department.id, department.name]),
               placeholder: t('department'),
-              disabled: busy || !departments?.length,
+              disabled: locked || !departments?.length,
             }),
             !departments?.length ? h('p', { className: 'sf-note' }, `${t('empty')} · ${t('department')}`) : null),
           h(FormRow, { label: t('taskDue') }, h(Field, { type: 'datetime-local', value: dueAt, onChange: setDueAt })),
           h(FormRow, { label: t('taskInstructions') }, h(Field, { value: instructions, onChange: setInstructions, maxLength: 500 })),
-          h(FormRow, { label: t('taskOwner') }, h(SearchSelect, { value: ownerName, onChange: setOwnerName, options: personOptions, allowCustom: true, placeholder: t('taskOwner'), maxLength: 100, disabled: busy })),
-          h(FormRow, { label: t('taskReviewer') }, h(SearchSelect, { value: reviewerName, onChange: setReviewerName, options: personOptions, allowCustom: true, placeholder: t('taskReviewer'), maxLength: 100, disabled: busy })),
+          h(FormRow, { label: t('taskOwner') }, h(SearchSelect, { value: ownerName, onChange: setOwnerName, options: personOptions, allowCustom: true, placeholder: t('taskOwner'), maxLength: 100, disabled: locked })),
+          h(FormRow, { label: t('taskReviewer') }, h(SearchSelect, { value: reviewerName, onChange: setReviewerName, options: personOptions, allowCustom: true, placeholder: t('taskReviewer'), maxLength: 100, disabled: locked })),
           members?.forbidden || members?.error ? h('p', { className: 'sf-note' }, '人员列表暂时无法加载，可在选择器中输入并确认自定义姓名。') : null,
           h('div', { className: 'sf-task-options' },
             h('label', null, h('input', { type: 'checkbox', checked: allowModify, onChange: event => setAllowModify(event.target.checked) }), t('taskAllowModify')),
@@ -4415,9 +4476,10 @@ window.__ModuleLoader__.load({
       } catch { setNotice(t('copyFailed')) }
     }
 
-    function analysisPrompt(entry, year, orgName) {
-      const context = typeof entry.prompt === 'function' ? entry.prompt(year, orgName) : entry.prompt
-      return `/${entry.skill}\n${context}`
+    function analysisPrompt(entry, year, orgName, orgId) {
+      const context = typeof entry.prompt === 'function' ? entry.prompt(year, orgName || (orgId ? '所选主体' : '')) : entry.prompt
+      const scope = orgId ? `所选主体 ID：${orgId}；名称：${orgName || '待核实'}。请通过 bootstrap 与主体列表核对，不得扩大为全部主体。` : '全部授权主体。'
+      return `/${entry.skill}\n${context}\n分析范围：${year} 年；${scope}租户级统计须单独标注范围。`
     }
 
     function AnalyzeView({ ctx, t }) {
@@ -4431,7 +4493,7 @@ window.__ModuleLoader__.load({
         startingRef.current = true
         setStarting(entry.id)
         setNotice(null)
-        try { await sendToAgent(analysisPrompt(entry, year, orgName), setNotice, t) }
+        try { await sendToAgent(analysisPrompt(entry, year, orgName, orgId), setNotice, t) }
         finally { startingRef.current = false; setStarting(null) }
       }
       return h('div', { className: 'sf-view' },
@@ -5111,7 +5173,7 @@ window.__ModuleLoader__.load({
         h('div', { className: 'sf-row' },
           h(Select, { 'aria-label': '填报状态', value: status, placeholder: '全部状态', options: section === 'tasks' ? [['DRAFT', '草稿活动'], ['OPEN', '开放活动'], ['CLOSED', '已关闭活动']] : [['PENDING', '待填写'], ['DRAFT', '草稿'], ['SUBMITTED', '已提交'], ['REJECTED', '已退回'], ['CONFIRMED', '已确认'], ['LOCKED', '已锁定'], ['VOIDED', '已作废']], onChange: value => { setStatus(value); setPage(1) } }),
           section === 'department' ? h(Select, { 'aria-label': '填报部门', value: departmentId, options: ctx.departments.map(row => [row.id, row.name]), placeholder: '全部可见部门', onChange: value => { setDepartmentId(value); setPage(1) } }) : null,
-          manage && section === 'tasks' ? h(GhostButton, { onClick: () => setDialog({ kind: 'create' }) }, '发起填报活动') : null),
+          manage && section === 'tasks' ? h(GhostButton, { onClick: () => setDialog({ kind: 'create' }) }, t('createTask')) : null),
         taskId ? h('p', null, `正在查看活动 ${taskId}`, h(GhostButton, { onClick: () => { setTaskId(''); setPage(1); ctx.onNavigate?.('filing', { section, year: ctx.year }) } }, '清除活动筛选')) : null,
         h(Notice, null, action.notice),
         h(Card, { title: section === 'tasks' ? '填报活动' : section === 'mine' ? '我的记录' : section === 'department' ? '部门填报' : '待填报任务' }, h(FinanceResource, { resource }, h(Table, { tableId: `finance-filing-${section}`, rows, empty: '暂无记录', columns: [
@@ -5131,7 +5193,7 @@ window.__ModuleLoader__.load({
                 verify && row.status === 'CONFIRMED' ? h(GhostButton, { onClick: () => setDialog({ kind: 'lock', title: '锁定已确认填报', row }) }, '锁定填报') : null,
                 verify && ['PENDING', 'DRAFT', 'SUBMITTED', 'REJECTED'].includes(row.status) ? h(GhostButton, { onClick: () => setDialog({ kind: 'void', title: '作废未确认填报', row }) }, '作废填报') : null)) },
         ] })), h(Pager, { page, total: resource.data?.total, limit: 20, onPage: setPage })),
-        dialog?.kind === 'create' ? h(CreateTaskDialog, { year: ctx.year, departments: ctx.departments, members: members.data, busy: action.busy, t, act, onClose: () => { setDialog(null); tasks.retry() } }) : null,
+        dialog?.kind === 'create' ? h(CreateTaskDialog, { year: ctx.year, orgs: ctx.orgs, departments: ctx.departments, members: members.error ? { error: true } : members.data, busy: action.busy, t, act, onClose: () => { setDialog(null); tasks.retry() } }) : null,
         dialog?.kind === 'assignment' ? detail.error || detail.loading ? h(Dialog, { title: '填报详情', onClose: () => setDialog(null) }, h(FinanceResource, { resource: detail })) : detail.data ? detail.data.task?.type === 'BUDGET' ? h(Dialog, { title: '预算填报与审核', onClose: () => setDialog(null) }, h('p', null, '预算按条目填报，经对接人初审和负责人终审后整体提交。'), h(PrimaryButton, { onClick: () => ctx.onNavigate?.('budget-filing', { year: String(detail.data.task.year), taskId: detail.data.taskId || detail.data.task.id }) }, '进入预算填报与审核')) : h(AssignmentDialog, { key: detail.data.id, assignment: detail.data, canEdit: ctx.permissions.includes('budget.submission.edit'), canVerify: verify, busy: action.busy, t, act, onClose: () => { setDialog(null); assignments.retry() } }) : null : null,
         dialog?.kind === 'history' ? h(Dialog, { title: dialog.title, onClose: () => setDialog(null) }, h(FinanceResource, { resource: history }, h(FinanceEvidence, { value: history.data }))) : null,
         dialog && !['create', 'assignment', 'history'].includes(dialog.kind) ? h(FinanceFormDialog, { title: dialog.title, onClose: () => setDialog(null), fields: dialog.kind === 'assignee' ? [{ key: 'assigneeUserId', label: '填报人（留空清除指定）', options: financeRows(members.data).map(row => [row.userId, row.name || row.userId]) }] : dialog.kind === 'publish' || dialog.kind === 'confirmAll' || dialog.kind === 'lock' ? [] : [{ key: 'reason', label: '原因', required: ['reopenTask', 'reopenAssignment', 'void'].includes(dialog.kind), type: 'textarea' }, ...(dialog.kind === 'reopenTask' ? [{ key: 'newDueAt', label: '新的截止时间', type: 'datetime-local' }] : [])], onSubmit: body => {

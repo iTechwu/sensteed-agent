@@ -1073,7 +1073,6 @@ test('client source wires sidebar entry, overlay, tabs, and skill-backed analysi
   for (const skill of ['finance-monthly-risk', 'finance-cost-structure', 'finance-cash-pressure', 'finance-budget-review', 'finance-revenue-attainment', 'finance-data-quality', 'finance-cost-cash-forecast', 'finance-budget-version-health', 'finance-alert-rules-audit']) {
     assert.match(source, new RegExp(`skill: '${skill}'`, 'u'))
   }
-  assert.ok(source.includes('return `/${entry.skill}\\n${context}`'))
   assert.match(source, /const id = await sessions\.create\(\)/u)
   assert.doesNotMatch(source, /sf-task-departments/u, 'department assignment must use the searchable multi-select')
   assert.doesNotMatch(source, /fetch\(`https?:\/\//u, 'client must only call same-origin routes')
@@ -1264,10 +1263,11 @@ test('filing task dialog submits the same dimensions and keeps failures open', a
   const element = (type, props, ...children) => ({ type, props: props || {}, children })
   const createDialog = values => {
     let index = 0
-    return new Function('h', 'useState', 'useEffect', `${format}\n${components}\n${entry}\nreturn CreateTaskDialog`)(
+    return new Function('h', 'useState', 'useEffect', 'useRef', `${format}\n${components}\n${entry}\nreturn CreateTaskDialog`)(
       element,
       initial => [index in values ? values[index++] : (index++, initial), () => {}],
       () => {},
+      initial => ({ current: initial }),
     )
   }
   const values = ['十月资金填报', 'org-1', 'PAYMENT_PLAN', '10', '', null, ['dept-1'], '2026-10-10T12:00', '填写说明', '负责人', '审核人', true, false, true]
@@ -2590,4 +2590,106 @@ test('cash legacy host forwards multi-month and expense filters instead of silen
     assert.equal(query.get('keyword'), '模具')
     assert.equal(query.get('expenseType'), kind === 'payment' ? 'FIXED_OPERATION' : null)
   }
+})
+
+test('schedule preserves unknown source fields, Beijing date and legacy priority without inventing a split', async () => {
+  const source = (await Promise.all(['src/format.js', 'src/components.js', 'src/views/cash.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  const harness = clientHarness(source, 'ScheduleDialog')
+  const writes = []
+  const props = { plan: { id: 'p', planMonth: 10, plannedAmount: 100, acceptsAcceptance: null, priority: '中', scheduleDate: '2026-10-15T16:00:00Z', plannedCashAmount: null, plannedAcceptanceAmount: null }, t: key => key, onClose() {}, act: async (...args) => { writes.push(args); return true } }
+  const render = () => harness.render(props)
+  assert.equal(clientNodes(render()).find(node => node.props.type === 'date').props.value, '2026-10-16')
+  assert.equal(clientNodes(render()).find(node => node.type?.name === 'Select' && node.props.placeholder === '未设置').props.value, 'MEDIUM')
+  await render().props.footer[1].props.onClick()
+  assert.deepEqual(writes, [['/payment-plans/p/schedule', { scheduleDate: '2026-10-15T16:00:00.000Z', priority: 'MEDIUM' }]])
+  const empty = clientHarness(source, 'ScheduleDialog')
+  await empty.render({ ...props, plan: { ...props.plan, priority: null, scheduleDate: 'invalid' } }).props.footer[1].props.onClick()
+  assert.deepEqual(writes[1], ['/payment-plans/p/schedule', {}])
+})
+
+test('schedule ratios keep typed text, round to cents and lock duplicate saving and closing until failure', async () => {
+  const source = (await Promise.all(['src/format.js', 'src/components.js', 'src/views/cash.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  const harness = clientHarness(source, 'ScheduleDialog')
+  let finish, closed = 0; const writes = []
+  const props = { plan: { id: 'p', planMonth: 10, plannedAmount: 100.01, acceptsAcceptance: true }, t: key => key, onClose: () => closed++, act: (...args) => { writes.push(args); return new Promise(resolve => { finish = resolve }) } }
+  const render = () => harness.render(props)
+  const input = label => clientNodes(clientNodes(render()).find(node => node.type?.name === 'FormRow' && node.props.label === label)).find(node => node.type?.name === 'Field')
+  input('现汇比例（%）').props.onChange('60')
+  assert.equal(input('现汇比例（%）').props.value, '60')
+  assert.equal(input('cashAmount').props.value, '60.01')
+  assert.equal(input('acceptanceAmount').props.value, '40.00')
+  const pending = render().props.footer[1].props.onClick()
+  await render().props.footer[1].props.onClick(); render().props.onClose()
+  assert.equal(writes.length, 1); assert.equal(closed, 0)
+  assert.equal(clientNodes(render()).find(node => node.type === 'fieldset').props.disabled, true)
+  finish(false); await pending
+  assert.equal(input('cashAmount').props.value, '60.01')
+  assert.ok(clientNodes(render()).some(node => node.props.role === 'alert' && node.children.some(value => typeof value === 'string' && value.includes('输入已保留'))))
+  input('现汇比例（%）').props.onChange('101')
+  await render().props.footer[1].props.onClick()
+  assert.equal(writes.length, 1)
+  const acceptance = clientNodes(render()).find(node => node.type?.name === 'Select' && node.props.options.some(([id]) => id === 'no'))
+  acceptance.props.onChange('no')
+  assert.equal(input('cashAmount').props.value, '100.01')
+  assert.equal(input('acceptanceAmount').props.value, '0')
+})
+
+test('real filing activity entry supplies organizations and only draft budget versions are selectable', async () => {
+  const source = (await Promise.all(['src/components.js', 'src/views/entry.js', 'src/views/filing.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  const resource = { data: { list: [] }, retry() {} }
+  const props = { ctx: { year: 2026, orgs: [{ id: 'org', name: '唯一主体' }], departments: [{ id: 'dept', name: '财务部' }], permissions: ['budget.activity.manage'], financeWriter: true, drillParams: { section: 'tasks' } }, t: key => key }
+  const view = clientHarness(source, 'FilingParityView', { useFinanceResource: () => resource, useFinanceAction: () => ({ revision: 0 }), financeRows: data => data?.list || [], financeColumns: () => [], FinanceResource() {} })
+  clientNodes(view.render(props)).find(node => node.children.includes('createTask')).props.onClick()
+  const dialogProps = clientNodes(view.render(props)).find(node => node.type?.name === 'CreateTaskDialog').props
+  assert.deepEqual(dialogProps.orgs, props.ctx.orgs)
+  const form = clientHarness(source, 'CreateTaskDialog', { api: async () => ({ data: { list: ['DRAFT', 'PUBLISHED', 'CONFIRMED', 'LOCKED'].map(status => ({ id: status, status, name: status })) } }) })
+  form.render(dialogProps); form.flushEffects(); await new Promise(resolve => setImmediate(resolve))
+  const nodes = clientNodes(form.render(dialogProps))
+  nodes.find(node => node.type?.name === 'Select' && node.props.value === 'PAYMENT_PLAN').props.onChange('BUDGET')
+  const budgetNodes = clientNodes(form.render(dialogProps))
+  assert.deepEqual(budgetNodes.find(node => node.type?.name === 'SearchSelect' && node.props.placeholder === 'version').props.options, [['DRAFT', 'DRAFT']])
+  assert.equal(budgetNodes.find(node => node.type?.name === 'SearchSelect' && node.props.placeholder === 'taskOrg').props.value, 'org')
+})
+
+test('filing activity locally locks submission and dismissal, retaining fields on a false result', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8')
+  const harness = clientHarness(source, 'CreateTaskDialog')
+  let finish, calls = 0, closed = 0
+  const props = { year: 2026, orgs: [{ id: 'o', name: '唯一主体' }], departments: [{ id: 'd', name: '财务部' }], t: key => key, onClose: () => closed++, act: () => { calls++; return new Promise(resolve => { finish = resolve }) } }
+  const render = () => harness.render(props)
+  clientNodes(render()).find(node => node.type?.name === 'Field' && node.props.maxLength === 150).props.onChange('虚构活动')
+  clientNodes(render()).find(node => node.props.type === 'datetime-local').props.onChange('2026-12-20T18:00')
+  const pending = render().props.footer[1].props.onClick()
+  await render().props.footer[1].props.onClick(); render().props.onClose()
+  assert.equal(calls, 1); assert.equal(closed, 0)
+  assert.equal(clientNodes(render()).find(node => node.type === 'fieldset').props.disabled, true)
+  finish(false); await pending
+  assert.equal(clientNodes(render()).find(node => node.type?.name === 'Field' && node.props.maxLength === 150).props.value, '虚构活动')
+  assert.ok(clientNodes(render()).some(node => node.props.role === 'alert'))
+})
+
+test('revenue actuals reject negative input and preserve Beijing dates, failed values and request locking', async () => {
+  const source = (await Promise.all(['src/format.js', 'src/components.js', 'src/views/cash.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  const harness = clientHarness(source, 'BackfillDialog')
+  const writes = []; let finish, closed = 0
+  const props = { row: { id: 'r', actualPaidAt: '2026-10-15T16:00:00Z' }, t: key => key, onClose: () => closed++, act: (...args) => { writes.push(args); return new Promise(resolve => { finish = resolve }) } }
+  const render = () => harness.render(props), event = { preventDefault() {} }
+  assert.equal(clientNodes(render()).find(node => node.props.type === 'date').props.value, '2026-10-16')
+  clientNodes(render()).find(node => node.props.type === 'number').props.onChange('-1')
+  await render().props.footer[1].props.onClick(event)
+  assert.equal(writes.length, 0)
+  clientNodes(render()).find(node => node.props.type === 'number').props.onChange('0')
+  const pending = render().props.footer[1].props.onClick(event)
+  await render().props.footer[1].props.onClick(event); render().props.onClose()
+  assert.equal(writes.length, 1); assert.equal(closed, 0)
+  assert.deepEqual(writes[0][1], { actualAmount: 0, actualPaidAt: '2026-10-15T16:00:00.000Z' })
+  finish(false); await pending
+  assert.equal(clientNodes(render()).find(node => node.props.type === 'number').props.value, '0')
+  assert.ok(clientNodes(render()).some(node => node.props.role === 'alert'))
+})
+
+test('source records deep link opens the source task instead of dropping its anchor', async () => {
+  const resolve = new Function(await readFile(new URL('src/navigation.js', root), 'utf8') + '\nreturn financeBusinessDestination')()
+  assert.deepEqual(resolve('/data-center#source-records'), { tab: 'sources', params: {} })
+  assert.deepEqual(resolve('/data-center'), { tab: 'datacenter', params: {} })
 })

@@ -123,7 +123,7 @@ const isOverdue = task => task.status !== 'CLOSED' && task.dueAt && new Date(tas
 
 function CreateTaskDialog({ year, orgs, departments, members, busy, t, onClose, act }) {
   const [title, setTitle] = useState('')
-  const [orgId, setOrgId] = useState('')
+  const [selectedOrgId, setOrgId] = useState('')
   const [type, setType] = useState('PAYMENT_PLAN')
   const [month, setMonth] = useState(String(Math.min(12, new Date().getMonth() + 2)))
   const [versionId, setVersionId] = useState('')
@@ -139,6 +139,12 @@ function CreateTaskDialog({ year, orgs, departments, members, busy, t, onClose, 
   const [departmentSelectionReady, setDepartmentSelectionReady] = useState(Boolean(departments?.length))
   const [versionError, setVersionError] = useState(false)
   const [versionRetry, setVersionRetry] = useState(0)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState(null)
+  const submitLock = useRef(false)
+  const locked = busy || submitting
+  const close = () => { if (!submitLock.current && !busy) onClose() }
+  const orgId = selectedOrgId || (orgs?.length === 1 ? orgs[0].id : '')
   const personOptions = [...new Set((members?.list || []).filter(member => member.enabled !== false).map(member => member.name?.trim()).filter(Boolean))]
     .sort((left, right) => left.localeCompare(right, 'zh-CN')).map(name => [name, name])
   const validDepartmentIds = selectedDepartmentIds.filter(id => (departments || []).some(department => department.id === id))
@@ -157,41 +163,48 @@ function CreateTaskDialog({ year, orgs, departments, members, busy, t, onClose, 
     setVersionError(false)
     setVersionId('')
     api(`/budget-versions?year=${year}`).then(value => {
-      if (!cancelled) setVersions((value.data?.list || []).filter(version => version.status !== 'LOCKED'))
+      if (!cancelled) setVersions((value.data?.list || []).filter(version => version.status === 'DRAFT'))
     }).catch(() => { if (!cancelled) { setVersions([]); setVersionError(true) } })
     return () => { cancelled = true }
   }, [year, versionRetry])
   const months = Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1}月`])
-  const canSubmit = !busy && title.trim() && validOrg && dueAt && Number.isFinite(new Date(dueAt).getTime()) && validDepartmentIds.length &&
+  const canSubmit = !locked && title.trim() && validOrg && dueAt && Number.isFinite(new Date(dueAt).getTime()) && validDepartmentIds.length &&
     (type !== 'BUDGET' || (!versionError && versions?.some(version => version.id === versionId))) &&
     (type !== 'PAYMENT_PLAN' || (Number(month) >= 1 && Number(month) <= 12))
   const submit = async () => {
-    if (!canSubmit) return
-    const created = await act('/filing-tasks', {
-      title: title.trim(), type, year: Number(year), dueAt: new Date(dueAt).toISOString(),
-      ...(type === 'PAYMENT_PLAN' ? { month: Number(month) } : { versionId }),
-      departments: validDepartmentIds.map(departmentId => ({ departmentId, orgId })),
-      ...(instructions.trim() ? { instructions: instructions.trim() } : {}),
-      ...(ownerName.trim() ? { ownerName: ownerName.trim() } : {}),
-      ...(reviewerName.trim() ? { reviewerName: reviewerName.trim() } : {}),
-      allowModify, freezeCurrentMonth, startAsDraft,
-    })
-    if (created) onClose()
+    if (!canSubmit || submitLock.current) return
+    submitLock.current = true; setSubmitting(true); setSubmitError(null)
+    try {
+      const created = await act('/filing-tasks', {
+        title: title.trim(), type, year: Number(year), dueAt: new Date(dueAt).toISOString(),
+        ...(type === 'PAYMENT_PLAN' ? { month: Number(month) } : { versionId }),
+        departments: validDepartmentIds.map(departmentId => ({ departmentId, orgId })),
+        ...(instructions.trim() ? { instructions: instructions.trim() } : {}),
+        ...(ownerName.trim() ? { ownerName: ownerName.trim() } : {}),
+        ...(reviewerName.trim() ? { reviewerName: reviewerName.trim() } : {}),
+        allowModify, freezeCurrentMonth, startAsDraft,
+      })
+      if (created) onClose()
+      else setSubmitError('发起失败，请检查字段与权限后重试；本次输入已保留。')
+    } catch {
+      setSubmitError('发起失败，请检查字段与权限后重试；本次输入已保留。')
+    } finally { submitLock.current = false; setSubmitting(false) }
   }
-  return h(Dialog, { title: t('createTask'), onClose, footer: [
-    h(GhostButton, { key: 'cancel', onClick: onClose }, t('cancel')),
-    h(PrimaryButton, { key: 'ok', disabled: !canSubmit, busy, onClick: submit }, t(startAsDraft ? 'taskStartDraft' : 'taskPublish')),
+  return h(Dialog, { title: t('createTask'), onClose: close, footer: [
+    h(GhostButton, { key: 'cancel', disabled: locked, onClick: close }, t('cancel')),
+    h(PrimaryButton, { key: 'ok', disabled: !canSubmit, busy: locked, onClick: submit }, t(startAsDraft ? 'taskStartDraft' : 'taskPublish')),
   ] },
-    h('fieldset', { className: 'sf-stack sf-fieldset', disabled: busy, 'aria-busy': busy },
+    submitError ? h('p', { role: 'alert', className: 'sf-neg' }, submitError) : null,
+    h('fieldset', { className: 'sf-stack sf-fieldset', disabled: locked, 'aria-busy': locked },
       h(FormRow, { label: t('taskTitle') }, h(Field, { value: title, onChange: setTitle, maxLength: 150 })),
       h(FormRow, { label: t('taskType') }, h(Select, { value: type, onChange: setType, options: [['PAYMENT_PLAN', t('typePlan')], ['BUDGET', t('typeBudget')]] })),
       type === 'PAYMENT_PLAN'
         ? h(FormRow, { label: t('taskMonth') }, h(Select, { value: month, onChange: setMonth, options: months, placeholder: t('taskMonth') }))
-        : h(FormRow, { label: t('version') }, h(SearchSelect, { value: versionId, onChange: setVersionId, options: (versions || []).map(version => [version.id, budgetVersionLabel(version)]), placeholder: t('version'), disabled: busy || !versions?.length })),
+        : h(FormRow, { label: t('version') }, h(SearchSelect, { value: versionId, onChange: setVersionId, options: (versions || []).map(version => [version.id, budgetVersionLabel(version)]), placeholder: t('version'), disabled: locked || !versions?.length })),
       type === 'BUDGET' && versionError ? h('div', { className: 'sf-row', role: 'alert' }, '预算版本加载失败', h(LinkButton, { onClick: () => setVersionRetry(value => value + 1) }, '重新加载版本')) : null,
       type === 'BUDGET' && !versionError && versions && !versions.length ? h('p', { className: 'sf-note' }, `${t('empty')} · ${t('version')}`) : null,
       h(FormRow, { label: `${t('taskOrg')} *` },
-        h(SearchSelect, { buttonTrigger: true, value: orgId, onChange: setOrgId, options: orgOptions, placeholder: t('taskOrg'), disabled: busy || !orgOptions.length })),
+        h(SearchSelect, { buttonTrigger: true, value: orgId, onChange: setOrgId, options: orgOptions, placeholder: t('taskOrg'), disabled: locked || !orgOptions.length })),
       !validOrg ? h('p', { role: 'alert', className: 'sf-note' }, t('taskOrgMissing')) : null,
       h('div', { className: 'sf-inline-form' },
         h('div', { className: 'sf-row-between' }, h('strong', null, `${t('taskDepartments')}（${validDepartmentIds.length}/${departments?.length || 0}）`),
@@ -203,13 +216,13 @@ function CreateTaskDialog({ year, orgs, departments, members, busy, t, onClose, 
           onChange: setSelectedDepartmentIds,
           options: (departments || []).map(department => [department.id, department.name]),
           placeholder: t('department'),
-          disabled: busy || !departments?.length,
+          disabled: locked || !departments?.length,
         }),
         !departments?.length ? h('p', { className: 'sf-note' }, `${t('empty')} · ${t('department')}`) : null),
       h(FormRow, { label: t('taskDue') }, h(Field, { type: 'datetime-local', value: dueAt, onChange: setDueAt })),
       h(FormRow, { label: t('taskInstructions') }, h(Field, { value: instructions, onChange: setInstructions, maxLength: 500 })),
-      h(FormRow, { label: t('taskOwner') }, h(SearchSelect, { value: ownerName, onChange: setOwnerName, options: personOptions, allowCustom: true, placeholder: t('taskOwner'), maxLength: 100, disabled: busy })),
-      h(FormRow, { label: t('taskReviewer') }, h(SearchSelect, { value: reviewerName, onChange: setReviewerName, options: personOptions, allowCustom: true, placeholder: t('taskReviewer'), maxLength: 100, disabled: busy })),
+      h(FormRow, { label: t('taskOwner') }, h(SearchSelect, { value: ownerName, onChange: setOwnerName, options: personOptions, allowCustom: true, placeholder: t('taskOwner'), maxLength: 100, disabled: locked })),
+      h(FormRow, { label: t('taskReviewer') }, h(SearchSelect, { value: reviewerName, onChange: setReviewerName, options: personOptions, allowCustom: true, placeholder: t('taskReviewer'), maxLength: 100, disabled: locked })),
       members?.forbidden || members?.error ? h('p', { className: 'sf-note' }, '人员列表暂时无法加载，可在选择器中输入并确认自定义姓名。') : null,
       h('div', { className: 'sf-task-options' },
         h('label', null, h('input', { type: 'checkbox', checked: allowModify, onChange: event => setAllowModify(event.target.checked) }), t('taskAllowModify')),

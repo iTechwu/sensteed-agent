@@ -22,7 +22,7 @@ function bridge(sessions, globals = {}) {
   return { globals, opened }
 }
 
-function analysis(globals, navigator = {}) {
+function analysis(globals, navigator = {}, context = {}) {
   const values = []
   let cursor = 0
   const useState = initial => {
@@ -38,7 +38,7 @@ function analysis(globals, navigator = {}) {
       return ref
     }, entries, PrimaryButton, () => {}, () => {}, message => message,
   )
-  const props = { ctx: { year: '2026', orgId: 'org-a', orgs: [{ id: 'org-a', name: '主体甲' }] }, t: key => key }
+  const props = { ctx: { year: '2026', orgId: 'org-a', orgs: [{ id: 'org-a', name: '主体甲' }], ...context }, t: key => key }
   const nodes = node => node && typeof node === 'object' ? [node, ...node.children.flatMap(nodes)] : []
   return {
     render() { cursor = 0; return nodes(component(props)).filter(node => node.type === PrimaryButton) },
@@ -57,9 +57,10 @@ test('all nine analysis buttons invoke their bundled skill in distinct new sessi
   for (let index = 0; index < expected.length; index++) await ui.render()[index].props.onClick()
   assert.deepEqual(opened, expected.map((_, index) => `new-${index + 1}`))
   assert.deepEqual(sent.map(({ prompt }) => prompt.split('\n')[0]), expected.map(name => `/${name}`))
-  for (const { prompt } of sent.filter((_, index) => ![5, 8].includes(index))) {
+  for (const { prompt } of sent) {
     assert.match(prompt, /2026/)
     assert.match(prompt, /主体甲/)
+    assert.match(prompt, /org-a/)
   }
   assert.equal(ui.notice(), 'sent')
 })
@@ -126,5 +127,19 @@ test('missing conversation and clipboard report failure without claiming analysi
     await ui.render()[0].props.onClick()
     assert.equal(ui.notice(), 'copyFailed')
     assert.ok(ui.render().every(button => !button.props.disabled))
+  }
+})
+
+
+test('unresolved selected org keeps its identifier and never widens analysis to all orgs', async () => {
+  const sent = []
+  const ui = analysis({ __sensteed_finance_conversation: () => ({ send: async prompt => sent.push(prompt) }) }, {}, { orgs: [] })
+  for (const button of ui.render()) await button.props.onClick()
+  assert.equal(sent.length, expected.length)
+  for (const prompt of sent) {
+    assert.match(prompt, /2026/)
+    assert.match(prompt, /所选主体 ID：org-a/)
+    assert.match(prompt, /名称：待核实/)
+    assert.doesNotMatch(prompt, /请(?:对|分析|复盘|为)全部主体/)
   }
 })

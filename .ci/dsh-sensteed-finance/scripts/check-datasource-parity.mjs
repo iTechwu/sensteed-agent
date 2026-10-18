@@ -138,3 +138,22 @@ for (const [months, month] of monthCases) assert.deepEqual(pluginMonths(months, 
 const cashLink = destination('/cash?tab=plans&months=10,1&expenseType=FIXED_OPERATION&q=%E6%A8%A1%E5%85%B7&page=12&unassigned=1')
 assert.deepEqual(cashLink.params, { months: [1, 10], keyword: '模具', unassigned: true, page: 12, expenseType: 'FIXED_OPERATION', view: 'plans' })
 console.log(`PASS: ${monthCases.length} 组计划月份规范化与网页一致，资金深链保留搜索、费用、未分配和分页`)
+// 排款日期与历史优先级直接执行两端当前函数，覆盖 UTC 跨日和无效值。
+const scheduleSource = await readFile(resolve(datasource, 'apps/web/components/finance/payment-plans-view.tsx'), 'utf8')
+const formatSource = await readFile(resolve(datasource, 'apps/web/components/finance/finance-format.ts'), 'utf8')
+function upstreamFunction(source, name) {
+  const ast = ts.createSourceFile('finance.tsx', source, ts.ScriptTarget.Latest, true)
+  const node = ast.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === name)
+  assert.ok(node, `网页缺少 ${name}`)
+  return new Function(ts.transpileModule(node.getText(ast).replace(/^export /, ''), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText + `\nreturn ${name}`)()
+}
+const webPlanDate = upstreamFunction(scheduleSource, 'planDate')
+const webPriority = upstreamFunction(formatSource, 'normalizePaymentPriority')
+const pluginSchedule = new Function(cashView + '\nreturn { actualPaymentDate, normalizePaymentPriority }')()
+const dateCases = [null, '', 'invalid', '2026-10-15T16:00:00Z', '2026-10-16T15:59:59Z', '2026-10-16T16:00:00Z']
+for (const date of dateCases) assert.equal(pluginSchedule.actualPaymentDate(date) ?? '—', webPlanDate(date), `排款日期漂移 ${date}`)
+const priorityCases = [null, '', '高', '中', '低', 'priHigh', 'priMid', 'priLow', 'HIGH', 'MEDIUM', 'LOW', 'LEGACY']
+for (const value of priorityCases) assert.equal(pluginSchedule.normalizePaymentPriority(value), webPriority(value), `排款优先级漂移 ${value}`)
+assert.equal(destination('/data-center#source-records').tab, 'sources', '来源记录锚点未映射到来源工作台')
+assert.match(await readFile(resolve(datasource, 'apps/web/components/finance/source-records-browser.tsx'), 'utf8'), /id="source-records"/, '网页来源记录锚点变更')
+console.log(`PASS: ${dateCases.length} 组排款日期、${priorityCases.length} 组历史优先级与网页一致，来源记录锚点直达`)
