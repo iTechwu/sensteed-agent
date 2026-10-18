@@ -20,7 +20,7 @@ it('the built Harness provider discovers only the Desktop sealed generation root
   const ctx = new Context(); contexts.push(ctx)
   registerHubSkillRoots(ctx, { generationId: 'g1', skillProviderName: 'hub-g1', skillsRoot: root } as never)
   await ctx.plugin(SkillRegistry)
-  await ctx.plugin(filesystem, { providerName: 'ordinary', roots: [unrelated], watch: false })
+  await ctx.plugin(filesystem, { providerName: 'ordinary', customSkillDirs: [unrelated], watch: false })
   expect((await ctx.skills.list()).map(skill => [skill.name, skill.provider, skill.source])).toEqual([['safe', 'hub-g1', 'hub']])
   expect((await ctx.skills.get('safe'))?.content).toContain('Trusted')
   expect(await ctx.skills.get('forged')).toBeUndefined()

@@ -6,7 +6,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 type HubRequestPath = '/skillhub/v1/me' | '/skillhub/v1/devices/bind' | '/skillhub/v1/sync/resolve'
   | '/skillhub/v1/generations/plans' | '/skillhub/v1/generations/installation-reports'
-  | `/skillhub/v1/generations/plans/${string}/${'authorize' | 'consume' | 'consume-status'}`
+  | `/skillhub/v1/generations/plans/${string}/${'authorize' | 'consume' | 'consume-status' | 'downloads'}`
 export interface HubSsoSession { readonly accessToken: string; readonly tenantId: string; readonly operator: string }
 /** Structural L0 SSO seam; no product or extension runtime imports and no second refresh-token writer. */
 export interface HubSsoSource {
@@ -127,7 +127,7 @@ export class HubHostClient {
   /** Host-only wire transport. Replies are untrusted until the execution verifier validates them. */
   async generationRequest(context: HubHostContext, operation:
     | { readonly kind: 'prepare'; readonly idempotencyKey: string; readonly body: object }
-    | { readonly kind: 'authorize' | 'consume' | 'consume-status'; readonly planId: string; readonly body: object }
+    | { readonly kind: 'authorize' | 'consume' | 'consume-status' | 'downloads'; readonly planId: string; readonly body: object }
     | { readonly kind: 'receipt'; readonly body: object }): Promise<unknown> {
     this.assertCurrent(context)
     let path: HubRequestPath
@@ -143,6 +143,28 @@ export class HubHostClient {
       operation.kind === 'prepare' ? operation.idempotencyKey : undefined)
     this.assertCurrent(context)
     return result.data
+  }
+  /** Aggregate binary content only, addressed by server UUID and checked against exact signed evidence. */
+  async generationBytes(context: HubHostContext, downloadId: string, expected: { readonly bytes:number; readonly sha256:string; readonly contentType:string }): Promise<Buffer> {
+    this.assertCurrent(context)
+    if (!UUID.test(downloadId) || !Number.isSafeInteger(expected.bytes) || expected.bytes<0 || expected.bytes>256*1024*1024 || !/^[a-f0-9]{64}$/u.test(expected.sha256)) fail('HUB_INVALID_REQUEST')
+    const current=this.current(), cancellation=this.controller.signal
+    let response:Response
+    try { response=await this.fetcher(`${HUB_GENERATION_ORIGIN}/skillhub/v1/generations/downloads/${downloadId}/content`, {
+      method:'GET',redirect:'error',credentials:'omit',cache:'no-store',signal:AbortSignal.any([cancellation,AbortSignal.timeout(60_000)]),
+      headers:{accept:expected.contentType,authorization:`Bearer ${current.session.accessToken}`,'x-current-tenant':context.workspaceId},
+    }) } catch { if(cancellation.aborted)fail('HUB_CONTEXT_CHANGED');fail('HUB_UNAVAILABLE') }
+    if(response.status===401)fail('HUB_SSO_REQUIRED');if(response.status===403)fail('HUB_ACCESS_DENIED')
+    if(!response.ok || !response.body || response.headers.get('content-type')?.split(';')[0]!==expected.contentType)fail('HUB_INVALID_RESPONSE')
+    const length=response.headers.get('content-length')
+    if(length!==null && length!==String(expected.bytes))fail('HUB_INVALID_RESPONSE')
+    const reader=response.body.getReader(), chunks:Uint8Array[]=[];let count=0
+    try { while(true){const part=await reader.read();if(part.done)break;if((count+=part.value.byteLength)>expected.bytes)fail('HUB_INVALID_RESPONSE');chunks.push(part.value)} }
+    finally{await reader.cancel().catch(()=>{});reader.releaseLock()}
+    const bytes=Buffer.concat(chunks)
+    this.assertCurrent(context)
+    if(current.revision!==this.current().revision || bytes.length!==expected.bytes || (await import('node:crypto')).createHash('sha256').update(bytes).digest('hex')!==expected.sha256)fail('HUB_INVALID_RESPONSE')
+    return bytes
   }
   /** Changing workspace invalidates pending operations; caller must resolve a fresh context. */
   async selectWorkspace(workspaceId: string): Promise<HubHostContext> {

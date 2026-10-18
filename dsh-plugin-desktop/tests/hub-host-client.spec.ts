@@ -1,4 +1,4 @@
-import { generateKeyPairSync, randomUUID, sign } from 'node:crypto'
+import { createHash, generateKeyPairSync, randomUUID, sign } from 'node:crypto'
 import { hubCanonicalJson, hubSyncDigest, hubSyncSnapshotData, type HubSyncExpected } from '../src/hub-sync-verifier.ts'
 import { registerHubHostService } from '../src/hub-host-service.ts'
 import { describe, expect, it, vi } from 'vitest'
@@ -45,7 +45,7 @@ describe('Desktop L0 fixed Hub client', () => {
   it('checks an authenticated signed snapshot without consuming or activating anything', async () => {
     const f = fixture(), context = await f.client.context(), now = Date.now(), pair = generateKeyPairSync('ed25519')
     const expected: HubSyncExpected = { origin: 'https://ai.hozonauto.com/plugins/api', tenantId: tenant, actorRef: 'test-actor', deviceId: randomUUID(), profileId: randomUUID(), channel: 'stable', observedStateDigest: 'a'.repeat(64), minimumPolicyRevision: 0,
-      target: { sensteedVersion: '0.2.1', harnessVersion: '0.2.1', os: 'darwin', arch: 'arm64', nodeVersion: '22.0.0', cordisVersion: '4.0.5-alpha.2', libc: null, nodeAbi: '127', hostCapabilities: [] } }
+      target: { sensteedVersion: '0.2.1', harnessVersion: '0.2.1', os: 'darwin', arch: 'arm64', nodeVersion: '22.0.0', cordisVersion: '4.0.5-alpha.2', libc: null, nodeAbi: '127', hostCapabilities: [], hostBuildDigest: 'b'.repeat(64) } }
     const { minimumPolicyRevision: _floor, ...binding } = expected
     const snapshot = { ...binding, schemaVersion: 'hub-sync-v1', snapshotId: randomUUID(), policyRevision: 0, catalogDigest: 'b'.repeat(64), entries: [], issuedAt: new Date(now).toISOString(), expiresAt: new Date(now + 300_000).toISOString() }
     const value = { snapshot, signature: { algorithm: 'Ed25519', canonicalization: 'RFC8785', keyId: 'test', payloadDigest: hubSyncDigest(snapshot), signature: sign(null, Buffer.from(hubCanonicalJson(snapshot)), pair.privateKey).toString('base64') } }
@@ -69,4 +69,16 @@ describe('Desktop L0 fixed Hub client', () => {
     expect(() => f.client.assertCurrent(before)).toThrow('HUB_CONTEXT_CHANGED')
     f.client.dispose(); await expect(f.client.context()).rejects.toMatchObject({ code: 'HUB_SSO_REQUIRED' })
   })
+})
+
+it('downloads only aggregate UUID content and checks exact streamed signed bytes', async () => {
+ const f=fixture(),context=await f.client.context(),bytes=Buffer.from('verified payload'),id=randomUUID()
+ const expected={bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),contentType:'application/gzip'}
+ f.fetcher.mockResolvedValue(new Response(bytes,{headers:{'content-type':'application/gzip','content-length':String(bytes.length)}}))
+ expect(await f.client.generationBytes(context,id,expected)).toEqual(bytes)
+ expect(f.fetcher.mock.calls.at(-1)?.[0]).toBe(`https://ai.hozonauto.com/plugins/api/skillhub/v1/generations/downloads/${id}/content`)
+ await expect(f.client.generationBytes(context,'../../foreign',expected)).rejects.toMatchObject({code:'HUB_INVALID_REQUEST'})
+ f.fetcher.mockResolvedValue(new Response(Buffer.from('tampered payload'),{headers:{'content-type':'application/gzip'}}))
+ await expect(f.client.generationBytes(context,id,expected)).rejects.toMatchObject({code:'HUB_INVALID_RESPONSE'})
+ f.client.dispose()
 })

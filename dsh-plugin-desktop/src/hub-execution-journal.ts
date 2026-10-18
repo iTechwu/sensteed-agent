@@ -12,14 +12,14 @@ const receiptSchema = z.strictObject({ seq:z.number().int().nonnegative(),previo
 const recordSchema = z.strictObject({
   schemaVersion: z.literal(1), scope: digest, planId: z.uuid(), planDigest: digest, operationId: z.uuid(),
   previousGenerationDigest: digest.nullable(), generationDigest: digest,
-  phase: z.enum(['DOWNLOADING', 'CONSUMING', 'AUTHORIZED', 'STAGED', 'COMMITTED', 'ACTIVATED', 'ROLLED_BACK', 'NEEDS_ATTENTION']),
+  phase: z.enum(['PLANNED', 'CONSUMING', 'AUTHORIZED', 'STAGED', 'COMMITTED', 'ACTIVATED', 'ROLLED_BACK', 'NEEDS_ATTENTION']),
   revision: z.number().int().nonnegative(), receiptSeq: z.number().int().nonnegative(),
   executionGeneration: z.string().regex(/^[1-9][0-9]*$/u).nullable(), executionExpiresAt: z.iso.datetime().nullable(),
   descriptorDigest: digest.nullable(), pendingReceipt: receiptSchema.nullable(),
 })
 export type HubExecutionRecord = Readonly<z.infer<typeof recordSchema>>
 const transitions: Record<HubExecutionRecord['phase'], readonly HubExecutionRecord['phase'][]> = {
-  DOWNLOADING: ['CONSUMING', 'NEEDS_ATTENTION'], CONSUMING: ['AUTHORIZED', 'NEEDS_ATTENTION'],
+  PLANNED: ['CONSUMING', 'NEEDS_ATTENTION'], CONSUMING: ['AUTHORIZED', 'NEEDS_ATTENTION'],
   AUTHORIZED: ['STAGED', 'NEEDS_ATTENTION', 'ROLLED_BACK'], STAGED: ['COMMITTED', 'NEEDS_ATTENTION', 'ROLLED_BACK'],
   COMMITTED: ['ACTIVATED', 'NEEDS_ATTENTION', 'ROLLED_BACK'], NEEDS_ATTENTION: ['NEEDS_ATTENTION', 'ROLLED_BACK'],
   ACTIVATED: [], ROLLED_BACK: [],
@@ -69,7 +69,7 @@ export class HubExecutionJournal {
       if (old && old.phase !== 'ACTIVATED' && old.phase !== 'ROLLED_BACK') throw new Error('Hub execution is already pending')
       const value = recordSchema.parse({ schemaVersion: 1, scope: this.store.scope, planId: plan.planId, planDigest: plan.planDigest,
         operationId, previousGenerationDigest: plan.expectedActiveGenerationDigest, generationDigest: plan.proposedGenerationDigest,
-        phase: 'DOWNLOADING', revision: (old?.revision ?? -1) + 1, receiptSeq: 0, executionGeneration: null, executionExpiresAt: null, descriptorDigest: null, pendingReceipt:null })
+        phase: 'PLANNED', revision: (old?.revision ?? -1) + 1, receiptSeq: 0, executionGeneration: null, executionExpiresAt: null, descriptorDigest: null, pendingReceipt:null })
       this.write(value); return Object.freeze(value)
     })
   }
