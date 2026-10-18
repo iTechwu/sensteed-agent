@@ -50,6 +50,15 @@ function asString(value: unknown): string | undefined {
 class DofeAuthTokenError extends Error {
   constructor(message: string, readonly code?: string) { super(message) }
 }
+class DofeAuthNetworkError extends Error {}
+interface OfflineOwner { operator: string; tenantId: string }
+function offlineOwner(value: unknown): OfflineOwner | undefined {
+  if (!value || typeof value !== 'object') return undefined
+  const owner = value as Partial<OfflineOwner>
+  return typeof owner.operator === 'string' && owner.operator.length > 0 && owner.operator.length <= 128
+    && typeof owner.tenantId === 'string' && /^[0-9a-f-]{36}$/iu.test(owner.tenantId)
+    ? { operator: owner.operator, tenantId: owner.tenantId } : undefined
+}
 
 /** Fixed copy only: transport errors may contain URLs, so never show their raw text. */
 function loginNetworkError(error: unknown): string {
@@ -72,6 +81,7 @@ export class DofeAuthService {
   private bindingRevision = 0
   private snapshot: DofeAuthSnapshot = { status: 'idle' }
   private accessToken: string | undefined
+  private offlineRestoreAllowed = false
   private server: ReturnType<typeof createServer> | undefined
   private timer: ReturnType<typeof setTimeout> | undefined
   private operation: Promise<void> | undefined
@@ -95,6 +105,14 @@ export class DofeAuthService {
   getDatasourceSession(): { accessToken: string; tenantId: string; operator: string } | undefined {
     if (this.snapshot.status !== 'bound' || !this.accessToken || !this.snapshot.tenant || !this.snapshot.user) return undefined
     return { accessToken: this.accessToken, tenantId: this.snapshot.tenant.tenantId, operator: this.snapshot.user.ssoSub }
+  }
+
+  /** Identifies the last verified credential owner only. Never authenticates an API call. */
+  async getOfflineIdentity(): Promise<OfflineOwner | undefined> {
+    if (!this.offlineRestoreAllowed || this.cancelled) return undefined
+    const record = await this.credentials.readRecord(DOFE_AUTH_GRANT_KEY)
+    const payload = record?.kind === 'grant' ? record.payload as { refreshToken?: unknown; verifiedOwner?: unknown } : undefined
+    return asString(payload?.refreshToken) ? offlineOwner(payload?.verifiedOwner) : undefined
   }
 
   watchBinding(listener: (snapshot: DofeAuthSnapshot) => void): () => void {
@@ -121,16 +139,22 @@ export class DofeAuthService {
     if (this.operation !== undefined) return this.getStatus()
     this.cancelled = false
     this.abort = new AbortController()
+    this.offlineRestoreAllowed = false
     // Silent renewal must not temporarily revoke the session used by business
     // routes. Only an explicit grant rejection invalidates a prior binding.
     const renewing = !interactive && this.snapshot.status === 'bound'
     if (!renewing) this.snapshot = { status: 'pending' }
+    if (interactive) {
+      this.accessToken = undefined
+      for (const listener of this.bindingListeners) { try { listener(this.getStatus()) } catch {} }
+    }
     this.operation = this.openAuthorization(interactive).catch(error => {
       if (!this.cancelled) {
         // The generic dialog copy hides the underlying failure; keep the cause
         // chain in the diagnostic log so network vs provisioning is decidable.
         this.logger?.error(`dsh-plugin-desktop: dofe 登录流程失败: ${formatDesktopErrorDetails(error)}`)
         const invalid = error instanceof DofeAuthTokenError && error.code === 'invalid_grant'
+        this.offlineRestoreAllowed = !interactive && error instanceof DofeAuthNetworkError
         if (renewing && !invalid) return
         this.fail(
           invalid ? '登录授权已失效，请重新登录' : loginNetworkError(error),
@@ -143,16 +167,18 @@ export class DofeAuthService {
 
   async cancel(): Promise<DofeAuthSnapshot> {
     this.cancelled = true
+    this.offlineRestoreAllowed = false
     this.accessToken = undefined
     this.abort.abort()
     this.cancelPending?.()
     this.cancelPending = undefined
     this.closeLoopback()
     this.snapshot = { status: 'cancelled' }
+    for (const listener of this.bindingListeners) { try { listener(this.getStatus()) } catch {} }
     return this.getStatus()
   }
 
-  async dispose(): Promise<void> { await this.cancel(); await this.operation }
+  async dispose(): Promise<void> { this.bindingListeners.clear(); await this.cancel(); await this.operation }
 
   async logout(): Promise<DofeAuthSnapshot> {
     await this.cancel()
@@ -164,6 +190,14 @@ export class DofeAuthService {
   }
 
   private async openAuthorization(interactive: boolean): Promise<void> {
+    if (interactive) {
+      // A new login must not retain offline authority from the previous account.
+      await this.credentials.modifyRecord(DOFE_AUTH_GRANT_KEY, async record => {
+        if (record?.kind !== 'grant') return undefined
+        const payload = record.payload as { refreshToken?: unknown }
+        return { kind: 'grant', payload: { refreshToken: payload.refreshToken } }
+      })
+    }
     if (!interactive) {
       const record = await this.credentials.readRecord(DOFE_AUTH_GRANT_KEY)
       if (record?.kind !== 'grant' || !asString((record.payload as { refreshToken?: unknown })?.refreshToken)) {
@@ -181,14 +215,15 @@ export class DofeAuthService {
     // Rotate inside the credential provider's cross-process lock, and persist
     // the replacement before provisioning so a Models outage cannot lose it.
     await this.credentials.modifyRecord(DOFE_AUTH_GRANT_KEY, async record => {
-      const payload = record?.kind === 'grant' ? record.payload as { refreshToken?: unknown } | null : null
+      const payload = record?.kind === 'grant' ? record.payload as { refreshToken?: unknown; verifiedOwner?: unknown } | null : null
       const refreshToken = asString(payload?.refreshToken)
       if (refreshToken === undefined) return undefined
       const refreshStartedAt = Date.now()
       try {
         const token = await this.exchangeRefresh(discovery, refreshToken)
         accessToken = token.accessToken
-        return { kind: 'grant', payload: { refreshToken: token.refreshToken ?? refreshToken } }
+        return { kind: 'grant', payload: { refreshToken: token.refreshToken ?? refreshToken,
+          ...(offlineOwner(payload?.verifiedOwner) ? { verifiedOwner: offlineOwner(payload?.verifiedOwner) } : {}) } }
       } catch (error) {
         if (!(error instanceof DofeAuthTokenError) || error.code !== 'invalid_grant') throw error
         return { kind: 'grant', payload: {} }
@@ -241,7 +276,7 @@ export class DofeAuthService {
   }
 
   private async readDiscovery(): Promise<OidcDiscovery> {
-    const response = await this.fetcher(SENSTEED_SSO_DISCOVERY_URL, { redirect: 'error', signal: this.signal(10_000) })
+    const response = await this.authFetch(SENSTEED_SSO_DISCOVERY_URL, { redirect: 'error', signal: this.signal(10_000) })
     if (!response.ok) throw new Error(`SSO discovery 请求失败（${response.status}）`)
     const value = await response.json() as Partial<OidcDiscovery>
     const issuer = asString(value.issuer)
@@ -281,7 +316,7 @@ export class DofeAuthService {
   }
 
   private async exchangeCode(discovery: OidcDiscovery, redirectUri: string, verifier: string, code: string): Promise<{ accessToken: string; refreshToken?: string }> {
-    const response = await this.fetcher(discovery.token_endpoint, {
+    const response = await this.authFetch(discovery.token_endpoint, {
       method: 'POST', redirect: 'error', signal: this.signal(15_000),
       headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json' },
       body: new URLSearchParams({ grant_type: 'authorization_code', client_id: SENSTEED_SSO_CLIENT_ID, code, redirect_uri: redirectUri, code_verifier: verifier }).toString(),
@@ -290,7 +325,7 @@ export class DofeAuthService {
   }
 
   private async exchangeRefresh(discovery: OidcDiscovery, refreshToken: string): Promise<{ accessToken: string; refreshToken?: string }> {
-    const response = await this.fetcher(discovery.token_endpoint, {
+    const response = await this.authFetch(discovery.token_endpoint, {
       method: 'POST', redirect: 'error', signal: this.signal(15_000),
       headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json' },
       body: new URLSearchParams({ grant_type: 'refresh_token', client_id: SENSTEED_SSO_CLIENT_ID, refresh_token: refreshToken }).toString(),
@@ -309,7 +344,7 @@ export class DofeAuthService {
 
   private async provision(discovery: OidcDiscovery, accessToken: string): Promise<void> {
     this.abort.signal.throwIfAborted()
-    const response = await this.fetcher(MODELS_PROVISION_URL, {
+    const response = await this.authFetch(MODELS_PROVISION_URL, {
       method: 'POST', redirect: 'error', signal: this.signal(15_000),
       headers: { authorization: `Bearer ${accessToken}`, 'x-company-code': 'sensteed', accept: 'application/json' },
     })
@@ -350,6 +385,11 @@ export class DofeAuthService {
         ? Object.fromEntries(Object.entries(value.groupNames).filter((entry): entry is [string, string] => typeof entry[1] === 'string')) : {},
     }
     await this.onBound?.(snapshot)
+    this.abort.signal.throwIfAborted()
+    await this.credentials.modifyRecord(DOFE_AUTH_GRANT_KEY, async record => {
+      const refreshToken = record?.kind === 'grant' ? asString((record.payload as { refreshToken?: unknown }).refreshToken) : undefined
+      return refreshToken ? { kind: 'grant', payload: { refreshToken, verifiedOwner: { operator: ssoSub, tenantId } } } : undefined
+    })
     this.abort.signal.throwIfAborted()
     this.accessToken = accessToken
     this.snapshot = snapshot
@@ -400,6 +440,14 @@ export class DofeAuthService {
 
   private signal(timeout: number): AbortSignal {
     return AbortSignal.any([this.abort.signal, AbortSignal.timeout(timeout)])
+  }
+
+  private async authFetch(input: string, init: RequestInit): Promise<Response> {
+    try { return await this.fetcher(input, init) }
+    catch (error) {
+      this.abort.signal.throwIfAborted()
+      throw new DofeAuthNetworkError('Authentication transport unavailable', { cause: error })
+    }
   }
 
   private fail(message: string, code?: 'invalid_grant'): void {
