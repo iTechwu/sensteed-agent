@@ -30,7 +30,7 @@ export function HubSetupSection({t}:Props){
  const change=(item:HubSelection|{kind:'skill'|'plugin';itemId:string},action:string)=>{intent.current=undefined;setPreview(undefined);setSelection(current=>[...current.filter(i=>hubKey(i)!==hubKey(item)),...(action==='skip'?[]:[{kind:item.kind,itemId:item.itemId,action:action as HubSelection['action'],enabled:check?.activeItems.find(i=>hubKey(i)===hubKey(item))?.enabled??true}])])}
  const blocked=check?.entries.some(e=>e.required&&hubBlocked(e))??false,pending=!hubTerminal(operation),expired=preview?Date.parse(preview.expiresAt)<=clock:true,missingAccess=preview?.items.some(i=>(i.action==='install'||i.action==='update')&&!i.accessDeclaration)??false
  return <section className="dshDofeAccess" aria-labelledby="hub-setup-title">
-  <h2 id="hub-setup-title">{t('hubTitle')}</h2><p>{t('hubIntro')}</p>
+  <h2 id="hub-setup-title">{t('hubTitle')}</h2><p>{t('hubIntro')}</p><p>{t('hubPersonalSkills')}</p>
   {error&&<p role="alert">{error}</p>}
   <div><Button disabled={busy||recovering} onClick={()=>void run(()=>refresh())}>{busy?t('hubWorking'):t('hubCheck')}</Button></div>
   {check&&<><p>{t('hubProfile')}: <code>{check.profileId}</code> · {check.activeGenerationDigest?t('hubActive'):t('hubInitial')}</p>
