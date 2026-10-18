@@ -1,0 +1,341 @@
+{
+  "date": "2026-10-18",
+  "baseline": "page-by-page-audit-20261018.evidence.json",
+  "method": "Local source inventory and execution of financeBusinessDestination; controlled synthetic browser; no production business session",
+  "sourceBeforeFinalCommit": {
+    "helm": "8a5b59b2a6d6833004ba65f14e8bdefab8d0b6fd",
+    "datasource": "c4a7f799636fdf867b5e960c5a1c491d9b1901bb"
+  },
+  "inventory": {
+    "pageCount": 29,
+    "canonicalBusinessPages": 25,
+    "mappedCanonicalPages": 25,
+    "unmappedCanonicalPages": [],
+    "canonical": [
+      {
+        "path": "/alerts",
+        "destination": {
+          "tab": "alerts",
+          "params": {}
+        }
+      },
+      {
+        "path": "/assistant",
+        "destination": {
+          "tab": "analyze",
+          "params": {}
+        }
+      },
+      {
+        "path": "/budget",
+        "destination": {
+          "tab": "budget",
+          "params": {}
+        }
+      },
+      {
+        "path": "/budget-engine",
+        "destination": {
+          "tab": "engine",
+          "params": {}
+        }
+      },
+      {
+        "path": "/budget/comparison/monthly-roll",
+        "destination": {
+          "tab": "comparisons",
+          "params": {
+            "mode": "monthly"
+          }
+        }
+      },
+      {
+        "path": "/budget/comparison/versions",
+        "destination": {
+          "tab": "comparisons",
+          "params": {
+            "mode": "versions"
+          }
+        }
+      },
+      {
+        "path": "/budget/comparison/yearly",
+        "destination": {
+          "tab": "comparisons",
+          "params": {
+            "mode": "yearly"
+          }
+        }
+      },
+      {
+        "path": "/cash",
+        "destination": {
+          "tab": "cash",
+          "params": {}
+        }
+      },
+      {
+        "path": "/cost-engineering",
+        "destination": {
+          "tab": "bom",
+          "params": {}
+        }
+      },
+      {
+        "path": "/dashboard",
+        "destination": {
+          "tab": "overview",
+          "params": {}
+        }
+      },
+      {
+        "path": "/data-center",
+        "destination": {
+          "tab": "datacenter",
+          "params": {}
+        }
+      },
+      {
+        "path": "/data-center/cost-items",
+        "destination": {
+          "tab": "costitems",
+          "params": {}
+        }
+      },
+      {
+        "path": "/data-entry",
+        "destination": {
+          "tab": "entry",
+          "params": {}
+        }
+      },
+      {
+        "path": "/filing/activities",
+        "destination": {
+          "tab": "filing",
+          "params": {
+            "section": "tasks"
+          }
+        }
+      },
+      {
+        "path": "/filing/budget",
+        "destination": {
+          "tab": "budget-filing",
+          "params": {}
+        }
+      },
+      {
+        "path": "/filing/department",
+        "destination": {
+          "tab": "filing",
+          "params": {
+            "section": "department"
+          }
+        }
+      },
+      {
+        "path": "/filing/records",
+        "destination": {
+          "tab": "filing",
+          "params": {
+            "section": "mine"
+          }
+        }
+      },
+      {
+        "path": "/filing/tasks",
+        "destination": {
+          "tab": "filing",
+          "params": {
+            "section": "assignments"
+          }
+        }
+      },
+      {
+        "path": "/notifications",
+        "destination": {
+          "tab": "notifications",
+          "params": {}
+        }
+      },
+      {
+        "path": "/operations",
+        "destination": {
+          "tab": "operations",
+          "params": {}
+        }
+      },
+      {
+        "path": "/review",
+        "destination": {
+          "tab": "review",
+          "params": {}
+        }
+      },
+      {
+        "path": "/settings/identity/directory",
+        "destination": {
+          "tab": "identity",
+          "params": {
+            "directorySection": "directory"
+          }
+        }
+      },
+      {
+        "path": "/settings/identity/employment",
+        "destination": {
+          "tab": "identity",
+          "params": {
+            "directorySection": "employment"
+          }
+        }
+      },
+      {
+        "path": "/settings/identity/members",
+        "destination": {
+          "tab": "identity",
+          "params": {
+            "directorySection": "members"
+          }
+        }
+      },
+      {
+        "path": "/settings/identity/permissions",
+        "destination": {
+          "tab": "permissions",
+          "params": {}
+        }
+      }
+    ],
+    "excluded": [
+      "/",
+      "/settings/finance-permissions",
+      "/login",
+      "/auth/oidc/success"
+    ]
+  },
+  "probes": [
+    {
+      "path": "/budget?view=snapshot-compare&year=2026",
+      "destination": {
+        "tab": "comparisons",
+        "params": {
+          "mode": "monthly",
+          "year": "2026"
+        }
+      }
+    },
+    {
+      "path": "/budget?view=year-compare&year=2026",
+      "destination": {
+        "tab": "comparisons",
+        "params": {
+          "mode": "yearly",
+          "year": "2026"
+        }
+      }
+    },
+    {
+      "path": "/budget?view=versions&year=2026",
+      "destination": {
+        "tab": "comparisons",
+        "params": {
+          "mode": "versions",
+          "year": "2026"
+        }
+      }
+    },
+    {
+      "path": "/budget?view=lines&unassigned=1&orgs=a,b&months=1,2&depts=d,e",
+      "destination": null
+    },
+    {
+      "path": "/budget-engine?version=11111111-1111-4111-8111-111111111111&year=2026",
+      "destination": {
+        "tab": "engine",
+        "params": {
+          "versionId": "11111111-1111-4111-8111-111111111111",
+          "year": "2026"
+        }
+      }
+    },
+    {
+      "path": "/review?task=11111111-1111-4111-8111-111111111111",
+      "destination": {
+        "tab": "review",
+        "params": {
+          "taskId": "11111111-1111-4111-8111-111111111111"
+        }
+      }
+    },
+    {
+      "path": "https://example.org/budget",
+      "destination": null
+    },
+    {
+      "path": "//example.org/budget",
+      "destination": null
+    },
+    {
+      "path": "/unknown-finance-page",
+      "destination": null
+    },
+    {
+      "path": "/budget?view=lines&year=2026&orgs=11111111-1111-4111-8111-111111111111,22222222-2222-4222-8222-222222222222&months=1,2&depts=33333333-3333-4333-8333-333333333333",
+      "destination": {
+        "tab": "budget",
+        "params": {
+          "orgIds": [
+            "11111111-1111-4111-8111-111111111111",
+            "22222222-2222-4222-8222-222222222222"
+          ],
+          "departmentIds": [
+            "33333333-3333-4333-8333-333333333333"
+          ],
+          "months": [
+            "1",
+            "2"
+          ],
+          "view": "lines",
+          "year": "2026"
+        }
+      }
+    }
+  ],
+  "verification": {
+    "plugin": {
+      "command": "npm run check",
+      "passed": 199
+    },
+    "datasourceWeb": {
+      "target": "3 filing-related web test suites",
+      "passed": 18
+    },
+    "datasourceApi": {
+      "target": "finance-filing.service.scope.spec.ts",
+      "passed": 18
+    },
+    "qualityGate": {
+      "command": "pnpm quality:gate",
+      "passed": true
+    },
+    "browser": {
+      "environment": "127.0.0.1:4932 synthetic fixtures; production disconnected",
+      "observed": [
+        "Data center uses server totals: 4 × 225 = 900, with recent-20 annotation",
+        "Quality issue navigation preserves unassigned budget filter",
+        "Filing rejected stage filters 2 visible synthetic records to 1",
+        "History labels current submission and replaced submission without claiming confirmed",
+        "Cost engineering quote requires node + pricing mode + composition, previews 100 → 120 CNY, confirmation disabled before preview",
+        "Adjustment dialog independently renders year-scoped budget-line selection"
+      ]
+    },
+    "limitations": [
+      "No authenticated production page comparison or deployment in this phase",
+      "Quote browser fixture omits before/after composition fields; numeric composition verified by contract and plugin tests",
+      "AI inline conversation and global back-navigation remain open",
+      "Cost-engineering advanced targets, full history reachability, and long directories remain partially open"
+    ]
+  }
+}
