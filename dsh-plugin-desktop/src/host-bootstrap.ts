@@ -1,3 +1,4 @@
+import { hubBaseComposition } from './hub-base-composition.ts'
 /** Headless bootstrap for the Beta isolated Host experiment. */
 import type { HubSkillObservation } from './hub-generation-health.ts'
 import { prepareHubHostBoot, type HubTrustedHostBootInput } from './hub-host-boot.ts'
@@ -128,9 +129,10 @@ export async function bootDesktopHost(options: DesktopHostOptions, runtime: Desk
     const trustedHubInput = options.hubGeneration ?? prepared.hubGeneration
     const hubBoot = trustedHubInput === undefined ? undefined : prepareHubHostBoot(trustedHubInput, prepared.profile.dir,
       [...composeEntries([prepared.patches])].map(entry => entry.id))
-    const hostPatches = hubBoot === undefined ? prepared.patches : [...prepared.patches, hubBoot.patch]
+    const basePatches=options.hubRuntimeTarget===undefined?prepared.patches:hubBaseComposition(prepared.patches)
+    const hostPatches = hubBoot === undefined ? basePatches : [...basePatches, hubBoot.patch]
     const releasePackageResolver = installProfilePackageResolver(prepared.bareModuleBaseUrl, hubBoot?.selection)
-    const profileBoot = createDesktopProfileBoot(prepared, desktopPnpmBootstrap, hubBoot?.selection, hubBoot === undefined ? [] : [hubBoot.patch])
+    const profileBoot = createDesktopProfileBoot(prepared, desktopPnpmBootstrap, hubBoot?.selection, hubBoot === undefined ? [] : [hubBoot.patch],options.hubRuntimeTarget===undefined?undefined:hubBaseComposition)
     // dsh 0.2.0 judges every profile row through the pluginPackages service.
     // Without it the compatibility preflight falls back to Node's own lookup
     // and reads the Profile's registry-installed @deepseek-ai copies instead

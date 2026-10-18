@@ -9,6 +9,8 @@
 
 import { prepareHubHostBoot } from './hub-host-boot.ts'
 import { registerHubHostService } from './hub-host-service.ts'
+import { hubBaseComposition } from './hub-base-composition.ts'
+import { HubHostSupervisor } from './hub-host-supervisor.ts'
 import { readHubRuntimeTarget } from './hub-runtime-target.ts'
 import { registerHubGenerationManager } from './hub-generation-manager.ts'
 import { registerHubSkillRoots } from './hub-skill-roots.ts'
@@ -1797,8 +1799,11 @@ async function start(): Promise<void> {
     hubBoot = prepared.hubGeneration === undefined ? undefined : prepareHubHostBoot(prepared.hubGeneration, prepared.profile.dir,
       [...composeEntries([prepared.patches])].map(entry => entry.id))
     const hubRuntimeTarget=await readHubRuntimeTarget({isPackaged:app.isPackaged,appPath:app.getAppPath(),resourcesPath:process.resourcesPath,sensteedVersion:appVersion})
+    if(hubRuntimeTarget!==undefined)prepared={...prepared,patches:hubBaseComposition(prepared.patches)}
     const hostPatches = hubBoot === undefined ? prepared.patches : [...prepared.patches, hubBoot.patch]
-    const profileBoot = createDesktopProfileBoot(prepared, desktopPnpmBootstrap, hubBoot?.selection, hubBoot === undefined ? [] : [hubBoot.patch])
+    const profileBoot = createDesktopProfileBoot(prepared, desktopPnpmBootstrap, hubBoot?.selection, hubBoot === undefined ? [] : [hubBoot.patch],hubRuntimeTarget===undefined?undefined:hubBaseComposition)
+    const hubSupervisor=new HubHostSupervisor()
+    generation.bindHost({fiber:{dispose:()=>hubSupervisor.dispose()}})
     if (process.env.DSH_DESKTOP_ISOLATED_HOST !== '0') {
       startupStage = 'host-boot'
       lifecycleRecorder.transitionStartupStage(startupStage)
@@ -1814,7 +1819,7 @@ async function start(): Promise<void> {
         // only binds the generation's minimal lifetime object here — it is
         // `{ fiber: { dispose } }`, never a Context, and must not be handed
         // to `profileBoot.prepare`.
-        bindHost: host => { generation.bindHost(host) }, requestQuit,
+        bindHost: host => { hubSupervisor.bind(host) }, requestQuit,
         registerQuitInspection: impl => {
           quitInspectionProbe = impl === undefined
             ? undefined
@@ -2077,7 +2082,7 @@ async function start(): Promise<void> {
         releasePackageResolver()
         throw cause
       })
-      generation.bindHost(ctx)
+      hubSupervisor.bind(ctx)
       if (hubBoot !== undefined) {
         const managedBoot = hubBoot
         inspectHubHealth = () => managedBoot.inspectLoaded(ctx.loader, ctx.skills, managedBoot.skillProviderName)

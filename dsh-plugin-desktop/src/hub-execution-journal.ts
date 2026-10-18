@@ -15,6 +15,7 @@ const recordSchema = z.strictObject({
   phase: z.enum(['PLANNED', 'CONSUMING', 'AUTHORIZED', 'STAGED', 'COMMITTED', 'ACTIVATED', 'ROLLED_BACK', 'NEEDS_ATTENTION']),
   revision: z.number().int().nonnegative(), receiptSeq: z.number().int().nonnegative(),
   executionGeneration: z.string().regex(/^[1-9][0-9]*$/u).nullable(), executionExpiresAt: z.iso.datetime().nullable(),
+  signedPlan: z.record(z.string(),z.unknown()).nullable(),
   descriptorDigest: digest.nullable(), pendingReceipt: receiptSchema.nullable(),
 })
 export type HubExecutionRecord = Readonly<z.infer<typeof recordSchema>>
@@ -43,7 +44,7 @@ export class HubExecutionJournal {
     this.check(); if (!existsSync(this.path)) return undefined
     const fd = openSync(this.path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0))
     try {
-      if (fstatSync(fd).size > 8192) throw new Error('Oversized Hub execution journal')
+      if (fstatSync(fd).size > 1024*1024) throw new Error('Oversized Hub execution journal')
       const value = recordSchema.parse(JSON.parse(readFileSync(fd, 'utf8')))
       if (value.scope !== this.store.scope) throw new Error('Hub execution journal identity mismatch')
       return Object.freeze(value)
@@ -58,7 +59,7 @@ export class HubExecutionJournal {
       if (process.platform !== 'win32') { const dir = openSync(this.store.directory, constants.O_RDONLY); try { fsyncSync(dir) } finally { closeSync(dir) } }
     } finally { if (existsSync(temp)) unlinkSync(temp) }
   }
-  async begin(cap: VerifiedHubGenerationPlan, operationId = randomUUID()): Promise<HubExecutionRecord> {
+  async begin(cap: VerifiedHubGenerationPlan, operationId = randomUUID(), signedPlan: Record<string,unknown>|null = null): Promise<HubExecutionRecord> {
     this.check()
     const plan = generationPlanData(cap)
     for (const key of ['origin', 'tenantId', 'actorRef', 'deviceId', 'profileId'] as const) {
@@ -69,7 +70,7 @@ export class HubExecutionJournal {
       if (old && old.phase !== 'ACTIVATED' && old.phase !== 'ROLLED_BACK') throw new Error('Hub execution is already pending')
       const value = recordSchema.parse({ schemaVersion: 1, scope: this.store.scope, planId: plan.planId, planDigest: plan.planDigest,
         operationId, previousGenerationDigest: plan.expectedActiveGenerationDigest, generationDigest: plan.proposedGenerationDigest,
-        phase: 'PLANNED', revision: (old?.revision ?? -1) + 1, receiptSeq: 0, executionGeneration: null, executionExpiresAt: null, descriptorDigest: null, pendingReceipt:null })
+        phase: 'PLANNED', revision: (old?.revision ?? -1) + 1, receiptSeq: 0, executionGeneration: null, executionExpiresAt: null, signedPlan, descriptorDigest: null, pendingReceipt:null })
       this.write(value); return Object.freeze(value)
     })
   }

@@ -13,7 +13,7 @@ import { desktopPnpmStoreDir } from './profile-store-dir.ts'
 import { desktopInstallAnchor, prepareDesktopProfile, type PreparedDesktopProfile } from './profile.ts'
 
 /** Keep package operations and subsequent HMR on the launcher's actual Profile. */
-export function createDesktopProfileBoot(prepared: PreparedDesktopProfile, pnpm: DesktopPnpmBootstrap, managedSelection?: HubManagedPackageSelection, managedPatches: readonly PatchOptions[] = []) {
+export function createDesktopProfileBoot(prepared: PreparedDesktopProfile, pnpm: DesktopPnpmBootstrap, managedSelection?: HubManagedPackageSelection, managedPatches: readonly PatchOptions[] = [], patchPolicy: (patches:PatchOptions[])=>PatchOptions[] = patches=>patches) {
   const options = prepared.reloadOptions
   if (pnpm.activeProfileName !== options.profileName || pnpm.activeProfileDir !== prepared.profile.dir
     || pnpm.homeDir !== prepared.homeDir) {
@@ -68,7 +68,7 @@ export function createDesktopProfileBoot(prepared: PreparedDesktopProfile, pnpm:
     // replaces only the profile layer; everything else above stays ours. When
     // absent (HMR, package operations) preparation reads the document from disk
     // as before.
-    readPatches: (profilePatches?: unknown) => [...prepareDesktopProfile(
+    readPatches: (profilePatches?: unknown) => [...patchPolicy([...prepareDesktopProfile(
       options.telemetryDisabled ?? '', prepared.homeDir, options.platform, options.profileName,
       options.pluginStatePath, options.marketSelection,
       {
@@ -77,7 +77,7 @@ export function createDesktopProfileBoot(prepared: PreparedDesktopProfile, pnpm:
         generationMode: prepared.mode,
         ...(profilePatches === undefined ? {} : { profilePatches }),
       } as Parameters<typeof prepareDesktopProfile>[6],
-    ).patches, ...context.overlays, ...managedPatches],
+    ).patches, ...context.overlays]), ...managedPatches],
   }
   let ready = false
   let disposed = false

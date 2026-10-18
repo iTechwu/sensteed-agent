@@ -1,7 +1,7 @@
 /** Host-owned aggregate transaction: consume once, materialize privately, then stage for a safe restart. */
 import { randomUUID } from 'node:crypto'
 import { HubExecutionJournal, type HubExecutionRecord } from './hub-execution-journal.ts'
-import { HubGenerationClient, hubGenerationConsumptionData, type VerifiedHubGenerationConsumption } from './hub-generation-client.ts'
+import { HubGenerationClient, generationPlanEnvelope, hubGenerationConsumptionData, type VerifiedHubGenerationConsumption } from './hub-generation-client.ts'
 import { generationPlanData, type VerifiedHubGenerationPlan } from './hub-generation-verifier.ts'
 import { materializeHubGeneration } from './hub-generation-materializer.ts'
 import { HubGenerationStore } from './hub-generation-store.ts'
@@ -14,7 +14,7 @@ export class HubGenerationExecution {
  /** Leaves active generation untouched. Launcher must stop old writers before separate activation. */
  async stage(cap:VerifiedHubGenerationPlan):Promise<HubExecutionRecord>{
   const journal=new HubExecutionJournal(this.store),plan=generationPlanData(cap)
-  let record=await journal.begin(cap),proof:VerifiedHubGenerationConsumption|undefined
+  let record=await journal.begin(cap,randomUUID(),generationPlanEnvelope(cap) as Record<string,unknown>),proof:VerifiedHubGenerationConsumption|undefined
   try{
    const grant=await this.execution.authorize(cap)
    record=await journal.advance(record,'CONSUMING')
