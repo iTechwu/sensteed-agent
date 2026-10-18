@@ -45,7 +45,7 @@ export function hubGenerationContentDigest(items: readonly HubGenerationPlanItem
   })).sort((a, b) => identity(a) < identity(b) ? -1 : identity(a) > identity(b) ? 1 : 0)
   return hubSyncDigest({ schemaVersion: 'hub-generation-content-v1', items: active })
 }
-export function verifyHubGenerationPlan(value: unknown, trust: HubReleaseTrust, expected: HubGenerationPlanExpected, now = Date.now()): VerifiedHubGenerationPlan {
+function checkedPlan(value: unknown, trust: HubReleaseTrust, expected: HubGenerationPlanExpected, now: number, recovery: boolean): Readonly<HubGenerationPlan> {
   const { plan, signature } = signedSchema.parse(value)
   verifyHubReleaseSignature(plan, signature, trust)
   const { planDigest, ...unsignedDigest } = plan
@@ -56,7 +56,7 @@ export function verifyHubGenerationPlan(value: unknown, trust: HubReleaseTrust, 
   if (hubSyncDigest(plan.target) !== hubSyncDigest(HubSyncTargetSchema.parse(expected.target))) fail('target binding mismatch')
   if (!Number.isSafeInteger(expected.minimumPolicyRevision) || expected.minimumPolicyRevision < 0 || plan.policyRevision < expected.minimumPolicyRevision) fail('policy revision rollback')
   const issued = Date.parse(plan.issuedAt), expires = Date.parse(plan.expiresAt)
-  if (!Number.isFinite(now) || issued > now + 30_000 || expires <= now || expires <= issued || expires - issued > 300_000) fail('expired or invalid plan lifetime')
+  if (!Number.isFinite(now) || issued > now + 30_000 || !recovery && expires <= now || expires <= issued || expires - issued > 300_000) fail('expired or invalid plan lifetime')
   const requested = new Map(expected.requested.map(item => [identity(item), item]))
   if (requested.size !== expected.requested.length || requested.size !== plan.items.length) fail('requested collection mismatch')
   const seen = new Set<string>()
@@ -68,8 +68,16 @@ export function verifyHubGenerationPlan(value: unknown, trust: HubReleaseTrust, 
     if (item.action !== 'uninstall' && item.channelRevision < 1) fail('invalid active channel revision')
   }
   if (plan.proposedGenerationDigest !== hubGenerationContentDigest(plan.items)) fail('generation content digest mismatch')
+  return freezeHubValue(plan)
+}
+/** Observation only, used to bind a fresh server operation-status query after restart. */
+export function inspectHubGenerationPlanForRecovery(value: unknown, trust: HubReleaseTrust, expected: HubGenerationPlanExpected, now = Date.now()): Readonly<HubGenerationPlan> {
+  return checkedPlan(value, trust, expected, now, true)
+}
+export function verifyHubGenerationPlan(value: unknown, trust: HubReleaseTrust, expected: HubGenerationPlanExpected, now = Date.now()): VerifiedHubGenerationPlan {
+  const plan = checkedPlan(value, trust, expected, now, false)
   const capability = Object.freeze({}) as VerifiedHubGenerationPlan
-  plans.set(capability, freezeHubValue(plan))
+  plans.set(capability, plan)
   return capability
 }
 export function generationPlanData(value: VerifiedHubGenerationPlan): Readonly<HubGenerationPlan> {

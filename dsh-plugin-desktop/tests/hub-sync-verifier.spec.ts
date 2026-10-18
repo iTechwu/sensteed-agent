@@ -9,7 +9,7 @@ function fixture() {
   const expected: HubSyncExpected = { origin: 'https://ai.hozonauto.com/plugins/api', tenantId: randomUUID(), actorRef: 'sso:user@example.com',
     deviceId: randomUUID(), profileId: randomUUID(), channel: 'stable', observedStateDigest: 'a'.repeat(64), minimumPolicyRevision: 1,
     target: { sensteedVersion: '0.2.1-alpha.3-beta.202610180853', harnessVersion: '0.2.1-alpha.3', os: 'darwin', arch: 'arm64', nodeVersion: '22.0.0',
-      cordisVersion: '4.0.5-alpha.2', libc: null, nodeAbi: '127', hostCapabilities: ['credentials'] } }
+      cordisVersion: '4.0.5-alpha.2', libc: null, nodeAbi: '127', hostBuildDigest: 'b'.repeat(64), hostCapabilities: ['credentials'] } }
   const { minimumPolicyRevision: _minimum, ...binding } = expected
   const snapshot = { ...binding, schemaVersion: 'hub-sync-v1', snapshotId: randomUUID(), policyRevision: 2, catalogDigest: 'b'.repeat(64),
     entries: [{ kind: 'skill', itemId: randomUUID(), displayName: 'Example', identity: 'example', initialInstall: true, required: false,

@@ -20,14 +20,15 @@
       "nodeAbi": "127",
       "hostCapabilities": [
         "credentials"
-      ]
+      ],
+      "hostBuildDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     },
     "minimumPolicyRevision": 0
   },
   "trust": {
     "schemaVersion": 1,
     "keys": {
-      "hub-interop-test": "MCowBQYDK2VwAyEAwwnZwQ+B3pzGLCAhElggGqdp49nK73nyjSZ+7tcgqfw="
+      "fixture": "MCowBQYDK2VwAyEAUSOteOn4VkOlPfXia5QsqrN51ea87u4WO3NcBZ0L7HY="
     },
     "revokedKeyIds": []
   },
@@ -51,7 +52,8 @@
         "nodeAbi": "127",
         "hostCapabilities": [
           "credentials"
-        ]
+        ],
+        "hostBuildDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
       },
       "schemaVersion": "hub-sync-v1",
       "snapshotId": "07dde7ae-b6f0-42c4-a88f-df034183d1cb",
@@ -64,9 +66,9 @@
     "signature": {
       "algorithm": "Ed25519",
       "canonicalization": "RFC8785",
-      "keyId": "hub-interop-test",
-      "payloadDigest": "e0b9c70156bd9ba3371268781a14970de98c9c314bba0038097eb16e3d374bc4",
-      "signature": "j6mzWutPgL7FbwiM3aYPhZbEfihblxEHz2UMHHNJMoQC5SZC3ngFJTwirtgj0ltByAYH0hIShM/I06YaPwaNBA=="
+      "keyId": "fixture",
+      "payloadDigest": "a1785a9983ebb7cf282ea32255a36a98752360da7e5204e9bd529699f0716e2b",
+      "signature": "DRqU2lJkLgnJ1dG+ERIwLIgHAhP+PX0DnIM8ndIQ6xReKF9IXkuFzlHScOq7E4UUTMHK2m3m6pgRiiZyBOnwAQ=="
     }
   }
 }

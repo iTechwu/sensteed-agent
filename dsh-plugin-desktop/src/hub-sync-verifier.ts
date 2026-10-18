@@ -10,6 +10,7 @@ export const HubSyncTargetSchema = z.strictObject({
   sensteedVersion: version, harnessVersion: version, os: z.enum(['darwin', 'win32', 'linux']),
   arch: z.enum(['x64', 'arm64']), nodeVersion: version, cordisVersion: version,
   libc: z.enum(['glibc', 'musl']).nullable(), nodeAbi: z.string().regex(/^\d{1,4}$/u),
+  hostBuildDigest: digest,
   hostCapabilities: z.array(z.string().regex(/^[a-z][a-z0-9.-]{0,79}$/u)).max(128),
 })
 const entry = z.strictObject({

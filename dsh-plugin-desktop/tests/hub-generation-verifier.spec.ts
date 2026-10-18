@@ -1,6 +1,6 @@
 import { generateKeyPairSync, randomUUID, sign } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import { generationPlanData, hubGenerationContentDigest, verifyHubGenerationPlan, type HubGenerationPlan, type HubGenerationPlanExpected } from '../src/hub-generation-verifier.ts'
+import { generationPlanData, hubGenerationContentDigest, inspectHubGenerationPlanForRecovery, verifyHubGenerationPlan, type HubGenerationPlan, type HubGenerationPlanExpected } from '../src/hub-generation-verifier.ts'
 import { hubCanonicalJson, hubSyncDigest, type HubReleaseTrust } from '../src/hub-sync-verifier.ts'
 
 function fixture() {
@@ -9,7 +9,7 @@ function fixture() {
   const item: HubGenerationPlan['items'][number] = { kind: 'skill', itemId: randomUUID(), action: 'install', enabled: true, releaseId: randomUUID(), artifactDigest: '1'.repeat(64), manifestDigest: '2'.repeat(64), channelRevision: 1, lockGraphDigest: null, packSetDigest: null }
   const expected: HubGenerationPlanExpected = { origin: 'https://ai.hozonauto.com/plugins/api', tenantId: randomUUID(), actorRef: 'user@example.com', deviceId: randomUUID(), profileId: randomUUID(), channel: 'stable',
     snapshotId: randomUUID(), snapshotDigest: '3'.repeat(64), observedStateDigest: '4'.repeat(64), expectedActiveGenerationDigest: null, minimumPolicyRevision: 1,
-    target: { sensteedVersion: '1.0.0', harnessVersion: '1.0.0', os: 'darwin', arch: 'arm64', nodeVersion: '22.0.0', cordisVersion: '4.0.5', libc: null, nodeAbi: '127', hostCapabilities: [] },
+    target: { sensteedVersion: '1.0.0', harnessVersion: '1.0.0', os: 'darwin', arch: 'arm64', nodeVersion: '22.0.0', cordisVersion: '4.0.5', libc: null, nodeAbi: '127', hostBuildDigest: 'b'.repeat(64), hostCapabilities: [] },
     requested: [{ kind: item.kind, itemId: item.itemId, action: item.action, enabled: item.enabled }] }
   const { requested: _requested, minimumPolicyRevision: _revision, ...binding } = expected
   const plan: HubGenerationPlan = { ...binding, schemaVersion: 'hub-generation-plan-v1', planId: randomUUID(), policyRevision: 1, catalogDigest: '5'.repeat(64), proposedGenerationDigest: hubGenerationContentDigest([item]), items: [item], closureDigest: '6'.repeat(64), totalBytes: 20, issuedAt: new Date(now).toISOString(), expiresAt: new Date(now + 300000).toISOString(), planDigest: '0'.repeat(64) }
@@ -57,5 +57,12 @@ describe('aggregate signed execution plan', () => {
     expect(hubGenerationContentDigest([first, second])).toBe(hubGenerationContentDigest([{ ...second, action: 'retain', channelRevision: 99 }, first]))
     expect(hubGenerationContentDigest([first, { ...second, action: 'uninstall' }])).toBe(hubGenerationContentDigest([first]))
     expect(hubGenerationContentDigest([first])).not.toBe(hubGenerationContentDigest([{ ...first, enabled: false }]))
+  })
+  it('can inspect an expired signed journal for fresh status recovery without minting execution authority', () => {
+    const f = fixture(), later = f.now + 310000
+    const observation = inspectHubGenerationPlanForRecovery(f.signed(), f.trust, f.expected, later)
+    expect(observation.planId).toBe(f.plan.planId)
+    expect(() => generationPlanData(observation as never)).toThrow('invalid plan capability')
+    expect(() => inspectHubGenerationPlanForRecovery(f.signed(), f.trust, { ...f.expected, deviceId: randomUUID() }, later)).toThrow('binding mismatch')
   })
 })
