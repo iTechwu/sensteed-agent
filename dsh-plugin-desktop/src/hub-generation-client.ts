@@ -97,6 +97,11 @@ export class HubGenerationClient {
     consumptionOwners.set(proof, () => this.client.assertCurrent(this.context))
     return Object.freeze({ plan, proof })
   }
+  async downloads(cap: VerifiedHubGenerationPlan, proof: VerifiedHubGenerationConsumption): Promise<unknown> {
+    const {plan,body}=this.binding(cap),authority=hubGenerationConsumptionData(proof)
+    if(authority.planId!==plan.planId||authority.planDigest!==plan.planDigest)throw new Error('Hub downloads plan mismatch')
+    return await this.client.generationRequest(this.context,{kind:'downloads',planId:plan.planId,body:{...body,operationId:authority.operationId}})
+  }
   async receipt(proof: VerifiedHubGenerationConsumption, receipt: {
     readonly seq: number; readonly previousGenerationDigest: string | null; readonly phase: 'STAGED' | 'COMMITTED' | 'ACTIVATED' | 'ROLLED_BACK' | 'NEEDS_ATTENTION';
     readonly evidenceDigest: string; readonly occurredAt: string; readonly errorCode: string | null
