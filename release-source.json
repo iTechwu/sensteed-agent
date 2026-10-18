@@ -1,6 +1,6 @@
 {
-  "version": "0.2.1-alpha.3-beta.202610180853",
-  "sourceVersion": "0.2.1-alpha.3",
+  "version": "0.2.1-rc.2-beta.202610190741",
+  "sourceVersion": "0.2.1-rc.2",
   "repository": "iTechwu/sensteed-harness",
-  "commit": "09183b943961aaeb691543e5f17228b2597db449"
+  "commit": "98853dea70b25f47b6af9bc7ffc1837e4d2ac634"
 }
