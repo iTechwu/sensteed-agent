@@ -16997,6 +16997,9 @@ importers:
       '@deepseek-ai/dsh-client-ui-cordis':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/extensions/ui-cordis
+      '@deepseek-ai/dsh-client-ui-deepseek-model-label-1017':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/client/ui-deepseek-model-label-1017
       '@deepseek-ai/dsh-client-ui-deliverables':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/client/ui-deliverables
@@ -17036,6 +17039,9 @@ importers:
       '@deepseek-ai/dsh-client-ui-plugin-manager':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/client/ui-plugin-manager
+      '@deepseek-ai/dsh-client-ui-plugin-market':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/client/ui-plugin-market
       '@deepseek-ai/dsh-client-ui-primitives':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/client/ui-primitives
@@ -17243,6 +17249,9 @@ importers:
       '@deepseek-ai/dsh-experimental-inspector-profile':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/experimental/inspector-profile
+      '@deepseek-ai/dsh-experimental-plugin-market-bundle':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/experimental/plugin-market-bundle
       '@deepseek-ai/dsh-experimental-ptc-runtime-python':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/experimental/ptc-runtime-python
@@ -17435,6 +17444,12 @@ importers:
       '@deepseek-ai/dsh-plugin-manager':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/boot/plugin-manager
+      '@deepseek-ai/dsh-plugin-market':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/boot/plugin-market
+      '@deepseek-ai/dsh-plugin-market-index':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/util/plugin-market-index
       '@deepseek-ai/dsh-plugin-package-inventory-deepseek':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/llm/plugin-package-inventory-deepseek
@@ -17783,6 +17798,9 @@ importers:
       '@deepseek-ai/dsh-web-app':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/bundle/web-app
+      '@deepseek-ai/dsh-web-deepseek-api':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/web/web-deepseek-api
       '@deepseek-ai/dsh-web-fetch-http':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/web/web-fetch-http
