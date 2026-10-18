@@ -7,6 +7,7 @@ import { hubPackageIsHostOwned } from './hub-base-ownership.ts'
 
 export const HUB_GENERATION_ORIGIN = 'https://ai.hozonauto.com/plugins/api' as const
 const HASH = /^[a-f0-9]{64}$/u
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu
 const ID = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}$/u
 const PACKAGE = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/u
 const MAX_METADATA = 1024 * 1024
@@ -29,8 +30,13 @@ export interface HubGenerationPackage {
   /** Signed payload/closure evidence reference, not a manifest-only integrity claim. */
   readonly payloadDigest: string
 }
+export interface HubVerifiedComposition {
+  readonly entries: readonly { readonly id: string; readonly packageName: string; readonly config: Readonly<Record<string, unknown>> }[]
+  readonly skills: readonly { readonly name: string; readonly path: string; readonly sha256: string }[]
+}
 export interface HubGenerationDescriptor {
-  readonly schemaVersion: 1
+  readonly schemaVersion: 1 | 2
+  readonly verifiedComposition?: HubVerifiedComposition
   readonly identity: HubGenerationIdentity
   readonly generationId: string
   readonly packages: readonly HubGenerationPackage[]
@@ -91,7 +97,8 @@ function identity(value: unknown): HubGenerationIdentity {
   const item = record(value)
   keys(item, ['origin', 'tenantId', 'actorRef', 'deviceId', 'profileId'])
   if (item.origin !== HUB_GENERATION_ORIGIN) fail('wrong Hub origin')
-  for (const key of ['tenantId', 'actorRef', 'deviceId', 'profileId']) token(item[key])
+  for (const key of ['tenantId', 'deviceId', 'profileId']) if (typeof item[key] !== 'string' || !UUID.test(item[key])) fail('invalid identity UUID')
+  if (typeof item.actorRef !== 'string' || !item.actorRef.length || item.actorRef.length > 128 || /[\x00-\x1f\x7f]/u.test(item.actorRef)) fail('invalid actor reference')
   return item as unknown as HubGenerationIdentity
 }
 export function hubGenerationScope(value: HubGenerationIdentity): string {
@@ -159,8 +166,8 @@ function pointer(value: unknown): Pointer | null {
 }
 function descriptor(value: unknown, expected: HubGenerationIdentity): HubGenerationDescriptor {
   const item = record(value)
-  keys(item, ['schemaVersion', 'identity', 'generationId', 'packages', 'skillsRoot', 'files'])
-  if (item.schemaVersion !== 1 || hubGenerationScope(identity(item.identity)) !== hubGenerationScope(expected)) fail('cross-profile or identity mismatch')
+  keys(item, ['schemaVersion', 'identity', 'generationId', 'packages', 'skillsRoot', 'files', ...(item.schemaVersion === 2 ? ['verifiedComposition'] : [])])
+  if (![1, 2].includes(item.schemaVersion as number) || hubGenerationScope(identity(item.identity)) !== hubGenerationScope(expected)) fail('cross-profile or identity mismatch')
   token(item.generationId); safeRelative(item.skillsRoot)
   if (!Array.isArray(item.packages) || item.packages.length > 1024) fail('invalid package list')
   const names = new Set<string>()
@@ -180,6 +187,39 @@ function descriptor(value: unknown, expected: HubGenerationIdentity): HubGenerat
     folded.add(path.toLowerCase())
   }
   for (const raw of item.packages) if (!Object.hasOwn(files, record(raw).manifest as string)) fail('package manifest missing from file set')
+  if (item.schemaVersion === 2) {
+    const composition = record(item.verifiedComposition); keys(composition, ['entries', 'skills'])
+    if (!Array.isArray(composition.entries) || composition.entries.length > 1024 || !Array.isArray(composition.skills) || composition.skills.length > 1024) fail('invalid verified composition')
+    const ids = new Set<string>(), skills = new Set<string>()
+    for (const raw of composition.entries) {
+      const entry = record(raw); keys(entry, ['id', 'packageName', 'config']); token(entry.id)
+      if (ids.has(entry.id)) fail('duplicate composition entry'); ids.add(entry.id)
+      if (typeof entry.packageName !== 'string' || !PACKAGE.test(entry.packageName) || !names.has(entry.packageName)) fail('composition package outside managed set')
+      const config = record(entry.config)
+      const check = (value: unknown, depth = 0): void => {
+        if (depth > 32) fail('composition depth limit')
+        if (value === null || typeof value === 'string' || typeof value === 'boolean') return
+        if (typeof value === 'number' && Number.isFinite(value)) return
+        if (Array.isArray(value)) { for (const child of value) check(child, depth + 1); return }
+        if (typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+          for (const [key, child] of Object.entries(value)) {
+            if (['__proto__', 'prototype', 'constructor', '__jsExpr'].includes(key)) fail('unsafe composition key')
+            check(child, depth + 1)
+          }
+          return
+        }
+        fail('non-JSON composition')
+      }
+      check(config)
+      if (Buffer.byteLength(JSON.stringify(config)) > 64 * 1024) fail('composition config limit')
+    }
+    for (const raw of composition.skills) {
+      const skill = record(raw); keys(skill, ['name', 'path', 'sha256'])
+      if (typeof skill.name !== 'string' || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(skill.name) || skills.has(skill.name)) fail('invalid composition skill')
+      skills.add(skill.name); safeRelative(skill.path); digest(skill.sha256)
+      if (!skill.path.startsWith(`${item.skillsRoot as string}/`) || !skill.path.endsWith('/SKILL.md') || files[skill.path] !== skill.sha256) fail('composition skill outside verified file set')
+    }
+  }
   return JSON.parse(JSON.stringify(item)) as HubGenerationDescriptor
 }
 

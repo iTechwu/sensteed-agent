@@ -12,7 +12,7 @@ const roots: string[] = []
 const hash = (text: string) => createHash('sha256').update(text).digest('hex')
 async function fixture(version: string) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'hub-exact-'))); roots.push(root)
-  const identity = { origin: HUB_GENERATION_ORIGIN, tenantId: 'tenant', actorRef: 'actor', deviceId: 'device', profileId: 'desktop' }
+  const identity = { origin: HUB_GENERATION_ORIGIN, tenantId: '11111111-1111-4111-8111-111111111111', actorRef: 'actor', deviceId: '22222222-2222-4222-8222-222222222222', profileId: '33333333-3333-4333-8333-333333333333' }
   const store = new HubGenerationStore(root, identity), gen = store.generationDirectory('g1')
   const manifest = 'profile/node_modules/extension/package.json'
   mkdirSync(join(gen, 'profile/node_modules/extension'), { recursive: true, mode: 0o700 })

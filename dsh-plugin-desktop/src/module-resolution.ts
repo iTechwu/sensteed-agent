@@ -813,3 +813,16 @@ export function refreshProfilePackageSelections(): void {
     invalidatePackageSelections(registration)
   }
 }
+
+/** Resolved module URLs actually observed by this retained managed generation's hooks. Not execution proof alone. */
+export function managedProfilePackageUrls(profileBaseUrl: string, selection: HubManagedPackageSelection, packageName: string): readonly string[] {
+  const registration = currentResolverState()?.registrations.get(profileBaseUrl)
+  if (registration?.managedSelection !== selection) throw new Error('Managed package observation does not match retained Profile')
+  const manifest = hubManagedPackageManifest(selection, packageName, registration.profileDirectory)
+  if (manifest === undefined) throw new Error('Package is outside managed generation')
+  const root = dirname(manifest)
+  return Object.freeze([...registration.moduleSources.entries()].filter(([url, source]) => {
+    const path = filePath(url)
+    return source === 'profile' && path !== undefined && path !== manifest && isLexicallyWithin(root, path)
+  }).map(([url]) => url))
+}

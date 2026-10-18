@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { HUB_GENERATION_ORIGIN, HubGenerationStore, type HubGenerationDescriptor, type HubGenerationIdentity } from '../src/hub-generation-store.ts'
 
 const roots: string[] = []
-const owner: HubGenerationIdentity = { origin: HUB_GENERATION_ORIGIN, tenantId: 'tenant-a', actorRef: 'actor-a', deviceId: 'device-a', profileId: 'desktop' }
+const owner: HubGenerationIdentity = { origin: HUB_GENERATION_ORIGIN, tenantId: '11111111-1111-4111-8111-111111111111', actorRef: 'actor-a', deviceId: '22222222-2222-4222-8222-222222222222', profileId: '33333333-3333-4333-8333-333333333333' }
 const digest = (bytes: string | Buffer) => createHash('sha256').update(bytes).digest('hex')
 function fixture() {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'hub-generation-'))); roots.push(root)
@@ -83,7 +83,7 @@ describe('Hub generation local transaction', () => {
   })
   it('rejects foreign identity, unknown keys, traversal and colliding paths', async () => {
     const { store } = fixture(); const value = stage(store, 'g1')
-    await expect(store.prepare({ ...value, identity: { ...owner, profileId: 'other' } })).rejects.toThrow('identity mismatch')
+    await expect(store.prepare({ ...value, identity: { ...owner, profileId: '44444444-4444-4444-8444-444444444444' } })).rejects.toThrow('identity mismatch')
     await expect(store.prepare({ ...value, extra: true } as HubGenerationDescriptor)).rejects.toThrow('fields')
     expect(() => store.generationDirectory('../escape')).toThrow('token')
     await expect(store.prepare({ ...value, skillsRoot: '../skills' })).rejects.toThrow('relative path')
@@ -116,9 +116,19 @@ describe('Hub generation local transaction', () => {
     rmSync(skills, { recursive: true }); symlinkSync(outside, skills)
     expect(() => store.activeDescriptor()).toThrow('symlink')
   })
+  it('seals v2 composition only for declared managed packages and exact skill files', async () => {
+    const { store } = fixture(); const value = stage(store, 'g1')
+    mkdirSync(join(store.generationDirectory('g1'), 'skills/example'), { mode: 0o700 })
+    writeFileSync(join(store.generationDirectory('g1'), 'skills/example/SKILL.md'), '# example', { mode: 0o600 })
+    const v2: HubGenerationDescriptor = { ...value, schemaVersion: 2, files: { ...value.files, 'skills/example/SKILL.md': digest('# example') }, verifiedComposition: {
+      entries: [{ id: 'example', packageName: 'extension', config: {} }], skills: [{ name: 'example', path: 'skills/example/SKILL.md', sha256: digest('# example') }] } }
+    await expect(store.prepare({ ...v2, verifiedComposition: { ...v2.verifiedComposition!, entries: [{ id: 'example', packageName: 'untracked', config: {} }] } })).rejects.toThrow('outside managed')
+    await expect(store.prepare({ ...v2, verifiedComposition: { ...v2.verifiedComposition!, skills: [{ name: 'example', path: 'skills/example/SKILL.md', sha256: 'a'.repeat(64) }] } })).rejects.toThrow('verified file set')
+    await store.prepare(v2); await store.activate(); expect(store.activeDescriptor()?.verifiedComposition?.entries).toHaveLength(1)
+  })
   it('does not reuse another profile scope and detects state scope tampering', async () => {
     const { store, root } = fixture(); await store.prepare(stage(store, 'g1'))
-    const other = new HubGenerationStore(root, { ...owner, profileId: 'other' })
+    const other = new HubGenerationStore(root, { ...owner, profileId: '44444444-4444-4444-8444-444444444444' })
     expect(other.directory).not.toBe(store.directory); expect(other.readState().pending).toBeNull()
     const path = join(store.directory, 'state.json'), state = JSON.parse(readFileSync(path, 'utf8'))
     writeFileSync(path, JSON.stringify({ ...state, scope: '0'.repeat(64) }))
