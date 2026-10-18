@@ -1,6 +1,7 @@
 const FINANCE_REVIEW_SOURCES = [['filing', '填报复核'], ['facts', 'OA 批次核对'], ['budget', '预算调整'], ['plans', '付款计划调整']]
 function ReviewView({ ctx }) {
-  const [section, setSection] = useState('filing')
+  // 深链定位（如旧资金页 tab=adjustments 迁移链接）直接落到对应复核类别。
+  const [section, setSection] = useState(() => FINANCE_REVIEW_SOURCES.some(([id]) => id === ctx.drillParams?.section) ? ctx.drillParams.section : 'filing')
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState([])
   const [dialog, setDialog] = useState(null)

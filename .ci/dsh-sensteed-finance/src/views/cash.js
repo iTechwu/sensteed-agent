@@ -14,13 +14,14 @@ function CashView({ ctx, t, onDrill }) {
   const canWrite = ctx.financeWriter && ctx.permissions.includes('cash.plan.write')
   const canVerify = ctx.financeWriter && ctx.permissions.includes('cash.plan.verify')
   const writeLock = useRef(false)
-  const [tab, setTab] = useState(() => ['summary', 'plans', 'adjustments', 'revenue'].includes(ctx.drillParams?.view) ? ctx.drillParams.view : 'summary')
+  const [tab, setTab] = useState(() => ['summary', 'plans', 'revenue', 'accuracy'].includes(ctx.drillParams?.view) ? ctx.drillParams.view : 'summary')
   const [cash, setCash] = useState(null)
   const [plans, setPlans] = useState(null)
   const [revenues, setRevenues] = useState(null)
-  const [filters, setFilters] = useState({ planType: ctx.drillParams?.planType || '', departmentId: ctx.drillParams?.departmentId || '', month: ctx.drillParams?.month ? String(ctx.drillParams.month) : '', unassigned: false })
-  const [page, setPage] = useState(1)
-  const [revenuePage, setRevenuePage] = useState(1)
+  const [filters, setFilters] = useState({ planType: ctx.drillParams?.planType || '', departmentId: ctx.drillParams?.departmentId || '', months: ctx.drillParams?.months || financePlanMonths(null, ctx.drillParams?.month), expenseType: ctx.drillParams?.expenseType || '', keyword: ctx.drillParams?.keyword || '', unassigned: ctx.drillParams?.unassigned === true })
+  const [page, setPage] = useState(ctx.drillParams?.page || 1)
+  const [revenuePage, setRevenuePage] = useState(ctx.drillParams?.page || 1)
+  const [keywordDraft, setKeywordDraft] = useState(ctx.drillParams?.keyword || '')
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState(null)
   const [dialog, setDialog] = useState(null)
@@ -28,14 +29,22 @@ function CashView({ ctx, t, onDrill }) {
 
   const query = (extra = {}) => {
     const params = new URLSearchParams({ year })
-    if (orgId) params.set('orgId', orgId)
+    if (orgId && !filters.unassigned) params.set('orgId', orgId)
     if (filters.planType) params.set('planType', filters.planType)
     if (filters.departmentId) params.set('departmentId', filters.departmentId)
-    if (filters.month) params.set('month', filters.month)
+    if (filters.months.length) params.set('months', filters.months.join(','))
+    if (filters.expenseType) params.set('expenseType', filters.expenseType)
+    if (filters.keyword.trim()) params.set('keyword', filters.keyword.trim())
     if (filters.unassigned) params.set('unassigned', '1')
     for (const [key, value] of Object.entries(extra)) if (value !== undefined && value !== '') params.set(key, value)
     return params.toString()
   }
+
+  const planPath = `/payment-plans?${query({ page, limit: PAGE_SIZE })}`
+  const revenuePath = `/revenue-plans?${new URLSearchParams({ year, ...(orgId ? { orgId } : {}), ...(filters.months.length ? { months: filters.months.join(',') } : {}), ...(filters.keyword.trim() ? { keyword: filters.keyword.trim() } : {}), page: String(revenuePage), limit: String(PAGE_SIZE) })}`
+  const currentPlans = plans?.path === planPath ? plans : null
+  const currentRevenues = revenues?.path === revenuePath ? revenues : null
+  const retryList = () => setReloadTick(value => value + 1)
 
   const act = async (path, payload, doneMessage) => {
     if (writeLock.current) return false
@@ -52,66 +61,57 @@ function CashView({ ctx, t, onDrill }) {
   useEffect(() => {
     let cancelled = false
     if (tab === 'summary') {
-      api(`/cash?${query()}`).then(value => { if (!cancelled) setCash(value) }).catch(() => { if (!cancelled) setCash({ error: true }) })
+      api(`/cash?${new URLSearchParams({ year, ...(orgId ? { orgId } : {}) })}`).then(value => { if (!cancelled) setCash(value) }).catch(() => { if (!cancelled) setCash({ error: true }) })
     }
     if (tab === 'plans') {
-      api(`/payment-plans?${query({ page, limit: PAGE_SIZE })}`).then(value => { if (!cancelled) setPlans(value) }).catch(() => { if (!cancelled) setPlans({ error: true }) })
+      setPlans(null)
+      api(planPath).then(value => { if (!cancelled) setPlans({ path: planPath, value }) }).catch(() => { if (!cancelled) setPlans({ path: planPath, error: true }) })
     }
     if (tab === 'revenue') {
-      api(`/revenue-plans?year=${year}${orgId ? `&orgId=${orgId}` : ''}&page=${revenuePage}&limit=${PAGE_SIZE}`).then(value => { if (!cancelled) setRevenues(value) }).catch(() => { if (!cancelled) setRevenues({ error: true }) })
+      setRevenues(null)
+      api(revenuePath).then(value => { if (!cancelled) setRevenues({ path: revenuePath, value }) }).catch(() => { if (!cancelled) setRevenues({ path: revenuePath, error: true }) })
     }
     return () => { cancelled = true }
-  }, [tab, page, revenuePage, year, orgId, filters.planType, filters.departmentId, filters.month, filters.unassigned, revision, reloadTick])
+  }, [tab, planPath, revenuePath, year, orgId, revision, reloadTick])
 
-  const filterBar = tab === 'plans' ? h('div', { className: 'sf-filters' },
-    h(Select, { value: filters.planType, onChange: value => { setPage(1); setFilters(f => ({ ...f, planType: value })) }, options: PLAN_TYPES.map(([id, label]) => [id, t(label)]), placeholder: t('planType') }),
-    h(SearchSelect, { value: filters.departmentId, onChange: value => { setPage(1); setFilters(f => ({ ...f, departmentId: value })) }, options: (departments || []).map(d => [d.id, d.name]), placeholder: t('department') }),
-    h(Select, { value: filters.month, onChange: value => { setPage(1); setFilters(f => ({ ...f, month: value })) }, options: Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1} 月`]), placeholder: t('monthCol') }),
-    h('label', { className: 'sf-row', style: { gap: 6, fontSize: 12, color: 'var(--sf-ink2)' } },
-      h('input', { type: 'checkbox', checked: filters.unassigned, onChange: event => { setPage(1); setFilters(f => ({ ...f, unassigned: event.target.checked })) } }), t('unassigned'))) : null
+  const updateFilters = patch => { setPage(1); setRevenuePage(1); setFilters(current => ({ ...current, ...patch })) }
+  const filterBar = ['plans', 'revenue'].includes(tab) ? h('div', { className: 'sf-filters' },
+    tab === 'plans' ? [
+      h(Select, { key: 'type', 'aria-label': t('planType'), value: filters.planType, onChange: value => updateFilters({ planType: value }), options: PLAN_TYPES.map(([id, label]) => [id, t(label)]), placeholder: t('planType') }),
+      h(Select, { key: 'expense', 'aria-label': t('expenseType'), value: filters.expenseType, onChange: value => updateFilters({ expenseType: value }), options: EXPENSE_TYPES.map(([id, label]) => [id, t(label)]), placeholder: t('expenseType') }),
+      h(SearchSelect, { key: 'department', value: filters.departmentId, onChange: value => updateFilters({ departmentId: value }), options: (departments || []).map(d => [d.id, d.name]), placeholder: t('department') }),
+    ] : null,
+    h(MultiSearchSelect, { selectedLabel: filters.months.length ? `${filters.months.join('、')}月` : '全部月份', value: filters.months.map(String), onChange: values => updateFilters({ months: values.map(Number).sort((a, b) => a - b) }), options: Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1}月`]), placeholder: '计划月份（可多选）' }),
+    h('form', { className: 'sf-row', onSubmit: event => { event.preventDefault(); updateFilters({ keyword: keywordDraft.trim() }) } },
+      h(Field, { 'aria-label': tab === 'plans' ? '搜索付款描述、收款方、PR 编号、部门' : '搜索收入项目、付款方、类型', value: keywordDraft, onChange: setKeywordDraft, placeholder: tab === 'plans' ? '搜索付款描述、收款方、PR 编号、部门' : '搜索收入项目、付款方、类型', maxLength: 200 }),
+      h(GhostButton, { type: 'submit' }, '搜索'),
+      filters.keyword ? h(GhostButton, { onClick: () => { setKeywordDraft(''); updateFilters({ keyword: '' }) } }, '清空') : null),
+    tab === 'plans' ? h('label', { className: 'sf-row', style: { gap: 6, fontSize: 12, color: 'var(--sf-ink2)' } },
+      h('input', { type: 'checkbox', checked: filters.unassigned, onChange: event => updateFilters({ unassigned: event.target.checked }) }), t('unassigned')) : null) : null
 
-  const planRows = plans?.data?.list || plans?.list || []
+  const planRows = currentPlans?.value?.data?.list || currentPlans?.value?.list || []
   return h('div', { className: 'sf-view' },
     h('div', { className: 'sf-row-between' },
-      h(PillTabs, { tabs: [['summary', 'cashSummaryV'], ['plans', 'cashPlans'], ['adjustments', 'cashAdjustments'], ['revenue', 'cashRevenue']], value: tab, onChange: id => { setTab(id); setPage(1) }, t }),
+      h(PillTabs, { tabs: [['summary', 'cashSummaryV'], ['plans', 'cashPlans'], ['revenue', 'cashRevenue'], ['accuracy', 'cashAccuracyTab']], value: tab, onChange: id => { setTab(id); setPage(1); setRevenuePage(1); setKeywordDraft(filters.keyword) }, t }),
       notice ? h(Notice, null, notice) : null),
     filterBar ? h('div', { className: 'sf-row-between' }, filterBar) : null,
 
     tab === 'summary' ? h(SummaryTab, { cash, t, year }) : null,
-    tab === 'plans' ? h(PlansTab, { rows: planRows, total: plans?.data?.total ?? plans?.total, page, onPage: setPage, t, busy, act, canWrite, onDialog: setDialog }) : null,
-    tab === 'adjustments' ? h(PlanAdjustmentsTab, { t, revision, reloadTick, busy, act, canWrite, canVerify, onDialog: setDialog }) : null,
-    tab === 'revenue' ? h(RevenueTab, { revenues, page: revenuePage, onPage: setRevenuePage, t, canWrite, onBackfill: row => setDialog({ kind: 'backfill', row }) }) : null,
+    tab === 'plans' ? !currentPlans ? h('p', { role: 'status' }, t('loading')) : currentPlans.error ? h(CashPlanListError, { onRetry: retryList }) : h(PlansTab, { rows: planRows, total: currentPlans.value?.data?.total ?? currentPlans.value?.total, page, onPage: setPage, t, busy, act, canWrite, onDialog: setDialog }) : null,
+    tab === 'revenue' ? !currentRevenues ? h('p', { role: 'status' }, t('loading')) : currentRevenues.error ? h(CashPlanListError, { onRetry: retryList }) : h(RevenueTab, { revenues: currentRevenues.value, page: revenuePage, onPage: setRevenuePage, t, canWrite, onBackfill: row => setDialog({ kind: 'backfill', row }), onLedger: row => setDialog({ kind: 'receiptLedger', row }) }) : null,
+    tab === 'accuracy' ? h(CashAccuracyView, { ctx, t }) : null,
 
     dialog?.kind === 'closeRemaining' && canWrite ? h(CloseRemainingDialog, { plan: dialog.plan, t, busy, onClose: () => setDialog(null), act }) : null,
     dialog?.kind === 'schedule' ? h(ScheduleDialog, { plan: dialog.plan, t, onClose: () => setDialog(null), act }) : null,
     dialog?.kind === 'increase' ? h(IncreaseDialog, { plan: dialog.plan, t, onClose: () => setDialog(null), act }) : null,
-    dialog?.kind === 'planDetail' ? h(PlanDetailDialog, { plan: dialog.plan, t, onClose: () => setDialog(null) }) : null,
+    dialog?.kind === 'planDetail' ? h(PlanDetailDialog, { plan: dialog.plan, ctx, t, onClose: () => setDialog(null) }) : null,
+    dialog?.kind === 'receiptLedger' ? h(Dialog, { title: `${t('settlementSectionReceipt')} · ${dialog.row.itemName ?? ''}`, onClose: () => setDialog(null) }, h(CashSettlementsSection, { planId: dialog.row.id, direction: 'RECEIPT', ctx, t })) : null,
     dialog?.kind === 'backfill' ? h(BackfillDialog, { row: dialog.row, t, onClose: () => setDialog(null), act }) : null,
-    dialog?.kind === 'reason' ? h(ReasonDialog, { title: dialog.title, required: dialog.required, t, onClose: () => setDialog(null), onSubmit: reason => { setDialog(null); return dialog.run(reason) } }) : null,
-    dialog?.kind === 'planAdjDetail' ? h(PlanAdjustDetailDialog, { id: dialog.id, t, onClose: () => setDialog(null) }) : null,
   )
 }
 
-function PlanAdjustDetailDialog({ id, t, onClose }) {
-  const [detail, setDetail] = useState(null)
-  useEffect(() => {
-    let cancelled = false
-    api(`/plan-adjustments/${id}`).then(value => { if (!cancelled) setDetail(value.data) }).catch(() => { if (!cancelled) setDetail({ error: true }) })
-    return () => { cancelled = true }
-  }, [id])
-  const flow = detail?.logs || detail?.flows || detail?.statusLogs || []
-  const adjustment = detail?.adjustment ?? detail
-  return h(Dialog, { title: `${t('adjustmentOf')} ${adjustment?.code ?? ''}`, onClose },
-    h('div', { className: 'sf-stack' },
-      adjustment ? h('div', { className: 'sf-row' },
-        h(Pill, { tone: ADJ_STATUS_TONES[adjustment.status] ?? 'muted' }, financeEnumLabel(adjustment.status, t, ADJ_STATUS_KEYS)),
-        h('span', { className: 'sf-note' }, `${wan(adjustment.oldAmount) ?? '—'} → ${wan(adjustment.newAmount) ?? '—'} ${t('unitYuan')}`)) : null,
-      adjustment?.reason ? h('p', { className: 'sf-note' }, `${t('increaseReason')}：${adjustment.reason}`) : null,
-      flow.length ? h('div', null, h('strong', null, t('flow')), h('div', { className: 'sf-timeline' }, ...flow.map((item, index) =>
-        h('div', { key: index, className: 'sf-timeline-row' },
-          h('span', { className: 'sf-timeline-dot' }),
-          h('div', { className: 'sf-timeline-main' }, h('span', null, `${financeDisplayValue(item.action ?? item.toStatus, item.action ? 'action' : 'toStatus')} · ${item.operatorName ?? item.operator ?? '—'}`), h('small', null, shortDate(item.at ?? item.createdAt) ?? '')),
-          h('span', { className: 'sf-note' }, item.note ?? ''))))) : null))
+function CashPlanListError({ onRetry }) {
+  return h('div', { role: 'alert', className: 'sf-stack' }, '计划加载失败，请重试。', h(LinkButton, { onClick: onRetry }, '重试加载'))
 }
 
 // ---- 汇总：当月执行 + 主体/月明细；空值保留未知，余额不跨月相加 ----
@@ -209,11 +209,45 @@ function ScheduleDialog({ plan, t, onClose, act }) {
   const [accepts, setAccepts] = useState(Boolean(plan.acceptsAcceptance))
   const [cashAmount, setCashAmount] = useState(plan.plannedCashAmount != null ? String(plan.plannedCashAmount) : '')
   const [acceptanceAmount, setAcceptanceAmount] = useState(plan.plannedAcceptanceAmount != null ? String(plan.plannedAcceptanceAmount) : '')
+  const [planMonth, setPlanMonth] = useState('')
+  const [splitTouched, setSplitTouched] = useState(false)
+  const [formError, setFormError] = useState(null)
+  const totalCents = finite(plan.plannedAmount) !== null ? Math.round(Number(plan.plannedAmount) * 100) : null
+  // 与网页一致：改一边自动补另一边（分单位计算），保留正在输入字段的原文。
+  const updateSplit = (field, value) => {
+    setSplitTouched(true); setFormError(null)
+    if (field === 'cash') {
+      setCashAmount(value)
+      if (totalCents !== null && /^\d+(\.\d{1,2})?$/.test(value.trim())) {
+        const cash = Math.round(Number(value) * 100)
+        setAcceptanceAmount(((totalCents - cash) / 100).toFixed(2))
+      }
+    } else {
+      setAcceptanceAmount(value)
+      if (totalCents !== null && /^\d+(\.\d{1,2})?$/.test(value.trim())) {
+        const acceptance = Math.round(Number(value) * 100)
+        setCashAmount(((totalCents - acceptance) / 100).toFixed(2))
+      }
+    }
+  }
   const submit = async () => {
+    const cash = cashAmount.trim() ? Number(cashAmount) : undefined
+    const acceptance = acceptanceAmount.trim() ? Number(acceptanceAmount) : undefined
+    if (cash !== undefined && (!Number.isFinite(cash) || cash < 0)) { setFormError(t('scheduleCashBad')); return }
+    if (acceptance !== undefined && (!Number.isFinite(acceptance) || acceptance < 0)) { setFormError(t('scheduleAcceptanceBad')); return }
+    if (plan.planMonth == null && !planMonth) { setFormError(t('scheduleMonthMissing')); return }
+    if (splitTouched) {
+      if (totalCents == null) { setFormError(t('scheduleNoPlanAmount')); return }
+      if (!/^\d+(\.\d{1,2})?$/.test(cashAmount.trim()) || !/^\d+(\.\d{1,2})?$/.test(acceptanceAmount.trim())) { setFormError(t('scheduleSplitBad')); return }
+      if (Math.round(Number(cashAmount) * 100) + Math.round(Number(acceptanceAmount) * 100) !== totalCents) { setFormError(t('scheduleSumBad')); return }
+      if (!accepts && Number(acceptanceAmount) > 0) { setFormError(t('scheduleNoAcceptance')); return }
+    }
+    setFormError(null)
     const saved = await act(`/payment-plans/${plan.id}/schedule`, {
       ...(scheduleDate ? { scheduleDate: new Date(`${scheduleDate}T00:00:00`).toISOString() } : {}),
       ...(priority ? { priority } : { priority: null }),
       acceptsAcceptance: accepts,
+      ...(plan.planMonth == null && planMonth ? { planMonth: Number(planMonth) } : {}),
       ...(cashAmount ? { plannedCashAmount: Number(cashAmount) } : {}),
       ...(acceptanceAmount ? { plannedAcceptanceAmount: Number(acceptanceAmount) } : {}),
     })
@@ -224,11 +258,13 @@ function ScheduleDialog({ plan, t, onClose, act }) {
     h(PrimaryButton, { key: 'ok', onClick: submit }, t('submit')),
   ] },
     h('div', { className: 'sf-stack' },
+      formError ? h('p', { role: 'alert', className: 'sf-neg' }, formError) : null,
+      plan.planMonth == null ? h(FormRow, { label: `${t('scheduleMonthBackfill')} *` }, h(Select, { value: planMonth, onChange: setPlanMonth, options: Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1} ${t('monthCol')}`]), placeholder: t('monthCol') })) : null,
       h(FormRow, { label: t('scheduleDate') }, h(Field, { type: 'date', value: scheduleDate, onChange: setScheduleDate })),
       h(FormRow, { label: t('priority') }, h(Select, { value: priority, onChange: setPriority, options: PRIORITIES.map(([id, label]) => [id, t(label)]), placeholder: '—' })),
       h(FormRow, { label: t('acceptAcceptance') }, h(Switch, { checked: accepts, onChange: setAccepts, label: t('acceptAcceptance') })),
-      accepts ? h(FormRow, { label: t('cashAmount') }, h(Field, { type: 'number', min: '0', step: '0.01', value: cashAmount, onChange: setCashAmount })) : null,
-      accepts ? h(FormRow, { label: t('acceptanceAmount') }, h(Field, { type: 'number', min: '0', step: '0.01', value: acceptanceAmount, onChange: setAcceptanceAmount })) : null))
+      accepts ? h(FormRow, { label: t('cashAmount') }, h(Field, { type: 'number', min: '0', step: '0.01', value: cashAmount, onChange: value => updateSplit('cash', value) })) : null,
+      accepts ? h(FormRow, { label: t('acceptanceAmount') }, h(Field, { type: 'number', min: '0', step: '0.01', value: acceptanceAmount, onChange: value => updateSplit('acceptance', value) })) : null))
 }
 
 function validPlanAdjustment(plan, value, reason) {
@@ -302,7 +338,7 @@ function PlanPayments({ planId, t }) {
     h(Pager, { page, total: data.total, limit: 20, onPage: setPage }))
 }
 
-function PlanDetailDialog({ plan, t, onClose }) {
+function PlanDetailDialog({ plan, ctx, t, onClose }) {
   const fields = [
     [t('org'), plan.orgName], [t('planType'), financeEnumLabel(plan.planType, t, PLAN_LABELS)], [t('description'), plan.description],
     [t('department'), plan.departmentName], [t('costItem'), plan.costItemName], [t('planMonth'), plan.planMonth ? `${plan.planMonth} 月` : '—'],
@@ -314,53 +350,13 @@ function PlanDetailDialog({ plan, t, onClose }) {
   return h(Dialog, { title: t('planDetail'), onClose },
     h('dl', { className: 'sf-evidence' }, ...fields.map(([label, value], index) =>
       h('div', { key: index, className: 'sf-evidence-item' }, h('small', null, label), h('strong', null, value ?? '—')))),
-    h(PlanPayments, { key: plan.id, planId: plan.id, t }))
-}
-
-// ---- 调整审批台 ----
-
-function PlanAdjustmentsTab({ t, revision, reloadTick, busy, act, canWrite = true, canVerify = true, onDialog }) {
-  const [status, setStatus] = useState('SUBMITTED')
-  const [data, setData] = useState(null)
-  const [page, setPage] = useState(1)
-  useEffect(() => {
-    let cancelled = false
-    api(`/plan-adjustments?${status ? `status=${status}&` : ''}page=${page}&limit=${PAGE_SIZE}`)
-      .then(value => { if (!cancelled) setData(value) })
-      .catch(() => { if (!cancelled) setData({ error: true }) })
-    return () => { cancelled = true }
-  }, [status, page, revision, reloadTick])
-  const rows = data?.adjustments || []
-  const deltaOf = row => { const delta = (finite(row.newAmount) ?? 0) - (finite(row.oldAmount) ?? 0); return delta >= 0 ? `+${wan(delta)}` : wan(delta) }
-  return h('div', { className: 'sf-stack' },
-    h(PillTabs, { tabs: ADJ_STATUSES, value: status, onChange: value => { setStatus(value); setPage(1) }, t }),
-    h(Card, { title: t('cashAdjustments'), unit: t('unitNote') },
-      h(Table, { tableId: 'finance-PlanAdjustmentsTab-1',
-        columns: [
-          { label: t('adjustmentOf'), key: 'code' },
-          { label: t('amount'), key: 'amount', sortValue: row => row.newAmount - row.oldAmount, render: row => h('span', null, `${wan(row.oldAmount) ?? '—'} → ${wan(row.newAmount) ?? '—'} `, h('span', { className: 'sf-pos' }, `（${deltaOf(row)}）`)), num: true },
-          { label: t('statusCol'), key: 'status', render: row => h(Pill, { tone: ADJ_STATUS_TONES[row.status] ?? 'muted' }, financeEnumLabel(row.status, t, ADJ_STATUS_KEYS)) },
-          { label: t('lastSeen'), key: 'submittedAt', render: row => shortDate(row.submittedAt) ?? '—', num: true },
-          {
-            label: t('actions'), key: 'actions', sortable: false,
-            render: row => h('div', { className: 'sf-row', style: { flexWrap: 'nowrap', justifyContent: 'flex-end' } },
-              h(LinkButton, { onClick: () => onDialog({ kind: 'planAdjDetail', id: row.id }) }, t('actDetail')),
-              canVerify && row.status === 'SUBMITTED' ? h(LinkButton, { onClick: () => act(`/plan-adjustments/${row.id}/approve`, {}) }, t('actApprove')) : null,
-              canVerify && row.status === 'SUBMITTED' ? h(LinkButton, { onClick: () => onDialog({ kind: 'reason', title: t('actReject'), required: true, run: reason => act(`/plan-adjustments/${row.id}/reject`, { note: reason }) }) }, t('actReject')) : null,
-              canVerify && row.status === 'APPROVED' ? h(LinkButton, { onClick: () => act(`/plan-adjustments/${row.id}/post`, {}) }, t('actPost')) : null,
-              row.status === 'DRAFT' || canVerify && row.status === 'SUBMITTED' ? h(LinkButton, { onClick: () => onDialog({ kind: 'reason', title: t('actCancel'), required: false, run: reason => act(`/plan-adjustments/${row.id}/cancel`, reason ? { note: reason } : {}) }) }, t('actCancel')) : null),
-          },
-        ],
-        rows, empty: t('empty'),
-      }),
-      h(Pager, { page, total: data?.total, limit: PAGE_SIZE, onPage: setPage })),
-    // 驳回理由 Dialog 与详情 Dialog 由外壳层渲染——这里通过 onDialog 请求，但 Dialog 需要在 CashView 层挂载
-    null)
+    h(PlanPayments, { key: plan.id, planId: plan.id, t }),
+    h(CashSettlementsSection, { key: `settlement-${plan.id}`, planId: plan.id, direction: 'PAYMENT', ctx, t }))
 }
 
 // ---- 收入计划 ----
 
-function RevenueTab({ revenues, page, onPage, t, canWrite = true, onBackfill }) {
+function RevenueTab({ revenues, page, onPage, t, canWrite = true, onBackfill, onLedger }) {
   const rows = revenues?.data?.list || revenues?.list || []
   return h(Card, { title: t('revenueVs'), unit: t('unitNote') },
     h(Table, { tableId: 'finance-RevenueTab-1',
@@ -379,7 +375,9 @@ function RevenueTab({ revenues, page, onPage, t, canWrite = true, onBackfill }) 
             return h('span', { className: value < 0 ? 'sf-neg' : 'sf-pos' }, wan(value))
           },
         },
-        { label: t('actions'), key: 'actions', sortable: false, render: row => canWrite ? h(LinkButton, { onClick: () => onBackfill(row) }, t('backfill')) : null },
+        { label: t('actions'), key: 'actions', sortable: false, render: row => h('div', { className: 'sf-row', style: { flexWrap: 'nowrap', justifyContent: 'flex-end' } },
+        canWrite ? h(LinkButton, { onClick: () => onBackfill(row) }, t('backfill')) : null,
+        canWrite ? h(LinkButton, { onClick: () => onLedger(row) }, t('settlementSectionReceipt')) : null) },
       ],
       rows, empty: t('empty'),
     }),

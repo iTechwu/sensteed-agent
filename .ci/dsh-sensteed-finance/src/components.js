@@ -273,7 +273,7 @@ function useFinancePopupPosition(open, anchorRef) {
   return style
 }
 
-function SearchSelect({ value, defaultValue = '', onChange, options = [], placeholder, disabled, required, buttonTrigger = false, allowCustom = false, preserveDraft = false, customLabel = '使用当前输入值', ...rest }) {
+function SearchSelect({ value, defaultValue = '', onChange, options = [], placeholder, disabled, required, buttonTrigger = false, allowCustom = false, preserveDraft = false, customLabel = '使用当前输入值', remoteSearch, selectedLabel: labelOverride, ...rest }) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const [selection, setSelection] = useState(defaultValue)
@@ -283,9 +283,9 @@ function SearchSelect({ value, defaultValue = '', onChange, options = [], placeh
   const menuId = useId()
   const popupStyle = useFinancePopupPosition(open, buttonTrigger ? triggerRef : inputRef)
   const chosen = value === undefined ? selection : value
-  const selectedLabel = options.find(([id]) => id === chosen)?.[1] ?? (chosen ? String(chosen) : '')
+  const selectedLabel = labelOverride ?? options.find(([id]) => id === chosen)?.[1] ?? (chosen ? String(chosen) : '')
   const normalizedQuery = query.trim().toLocaleLowerCase()
-  const filteredOptions = options.filter(([id, label]) => !normalizedQuery || (String(label) + ' ' + String(id)).toLocaleLowerCase().includes(normalizedQuery))
+  const filteredOptions = remoteSearch ? options : options.filter(([id, label]) => !normalizedQuery || (String(label) + ' ' + String(id)).toLocaleLowerCase().includes(normalizedQuery))
   const exactMatch = options.some(([id, label]) => String(id) === query.trim() || String(label) === query.trim())
   const customAvailable = allowCustom && query.trim() && !exactMatch
   const pendingDraft = preserveDraft && allowCustom && query.trim() !== selectedLabel ? query.trim() : ''
@@ -331,7 +331,7 @@ function SearchSelect({ value, defaultValue = '', onChange, options = [], placeh
       event.preventDefault()
       event.stopPropagation()
       ;(buttonTrigger ? triggerRef : inputRef).current?.focus()
-      closeMenu(true)
+      closeMenu()
     } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
       setOpen(true)
@@ -343,7 +343,9 @@ function SearchSelect({ value, defaultValue = '', onChange, options = [], placeh
         items[next]?.focus()
       })
     } else if (event.key === 'Enter' && event.target === inputRef.current && open) {
+      if (event.nativeEvent?.isComposing || event.isComposing) return
       event.preventDefault()
+      if (remoteSearch) { event.stopPropagation(); remoteSearch.onSubmit(); return }
       if (filteredOptions.length === 1 && !customAvailable) selectOption(filteredOptions[0][0])
       else if (customAvailable && !filteredOptions.length) selectOption(query.trim())
     }
@@ -369,12 +371,14 @@ function SearchSelect({ value, defaultValue = '', onChange, options = [], placeh
         onChange: event => { setQuery(event.target.value); setOpen(true) },
       }),
       (chosen || (allowCustom && query)) && !disabled ? h('button', { type: 'button', className: 'sf-search-clear', onClick: () => selectOption(''), 'aria-label': '清除' + placeholder }, '×') : null),
-    h('div', { className: 'sf-search-menu', style: popupStyle, id: menuId, role: 'listbox', 'aria-label': placeholder, hidden: !open || disabled },
+    h('div', { className: 'sf-search-menu', style: popupStyle, hidden: !open || disabled },
       buttonTrigger ? h('input', {
-        ref: inputRef, type: 'search', role: 'combobox', 'aria-expanded': open, 'aria-controls': menuId, value: query, maxLength: rest.maxLength, 'aria-label': '搜索' + placeholder, placeholder: '搜索' + placeholder,
-        onChange: event => setQuery(event.target.value),
+        ref: inputRef, type: 'search', role: 'combobox', 'aria-expanded': open, 'aria-controls': menuId, value: remoteSearch?.value ?? query, maxLength: rest.maxLength, 'aria-label': '搜索' + placeholder, placeholder: '搜索' + placeholder,
+        'data-entry-filter': !allowCustom ? '' : undefined, onChange: event => remoteSearch ? remoteSearch.onChange(event.target.value) : setQuery(event.target.value),
       }) : null,
+      remoteSearch ? h(GhostButton, { onClick: remoteSearch.onSubmit }, '搜索') : null,
       buttonTrigger && chosen ? h('button', { type: 'button', className: 'sf-search-option', onClick: () => selectOption('') }, '清除当前选择') : null,
+      h('div', { id: menuId, role: 'listbox', 'aria-label': placeholder, className: 'sf-search-results' },
       customAvailable ? h('button', {
         type: 'button', className: 'sf-search-option sf-search-custom', role: 'option', 'aria-selected': false,
         onMouseDown: event => event.preventDefault(), onClick: () => selectOption(query.trim()),
@@ -384,12 +388,13 @@ function SearchSelect({ value, defaultValue = '', onChange, options = [], placeh
         className: 'sf-search-option' + (id === chosen ? ' is-selected' : ''),
         onMouseDown: event => event.preventDefault(), onClick: () => selectOption(id),
       }, label)),
-      !filteredOptions.length && !customAvailable ? h('p', { className: 'sf-search-empty' }, allowCustom ? '暂无历史选项，输入名称即可新增本次值。' : '没有匹配项') : null),
+      !remoteSearch && !filteredOptions.length && !customAvailable ? h('p', { className: 'sf-search-empty' }, allowCustom ? '暂无历史选项，输入名称即可新增本次值。' : '没有匹配项') : null),
+      remoteSearch?.content),
     preserveDraft && rest.name ? h('input', { type: 'hidden', name: rest.name + 'Draft', value: pendingDraft, disabled }) : null,
     h('input', { type: 'hidden', name: rest.name, value: chosen, disabled }))
 }
 
-function MultiSearchSelect({ value = [], onChange, options = [], placeholder = '选项', disabled }) {
+function MultiSearchSelect({ value = [], onChange, options = [], placeholder = '选项', disabled, selectedLabel }) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const rootRef = useRef(null)
@@ -451,7 +456,7 @@ function MultiSearchSelect({ value = [], onChange, options = [], placeholder = '
       onClick: () => { if (open) close(); else setOpen(true) },
       onKeyDown: event => { if (event.key === 'Escape') handleKeyDown(event) },
     },
-      h('span', { className: selectedOptions.length ? 'is-selected' : '' }, selectedOptions.length ? '已选 ' + selectedOptions.length + ' 项' : placeholder),
+      h('span', { className: selectedOptions.length ? 'is-selected' : '' }, selectedLabel || (selectedOptions.length ? '已选 ' + selectedOptions.length + ' 项' : placeholder)),
       h(Glyph, { name: 'down', size: 13 })),
     open && !disabled ? h('div', { className: 'sf-multi-menu', style: popupStyle, role: 'dialog', 'aria-label': '搜索' + placeholder },
       h('div', { className: 'sf-multi-search-input' },

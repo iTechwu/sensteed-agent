@@ -35,6 +35,9 @@ function Dashboard({ t, embedded = false, onClose = closeOverlay }) {
   const [briefState, setBriefState] = useState('loading')
   const [workQueue, setWorkQueue] = useState(null)
   const shellRef = useRef(null)
+  const entryLeaveRef = useRef(null)
+  const registerEntryLeave = useCallback(guard => { entryLeaveRef.current = guard }, [])
+  const closeSafely = () => { if (entryLeaveRef.current) entryLeaveRef.current(onClose); else onClose() }
   // 同步请求锁：brief 取数在途时丢弃重复刷新，避免 revision 连击叠加请求
   const loadingRef = useRef(false)
 
@@ -90,7 +93,7 @@ function Dashboard({ t, embedded = false, onClose = closeOverlay }) {
   useEffect(() => {
     if (!active) return undefined
     window.addEventListener('sf:refresh', refresh)
-    const key = event => { if (event.key === 'Escape') onClose() }
+    const key = event => { if (event.key === 'Escape') closeSafely() }
     window.addEventListener('keydown', key)
     return () => { window.removeEventListener('sf:refresh', refresh); window.removeEventListener('keydown', key) }
   }, [active])
@@ -102,10 +105,14 @@ function Dashboard({ t, embedded = false, onClose = closeOverlay }) {
   const onDrill = (target, params) => {
     const item = financeNavigationItem(target, params)
     if (!canOpen(target) || (item && !financeNavigationAllowed(item, identity))) return
-    setDrillParams(params ?? null)
-    if (params?.year) setYear(params.year)
-    if (params?.orgId) setOrgId(params.orgId)
-    setTab(target)
+    const navigate = () => {
+      setDrillParams(params ?? null)
+      if (params?.year) setYear(params.year)
+      if (params?.orgId) setOrgId(params.orgId)
+      setTab(target)
+    }
+    if (entryLeaveRef.current) entryLeaveRef.current(navigate)
+    else navigate()
   }
   const ctx = { year, orgId, orgs, departments, revision, drillParams, permissions: capabilities.permissions || [], financeWriter, role: capabilities.role, fullAccess: capabilities.fullAccess, onNavigate: onDrill }
   const activeItem = financeNavigationItem(tab, drillParams)
@@ -124,10 +131,10 @@ function Dashboard({ t, embedded = false, onClose = closeOverlay }) {
         tab === 'cash' ? h(CashView, { ctx, t, onDrill }) : null,
         tab === 'alerts' ? h(AlertsView, { ctx, t, onDrill }) : null,
         tab === 'datacenter' ? h(DataCenterView, { ctx, t }) : null,
-        tab === 'entry' ? h(EntryPanel, { year, orgId, orgs, departments, role: ctx.role, t, onSaved: refresh, onYearChange: setYear, onNavigate: canOpen('budget') ? onDrill : undefined }) : null,
+        tab === 'entry' ? h(EntryPanel, { year, orgId, orgs, departments, role: ctx.role, t, onSaved: refresh, onYearChange: setYear, onNavigate: onDrill, onLeaveGuardChange: registerEntryLeave }) : null,
         tab === 'budget-filing' ? h(BudgetFilingView, { key: `budget-filing-${year}-${drillParams?.taskId || ''}`, ctx, t }) : null,
-        tab === 'filing' ? h(FilingParityView, { ctx, t }) : null,
-        tab === 'identity' ? h(EntryView, { ctx, t, directoryOnly: true, directorySection: drillParams?.directorySection }) : null,
+        tab === 'filing' ? h(FilingParityView, { key: `filing-${year}-${drillParams?.section || 'assignments'}-${drillParams?.taskId || ''}`, ctx, t }) : null,
+        tab === 'identity' ? drillParams?.directorySection === 'members' ? h(FinanceMembersView, { ctx, t }) : h(EntryView, { ctx, t, directoryOnly: true, directorySection: drillParams?.directorySection }) : null,
         tab === 'bom' && canOpen('bom') ? h(BomView, { ctx, t }) : null,
         tab === 'analyze' ? h(AnalyzeView, { ctx, t }) : null,
         tab === 'engine' ? h(EngineView, { ctx, t }) : null,
@@ -149,20 +156,20 @@ function Dashboard({ t, embedded = false, onClose = closeOverlay }) {
           h('h1', { id: 'sf-title' }, activeItem?.[1] ?? t(SECTION_META[tab]?.[0] ?? 'title')),
           h('p', { className: 'sf-desc' }, [operator ? `${t('operatorAs')} ${operator}` : null, tab === 'budget-filing' ? '本人填报、两级审核与部门预算确认' : tab === 'filing' ? '完成部门填报并跟踪提交、退回与确认进度' : tab === 'identity' ? '维护成员职责、组织身份与部门归属' : t(SECTION_META[tab]?.[1] ?? 'subtitle')].filter(Boolean).join(' · '))),
         h('div', { className: 'sf-header-side' },
-          !['entry', 'identity', 'bom', 'sources', 'datacenter', 'review', 'notifications', 'permissions'].includes(tab) ? h('label', { className: 'sf-filter' }, h('span', null, t('year')), h(Select, { value: year, onChange: value => { setYear(value); setDrillParams(current => current ? { ...current, taskId: undefined, lineId: undefined } : null) }, options: yearOptions(year) })) : null,
+          !['entry', 'identity', 'bom', 'sources', 'datacenter', 'review', 'notifications', 'permissions'].includes(tab) ? h('label', { className: 'sf-filter' }, h('span', null, t('year')), h(Select, { value: year, onChange: value => { setYear(value); setDrillParams(current => current ? { ...current, year: value, taskId: undefined, versionId: undefined, lineId: undefined } : null) }, options: yearOptions(year) })) : null,
           ['overview', 'operations', 'cash', 'alerts'].includes(tab) ? h('label', { className: 'sf-filter' }, h('span', null, t('org')), h(SearchSelect, { value: orgId, onChange: value => { setOrgId(value); setDrillParams(null) }, options: orgs.filter(org => org.type !== 'GROUP').map(org => [org.id, org.name]), placeholder: t('allOrgs') })) : null,
           h('div', { className: 'sf-header-buttons' },
             h(Tooltip, { label: t('refresh') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('refresh'), onClick: refresh }, h(IconRefreshOutlineRegular, { size: 16 }))),
-            h(Tooltip, { label: t('close') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('close'), onClick: onClose }, h(IconCloseOutlineRegular, { size: 16 })))))),
+            h(Tooltip, { label: t('close') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('close'), onClick: closeSafely }, h(IconCloseOutlineRegular, { size: 16 })))))),
       h('nav', { className: 'sf-tabs', 'aria-label': t('title') }, ...FINANCE_NAVIGATION.map(([label, items]) => {
         const visible = items.filter(item => financeNavigationAllowed(item, identity))
         return visible.length ? h('section', { key: label, className: 'sf-nav-group', 'aria-label': label },
-          h('h2', null, label), ...visible.map(item => h('button', { type: 'button', key: item[0], 'aria-current': activeItem?.[0] === item[0] ? 'page' : undefined, onClick: () => onDrill(item[2], item[3]) }, item[1]))) : null
+          h('h2', null, label), ...visible.map(item => h('button', { type: 'button', key: item[0], 'aria-current': activeItem?.[0] === item[0] ? 'page' : undefined, onClick: () => onDrill(item[2], financeSidebarParams(item, tab, drillParams, year)) }, item[1]))) : null
       })),
       h('label', { className: 'sf-mobile-nav' }, h('span', null, '前往页面'),
         h('select', { value: activeItem?.[0] || 'overview', onChange: event => {
           const item = FINANCE_NAVIGATION.flatMap(([, items]) => items).find(item => item[0] === event.target.value)
-          if (item) onDrill(item[2], item[3])
+          if (item) onDrill(item[2], financeSidebarParams(item, tab, drillParams, year))
         } }, ...FINANCE_NAVIGATION.map(([label, items]) => {
           const visible = items.filter(item => financeNavigationAllowed(item, identity))
           return visible.length ? h('optgroup', { key: label, label }, ...visible.map(item => h('option', { key: item[0], value: item[0] }, item[1]))) : null

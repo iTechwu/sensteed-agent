@@ -1,4 +1,4 @@
-// 片段 5/7 视图：深度分析入口（预制指令投递当前会话，Agent 调 mcp__finance__* 完成分析）
+// 深度分析入口：在独立新会话调用对应默认技能。
 
 function sendErrorReason(error) {
   const message = error instanceof Error ? error.message : String(error)
@@ -6,31 +6,30 @@ function sendErrorReason(error) {
   return Object.hasOwn(reasons, message) ? reasons[message] : financeErrorText(message)
 }
 
-function sendToAgent(prompt, setNotice, t) {
-  // 优先直接投递到当前会话；宿主未暴露 conversation 服务时降级为剪贴板复制。
+async function sendToAgent(prompt, setNotice, t) {
+  // 由宿主桥接创建新会话；服务不可用时保留分析指令供用户重试。
   try {
     const conversation = globalThis.__sensteed_finance_conversation?.() ?? null
     if (conversation?.send) {
-      void conversation.send(prompt)
-        .then(() => { globalThis.__sensteed_finance_close?.(); setNotice(t('sent')) })
-        .catch(error => {
-          globalThis.console?.warn?.('[dofe.sensteed-finance] conversation send failed', error)
-          copyFallback(prompt, setNotice, t, sendErrorReason(error))
-        })
+      await conversation.send(prompt)
+      globalThis.__sensteed_finance_close?.()
+      setNotice(t('sent'))
       return
     }
   } catch (error) {
     globalThis.console?.warn?.('[dofe.sensteed-finance] conversation bridge unavailable', error)
-    copyFallback(prompt, setNotice, t, sendErrorReason(error))
+    await copyFallback(prompt, setNotice, t, sendErrorReason(error))
     return
   }
-  copyFallback(prompt, setNotice, t)
+  await copyFallback(prompt, setNotice, t)
 }
 
-function copyFallback(prompt, setNotice, t, reason) {
-  const failed = () => setNotice(t('copyFailed'))
-  if (!navigator.clipboard?.writeText) return failed()
-  try { navigator.clipboard.writeText(prompt).then(() => setNotice(reason ? t('sendFailReason', { reason }) : t('sendFail')), failed) } catch { failed() }
+async function copyFallback(prompt, setNotice, t, reason) {
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error('clipboard_unavailable')
+    await navigator.clipboard.writeText(prompt)
+    setNotice(reason ? t('sendFailReason', { reason }) : t('sendFail'))
+  } catch { setNotice(t('copyFailed')) }
 }
 
 function analysisPrompt(entry, year, orgName) {
@@ -41,13 +40,23 @@ function analysisPrompt(entry, year, orgName) {
 function AnalyzeView({ ctx, t }) {
   const { year, orgId, orgs } = ctx
   const [notice, setNotice] = useState(null)
+  const [starting, setStarting] = useState(null)
+  const startingRef = useRef(false)
   const orgName = (orgs || []).find(org => org.id === orgId)?.name
+  const startAnalysis = async entry => {
+    if (startingRef.current) return
+    startingRef.current = true
+    setStarting(entry.id)
+    setNotice(null)
+    try { await sendToAgent(analysisPrompt(entry, year, orgName), setNotice, t) }
+    finally { startingRef.current = false; setStarting(null) }
+  }
   return h('div', { className: 'sf-view' },
     h('p', { className: 'sf-note' }, t('analyzeHint')),
     h('div', { className: 'sf-analysis-grid' }, ...ANALYSIS_ENTRIES.map(entry => h('article', { className: 'sf-card sf-analysis-card', key: entry.id },
       h('div', { className: 'sf-analysis-head' }, h(Glyph, { name: entry.icon, size: 15 }), h('h2', null, t(`analysis_${entry.id}`))),
       h('p', null, t(`analysis_${entry.id}_desc`)),
-      h('div', null, h(PrimaryButton, { onClick: () => sendToAgent(analysisPrompt(entry, year, orgName), setNotice, t) }, h(Glyph, { name: 'send', size: 12 }), t('send')))))),
+      h('div', null, h(PrimaryButton, { busy: starting === entry.id, disabled: starting !== null, onClick: () => startAnalysis(entry), 'aria-label': `${t(`analysis_${entry.id}`)}：${t('send')}` }, h(Glyph, { name: 'send', size: 12 }), t(starting === entry.id ? 'analysisStarting' : 'send')))))),
     notice ? h(Notice, null, notice) : null,
     h('p', { className: 'sf-note' }, t('analyzingNote')))
 }

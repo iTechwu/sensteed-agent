@@ -111,7 +111,7 @@
       "source": "sibling",
       "siblingDir": "../docker-helm.dofe.ai/skills/finance-budget-review",
       "snapshotDir": "dsh-plugin-desktop/bundled/skills/finance-budget-review",
-      "resolvedSha": "06be24a348619ff50bf4cdfa7588fca3d7200ba3"
+      "resolvedSha": "f406b7b5c13950d8e9141b6d67a55efc8260e5fc"
     },
     {
       "name": "finance-revenue-attainment",
