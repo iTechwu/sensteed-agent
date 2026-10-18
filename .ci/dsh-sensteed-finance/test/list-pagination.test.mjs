@@ -13,6 +13,8 @@ test('complete list crosses the old 200-row limit and preserves metadata', async
 test('explicit page and operational lists retain caller pagination', () => {
   assert.equal(needsCompleteList('/ce/packages/p/quotes'),true)
   assert.equal(needsCompleteList('/finance/orgs'),true)
+  assert.equal(needsCompleteList('/finance/access-roles'),true)
+  assert.equal(needsCompleteList('/finance/permission-policies'),true)
   assert.equal(needsCompleteList('/finance/orgs',{page:2}),false)
   assert.equal(needsCompleteList('/finance/payment-plans'),false)
 })

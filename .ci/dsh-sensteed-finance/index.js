@@ -193,9 +193,9 @@ export function apply(ctx, overrides = {}) {
 // 路由分发：GET 统计面 / POST 录入与回填面
 // ---------------------------------------------------------------------------
 
-const QUERY_KEYS = [
-  'year', 'month', 'page', 'limit', 'severity', 'status', 'orgId', 'expenseType', 'recordType', 'planType',
-  'versionId', 'departmentId', 'unassigned', 'operator', 'keyword', 'onlyUnmapped', 'systemUserId', 'days',
+const QUERY_KEYS = ['orgIds', 'departmentIds', 'expenseTypes',
+  'year', 'month', 'months', 'page', 'limit', 'severity', 'status', 'orgId', 'expenseType', 'recordType', 'planType',
+  'versionId', 'departmentId', 'unassigned', 'operator', 'keyword', 'incomeTypeName', 'onlyUnmapped', 'systemUserId', 'days',
   'project', 'sortBy', 'sortDirection', 'alertType', 'baseVersionId', 'targetVersionId', 'planId', 'type', 'scope', 'kind', 'bizSystem', 'transport',
 ]
 
@@ -242,26 +242,26 @@ async function dispatchGet(fetchImpl, config, sub, url, res, logger) {
     }
     case '/budget':
       calls = [
-        ['finance_get_budget_summary', { ...tenant(), year: query.year, orgId: query.orgId, versionId: query.versionId, departmentId: query.departmentId, unassigned: query.unassigned === '1' ? true : undefined }],
+        ['finance_get_budget_summary', { ...tenant(), year: query.year, orgId: query.orgId, orgIds: query.orgIds, departmentIds: query.departmentIds, expenseTypes: query.expenseTypes, versionId: query.versionId, departmentId: query.departmentId, unassigned: query.unassigned === '1' ? true : undefined }],
         ['finance_get_budget_lines', {
-          ...tenant(), year: query.year, orgId: query.orgId, versionId: query.versionId,
+          ...tenant(), year: query.year, orgId: query.orgId, orgIds: query.orgIds, departmentIds: query.departmentIds, expenseTypes: query.expenseTypes, months: query.months, versionId: query.versionId,
           departmentId: query.departmentId, unassigned: query.unassigned === '1' ? true : undefined,
           month: query.month, expenseType: query.expenseType, page: query.page, limit: query.limit,
         }],
       ]
       break
     case '/pr':
-      calls = [['finance_get_payment_requests', { ...tenant(), year: query.year, orgId: query.orgId, month: query.month, recordType: query.recordType, page: query.page, limit: query.limit }]]
+      calls = [['finance_get_payment_requests', { ...tenant(), year: query.year, orgId: query.orgId, orgIds: query.orgIds, month: query.month, recordType: query.recordType, page: query.page, limit: query.limit }]]
       break
     case '/payment-plans':
       calls = [['finance_get_payment_plans', {
         ...tenant(), year: query.year, orgId: query.orgId, departmentId: query.departmentId,
         unassigned: query.unassigned === '1' ? true : undefined,
-        month: query.month, planType: query.planType, page: query.page, limit: query.limit,
+        month: query.month, months: query.months, planType: query.planType, expenseType: query.expenseType, keyword: query.keyword, page: query.page, limit: query.limit,
       }]]
       break
     case '/revenue-plans':
-      calls = [['finance_get_revenue_plans', { ...tenant(), year: query.year, orgId: query.orgId, page: query.page, limit: query.limit }]]
+      calls = [['finance_get_revenue_plans', { ...tenant(), year: query.year, orgId: query.orgId, month: query.month, months: query.months, incomeTypeName: query.incomeTypeName, keyword: query.keyword, page: query.page, limit: query.limit }]]
       break
     case '/cash':
       calls = [['finance_get_cash_summary', { ...tenant(), year: query.year, orgId: query.orgId }]]
@@ -720,12 +720,12 @@ function safePathname(url) {
   try { return new URL(url || ROUTE_PREFIX, 'https://dsh.local').pathname } catch { return ROUTE_PREFIX }
 }
 
-async function readJsonBody(req) {
+async function readJsonBody(req, maxBytes = MAX_BODY_BYTES) {
   const chunks = []
   let size = 0
   for await (const chunk of req) {
     size += chunk.length
-    if (size > MAX_BODY_BYTES) return { error: 'body too large' }
+    if (size > maxBytes) return { error: 'body too large' }
     chunks.push(chunk)
   }
   const raw = Buffer.concat(chunks).toString('utf8')
@@ -753,13 +753,13 @@ function sendJson(res, status, body) {
 
 const FINANCE_GUIDANCE = `你是资深的财务分析师（CFO 视角），可使用 mcp__finance__* 工具读取与写入财务数据中心（datasource.dofe.ai）。分析纪律：
 
-【口径】金额单位一律为元；严格区分四个口径：预算（budgetAmount）、已打 PR（prSubmittedAmount）、预计 PR（prEstimatedAmount）、实际付款（paidAmount）。执行率 =（已打PR+预计PR）/预算，实际支付率 = 实际付款/预算。引用任何数字须说明口径与期间（年度/月度/主体）。
+【口径】金额沿用工具响应单位（通常元）；预算、已打 PR、预计 PR、无 PR、实际付款分列，执行率=已打PR/预算，实际支付率=实际付款/预算，分母非正/缺失不算百分比。合计比率用金额合计相除；预算已含调剂，不重复增加 netTransferAmount，不跨月相加 availableCumulative。budgetVersionId=null 表示无已发布基线。null 不当作零；引用数字说明主体、期间和版本/口径，meta.generatedAt 不代表业务数据新鲜度。
 
-【工作流】1) 先调 sensteed_finance_bootstrap 拿 tenantId 与主体列表；2) 用 mcp__finance__finance_analysis_brief 一次性建立全年口径基线（总览/预算/资金/预警/质量/批次）；3) 按需用 finance_get_budget_summary、finance_get_cash_summary、finance_get_payment_plans、finance_get_revenue_plans、finance_get_budget_lines（支持 departmentId/versionId/unassigned 筛选）、finance_get_payment_requests 下钻到主体×月度×部门；4) 预警细节用 finance_get_alerts 与 finance_get_alert_summary，数据可信度用 finance_get_data_quality 与 finance_get_import_batches；部门口径用 finance_get_departments，人员归属用 finance_get_employment_records。
+【工作流】先调 sensteed_finance_bootstrap，沿用可信身份和用户指定范围；工具以当前暴露的 schema 为准，不猜参数或拓宽范围。finance_analysis_brief 是可选年度快照（预警Top10/批次Top5并非全量），按需分别读预算、资金、计划、PR和质量工具，明细分页取齐并去重；失败/部分覆盖时披露限制。部门/版本筛选用支持该参数的明细，不把年度汇总当部门明细。深度分析调用的九个 finance-* skill 均为只读任务，不因本 guidance 列有写工具而取得修改、确认或刷新引擎的授权。
 
-【风险预判框架】输出必须覆盖四类确定性警情（与规则引擎口径一致）：预算超支（已打PR>预算，超 20% 为重大）、执行偏慢（已到期间执行率<30%）、资金缺口（预计/实际余额<0）、数据质量（未分配主体/缺失金额）。每条风险给出：影响金额（元）、涉及主体与期间、严重级别（重大/关注/提示）、置信度（高/中/低，基于数据完整度）、建议动作（可执行、有责任口）。分析前先看 finance_get_alert_rules：规则集未确认生效时正式告警为空属预期，须在结论中说明并以阈值手工推演。
+【风险预判框架】区分正式预警和分析发现；严重度与阈值以生效规则和 metrics 快照为准，不硬编码20%/30%。规则未生效时阈值类预警可能为空，数据质量预警仍可存在；无预警不等于无风险。分析已结束月、当前月和未来月的差别，不能把未来低执行判为滞后。每项给出可支持的影响金额、主体/期间、证据、判断依据和建议；未知金额不补造。finance_get_alert_summary 是年度当前 OPEN 存量，不能当近30天事件量；lastSeenAt 也不是新增时间。
 
-【成本预判框架】基于月度趋势外推：结构占比（三类费用：项目运营/固定运营/模型专项）、环比变动、单主体集中度。预测须声明方法（如"按近3个月均值外推"）与假设，不虚构精度；数据不足时明确说明并给出补数建议。
+【成本与资金框架】按返回的全部费用类别和未分类项分析，不限于旧三类；MODEL_SPECIFIC 指车型专属。预算、PR承诺、付款和计划不能直接叠加为成本或现金敞口。预测用可比完整月份，缺月不补零，避免历史运行率与计划重复计算；少量样本的情景区间不是统计置信区间。PUBLISHED_FACTS 可能没有余额，缺可靠期初只分析净收支，不编造月末余额或资金缺口；计划实际记录不冒充已核验银行流水。具体流程、公式与证据要求使用对应技能。
 
 【版本与规则纪律（v0.4）】① 预算版本：finance_get_budget_versions 查看主版本与草稿；版本推进链路=审定（confirm）→生效（activate，切主版本）→锁定（lock），用 finance_budget_version_action；对比两版本用 finance_get_budget_version_diff；结转口径用 finance_get_carryover_rules。引用预算数字须说明所属版本与是否主版本。② 预警规则集：finance_get_alert_rules 查看版本与阈值；确认生效用 finance_confirm_alert_rules（仅财务负责人，须复述阈值）。③ 保存视图：finance_save_view / finance_get_saved_views 可沉淀分析口径。
 
@@ -767,7 +767,7 @@ const FINANCE_GUIDANCE = `你是资深的财务分析师（CFO 视角），可�
 
 【幂等与身份】所有写工具必须提供独立业务 idempotencyKey，同一操作重试复用该键。操作者使用 bootstrap 返回的 operator；服务端按飞书 token 校验实际用户与租户。
 
-【录入与回填】用户明确要求录入或回填时才可调用写入工具（finance_create_payment_plan / finance_create_revenue_plan / finance_create_budget_line / finance_patch_payment_plan_actuals / finance_patch_revenue_plan_actuals / finance_patch_payment_plan_schedule）；付款计划排款月份必填；调用前必须复述关键金额、期间与主体并等待确认；写入后建议调用 finance_run_alert_engine 刷新警情。
+【录入与回填】用户明确要求录入或回填时才可调用写入工具（finance_create_payment_plan / finance_create_revenue_plan / finance_patch_payment_plan_actuals / finance_patch_revenue_plan_actuals / finance_patch_payment_plan_schedule）；付款计划排款月份必填；调用前必须复述关键金额、期间与主体并等待确认；预算新增统一进入“预算填报与审核”，保存本人草稿并完成初审、终审、部门提交及财务确认；不得调用 finance_create_budget_line 直接新增正式预算。写入后建议调用 finance_run_alert_engine 刷新警情。
 
 【输出口吻】财务口吻、结论先行、金额精确到元并按万/亿辅助表述；先给结论摘要，再给明细与依据；区分"事实（数据口径）"与"判断（预测/归因）"；最后给出下一步行动清单。数据不可用时说明原因，绝不编造数字。`
 
@@ -780,7 +780,13 @@ async function dispatchPublicContract(fetchImpl, config, path, req, res, logger)
   if (complete) Object.assign(query, {page: 1, limit: 200})
   let body
   if (req.method !== 'GET') {
-    const parsed = await readJsonBody(req)
+    // 512 KB Excel 经过 base64 后需要更大的 JSON 空间；仅开放两个精确上传接口。
+    const filingExcelUpload = /^\/finance\/filing\/assignments\/[^/]+\/excel-preview$/.test(path)
+    const excelUpload = /^\/finance\/budget-filing\/[^/]+\/excel\/(preview|import)$/.test(path)
+    // 1 MB 结构化资金证据 JSON（快照导入 / 逐笔交易导入）经 JSON 转义需要更大空间；同样仅精确路由放宽。
+    const cashEvidenceUpload = /^\/finance\/cash-evidence\/(snapshots|settlements)$/.test(path)
+    const ceUpload = /^\/ce\/packages\/[^/]+\/(ebom\/preview|nodes)$/.test(path)
+    const parsed = await readJsonBody(req, ceUpload ? 12 * 1024 * 1024 + 4096 : (excelUpload || filingExcelUpload) ? 768 * 1024 : cashEvidenceUpload ? 1536 * 1024 : MAX_BODY_BYTES)
     if (parsed.error) return sendJson(res, 400, { ok: false, error: parsed.error })
     body = stripControlFields(parsed.json)
     delete body.recipientId

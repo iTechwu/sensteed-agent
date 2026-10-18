@@ -3,7 +3,7 @@
 
 const BUDGET_VIEWS = [
   ['matrix', 'viewMatrix'], ['month', 'viewMonth'], ['lines', 'viewLines'], ['ledger', 'viewLedger'],
-  ['variance', 'viewVariance'], ['adjustments', 'viewAdjustments'], ['allocations', 'viewAllocations'], ['versions', 'viewVersions'],
+  ['variance', 'viewVariance'], ['adjustments', 'viewAdjustments'], ['allocations', 'viewAllocations'],
 ]
 const ADJ_TYPES = [['NEW_BUDGET', 'typeNew'], ['TRANSFER_SAME_DEPT', 'typeTransferSame'], ['TRANSFER_CROSS_DEPT', 'typeTransferCross'], ['REDUCE', 'typeReduce']]
 const ADJ_STATUSES = [
@@ -17,13 +17,32 @@ const mm = month => (month == null ? '—' : String(month).padStart(2, '0'))
 /** 预算行选择器的行标签 */
 const lineLabel = line => [line.orgName, line.departmentName, line.costItemName, line.month != null ? mm(line.month) + '月' : null].filter(Boolean).join(' / ')
 
+// 保存视图使用网页 URL 的字段名，兼容历史插件单值字段。
+function financeBudgetFilters(q = {}, orgId = '') {
+  const values = (multi, single) => multi ? String(multi).split(',').filter(Boolean) : single ? [String(single)] : []
+  return { orgIds: q.orgIds || values(q.orgs, q.org === 'all' ? '' : q.org || q.orgId || orgId), departmentIds: q.departmentIds || values(q.depts, q.dept || q.departmentId), expenseTypes: q.expenseTypes || values(q.expenses, q.expense || q.expenseType), months: Array.isArray(q.months) ? q.months.map(String) : values(q.months, q.month), versionId: q.version === 'primary' ? '' : q.version || q.versionId || '', recordType: q.recordType || '', month: String(q.month || ''), unassigned: !orgId && (q.unassigned === true || q.unassigned === '1') }
+}
+function financeBudgetSavedQuery(view, filters) {
+  const q = { view }
+  for (const [key, value] of [['orgs', filters.orgIds], ['depts', filters.departmentIds], ['expenses', filters.expenseTypes], ['months', filters.months]]) if (value?.length) q[key] = value.join(',')
+  if (filters.versionId) q.version = filters.versionId
+  if (filters.recordType) q.recordType = filters.recordType
+  if (filters.unassigned) q.unassigned = '1'
+  return q
+}
+function financeBudgetVisible(budget, filters, view) {
+  if (!budget?.summary) return budget
+  const list = (budget.summary.list || []).filter(row => (!filters.expenseTypes.length || filters.expenseTypes.includes(row.expenseType)) && (view === 'month' || !filters.months.length || filters.months.map(Number).includes(row.month)))
+  return { ...budget, summary: { ...budget.summary, list } }
+}
+
 function BudgetView({ ctx, t }) {
   const { year, orgId, orgs, departments, revision } = ctx
   const availableViews = BUDGET_VIEWS.filter(([id]) => ctx.financeWriter || !['adjustments', 'allocations', 'versions'].includes(id))
   useEffect(() => { if (!availableViews.some(([id]) => id === view)) setView('matrix') }, [ctx.financeWriter])
   const [view, setView] = useState(() => BUDGET_VIEWS.map(([id]) => id).includes(ctx.drillParams?.view) ? ctx.drillParams.view : 'matrix')
-  const [filters, setFilters] = useState({ expenseType: ctx.drillParams?.expenseType || '', departmentId: ctx.drillParams?.departmentId || '', versionId: ctx.drillParams?.versionId || '', recordType: ctx.drillParams?.recordType || '', month: ctx.drillParams?.month ? String(ctx.drillParams.month) : '', unassigned: false })
-  const [page, setPage] = useState(1)
+  const [filters, setFilters] = useState(() => financeBudgetFilters(ctx.drillParams || {}, orgId))
+  const [page, setPage] = useState(ctx.drillParams?.page || 1)
   const [budget, setBudget] = useState(null) // { summary, lines }
   const [pr, setPr] = useState(null)
   const [versions, setVersions] = useState(null) // 筛选条里的版本下拉也用
@@ -36,13 +55,18 @@ function BudgetView({ ctx, t }) {
 
   const query = (extra = {}) => {
     const params = new URLSearchParams({ year })
-    if (orgId) params.set('orgId', orgId)
-    if (view === 'ledger' && filters.recordType) params.set('recordType', filters.recordType)
-    if (filters.expenseType) params.set('expenseType', filters.expenseType)
-    if (filters.departmentId) params.set('departmentId', filters.departmentId)
-    if (filters.versionId) params.set('versionId', filters.versionId)
-    if (filters.month) params.set('month', filters.month)
-    if (filters.unassigned) params.set('unassigned', '1')
+    if (filters.orgIds.length === 1) params.set('orgId', filters.orgIds[0])
+    else if (filters.orgIds.length) params.set('orgIds', JSON.stringify(filters.orgIds))
+    if (view === 'ledger') {
+      if (filters.recordType) params.set('recordType', filters.recordType)
+      if (filters.month) params.set('month', filters.month)
+    } else {
+      if (filters.departmentIds.length) params.set('departmentIds', JSON.stringify(filters.departmentIds))
+      if (filters.expenseTypes.length) params.set('expenseTypes', JSON.stringify(filters.expenseTypes))
+      if (filters.versionId) params.set('versionId', filters.versionId)
+      if (filters.months.length) params.set('months', JSON.stringify(filters.months.map(Number)))
+      if (filters.unassigned && !filters.orgIds.length) params.set('unassigned', '1')
+    }
     for (const [key, value] of Object.entries(extra)) if (value !== undefined && value !== '') params.set(key, value)
     return params.toString()
   }
@@ -52,13 +76,15 @@ function BudgetView({ ctx, t }) {
   useEffect(() => {
     let cancelled = false
     if (view === 'matrix' || view === 'month' || view === 'lines' || view === 'variance') {
-      api(`/budget?${query({ page, limit: BUDGET_LINE_LIMIT })}`).then(value => { if (!cancelled) setBudget(value) }).catch(() => { if (!cancelled) setBudget({ error: true }) })
+      setBudget(null)
+      api(`/budget?${query({ page, limit: PAGE_SIZE })}`).then(value => { if (!cancelled) setBudget(value) }).catch(() => { if (!cancelled) setBudget({ error: true }) })
     }
     if (view === 'ledger') {
+      setPr(null)
       api(`/pr?${query({ page, limit: PAGE_SIZE })}`).then(value => { if (!cancelled) setPr(value) }).catch(() => { if (!cancelled) setPr({ error: true }) })
     }
     return () => { cancelled = true }
-  }, [view, page, year, orgId, filters.expenseType, filters.departmentId, filters.versionId, filters.month, filters.recordType, filters.unassigned, revision, reloadTick])
+  }, [view, page, year, orgId, JSON.stringify(filters), revision, reloadTick])
 
   useEffect(() => {
     api(`/budget-versions?year=${year}`).then(value => setVersions(value.data ?? { list: [] })).catch(() => setVersions({ list: [] }))
@@ -76,24 +102,26 @@ function BudgetView({ ctx, t }) {
     } catch (error) { setNotice(`${t('opFailed')}: ${error.message}`); return false } finally { setBusy(false) }
   }
 
-  const activeCount = ['expenseType', 'departmentId', 'versionId', 'month', 'recordType'].filter(key => filters[key]).length + (filters.unassigned ? 1 : 0)
+  const activeCount = filters.orgIds.length + filters.departmentIds.length + filters.expenseTypes.length + filters.months.length + (filters.versionId ? 1 : 0) + (filters.recordType ? 1 : 0) + (filters.unassigned ? 1 : 0)
+  const update = patch => { setPage(1); setFilters(current => ({ ...current, ...patch })) }
   const filterBar = h('div', { className: 'sf-filters sf-budget-filters' },
-    view === 'ledger' ? h(Select, { 'aria-label': 'PR 记录类型', value: filters.recordType || '', onChange: value => { setPage(1); setFilters(current => ({ ...current, recordType: value })) }, options: [['SUBMITTED', '已打 PR'], ['ESTIMATED', '预计 PR']], placeholder: '全部 PR 类型' }) : null,
-    h(Select, { value: filters.expenseType, onChange: value => { setPage(1); setFilters(f => ({ ...f, expenseType: value })) }, options: EXPENSE_TYPES.map(([id, label]) => [id, t(label)]), placeholder: t('expenseType') }),
-    h(SearchSelect, { value: filters.departmentId, onChange: value => { setPage(1); setFilters(f => ({ ...f, departmentId: value })) }, options: (departments || []).map(d => [d.id, d.name]), placeholder: t('department') }),
-    h(Select, { value: filters.month, onChange: value => { setPage(1); setFilters(f => ({ ...f, month: value })) }, options: Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1} 月`]), placeholder: t('monthCol') }),
-    view === 'matrix' || view === 'lines' ? h(SearchSelect, { value: filters.versionId, onChange: value => { setPage(1); setFilters(f => ({ ...f, versionId: value })) }, options: (versions?.list || []).map(version => [version.id, budgetVersionLabel(version)]), placeholder: t('version') }) : null,
-    view === 'matrix' || view === 'lines' ? h('label', { className: 'sf-row', style: { gap: 6, fontSize: 12, color: 'var(--sf-ink2)' } },
-      h('input', { type: 'checkbox', checked: filters.unassigned, onChange: event => { setPage(1); setFilters(f => ({ ...f, unassigned: event.target.checked })) } }), t('unassigned')) : null,
-    activeCount > 0 ? h(LinkButton, { onClick: () => { setPage(1); setFilters({ expenseType: '', departmentId: '', versionId: '', recordType: '', month: '', unassigned: false }) } }, `${t('clearFilters')} (${activeCount})`) : null)
+    h(MultiSearchSelect, { value: filters.orgIds, onChange: orgIds => update({ orgIds, unassigned: false }), options: (orgs || []).filter(org => org.type !== 'GROUP').map(org => [org.id, org.name]), placeholder: t('org') }),
+    view === 'ledger' ? h(Select, { 'aria-label': 'PR 记录类型', value: filters.recordType, onChange: recordType => update({ recordType }), options: [['SUBMITTED', '已打 PR'], ['ESTIMATED', '预计 PR']], placeholder: '全部 PR 类型' }) : null,
+    view !== 'ledger' ? h(MultiSearchSelect, { value: filters.expenseTypes, onChange: expenseTypes => update({ expenseTypes }), options: EXPENSE_TYPES.map(([id, label]) => [id, t(label)]), placeholder: t('expenseType') }) : null,
+    view !== 'ledger' ? h(MultiSearchSelect, { value: filters.departmentIds, onChange: departmentIds => update({ departmentIds }), options: (departments || []).map(d => [d.id, d.name]), placeholder: t('department') }) : null,
+    view === 'month' || view === 'ledger' ? h(Select, { 'aria-label': '预算月份', value: filters.month, onChange: month => update({ month, months: month ? [month] : [] }), options: Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1} 月`]), placeholder: t('monthCol') }) : h(MultiSearchSelect, { value: filters.months.map(String), onChange: months => update({ months }), options: Array.from({ length: 12 }, (_, i) => [String(i + 1), `${i + 1} 月`]), placeholder: t('monthCol') }),
+    ['matrix', 'month', 'lines', 'variance'].includes(view) ? h(SearchSelect, { value: filters.versionId, onChange: versionId => update({ versionId }), options: (versions?.list || []).map(version => [version.id, budgetVersionLabel(version)]), placeholder: t('version') }) : null,
+    !filters.orgIds.length && ['matrix', 'month', 'lines', 'variance'].includes(view) ? h('label', { className: 'sf-row' }, h('input', { type: 'checkbox', checked: filters.unassigned, onChange: event => update({ unassigned: event.target.checked }) }), t('unassigned')) : null,
+    activeCount > 0 ? h(LinkButton, { onClick: () => { setPage(1); setFilters(financeBudgetFilters()) } }, `${t('clearFilters')} (${activeCount})`) : null)
+  const visibleBudget = financeBudgetVisible(budget, filters, view)
 
   const savedViewsBar = h('div', { className: 'sf-row' },
     ...(savedViews?.list || []).map(item => h('span', { key: item.id, className: 'sf-pill sf-pill-muted' },
       item.name,
       h(LinkButton, { style: { marginLeft: 6 }, onClick: () => {
         const q = item.query || {}
-        setFilters({ expenseType: q.expenseType || '', departmentId: q.departmentId || '', versionId: q.versionId || '', month: q.month || '', unassigned: q.unassigned === '1' })
-        if (q.view) setView(q.view)
+        setPage(1); setFilters(financeBudgetFilters(q))
+        if (BUDGET_VIEWS.some(([id]) => id === q.view)) setView(q.view)
       } }, t('applyView')),
       h(LinkButton, { style: { marginLeft: 4 }, onClick: () => act(`/saved-views/delete`, { id: item.id }, t('deleted')).then(() => api('/saved-views').then(value => setSavedViews(value.data ?? { list: [] })).catch(() => {})) }, '×'))),
     h(LinkButton, { onClick: () => setDialog({ kind: 'saveView' }) }, t('saveView')))
@@ -103,13 +131,15 @@ function BudgetView({ ctx, t }) {
       h(PillTabs, { tabs: availableViews, value: view, onChange: id => { setView(id); setPage(1) }, t }),
       savedViewsBar),
     budget?.summary?.budgetVersionId === null ? h('p', { role: 'status', className: 'sf-banner sf-banner-amber' }, '当前年度没有已发布预算；空汇总不代表已批准零预算。') : null,
-    h('div', { className: 'sf-row-between' }, filterBar, notice ? h(Notice, null, notice) : null),
+    h('div', { className: 'sf-row-between' }, ['matrix', 'month', 'lines', 'ledger', 'variance'].includes(view) ? filterBar : null, notice ? h(Notice, null, notice) : null),
 
-    view === 'matrix' ? h(MatrixView, { budget, t, onCell: cell => { setFilters(f => ({ ...f, month: cell.month ? String(cell.month) : '' })); setView('lines') } }) : null,
-    view === 'month' ? h(MonthView, { budget, t }) : null,
-    view === 'lines' ? h(LinesView, { budget, page, onPage: setPage, t, onDetail: line => setDialog({ kind: 'lineDetail', line }) }) : null,
+    ['matrix', 'month', 'lines', 'variance'].includes(view) && !budget ? h('p', { role: 'status' }, '预算加载中…') : null,
+    budget?.error ? h(ListLoadError, { label: '预算', onRetry: () => setReloadTick(value => value + 1) }) : null,
+    view === 'matrix' && budget && !budget.error ? h(MatrixView, { budget: visibleBudget, t, onCell: cell => { update({ orgIds: cell.orgId ? [cell.orgId] : [], unassigned: !cell.orgId, departmentIds: cell.departmentId ? [cell.departmentId] : [], expenseTypes: cell.expenseType ? [cell.expenseType] : [], months: [String(cell.month)] }); setView('lines') } }) : null,
+    view === 'month' && budget && !budget.error ? h(MonthView, { budget: visibleBudget, t, month: Number(filters.month || filters.months[0]) || new Date().getMonth() + 1, onMonth: month => update({ month: String(month), months: [String(month)] }) }) : null,
+    view === 'lines' && budget && !budget.error ? h(LinesView, { budget, page, onPage: setPage, t, onDetail: line => setDialog({ kind: 'lineDetail', line }) }) : null,
     view === 'ledger' ? h(LedgerView, { pr, page, onPage: setPage, t }) : null,
-    view === 'variance' ? h(VarianceView, { budget, t }) : null,
+    view === 'variance' && budget && !budget.error ? h(VarianceView, { budget: visibleBudget, t }) : null,
     view === 'adjustments' ? h(AdjustmentsView, { page, onPage: setPage, t, busy, revision, reloadTick, act, onDialog: setDialog }) : null,
     view === 'allocations' ? h(AllocationsView, { query, page, onPage: setPage, t, revision, reloadTick, act, onDialog: setDialog }) : null,
     view === 'versions' ? h(VersionsView, { versions, year, t, revision, reloadTick, act, onDialog: setDialog }) : null,
@@ -119,7 +149,7 @@ function BudgetView({ ctx, t }) {
     dialog?.kind === 'adjCreate' ? h(AdjustCreateDialog, { year, orgs, departments, lines: budget?.lines?.list || [], busy, t, onClose: () => setDialog(null), act }) : null,
     dialog?.kind === 'reason' ? h(ReasonDialog, { title: dialog.title, required: dialog.required, t, onClose: () => setDialog(null), onSubmit: reason => { setDialog(null); return dialog.run(reason) } }) : null,
     dialog?.kind === 'adjDetail' ? h(AdjustDetailDialog, { id: dialog.id, t, onClose: () => setDialog(null) }) : null,
-    dialog?.kind === 'allocPick' ? h(AllocPickDialog, { entry: dialog.entry, availability, t, onClose: () => setDialog(null), act }) : null,
+    dialog?.kind === 'allocPick' ? h(AllocPickDialog, { entry: dialog.entry, availability: dialog.availability, t, onClose: () => setDialog(null), act }) : null,
     dialog?.kind === 'carryover' ? h(CarryoverDialog, { t, onClose: () => setDialog(null), act }) : null,
     dialog?.kind === 'versionDiff' ? h(VersionDiffDialog, { versions, year, t, onClose: () => setDialog(null) }) : null,
   )
@@ -133,8 +163,8 @@ function MatrixView({ budget, t, onCell }) {
   if (!rows.length) return h(EmptyState, null, t('empty'))
   const groups = new Map()
   for (const row of rows) {
-    const key = `${row.orgName ?? t('unassigned')}|${row.expenseType ?? ''}|${row.departmentName ?? ''}`
-    if (!groups.has(key)) groups.set(key, { label: [row.orgName ?? t('unassigned'), row.expenseType ? financeEnumLabel(row.expenseType, t, EXPENSE_LABELS) : '', row.departmentName].filter(Boolean).join(' / '), months: {}, total: { budget: 0, pr: 0, paid: 0, prEstimated: 0 } })
+    const key = `${row.orgId || ''}|${row.expenseType || ''}|${row.departmentId || ''}`
+    if (!groups.has(key)) groups.set(key, { orgId: row.orgId, departmentId: row.departmentId, expenseType: row.expenseType, label: [row.orgName ?? t('unassigned'), row.expenseType ? financeEnumLabel(row.expenseType, t, EXPENSE_LABELS) : '', row.departmentName].filter(Boolean).join(' / '), months: {}, total: { budget: 0, pr: 0, paid: 0, prEstimated: 0 } })
     const group = groups.get(key)
     const month = row.month ?? 0
     group.months[month] = {
@@ -150,7 +180,7 @@ function MatrixView({ budget, t, onCell }) {
   const data = [...groups.values()]
   const columns = [
     { label: t('org'), key: 'label', stickyLeft: true },
-    ...Array.from({ length: 12 }, (_, index) => ({ label: `${index + 1}`, key: 'month-' + (index + 1), sortValue: row => row.months[index + 1]?.pr ?? null, render: row => renderCell(row.months[index + 1], index + 1), num: true })),
+    ...Array.from({ length: 12 }, (_, index) => ({ label: `${index + 1}`, key: 'month-' + (index + 1), sortValue: row => row.months[index + 1]?.pr ?? null, render: row => renderCell(row.months[index + 1], index + 1, row), num: true })),
     { label: t('annualTotal'), key: 'total.budget', sortValue: row => row.total.budget, render: row => wan(row.total.budget) ?? '—', num: true },
     { label: t('kpiPrSubmitted'), key: 'total.pr', sortValue: row => row.total.pr, render: row => wan(row.total.pr) ?? '—', num: true },
     { label: t('kpiPaid'), key: 'total.paid', sortValue: row => row.total.paid, render: row => wan(row.total.paid) ?? '—', num: true },
@@ -163,14 +193,14 @@ function MatrixView({ budget, t, onCell }) {
       },
     },
   ]
-  function renderCell(cell, month) {
-    if (!cell || !cell.budget) return h('span', { style: { color: 'var(--sf-ink3)' } }, '·')
+  function renderCell(cell, month, row) {
+    if (!cell) return h('span', { style: { color: 'var(--sf-ink3)' } }, '·')
     const rate = execRateOf(cell.pr, 0, cell.budget)
     const level = heatLevel(rate)
     return h('a', {
       href: '#', style: { textDecoration: 'none', color: 'inherit' },
       className: level ? `sf-heat sf-heat-${level}` : '',
-      onClick: event => { event.preventDefault(); onCell({ month }) },
+      onClick: event => { event.preventDefault(); onCell({ month, orgId: row.orgId, departmentId: row.departmentId, expenseType: row.expenseType }) },
     }, wan(cell.pr))
   }
   return h(Card, { title: t('budgetSummaryTitle'), unit: t('unitNote') }, h(Table, { tableId: 'finance-MatrixView-1', columns, rows: data, minColumns: 1080, empty: t('empty') }))
@@ -178,8 +208,8 @@ function MatrixView({ budget, t, onCell }) {
 
 // ---- 月度视图 ----
 
-function MonthView({ budget, t }) {
-  const [month, setMonth] = useState(new Date().getMonth() + 1)
+function MonthView({ budget, t, month, onMonth }) {
+  const setMonth = next => onMonth(typeof next === 'function' ? next(month) : next)
   const rows = (budget?.summary?.list || []).filter(row => row.month === month)
   const totals = rows.reduce((acc, row) => {
     acc.budget += finite(row.budgetAmount) ?? 0
@@ -234,7 +264,7 @@ function LinesView({ budget, page, onPage, t, onDetail }) {
       ],
       rows: lines?.list || [], empty: t('empty'), onRowClick: onDetail, rowKey: 'id',
     }),
-    h('div', { className: 'sf-row-between' }, h(LimitNote, { rows: lines?.list, limit: BUDGET_LINE_LIMIT, t }), h(Pager, { page, total: lines?.total, limit: PAGE_SIZE, onPage })))
+    h(Pager, { page, total: lines?.total, limit: PAGE_SIZE, onPage }))
 }
 
 function LineDetailDialog({ line, t, onClose }) {
@@ -455,6 +485,7 @@ function AllocationsView({ query, page, onPage, t, revision, reloadTick, act, on
   const [pool, setPool] = useState(null)
   const [availability, setAvailability] = useState(null)
   const [recent, setRecent] = useState(null)
+  const scope = query()
   useEffect(() => {
     let cancelled = false
     void Promise.all([
@@ -466,7 +497,7 @@ function AllocationsView({ query, page, onPage, t, revision, reloadTick, act, on
       setPool(poolValue.data); setAvailability(availabilityValue.data); setRecent(recentValue.data)
     })
     return () => { cancelled = true }
-  }, [page, revision, reloadTick]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [page, scope, revision, reloadTick]) // eslint-disable-line react-hooks/exhaustive-deps
   const entries = pool?.entries || []
   const recentList = recent?.list || []
   return h('div', { className: 'sf-stack' },
@@ -481,7 +512,7 @@ function AllocationsView({ query, page, onPage, t, revision, reloadTick, act, on
             label: t('actions'), key: 'actions', sortable: false,
             render: row => h('div', { className: 'sf-row', style: { justifyContent: 'flex-end', flexWrap: 'nowrap' } },
               row.suggestions?.[0] ? h(LinkButton, { onClick: () => act('/allocations', { sourceType: row.sourceType, sourceId: row.sourceId, budgetLineId: row.suggestions[0].budgetLineId ?? row.suggestions[0].id, amount: row.amount }) }, t('allocOneClick')) : null,
-              h(LinkButton, { onClick: () => onDialog({ kind: 'allocPick', entry: row }) }, t('allocPick'))),
+              h(LinkButton, { onClick: () => onDialog({ kind: 'allocPick', entry: row, availability }) }, t('allocPick'))),
           },
         ],
         rows: entries, empty: t('empty'),
@@ -623,8 +654,7 @@ function SaveViewDialog({ view, filters, t, onClose, onSaved }) {
   const [name, setName] = useState('')
   const submit = () => {
     if (!name.trim()) return
-    const query = { view }
-    for (const [key, value] of Object.entries(filters)) if (value) query[key] = value
+    const query = financeBudgetSavedQuery(view, filters)
     post('/saved-views', { name: name.trim(), query })
       .then(() => api('/saved-views'))
       .then(value => { onSaved(value.data ?? { list: [] }); onClose() })

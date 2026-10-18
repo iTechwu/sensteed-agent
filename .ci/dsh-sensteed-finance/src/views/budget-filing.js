@@ -6,31 +6,46 @@ const BUDGET_FILING_STAGES = {
 const BUDGET_FILING_ACTIONS = { SUBMIT: '提交初审', INITIAL_APPROVE: '初审通过', FINAL_APPROVE: '终审通过', REJECT: '退回', DELETE: '删除草稿' }
 const budgetFilingMoney = value => Number(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-function financeBudgetRowBody(value, costItems) {
-  if (!(costItems || []).some(item => item.id === value.costItemId)) throw new Error('请选择可用的费用类别')
+function financeBudgetRowBody(value, costItems, card) {
+  let mapping
+  if (card?.configurationRequired) {
+    mapping = card.configurationImported && (card.expenseMappings || []).find(item => item.code === value.expenseMappingCode && item.costItemId === value.costItemId)
+    if (!mapping) throw new Error('请选择本部门可用的年度费用科目与分类')
+  }
+  if (!mapping && !(costItems || []).some(item => item.id === value.costItemId)) throw new Error('请选择可用的费用类别')
   const month = Number(value.month), plannedAmount = Number(value.plannedAmount), description = String(value.description || '').trim()
   if (!Number.isInteger(month) || month < 1 || month > 12) throw new Error('请选择 1 至 12 月的预算月份')
   if (!String(value.plannedAmount ?? '').trim() || !Number.isFinite(plannedAmount) || plannedAmount <= 0 || plannedAmount > 999999999999.99) throw new Error('请填写大于 0 且不超过 999999999999.99 元的金额')
   if (plannedAmount !== Number(plannedAmount.toFixed(2))) throw new Error('金额最多两位小数')
   if (!description || description.length > 500) throw new Error('请填写 1 至 500 字的编制说明')
-  return { costItemId: value.costItemId, month, plannedAmount, description }
+  return { costItemId: value.costItemId, ...(mapping ? { expenseMappingCode: mapping.code } : {}), month, plannedAmount, description }
 }
 
 function BudgetFilingView({ ctx }) {
   const [page, setPage] = useState(1)
   const [notice, setNotice] = useState('')
-  const taskId = ctx.drillParams?.taskId
+  const taskId = ctx.drillParams?.taskId, versionId = ctx.drillParams?.versionId
+  const [versionPage, setVersionPage] = useState(1)
   const query = new URLSearchParams({ page: String(page), limit: '10' })
-  if (!taskId || ctx.drillParams?.year) query.set('year', ctx.year)
+  const linkedWithoutYear = (taskId || versionId) && !ctx.drillParams?.year
+  if (!linkedWithoutYear) query.set('year', ctx.year)
   if (taskId) query.set('taskId', taskId)
+  if (versionId) query.set('versionId', versionId)
   const resource = useFinanceResource(`/finance/budget-filing?${query}`, ctx.revision)
+  const versions = useFinanceResource(`/finance/budget-filing/versions?page=${versionPage}&limit=100${linkedWithoutYear ? '' : `&year=${ctx.year}`}`, ctx.revision)
+  const versionOptions = financeRows(versions.data).map(item => [item.id, `${item.name} · ${financeLabel(item.status)} · ${item.id.slice(0, 8)}`])
+  if (versionId && !versionOptions.some(([id]) => id === versionId)) versionOptions.unshift([versionId, '当前链接版本'])
   useEffect(() => {
     const year = resource.data?.list?.[0]?.year
-    if (taskId && !ctx.drillParams?.year && year) ctx.onNavigate?.('budget-filing', { taskId, year: String(year) })
-  }, [taskId, ctx.drillParams?.year, resource.data])
+    if (linkedWithoutYear && year) ctx.onNavigate?.('budget-filing', { ...(taskId ? { taskId } : {}), ...(versionId ? { versionId } : {}), year: String(year) })
+  }, [taskId, versionId, ctx.drillParams?.year, resource.data])
   return h('div', { className: 'sf-stack' },
     h('p', { className: 'sf-note' }, '本人填报 → 对接人初审 → 负责人终审 → 部门整体提交 → 财务确认'),
-    h('div', { className: 'sf-row' }, h(GhostButton, { disabled: resource.loading, onClick: resource.retry }, '刷新进度'),
+    h('div', { className: 'sf-row' },
+      h(FormRow, { label: '预算版本' }, h(SearchSelect, { buttonTrigger: true, 'aria-label': '预算版本', value: versionId || '', disabled: versions.loading || Boolean(versions.error), options: [['', '全部可访问版本'], ...versionOptions], placeholder: '全部可访问版本', onChange: value => ctx.onNavigate?.('budget-filing', { year: ctx.year, ...(value ? { versionId: value } : {}) }) })),
+      versions.error ? h('span', { role: 'alert' }, '版本列表加载失败', h(GhostButton, { onClick: versions.retry }, '重试版本列表')) : null,
+      versions.data?.total > 100 ? h('div', { className: 'sf-row' }, h(GhostButton, { disabled: versionPage === 1 || versions.loading, onClick: () => setVersionPage(n => n - 1) }, '上一组版本'), h(GhostButton, { disabled: versionPage * 100 >= versions.data.total || versions.loading, onClick: () => setVersionPage(n => n + 1) }, '下一组版本')) : null,
+      h(GhostButton, { disabled: resource.loading, onClick: resource.retry }, '刷新进度'),
       h(GhostButton, { onClick: () => ctx.onNavigate?.('filing', { section: 'assignments', year: ctx.year }) }, '其他填报任务'),
       taskId ? h(GhostButton, { onClick: () => ctx.onNavigate?.('budget-filing', { year: ctx.year }) }, '全部预算活动') : null),
     h('p', { className: 'sf-note' }, '普通员工仅查看和修改本人条目。提交后须完成两级审核；负责人整体提交后，由财务确认纳入本轮预算。'),
@@ -44,6 +59,7 @@ function BudgetFilingView({ ctx }) {
 function BudgetFilingCard({ card, costItems, onRefresh }) {
   const action = useFinanceAction()
   const [dialog, setDialog] = useState(null)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const run = async (path, body, message) => {
     const result = await action.run(path, body)
     if (!result) return false
@@ -53,7 +69,7 @@ function BudgetFilingCard({ card, costItems, onRefresh }) {
     if (['REJECT', 'DELETE'].includes(kind)) { setDialog({ kind: 'decision', row, action: kind }); return }
     try { await run(`/finance/budget-filing/${card.id}/rows`, { action: kind, rowId: row.id, revision: row.revision }, '条目进度已更新') } catch { /* action.notice 保留错误 */ }
   }
-  return h(Card, { title: card.title }, h('div', { className: 'sf-stack' },
+  return h(Card, { title: card.title, actions: [h(GhostButton, { key: 'history', onClick: () => setHistoryOpen(true) }, '预算变动历史')] }, h('div', { className: 'sf-stack' },
     h('p', { className: 'sf-note' }, `${card.year} 年 · ${card.departmentName}${card.orgName ? ' · ' + card.orgName : ''} · ${card.versionName || '未绑定预算版本'}`),
     h('p', { className: 'sf-note' }, `截止 ${new Date(card.dueAt).toLocaleString('zh-CN')} · ${card.taskStatus === 'CLOSED' ? '活动已关闭' : BUDGET_FILING_STAGES[card.status] || card.status}`),
     h('strong', null, `${card.canViewDepartment ? '部门填报合计' : '本人填报合计'}：¥ ${budgetFilingMoney(card.totalAmount)}`),
@@ -63,11 +79,14 @@ function BudgetFilingCard({ card, costItems, onRefresh }) {
     h('div', { role: 'status' }, h(Notice, null, action.notice)),
     !card.rows.length ? h(EmptyState, null, '尚无预算条目，可在开放期间新增本人预算。') : h('ul', { className: 'sf-stack sf-budget-filing-rows' }, ...card.rows.map(row => h('li', { key: row.id, className: 'sf-inline-form sf-stack' },
       h('strong', null, `${row.costItemName} · ${row.month} 月 · ¥ ${budgetFilingMoney(row.plannedAmount)}`),
-      h('p', null, row.description), h('p', { className: 'sf-note' }, `${row.ownerName ? row.ownerName + ' · ' : ''}${BUDGET_FILING_STAGES[row.reviewStatus] || row.reviewStatus}${row.sourceAmount != null ? ' · 原版 ¥ ' + budgetFilingMoney(row.sourceAmount) : ''}`),
+      h('p', null, row.description),
+      row.expenseType ? h('p', { className: 'sf-note' }, `${financeLabel(row.expenseType)}${row.expenseMappingCode ? ' · ' + row.expenseMappingCode : ''}`) : null, h('p', { className: 'sf-note' }, `${row.ownerName ? row.ownerName + ' · ' : ''}${BUDGET_FILING_STAGES[row.reviewStatus] || row.reviewStatus}${row.sourceAmount != null ? ' · 原版 ¥ ' + budgetFilingMoney(row.sourceAmount) : ''}`),
       row.reviewReason ? h('p', null, '退回原因：' + row.reviewReason) : null,
       h('div', { className: 'sf-row' }, ...(row.actions || []).map(kind => kind === 'SAVE' ? h(GhostButton, { key: kind, disabled: action.busy, onClick: () => setDialog({ kind: 'edit', row }) }, '修改')
         : kind === 'ASSIGN_OWNER' ? h(GhostButton, { key: kind, disabled: action.busy, onClick: () => setDialog({ kind: 'owner', row }) }, '指定历史填报人')
           : BUDGET_FILING_ACTIONS[kind] ? h(GhostButton, { key: kind, disabled: action.busy, onClick: () => rowAction(row, kind) }, BUDGET_FILING_ACTIONS[kind]) : null))))),
+    card.canCreate ? h(BudgetFilingExcel, { card, costItems, onRefresh }) : null,
+    historyOpen ? h(BudgetFilingHistory, { id: card.id, onClose: () => setHistoryOpen(false) }) : null,
     h('div', { className: 'sf-row' },
       card.canCreate ? h(GhostButton, { disabled: action.busy, onClick: () => setDialog({ kind: 'edit' }) }, '新增本人预算') : null,
       ...(card.departmentActions || []).map(kind => h(PrimaryButton, { key: kind, busy: action.busy, onClick: () => setDialog({ kind: 'decision', action: kind }) }, kind === 'SUBMIT' ? '提交部门预算' : kind === 'CONFIRM' ? '确认部门预算' : '退回部门预算')),
@@ -81,7 +100,11 @@ function BudgetFilingCard({ card, costItems, onRefresh }) {
 }
 
 function BudgetFilingRowDialog({ card, row, costItems, onClose, onSave }) {
-  const [value, setValue] = useState(() => ({ costItemId: row?.costItemId || '', month: String(row?.month || 1), plannedAmount: String(row?.plannedAmount ?? ''), description: row?.description || '' }))
+  const [value, setValue] = useState(() => ({ costItemId: row?.costItemId || '', month: String(row?.month || 1), plannedAmount: String(row?.plannedAmount ?? ''), description: row?.description || '', expenseMappingCode: row?.expenseMappingCode || '' }))
+  const mappings = card.expenseMappings || []
+  const [level1, setLevel1] = useState(() => mappings.find(item => item.code === row?.expenseMappingCode)?.level1Name || '')
+  const ready = card.configurationRequired ? card.configurationImported && mappings.length > 0 : costItems.length > 0
+  const selectedMapping = mappings.find(item => item.code === value.expenseMappingCode && item.level1Name === level1 && item.costItemId === value.costItemId)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const lock = useRef(false)
@@ -90,7 +113,7 @@ function BudgetFilingRowDialog({ card, row, costItems, onClose, onSave }) {
     event.preventDefault()
     if (lock.current) return
     let body
-    try { body = financeBudgetRowBody(value, costItems) } catch (e) { setError(e.message); return }
+    try { body = financeBudgetRowBody(value, costItems, card) } catch (e) { setError(e.message); return }
     lock.current = true; setBusy(true); setError('')
     try { await onSave({ action: 'SAVE', ...(row ? { rowId: row.id, revision: row.revision } : {}), row: body }) }
     catch (e) { setError(e.message || '保存失败，填写内容已保留，请重试') }
@@ -100,14 +123,20 @@ function BudgetFilingRowDialog({ card, row, costItems, onClose, onSave }) {
     h('form', { onSubmit: save, className: 'sf-stack' },
       h('p', { className: 'sf-note' }, `${card.year} 年 · ${card.departmentName} · ${card.title}`),
       h('fieldset', { disabled: busy, className: 'sf-fieldset sf-form sf-budget-filing-form' },
-        h(FormRow, { label: '费用类别' }, h(SearchSelect, { buttonTrigger: true, value: value.costItemId, onChange: costItemId => update({ costItemId }), options: costItems.map(item => [item.id, item.name]), placeholder: '选择费用类别', disabled: !costItems.length, required: true })),
-        !costItems.length ? h('p', { role: 'status', className: 'sf-note' }, '暂无可用费用类别，请联系财务维护。') : null,
+        card.configurationRequired ? h('div', { className: 'sf-stack' },
+          !ready ? h('p', { role: 'status' }, !card.configurationImported ? `${card.year} 年度配置尚未导入，请联系财务负责人。` : '本部门暂无可用年度费用映射，请联系财务负责人。') : null,
+          h(FormRow, { label: '一级费用类别' }, h(SearchSelect, { buttonTrigger: true, 'aria-label': '一级费用类别', value: level1, disabled: !ready, options: [...new Set(mappings.map(item => item.level1Name))].map(name => [name, name]), placeholder: '选择一级费用类别', onChange: name => { setLevel1(name); update({ costItemId: '', expenseMappingCode: '' }) } })),
+          h(FormRow, { label: '费用科目与分类' }, h(SearchSelect, { buttonTrigger: true, 'aria-label': '费用科目与分类', value: value.expenseMappingCode, disabled: !ready || !level1, options: mappings.filter(item => item.level1Name === level1).map(item => [item.code, `${item.level2Name} · ${financeLabel(item.expenseType)} · ${item.sourceCode}`]), placeholder: '选择费用科目与分类', onChange: code => { const item = mappings.find(item => item.code === code && item.level1Name === level1); if (item) update({ costItemId: item.costItemId, expenseMappingCode: item.code }) } })),
+          selectedMapping ? h('p', { role: 'status' }, '费用分类：' + financeLabel(selectedMapping.expenseType)) : null)
+          : h('div', { className: 'sf-stack' },
+            h(FormRow, { label: '费用类别' }, h(SearchSelect, { buttonTrigger: true, value: value.costItemId, onChange: costItemId => update({ costItemId }), options: costItems.map(item => [item.id, item.name]), placeholder: '选择费用类别', disabled: !ready, required: true })),
+            !ready ? h('p', { role: 'status', className: 'sf-note' }, '暂无可用费用类别，请联系财务维护。') : null),
         h('div', { className: 'sf-form-grid' },
           h(FormRow, { label: '预算月份' }, h(Select, { 'aria-label': '预算月份', value: value.month, onChange: month => update({ month }), options: Array.from({ length: 12 }, (_, i) => [String(i + 1), `${i + 1} 月`]), required: true })),
           h(FormRow, { label: '金额（元）' }, h(Field, { 'aria-label': '金额（元）', type: 'number', min: '0.01', max: '999999999999.99', step: '0.01', value: value.plannedAmount, onChange: plannedAmount => update({ plannedAmount }), required: true }))),
         h(FormRow, { label: '编制说明' }, h(Textarea, { 'aria-label': '编制说明', value: value.description, onChange: description => update({ description }), maxLength: 500, required: true }))),
       error ? h('p', { role: 'alert', className: 'sf-neg' }, error) : null,
-      h('div', { className: 'sf-row' }, h(GhostButton, { disabled: busy, onClick: onClose }, '取消'), h(PrimaryButton, { type: 'submit', busy, disabled: !costItems.length }, busy ? '保存中…' : '保存草稿'))))
+      h('div', { className: 'sf-row' }, h(GhostButton, { disabled: busy, onClick: onClose }, '取消'), h(PrimaryButton, { type: 'submit', busy, disabled: !ready }, busy ? '保存中…' : '保存草稿'))))
 }
 
 function BudgetFilingDecisionDialog({ decision, onClose, onSave }) {
