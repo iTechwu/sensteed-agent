@@ -23,7 +23,7 @@ it('fails closed on absent/mismatched installation or corrupt immutable base', a
  }
  await expect(policy({ ...base, args: ['--help'], verify: async () => { throw Error('corrupt base') } })).rejects.toThrow('corrupt base')
 })
-it('preserves developer and Yootun behavior without enterprise verification', async () => {
+it('preserves developer and non-enterprise brand behavior without enterprise verification', async () => {
  const verify = vi.fn()
  expect(await policy({ ...base, moduleUrl: 'file:///workspace/src/desktop-cli.ts', args: ['chat'], verify })).toBeUndefined()
  expect(await policy({ ...base, brand: 'yootun', args: ['plugin', 'add', 'x'], verify })).toBeUndefined()
