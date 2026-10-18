@@ -9,6 +9,8 @@ import {
   loadManifest,
   normalizeSkillName,
   planSkillTargets,
+  refreshBundledContents,
+  verifyBundled,
 } from '../../scripts/refresh-bundled.mjs'
 
 const REPO_ROOT = resolve(import.meta.dirname, '../..')
@@ -173,5 +175,35 @@ describe('planSkillTargets', () => {
     } finally {
       await rm(dir, { recursive: true, force: true })
     }
+  })
+})
+
+
+describe('filtered sibling refresh', () => {
+  it('preserves another skill from the same repository and prunes only removed entries', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'bundled-sibling-filter-'))
+    const repository = 'https://example.invalid/shared-skills'
+    const skill = (name: string) => ({ name, repository, source: 'sibling', siblingDir: `source/${name}`, snapshotDir: `${BUNDLED_SKILLS_ROOT}/${name}`, resolvedSha: `baseline-${name}` })
+    const entries = [skill('alpha'), skill('beta')]
+    const output = (name: string) => ({ name, kind: 'dir', path: name, repository, resolvedSha: `baseline-${name}` })
+    const save = async (path: string, text: string) => { await mkdir(resolve(root, path, '..'), { recursive: true }); await writeFile(join(root, path), text) }
+    try {
+      await save('bundled.json', JSON.stringify({ version: 1, skills: entries, plugins: [] }))
+      await save(BUNDLED_MANIFEST, JSON.stringify({ schemaVersion: 1, skills: ['alpha', 'beta', 'removed'].map(output) }))
+      for (const name of ['alpha', 'beta', 'removed']) await save(`${BUNDLED_SKILLS_ROOT}/${name}/SKILL.md`, `old-${name}`)
+      await save('source/alpha/SKILL.md', 'new-alpha')
+      // beta has no source checkout: the filtered run must neither fetch nor prune it.
+      const result = await refreshBundledContents(root, { network: false, select: (kind, name) => kind === 'skill' && name === 'alpha', log() {} })
+      expect(result.refreshed).toEqual(['alpha'])
+      expect(result.degraded).toEqual([])
+      expect(await readFile(join(root, BUNDLED_SKILLS_ROOT, 'alpha/SKILL.md'), 'utf8')).toBe('new-alpha')
+      expect(await readFile(join(root, BUNDLED_SKILLS_ROOT, 'beta/SKILL.md'), 'utf8')).toBe('old-beta')
+      expect(existsSync(join(root, BUNDLED_SKILLS_ROOT, 'removed'))).toBe(false)
+      const derived = JSON.parse(await readFile(join(root, BUNDLED_MANIFEST), 'utf8'))
+      expect(derived.skills.map((entry: { name: string }) => entry.name).sort()).toEqual(['alpha', 'beta'])
+      expect(derived.skills.find((entry: { name: string }) => entry.name === 'beta')).toEqual(output('beta'))
+      expect((await loadManifest(root)).skills).toEqual(entries)
+      expect(await verifyBundled(root)).toEqual([])
+    } finally { await rm(root, { recursive: true, force: true }) }
   })
 })
