@@ -66,7 +66,7 @@ export function apply(ctx: Context): void {
 }
 
 /** Own each process handle so a stale cancellation cannot kill its successor. */
-export function createPackageRunner(invocation: ProfilePnpmInvocation, directory: string) {
+export function createPackageRunner(invocation: ProfilePnpmInvocation, directory: string, forceKillDelayMs = 2_000) {
   let active: { cancel(): void; done: Promise<unknown> } | undefined
   let disposed = false
   function start(args: readonly string[], cwd: string, signal?: AbortSignal, env: NodeJS.ProcessEnv = {}) {
@@ -93,7 +93,7 @@ export function createPackageRunner(invocation: ProfilePnpmInvocation, directory
     const cancel = (): void => {
       if (settled || killTimer) return
       kill('SIGTERM')
-      killTimer = setTimeout(() => kill('SIGKILL'), 2_000)
+      killTimer = setTimeout(() => kill('SIGKILL'), forceKillDelayMs)
       killTimer.unref()
     }
     const done = new Promise<{ exitCode: number | null; signal: NodeJS.Signals | null }>((resolve, reject) => {

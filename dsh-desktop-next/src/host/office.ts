@@ -43,7 +43,7 @@ export function resolveOfficeConfig(runtimeDir: string, source: string | undefin
 }
 
 /**
- * Enable offline Office authoring and structural checks in the Next profile.
+ * Enable offline Office authoring and LibreOffice Kit operations in the Next profile.
  * @param ctx - Profile scope; child plugins declare their own service requirements.
  * @param config - Bundled payload source and installation root.
  */

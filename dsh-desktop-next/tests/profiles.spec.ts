@@ -4,7 +4,8 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, expect, it, vi } from 'vitest'
 import { composeEntries, loadOverlayPatches, loadProfileDirectory, OPTIONAL_BUNDLES } from '@deepseek-ai/dsh-app-boot'
-import { AA_PACKAGE, COMMUNITY_MARKET_PACKAGE, DSH_MARKET_PACKAGE, loadNextProfile, NEXT_PACKAGE, NextProfiles, profileName, readNextProfilePatches, WEB_BUNDLES } from '../src/profiles.ts'
+import { AA_PACKAGE, COMMUNITY_MARKET_PACKAGE, DSH_MARKET_PACKAGE, loadNextProfile, NEXT_PACKAGE, NextProfiles, OFFICIAL_MARKET_PACKAGE, profileName, readNextProfilePatches, WEB_BUNDLES } from '../src/profiles.ts'
+import { DEFAULT_OFFICIAL_MARKET_INDEX_URL } from '../src/profile-plugin-market.ts'
 import * as privateFiles from '../src/private-files.ts'
 import * as linkProjections from '../../dsh-plugin-desktop/src/link-projections.ts'
 
@@ -111,6 +112,26 @@ it('records onboarding per Profile together with its plugin choices and retains 
   expect(manager.onboardingRequired('desktop')).toBe(false)
 })
 
+it('enables the official custom plugin market bundle and preconfigures the built-in dsh-market index source on onboarding', () => {
+  const manager = profiles()
+  const dir = manager.ensure('desktop')
+  const patchPath = join(dir, 'cordis.patch.yml')
+  writeFileSync(patchPath, `# keep comment\n- id: plugin-market\n  name: '@deepseek-ai/dsh-plugin-market'\n  config:\n    indexes:\n      - https://example.com/custom-index.json\n`)
+  manager.finishOnboarding('desktop', { features: { market: false, officialMarket: true, remoteControl: false }, computerUse: false })
+  expect(manager.features('desktop')).toEqual({ market: false, officialMarket: true, remoteControl: false })
+  const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'))
+  expect(manifest.dsh.profile.bundles).toContain(OFFICIAL_MARKET_PACKAGE)
+  expect(manifest.dsh.profile.bundles).not.toContain(COMMUNITY_MARKET_PACKAGE)
+  expect(manifest.dsh.profile.bundles).not.toContain(DSH_MARKET_PACKAGE)
+  const saved = readFileSync(patchPath, 'utf8')
+  expect(saved).toContain('# keep comment')
+  const profile = loadNextProfile(dir, manager.home)
+  const rows = composeEntries([...profile.layers.map(layer => layer.patches), profile.patches])
+  expect(rows.find(row => row.id === 'plugin-market')?.config).toEqual({
+    indexes: [DEFAULT_OFFICIAL_MARKET_INDEX_URL, 'https://example.com/custom-index.json'],
+  })
+})
+
 it('skips onboarding without changing current choices, while a recreated Profile starts fresh', () => {
   const manager = profiles()
   const dir = manager.create('work')
@@ -131,6 +152,8 @@ it('skips onboarding without changing current choices, while a recreated Profile
 
 it.each([
   { market: true, dshMarket: true, remoteControl: false },
+  { market: true, officialMarket: true, remoteControl: false },
+  { market: false, dshMarket: true, officialMarket: true, remoteControl: false },
   { market: true, remoteControl: 'yes' },
   { market: false, remoteControl: false, extra: true },
 ])('leaves onboarding incomplete and configuration untouched on invalid choices %j', value => {

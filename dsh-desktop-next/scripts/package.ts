@@ -1,3 +1,4 @@
+import { refreshBundledForPackaging } from '../../dsh-plugin-desktop/scripts/refresh-bundled-cli.ts'
 /** Next entry points reuse Stable/Beta's native packaging and credential boundaries. */
 import { spawnSync } from 'node:child_process'
 import { readFileSync, rmSync } from 'node:fs'
@@ -9,7 +10,6 @@ import { releaseMac } from '../../dsh-plugin-desktop/scripts/release-mac.ts'
 import { adaptMacReleaseEnvironment, assertMacReleaseReady, withoutMacReleaseSecrets } from '../../dsh-plugin-desktop/scripts/release-preflight.ts'
 import { packageMacSmoke } from '../../dsh-plugin-desktop/scripts/package-mac.ts'
 import { createWindowsPackageOptions, packageWindowsInstaller } from '../../dsh-plugin-desktop/scripts/package-win.ts'
-import { refreshBundledForPackaging } from '../../dsh-plugin-desktop/scripts/refresh-bundled-cli.ts'
 import { prepareNextMacRuntime } from './mac-runtime.ts'
 import { runNextPackagingCommand } from './packaging-command.ts'
 import { expectedNextVersion, nextRuntimeBuildPaths, nextRuntimeTargets, prepareNextRuntime, primaryRuntimeDirectory, smokeNextRuntime, verifyNextRuntimeTree } from './prepare-runtime.ts'

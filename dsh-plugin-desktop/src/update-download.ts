@@ -7,8 +7,8 @@ import { writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 import {
   compareSemVerVersions,
   DESKTOP_RELEASE_CHANNEL_HEADER,
-  parseCanonicalChannelVersion,
   parseCanonicalSupportedVersion,
+  parseCanonicalUpdateVersion,
   type DesktopReleaseChannel,
 } from './update-checker.ts'
 
@@ -291,7 +291,7 @@ function validatedPlatform(platform: DesktopDownloadPlatform): DesktopDownloadPl
 }
 
 function validatedVersion(version: string, channel: DesktopReleaseChannel = 'stable'): string {
-  if (parseCanonicalChannelVersion(version, channel) === null) {
+  if (parseCanonicalUpdateVersion(version, channel) === null) {
     throw new UpdateDownloadError('invalid-options', `The update version must match the ${channel} channel.`)
   }
   return version

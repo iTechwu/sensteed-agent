@@ -735,6 +735,8 @@ describe('Desktop settings Slot registration', () => {
       platform,
       initialMode: 'compatibility',
       setMode: expect.any(Function),
+      capabilities: { pluginSelectors: false },
+      openPlugins: expect.any(Function),
     })
     expect(component).toBe(DesktopSettingsSection)
 
@@ -753,7 +755,15 @@ describe('Desktop settings Slot registration', () => {
     expect(inject).toHaveBeenCalledWith('plugins.bundle.hidden', expect.any(Function))
     expect(register).toHaveBeenNthCalledWith(3, {
       name: 'plugins.bundle.hidden',
+      key: 'dsh-community-market',
+    }, expect.any(Function))
+    expect(register).toHaveBeenNthCalledWith(4, {
+      name: 'plugins.bundle.hidden',
       key: 'dshmarket',
+    }, expect.any(Function))
+    expect(register).toHaveBeenNthCalledWith(5, {
+      name: 'plugins.bundle.hidden',
+      key: '@agents-anywhere/dsh-bridge-next',
     }, expect.any(Function))
     await control.setMode('extended')
     expect(scope.set).toHaveBeenCalledWith('mode', 'extended')

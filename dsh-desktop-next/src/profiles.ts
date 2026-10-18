@@ -9,6 +9,7 @@ import { atomicJson, atomicText, readPrivateFile } from './private-files.ts'
 import { NextRecovery } from './recovery.ts'
 import { DEFAULT_PROFILE } from './desktop-contract.ts'
 import { computerUsePatch } from './profile-computer-use.ts'
+import { pluginMarketPatch } from './profile-plugin-market.ts'
 import { RETIRED_SCHEDULE_BUNDLE, retiredSchedulePatch } from './profile-schedule.ts'
 import { removeLinkProjectionsSafely } from '../../dsh-plugin-desktop/src/link-projections.ts'
 import { insideArchive, unpackedPath } from './asar-archive-policy.ts'
@@ -19,8 +20,9 @@ const NEXT_BUNDLE_PATCH = fileURLToPath(new URL('../cordis.patch.yml', import.me
 export const AA_PACKAGE = '@agents-anywhere/dsh-bridge-next'
 export const COMMUNITY_MARKET_PACKAGE = 'dsh-community-market'
 export const DSH_MARKET_PACKAGE = 'dshmarket'
+export const OFFICIAL_MARKET_PACKAGE = '@deepseek-ai/dsh-experimental-plugin-market-bundle'
 /** Legacy shell shape, now projected from the standard Profile bundle selection. */
-export interface Features { remoteControl: boolean; market: boolean; dshMarket?: boolean }
+export interface Features { remoteControl: boolean; market: boolean; dshMarket?: boolean; officialMarket?: boolean }
 export interface OnboardingChoices { features: Features; computerUse: boolean }
 export const DEFAULT_FEATURES: Readonly<Features> = { remoteControl: false, market: false }
 
@@ -41,10 +43,10 @@ interface ProfileManifest {
 }
 
 function applyFeatures(manifest: ProfileManifest, features: Features): void {
-  const optional = [AA_PACKAGE, COMMUNITY_MARKET_PACKAGE, DSH_MARKET_PACKAGE]
+  const optional = [AA_PACKAGE, COMMUNITY_MARKET_PACKAGE, DSH_MARKET_PACKAGE, OFFICIAL_MARKET_PACKAGE]
   manifest.dsh.profile.bundles = [...manifest.dsh.profile.bundles.filter(name => !optional.includes(name)),
     ...(features.market ? [COMMUNITY_MARKET_PACKAGE] : []), ...(features.dshMarket ? [DSH_MARKET_PACKAGE] : []),
-    ...(features.remoteControl ? [AA_PACKAGE] : [])]
+    ...(features.officialMarket ? [OFFICIAL_MARKET_PACKAGE] : []), ...(features.remoteControl ? [AA_PACKAGE] : [])]
   manifest.dsh.desktopNextPlugins = 1
 }
 
@@ -61,8 +63,14 @@ export function parseFeatures(value: unknown): Features {
   const features = value as Record<string, unknown>
   if (typeof features.remoteControl !== 'boolean' || typeof features.market !== 'boolean'
     || (features.dshMarket !== undefined && typeof features.dshMarket !== 'boolean')
-    || Object.keys(features).some(key => !['remoteControl', 'market', 'dshMarket'].includes(key))) throw new Error('Invalid Next features')
-  return { remoteControl: features.remoteControl, market: features.market, ...(features.dshMarket ? { dshMarket: true } : {}) }
+    || (features.officialMarket !== undefined && typeof features.officialMarket !== 'boolean')
+    || Object.keys(features).some(key => !['remoteControl', 'market', 'dshMarket', 'officialMarket'].includes(key))) throw new Error('Invalid Next features')
+  return {
+    remoteControl: features.remoteControl,
+    market: features.market,
+    ...(features.dshMarket ? { dshMarket: true } : {}),
+    ...(features.officialMarket ? { officialMarket: true } : {}),
+  }
 }
 
 export class NextProfiles {
@@ -140,7 +148,8 @@ export class NextProfiles {
     if (manifest.dsh.desktopNextPlugins === 1 || !manifest.dsh.profile.bundles.includes('dsh-desktop-next')) {
       const bundles = manifest.dsh.profile.bundles
       return { remoteControl: bundles.includes(AA_PACKAGE), market: bundles.includes(COMMUNITY_MARKET_PACKAGE),
-        ...(bundles.includes(DSH_MARKET_PACKAGE) ? { dshMarket: true } : {}) }
+        ...(bundles.includes(DSH_MARKET_PACKAGE) ? { dshMarket: true } : {}),
+        ...(bundles.includes(OFFICIAL_MARKET_PACKAGE) ? { officialMarket: true } : {}) }
     }
     const file = join(this.directory(name), 'desktop-next.features.json')
     const text = readPrivateFile(file)
@@ -180,10 +189,11 @@ export class NextProfiles {
         || Object.keys(value).some(key => !['features', 'computerUse'].includes(key))) throw new Error('Invalid onboarding choices')
       const choices = value as Record<string, unknown>
       const features = parseFeatures(choices.features)
-      if (features.market && features.dshMarket) throw new Error('Select only one plugin market')
+      if ([features.market, features.dshMarket, features.officialMarket].filter(Boolean).length > 1) throw new Error('Select only one plugin market')
       if (typeof choices.computerUse !== 'boolean') throw new Error('Invalid Computer Use choice')
       originalPatch = readPrivateFile(patchPath)
       nextPatch = computerUsePatch(originalPatch ?? '[]\n', choices.computerUse).text
+      if (features.officialMarket) nextPatch = pluginMarketPatch(nextPatch, true).text
       applyFeatures(manifest, features)
     }
     manifest.dsh.desktopNextOnboarding = { version: 1, outcome: value === undefined ? 'skipped' : 'completed',
@@ -205,7 +215,11 @@ export class NextProfiles {
   migrateFeatures(name: string): void {
     const manifest = this.manifest(name)
     if (manifest.dsh.desktopNextPlugins === 1) return
-    this.setFeatures(name, { ...this.features(name), dshMarket: manifest.dsh.profile.bundles.includes(DSH_MARKET_PACKAGE) })
+    this.setFeatures(name, {
+      ...this.features(name),
+      dshMarket: manifest.dsh.profile.bundles.includes(DSH_MARKET_PACKAGE),
+      officialMarket: manifest.dsh.profile.bundles.includes(OFFICIAL_MARKET_PACKAGE),
+    })
   }
   /**
    * Once per Profile: upstream retired the Scheduled Tasks bundle and the Web

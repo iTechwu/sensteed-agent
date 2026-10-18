@@ -1596,7 +1596,7 @@ async function start(): Promise<void> {
           desktopProfilePreferencesFromSettings(
             setupResult.selection,
             setupResult.selection.notifications,
-            setupResult.selection.market,
+            setupResult.selection.market as DesktopMarketProvider,
             setupResult.selection.aaEnabled === true,
           ),
         )
@@ -1608,7 +1608,7 @@ async function start(): Promise<void> {
           networkExposure: setupResult.selection.networkExposure,
           notifications: setupResult.selection.notifications,
         })
-        await selectDesktopMarketProvider(marketUserDataDir, setupResult.selection.market)
+        await selectDesktopMarketProvider(marketUserDataDir, setupResult.selection.market as DesktopMarketProvider)
         marketSelection = readDesktopMarketStateForUserData(marketUserDataDir)
         prepared = prepareDesktopProfile(
           process.env.DSH_TELEMETRY_DISABLED,
@@ -1625,8 +1625,7 @@ async function start(): Promise<void> {
           'completed',
           setupWizardVersions,
         )
-      }
-    }
+      }    }
     if (profileCheckpoint === undefined) {
       try {
         profileCheckpoint = new DesktopProfileCheckpoint({
@@ -1858,6 +1857,7 @@ async function start(): Promise<void> {
       }
       startupStage = 'host-boot'
       lifecycleRecorder.transitionStartupStage(startupStage)
+      let effectiveMarket = prepared.market.effective
       const releasePackageResolver = installProfilePackageResolver(prepared.bareModuleBaseUrl)
       // Same pluginPackages contract as the isolated Host: the compatibility
       // preflight must judge rows against this installation's versions, not
@@ -1907,14 +1907,12 @@ async function start(): Promise<void> {
             requestRestart: () => runtime.requestRestart(),
             confirmRestart: acknowledge => runtime.confirmRestart(acknowledge),
           })
-          if (prepared.market.effective === 'community-market') {
-            await hostCtx.plugin(DesktopPluginsService, {
-              profileName: activeProfileName,
-              homeDir,
-              statePath: pluginManagementStatePath,
-              installAnchor: desktopInstallAnchor(),
-            })
-          }
+          await hostCtx.plugin(DesktopPluginsService, {
+            profileName: activeProfileName,
+            homeDir,
+            statePath: pluginManagementStatePath,
+            installAnchor: desktopInstallAnchor(),
+          })
           if (logSink !== undefined) {
             fileExporter = new FileExporter(logSink)
             hostCtx.logger.exporter(fileExporter)
@@ -1980,13 +1978,11 @@ async function start(): Promise<void> {
           }, 'dsh-plugin-desktop: pending Desktop settings restart')
           const readMarket = () => desktopMarketSnapshotWithEffective(
             desktopProfileMarketSnapshot(currentProfilePreferences.market),
-            prepared.market.effective,
-          )
+            prepared.market.effective,          )
           hostCtx.provide('desktopSettingsController', new DesktopSettingsController({
             profiles: hostCtx.desktopProfiles,
             readMarket,
-            readAa: () => ({ requested: currentProfilePreferences.aaEnabled === true, effective: prepared.aaEnabled }),
-            selectAa: async enabled => {
+            readAa: () => ({ requested: currentProfilePreferences.aaEnabled === true, effective: prepared.aaEnabled }),            selectAa: async enabled => {
               await enqueueProfilePreferencesWrite(current => desktopProfilePreferencesFromSettings(
                 current,
                 current.notifications,
@@ -2025,7 +2021,7 @@ async function start(): Promise<void> {
               ))
               return desktopMarketSnapshotWithEffective(
                 await selectDesktopMarketProvider(marketUserDataDir, provider),
-                prepared.market.effective,
+                effectiveMarket,
               )
             },
             scheduleRestart: scheduleSettingsRestart,

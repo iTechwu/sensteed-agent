@@ -24,6 +24,8 @@ export interface DesktopNativeCopy {
   readonly updateAvailableTitle: string
   readonly updateAvailableMessage: (version: string) => string
   readonly downloadUpdate: string
+  readonly installNext: string
+  readonly macNextInstallInstructions: string
   readonly installStableAlongsideBeta: string
   readonly download: string
   readonly later: string
@@ -103,6 +105,8 @@ const COPY: Record<DesktopLocale, DesktopNativeCopy> = {
     updateAvailableTitle: `${PRODUCT_NAME} Update Available`,
     updateAvailableMessage: version => `${PRODUCT_NAME} ${version} is available.`,
     downloadUpdate: 'Download this update now?',
+    installNext: 'Download Sensteed Agent Next, the successor to the current stable desktop app? It installs as a separate app.',
+    macNextInstallInstructions: 'The disk image has opened. Drag Sensteed Agent Next into Applications, then open Sensteed Agent Next.',
     installStableAlongsideBeta: 'Install the stable edition alongside Sensteed Agent Beta? The Beta app will remain installed.',
     download: 'Download',
     later: 'Later',
@@ -180,6 +184,8 @@ const COPY: Record<DesktopLocale, DesktopNativeCopy> = {
     updateAvailableTitle: `${PRODUCT_NAME} 有可用更新`,
     updateAvailableMessage: version => `${PRODUCT_NAME} ${version} 已可用。`,
     downloadUpdate: '现在下载此更新？',
+    installNext: '是否下载 Sensteed Agent Next？它将接替当前稳定版桌面端，将作为独立应用安装。',
+    macNextInstallInstructions: '磁盘映像已打开。请将 Sensteed Agent Next 拖入“应用程序”，然后打开 Sensteed Agent Next。',
     installStableAlongsideBeta: '是否同时安装稳定版？Sensteed Agent Beta 将继续保留。',
     download: '下载',
     later: '稍后',

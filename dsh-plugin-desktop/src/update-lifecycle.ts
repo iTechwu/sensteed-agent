@@ -13,6 +13,7 @@ import { desktopTrayLabel } from './tray-locale.ts'
 import { BRAND_DISPLAY_NAME } from './generated-product-identity.ts'
 import {
   checkForDesktopUpdate,
+  parseSemVer,
   parseCanonicalChannelVersion,
   type DesktopReleaseChannel,
   type UpdateCheckResult,
@@ -383,7 +384,12 @@ function renderState(state: UpdateStateV3): string {
 
 function isSupportedVersion(value: unknown): value is string {
   if (typeof value !== 'string') return false
-  return parseCanonicalChannelVersion(value, 'stable') !== null || parseCanonicalChannelVersion(value, 'beta') !== null
+  const parsed = parseSemVer(value)
+  const supportedPrerelease = parsed?.prerelease.length === 0
+    || (parsed?.prerelease.length === 2
+      && parsed.prerelease[0] === 'beta'
+      && /^[0-9]+$/u.test(parsed.prerelease[1]!))
+  return parsed !== null && (supportedPrerelease || parseCanonicalChannelVersion(value, 'next') !== null) && parsed.version === value
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

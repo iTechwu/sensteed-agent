@@ -11,6 +11,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 }
 
 export const zh = {
+  language: 'zh',
   loggingTitle: '日志',
   developerLogging: '开发者日志',
   developerLoggingBody: '立即记录模型、工具、重试、HTTP、进程通信和界面诊断的元数据，不主动采集提示词、工具参数或响应正文；日志会随诊断 ZIP 导出。会话事件可按序号与官方 Session Log 对照。',
@@ -49,7 +50,8 @@ export const zh = {
   searchSaved: 'Search API Key 已保存，可直接调用 DeepSeek Search。',
   showSearchKey: '显示 Search API Key',
   hideSearchKey: '隐藏 Search API Key',
-  loading: '正在读取桌面设置…',
+  pluginSettingsMovedNotice: '插件市场和远程控制设置已移至插件页面。',
+  goToPlugins: '前往插件页面',  loading: '正在读取桌面设置…',
   retry: '重试',
   unavailable: '暂时无法读取桌面设置。',
   operationFailed: '暂时无法完成这项操作，请稍后重试。',
@@ -159,6 +161,7 @@ export const zh = {
 export type DesktopSettingsLocaleKey = keyof typeof zh
 
 export const en: Record<DesktopSettingsLocaleKey, string> = {
+  language: 'en',
   loggingTitle: 'Logging',
   developerLogging: 'Developer logging',
   developerLoggingBody: 'Trace model, tool, retry, HTTP, IPC and UI metadata immediately. Prompts, tool arguments and response bodies are not collected by these observers. Logs are included in diagnostic ZIP exports. Match session events to the official Session Log by sequence number.',
@@ -197,7 +200,8 @@ export const en: Record<DesktopSettingsLocaleKey, string> = {
   searchSaved: 'Search API Key saved. DeepSeek Search is ready for new calls.',
   showSearchKey: 'Show Search API Key',
   hideSearchKey: 'Hide Search API Key',
-  loading: 'Loading Desktop settings…',
+  pluginSettingsMovedNotice: 'Plugin market and remote control settings have moved to the Plugins page.',
+  goToPlugins: 'Go to Plugins',  loading: 'Loading Desktop settings…',
   retry: 'Try again',
   unavailable: 'Desktop settings are temporarily unavailable.',
   operationFailed: 'This action could not be completed. Please try again shortly.',

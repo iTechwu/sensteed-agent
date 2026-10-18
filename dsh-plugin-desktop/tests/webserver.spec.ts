@@ -75,10 +75,10 @@ describe('Desktop WebServer port policy', () => {
     const context = new Context()
     contexts.push(context)
 
-    // 上游 host-webserver 先于 Desktop 守卫硬拒绝通配地址;Desktop 的 loopback
-    // 守卫仍在(非通配非回环时触发)。这里断言拒绝发生即可。
+    // dsh 0.2.1-alpha.2's webserver schema rejects wildcard binds before the
+    // Desktop policy runs; either refusal keeps the bind closed.
     await expect(context.plugin(DesktopWebServer, { host: '0.0.0.0', port: 0 }))
-      .rejects.toThrow(/unspecified \(wildcard\) address|requires loopback until LAN HTTPS/)
+      .rejects.toThrow(/requires loopback until LAN HTTPS is available|unspecified \(wildcard\) address, which is not supported/u)
   })
 
   it('increments only after the requested loopback bind reports EADDRINUSE', async () => {
@@ -171,10 +171,8 @@ describe('Desktop WebServer browser gate', () => {
       },
     })
 
-    const { port } = server
-    if (port === undefined) throw new Error('web server did not report a listening port')
-    await expect(requestUpgrade(port, '/socket')).resolves.toContain('403 Forbidden')
-    await expect(requestUpgrade(port, '/socket', {
+    await expect(requestUpgrade(server.port!, '/socket')).resolves.toContain('403 Forbidden')
+    await expect(requestUpgrade(server.port!, '/socket', {
       [access.rendererHeader.name]: access.rendererHeader.value,
     })).resolves.toContain('101 Switching Protocols')
   })
