@@ -16,7 +16,7 @@ import {
   PackageOverlayNotFoundError,
   type PackageOverlayCandidate,
 } from './package-overlay.ts'
-import type { HubManagedPackageSelection } from './hub-generation-store.ts'
+import { hubManagedPackageManifest, hubManagedResolutionAnchor, type HubManagedPackageSelection } from './hub-generation-store.ts'
 import { retainAsarModuleResolver } from './asar-module-resolver-state.ts'
 
 const LOADER_ENTRY_URL = import.meta.resolve('@deepseek-ai/cordis-plugin-loader')
@@ -376,7 +376,10 @@ function selectedOverlayCandidate(
   // while this process is alive.
   if (overlay === undefined) throw new PackageOverlayNotFoundError(packageName)
   let selected = overlay.selected
+  const exactManagedManifest = registration.managedSelection === undefined ? undefined
+    : hubManagedPackageManifest(registration.managedSelection, packageName, registration.profileDirectory)
   if (overlay.selected.source === 'profile'
+    && exactManagedManifest !== overlay.selected.manifestPath
     && !isLexicallyWithin(join(registration.profileDirectory, 'node_modules'), overlay.selected.manifestPath)) {
     // findPackageJSON follows Node's ordinary ancestor walk. Only the exact
     // active Profile node_modules tree is an overlay candidate; accepting a
@@ -412,6 +415,12 @@ function track(
   registration.moduleSources.set(canonical, source)
 }
 
+function managedAnchor(registration: ProfileResolverRegistration, specifier: string, source: ModuleSource): string | undefined {
+  const name = resolvablePackageName(specifier)
+  return source === 'profile' && name !== undefined && registration.managedSelection !== undefined
+    ? hubManagedResolutionAnchor(registration.managedSelection, name, registration.profileDirectory) : undefined
+}
+
 function resolveFromAnchor(
   state: ProcessResolverState,
   registration: ProfileResolverRegistration,
@@ -420,10 +429,11 @@ function resolveFromAnchor(
   context: Parameters<ResolveHookSync>[1],
   nextResolve: Parameters<ResolveHookSync>[2],
 ): ReturnType<ResolveHookSync> {
+  const exactAnchor = managedAnchor(registration, specifier, source)
   if (!context.conditions?.includes('require')) {
     return nextResolve(specifier, {
       ...context,
-      parentURL: source === 'profile' ? registration.profileBaseUrl : DESKTOP_ENTRY_URL,
+      parentURL: exactAnchor === undefined ? (source === 'profile' ? registration.profileBaseUrl : DESKTOP_ENTRY_URL) : pathToFileURL(exactAnchor).href,
     })
   }
   // Node's synchronous hook observes require/createRequire, but its CJS
@@ -433,7 +443,7 @@ function resolveFromAnchor(
   // the nested require.resolve call from re-entering our own policy.
   state.bypassDepth += 1
   try {
-    const require = source === 'profile' ? registration.profileRequire : DESKTOP_REQUIRE
+    const require = exactAnchor === undefined ? (source === 'profile' ? registration.profileRequire : DESKTOP_REQUIRE) : createRequire(exactAnchor)
     return {
       url: pathToFileURL(require.resolve(specifier)).href,
       shortCircuit: true,
@@ -451,7 +461,8 @@ function resolveCommonJsFromAnchor(
 ): string {
   state.bypassDepth += 1
   try {
-    const require = source === 'profile' ? registration.profileRequire : DESKTOP_REQUIRE
+    const exactAnchor = managedAnchor(registration, request, source)
+    const require = exactAnchor === undefined ? (source === 'profile' ? registration.profileRequire : DESKTOP_REQUIRE) : createRequire(exactAnchor)
     return require.resolve(request)
   } finally {
     state.bypassDepth -= 1

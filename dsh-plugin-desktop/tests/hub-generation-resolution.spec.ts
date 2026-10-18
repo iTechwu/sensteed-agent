@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { pathToFileURL } from 'node:url'
 import { findOverlayPackage } from '../src/package-overlay.ts'
 import { HUB_GENERATION_ORIGIN, HubGenerationStore, type HubGenerationDescriptor, type HubManagedPackageSelection } from '../src/hub-generation-store.ts'
+import { hubGenerationBootReference, reopenHubGenerationBoot } from '../src/hub-generation-boot.ts'
 import { hubPackageIsHostOwned } from '../src/hub-base-ownership.ts'
 const roots: string[] = []
 const hash = (text: string) => createHash('sha256').update(text).digest('hex')
@@ -73,6 +74,17 @@ describe('exact managed package selection', () => {
     expect(findOverlayPackage('react', options)?.selected.version).toBe('1.0.0')
     rmSync(join(base, 'node_modules/react'), { recursive: true })
     expect(findOverlayPackage('react', options)).toBeUndefined()
+  })
+  it('reopens serialized boot facts against launcher-owned identity and a stable logical Profile', async () => {
+    const { store, root, options, gen } = await fixture('1.0.0')
+    const logical = join(root, 'logical-profile'); mkdirSync(logical, { mode: 0o700 })
+    const reference = JSON.parse(JSON.stringify(hubGenerationBootReference(store, logical)))
+    const boot = reopenHubGenerationBoot(reference, store.identity, logical)
+    expect(boot.skillsRoot).toBe(join(gen, 'skills'))
+    expect(findOverlayPackage('extension', { ...options, profilePackageUrl: pathToFileURL(join(logical, 'package.json')).href, managedSelection: boot.selection })?.selected.manifestPath).toBe(join(gen, 'profile/node_modules/extension/package.json'))
+    expect(() => reopenHubGenerationBoot(reference, { ...store.identity, actorRef: 'other' }, logical)).toThrow('boot reference')
+    expect(() => reopenHubGenerationBoot(reference, store.identity, join(root, 'other'))).toThrow('boot reference')
+    expect(() => reopenHubGenerationBoot({ ...reference, generationId: 'stale' }, store.identity, logical)).toThrow('boot reference')
   })
   it('keeps ordinary Profile version selection unchanged', async () => {
     const { options } = await fixture('1.0.0')

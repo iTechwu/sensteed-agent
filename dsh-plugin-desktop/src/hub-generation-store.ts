@@ -52,7 +52,7 @@ export interface HubGenerationState {
 declare const managedSelectionBrand: unique symbol
 /** Opaque runtime capability. Only a revalidated active store can mint one. */
 export interface HubManagedPackageSelection { readonly [managedSelectionBrand]: true }
-const selections = new WeakMap<HubManagedPackageSelection, { store: HubGenerationStore; generationId: string; descriptorDigest: string }>()
+const selections = new WeakMap<HubManagedPackageSelection, { store: HubGenerationStore; generationId: string; descriptorDigest: string; profileDirectory: string }>()
 /** Validates scope and active contents before returning an exact managed manifest. */
 export function hubManagedPackageManifest(selection: HubManagedPackageSelection, name: string, profileDirectory: string): string | undefined {
   const authority = selections.get(selection)
@@ -62,9 +62,16 @@ export function hubManagedPackageManifest(selection: HubManagedPackageSelection,
   const value = authority.store.activeDescriptor()
   if (value === undefined) fail('missing active generation')
   const generation = authority.store.generationDirectory(value.generationId)
-  if (resolve(profileDirectory) !== join(generation, 'profile')) fail('managed Profile anchor mismatch')
+  if (resolve(profileDirectory) !== authority.profileDirectory) fail('managed Profile anchor mismatch')
   const pkg = value.packages.find(item => item.name === name)
   return pkg === undefined ? undefined : join(generation, pkg.manifest)
+}
+/** Package-manager layout anchor for exact managed payload exports, distinct from logical settings ownership. */
+export function hubManagedResolutionAnchor(selection: HubManagedPackageSelection, name: string, profileDirectory: string): string | undefined {
+  const manifest = hubManagedPackageManifest(selection, name, profileDirectory)
+  if (manifest === undefined) return undefined
+  const authority = selections.get(selection)!
+  return join(authority.store.generationDirectory(authority.generationId), 'profile', 'package.json')
 }
 function fail(message: string): never { throw new Error(`Hub generation: ${message}`) }
 function record(value: unknown): Record<string, unknown> {
@@ -180,10 +187,12 @@ function descriptor(value: unknown, expected: HubGenerationIdentity): HubGenerat
 export class HubGenerationStore {
   readonly directory: string
   readonly scope: string
-  private readonly identity: HubGenerationIdentity
+  readonly identity: HubGenerationIdentity
+  readonly root: string
   constructor(root: string, owner: HubGenerationIdentity) {
     if (!isAbsolute(root) || resolve(root) !== root) fail('absolute normalized root required')
     safeAncestors(root); privateStat(root, true)
+    this.root = root
     this.identity = Object.freeze({ ...identity(owner) })
     this.scope = hubGenerationScope(owner)
     privateDirectory(join(root, 'hub-managed'))
@@ -260,12 +269,15 @@ export class HubGenerationStore {
     return state.active === null ? undefined : this.load(state.active)
   }
   /** Scope-bound exact-selection authority; no authorization or loaded-health claim. */
-  managedSelection(): HubManagedPackageSelection {
+  managedSelection(profileDirectory?: string): HubManagedPackageSelection {
     const state = this.readState()
     if (state.active === null) fail('no active managed generation')
     this.load(state.active)
     const capability = Object.freeze({}) as HubManagedPackageSelection
-    selections.set(capability, { store: this, generationId: state.active.generationId, descriptorDigest: state.active.descriptorDigest })
+    const anchor = profileDirectory ?? join(this.generationDirectory(state.active.generationId), 'profile')
+    if (!isAbsolute(anchor) || resolve(anchor) !== anchor) fail('invalid logical Profile directory')
+    safeAncestors(anchor)
+    selections.set(capability, { store: this, generationId: state.active.generationId, descriptorDigest: state.active.descriptorDigest, profileDirectory: anchor })
     return capability
   }
   private async update(action: (state: HubGenerationState) => Omit<HubGenerationState, 'revision'>): Promise<HubGenerationState> {
