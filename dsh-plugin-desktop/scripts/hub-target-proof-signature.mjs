@@ -17,7 +17,12 @@ export function canonicalProofJson(value) {
     }
     return JSON.stringify(value)
   }
-  if (Array.isArray(value)) return `[${value.map(canonicalProofJson).join(',')}]`
+  if (Array.isArray(value)) {
+    for (let i = 0; i < value.length; i++) {
+      if (!Object.hasOwn(value, i)) throw new Error('Sparse array is not I-JSON')
+    }
+    return `[${value.map(canonicalProofJson).join(',')}]`
+  }
   if (typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
     return `{${Object.keys(value).sort().map(k => `${canonicalProofJson(k)}:${canonicalProofJson(value[k])}`).join(',')}}`
   }

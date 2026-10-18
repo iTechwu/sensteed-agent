@@ -31,7 +31,7 @@ test('non-Ed25519 runner keys are refused', () => {
 test('canonical proof JSON preserves numeric object key ordering and rejects non-I-JSON inputs', () => {
   assert.equal(canonicalProofJson({ 2: 'two', 10: 'ten', nested: [null, -0, 1e30, '中文😀'] }),
     '{"10":"ten","2":"two","nested":[null,0,1e+30,"中文😀"]}')
-  for (const invalid of [NaN, Infinity, undefined, { invalid: undefined }, '\ud800', new Date()]) {
+  for (const invalid of [NaN, Infinity, undefined, { invalid: undefined }, '\ud800', new Date(), Array(2), [1, , 3]]) {
     assert.throws(() => canonicalProofJson(invalid))
   }
 })
