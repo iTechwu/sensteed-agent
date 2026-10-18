@@ -55,14 +55,6 @@ This repository owns the desktop product around an unmodified DeepSeek Harness c
 - 个人技能显式入口为当前 Desktop home 的 `skills/`，provider/source 均为 `user-local`，调用名 `user-local-<原名>`。该保留命名空间不属于企业签名技能；两类技能不得互相覆盖。不要将仅保留磁盘文件称为用户技能可用。
 - `dofe-host-capabilities` 只拥有受认证的公共 MCP transport/权限门禁，不预注册业务路由；Hub 插件通过 `ctx.hubMcp` 声明相对路径，不得携带 URL、headers、tenant 或凭据。
 
-## 企业 Hub 唯一分发边界
-
-- 仅 packaged Sensteed 的 sealed target 启用企业 Hub 模式；开发态及其他品牌保留原行为。L0/core 始终从当前 sealed install 解析，禁止旧 Profile 中更高版本覆盖核心。
-- 企业普通启动先 base-only：企业 filesystem roots 为空；managed Host 只读取已签名、经授权、实际健康验收的 Hub generation。旧 bundled/env/customSkillDirs 不得进入企业技能来源，HMR 同样执行 base source policy。
-- 企业模式不挂 native npm plugin-manager Host/tools 与安装页面，仍保留核心设置和只读 inventory。业务安装、更新、回滚、重启只走 L0 Hub manager；不得为了恢复旧 npm UI 绕过授权。
-- 个人技能显式入口为当前 Desktop home 的 `skills/`，provider/source 均为 `user-local`，调用名 `user-local-<原名>`。该保留命名空间不属于企业签名技能；两类技能不得互相覆盖。不要将仅保留磁盘文件称为用户技能可用。
-- `dofe-host-capabilities` 只拥有受认证的公共 MCP transport/权限门禁，不预注册业务路由；Hub 插件通过 `ctx.hubMcp` 声明相对路径，不得携带 URL、headers、tenant 或凭据。
-
 ## 内置 Skills 与 Plugins (Built-in skills and plugins)
 
 - `bundled.json`（仓库根，与 `upstream.json` 同级）是内置内容的机器可读清单：`skills[]` 记录每个 skill 的来源（`source: "sibling"` 指向 `../docker-helm.dofe.ai/skills/<name>` 的 vendored 源，缺省 `"github"` 直连仓库拉取）与已提交快照目录；`plugins[]` 记录预装插件（sibling 唯一源）及其 `.ci` 快照，GitHub 源插件额外带 `upstream`/`siblingDir`。
