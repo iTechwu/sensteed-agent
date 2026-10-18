@@ -80,6 +80,7 @@ window.__ModuleLoader__.load({
         gateway_request_failed: '供应链服务暂不可用。', supplier_mcp_request_failed: '供应链服务暂不可用。',
         VERSION_CONFLICT: '记录已被其他操作更新，请刷新后重试。', STALE_EVIDENCE: '证据已变化，请刷新后重新保存。',
         SUPPLIER_NOT_FOUND: '该供应商当前不可用。', REPORT_NOT_READY: '周报尚未生成完成。',
+        supplier_list_incomplete: '供应商台账已发生变化，未能完整读取，请刷新重试。',
       }
       return map[error?.message] || `加载或保存失败（${error?.message || '未知错误'}）`
     }
@@ -175,9 +176,9 @@ window.__ModuleLoader__.load({
       useEffect(() => {
         const controller = new AbortController()
         let active = true
-        setState(value => ({ ...value, loading: true }))
+        setState(value => ({ ...value, loading: true, error: null }))
         loader(controller.signal).then(data => { if (active) setState({ loading: false, data }) })
-          .catch(error => { if (active) { setState({ loading: false, data: null }); setError(errorText(error)) } })
+          .catch(error => { if (active) { setState({ loading: false, data: null, error: errorText(error) }); setError(errorText(error)) } })
         return () => { active = false; controller.abort() }
       }, deps)
       return state
@@ -185,6 +186,7 @@ window.__ModuleLoader__.load({
 
     function Loading({ state, empty }) {
       if (state.loading && !state.data) return h('p', { className: 'sr-muted', role: 'status' }, '正在读取已归集数据…')
+      if (state.error) return h('p', { className: 'sr-muted', role: 'alert' }, state.error)
       if (!state.data) return h('p', { className: 'sr-muted' }, empty || '暂无可显示的数据。')
       return null
     }
@@ -231,6 +233,7 @@ window.__ModuleLoader__.load({
       const [busy, setBusy] = useState(false)
       const state = useLoad(() => api('supply_chain_workbench_suppliers_list', { page, pageSize: 20, ...(submitted ? { query: submitted } : {}) }), [page, submitted, revision], setError)
       const data = state.data
+      const clearFilter = () => { setQuery(''); setSubmitted(''); setPage(1) }
       let lastTrigger = null
       const closeIntake = () => {
         setShowAdd(false)
@@ -241,10 +244,31 @@ window.__ModuleLoader__.load({
           h('div', { className: 'sr-toolbar-actions' }, h('span', { className: 'sr-muted' }, `${data?.total ?? '—'} 家供应商`), h('button', { type: 'button', className: 'sr-button sr-secondary', ref: element => { lastTrigger = element }, 'aria-haspopup': 'dialog', 'aria-expanded': showAdd, onClick: () => { showAdd ? closeIntake() : setShowAdd(true) } }, showAdd ? '收起新增' : '新增 / 导入'))),
         showAdd ? h('div', { role: 'dialog', 'aria-label': '新增或导入供应商', onKeyDown: event => { if (event.key === 'Escape') { event.stopPropagation(); closeIntake() } } },
           h(SupplierIntake, { newName, setNewName, importText, setImportText, busy, setBusy, setError, onDone: () => { setPage(1); setSubmitted(''); onImported?.(); window.dispatchEvent(new CustomEvent('supplier-risk:refresh')) } })) : null,
-        h(Loading, { state }), data ? h(React.Fragment, null,
+        h(Loading, { state }), data && data.items.length === 0 ? h('section', { className: 'sr-section sr-empty-panel', role: 'status' },
+          h('h2', null, submitted ? '没有匹配的供应商' : page > 1 ? '这一页暂无供应商' : '当前团队尚未导入供应商'),
+          h('p', { className: 'sr-muted' }, submitted ? '请调整供应商名称或统一社会信用代码后重试。' : page > 1 ? '台账可能已更新，请返回第一页查看。' : '若此前已录入，请先确认当前登录团队，并由管理员核对历史数据迁移，避免重复建档。'),
+          submitted || page > 1 ? h('button', { type: 'button', className: 'sr-button sr-secondary', onClick: clearFilter }, submitted ? '清除筛选' : '返回第一页') :
+            h('button', { type: 'button', className: 'sr-button sr-secondary', onClick: () => setShowAdd(true) }, '新增 / 导入供应商')) : null,
+        data && data.items.length > 0 ? h(React.Fragment, null,
           h('div', { className: 'sr-table-wrap' }, h('table', { className: 'sr-table' }, h('thead', null, h('tr', null, ...['供应商', '统一社会信用代码', '类别', '主体核验', '监控范围', '来源覆盖', '更新时间', ''].map(label => h('th', { key: label }, label)))), h('tbody', null,
             ...data.items.map(row => h('tr', { key: row.supplierId }, h('td', null, h('strong', null, row.displayName)), h('td', null, row.creditCode || '未关联'), h('td', null, row.category || '未分类'), h('td', null, h(Status, { value: row.verificationStatus })), h('td', null, row.monitoringScope || '未设置'), h('td', null, row.coverage?.status === 'partial' ? '部分来源' : '待接入'), h('td', null, fmt(row.updatedAt)), h('td', null, h('button', { type: 'button', className: 'sr-link', onClick: () => onSelect(row.supplierId) }, '业务影响'))))))),
           h(Pagination, { page, pageSize: 20, total: data.total, onChange: setPage })) : null)
+    }
+
+    async function loadSupplierOptions(signal) {
+      const suppliers = []
+      const seen = new Set()
+      for (let page = 1; ; page++) {
+        const data = await api('supply_chain_workbench_suppliers_list', { page, pageSize: 100 }, signal)
+        if (!Array.isArray(data?.items) || !Number.isInteger(data.total) || data.total < 0) throw new Error('invalid_gateway_response')
+        for (const supplier of data.items) {
+          if (!supplier.supplierId || seen.has(supplier.supplierId)) throw new Error('supplier_list_incomplete')
+          seen.add(supplier.supplierId)
+          suppliers.push(supplier)
+        }
+        if (suppliers.length >= data.total) return suppliers
+        if (!data.items.length) throw new Error('supplier_list_incomplete')
+      }
     }
 
     function SupplierIntake({ newName, setNewName, importText, setImportText, busy, setBusy, setError, onDone }) {
@@ -445,12 +469,14 @@ window.__ModuleLoader__.load({
         api('supply_chain_weekly_report_plan_get'),
         api('supply_chain_weekly_reports_list', { page: 1, pageSize: 20 }),
         reportId ? api('supply_chain_weekly_report_get', { reportId }) : Promise.resolve(null),
-        api('supply_chain_workbench_suppliers_list', { page: 1, pageSize: 500 }),
       ]) : Promise.resolve(null)), [revision, reportId], setError)
+      const supplierState = useLoad(signal => onScopeReady ? loadSupplierOptions(signal) : Promise.resolve(null), [revision, onScopeReady], setError)
       const plan = state.data?.[0]?.plan
       const reports = state.data?.[1]
       const report = state.data?.[2]?.report
-      const suppliers = state.data?.[3]?.items || []
+      const suppliers = supplierState.data || []
+      const selectedIds = normalizeSupplierIds(planFields?.supplierIds)
+      const unavailableIds = selectedIds.filter(id => !suppliers.some(supplier => supplier.supplierId === id))
       useEffect(() => { if (plan) setPlanFields(current => current ?? ({ ...plan, supplierIds: normalizeSupplierIds(plan.supplierIds) })) }, [plan])
       useEffect(() => { if (reports) onUnread(reports.unreadCount || 0) }, [reports?.unreadCount])
       const savePlan = async event => {
@@ -470,7 +496,7 @@ window.__ModuleLoader__.load({
           setReportId(id); window.dispatchEvent(new CustomEvent('supplier-risk:refresh'))
         } catch (error) { setError(errorText(error)) } finally { setBusy(false) }
       }
-      if (!planFields || !reports || !state.data?.[3]) return h(Loading, { state })
+      if (!planFields || !reports) return h(Loading, { state })
       return h(React.Fragment, null,
         h('div', { className: 'sr-weekly-layout' },
           h('section', { className: 'sr-section' }, h('h2', null, '周报计划'), h('p', { className: 'sr-muted' }, '服务端每周一 09:00（Asia/Shanghai）汇总已保存事实，不会启动外部采集或模型调用。'),
@@ -478,11 +504,12 @@ window.__ModuleLoader__.load({
               Field('供应商范围', h(React.Fragment, null,
                 h('select', {
                   className: 'sr-multi-select', multiple: true, size: Math.min(Math.max(suppliers.length, 3), 8),
-                  value: normalizeSupplierIds(planFields.supplierIds),
+                  value: selectedIds, disabled: supplierState.loading || !supplierState.data,
                   onChange: event => setPlanFields({ ...planFields, supplierIds: Array.from(event.target.selectedOptions, option => option.value) }),
                   'aria-label': '选择周报供应商',
-                }, suppliers.map(supplier => h('option', { key: supplier.supplierId, value: supplier.supplierId }, supplier.displayName || supplier.supplierId))),
-                h('small', { className: 'sr-field-hint' }, suppliers.length ? `已录入 ${suppliers.length} 家供应商，可按住 Command 或 Ctrl 多选。` : '暂无已录入供应商。'))),
+                }, ...suppliers.map(supplier => h('option', { key: supplier.supplierId, value: supplier.supplierId }, supplier.displayName || supplier.supplierId)),
+                ...unavailableIds.map(id => h('option', { key: id, value: id }, '已选供应商（当前不可用）'))),
+                h('small', { className: 'sr-field-hint' }, supplierState.loading ? '正在读取供应商台账…' : !supplierState.data ? '供应商台账读取失败，请刷新重试；已保存范围保留。' : suppliers.length ? `已录入 ${suppliers.length} 家供应商，可按住 Command 或 Ctrl 多选。未选择表示全部供应商（含后续新增）。` : '当前团队暂无供应商，请先核对台账或历史数据迁移。'))),
               Field('采集预算记录', h('input', { type: 'number', min: 0, value: planFields.collectionBudget || 0, onChange: event => setPlanFields({ ...planFields, collectionBudget: event.target.value }) })),
               h('p', { className: 'sr-footnote' }, `下次执行：${fmt(plan.nextRunAt)} · 当前运行：${plan.currentRunStatus || '无'}${plan.failureCode ? ` · ${plan.failureCode}` : ''}`),
               h('button', { type: 'submit', className: 'sr-button', disabled: busy }, busy ? '保存中…' : '保存计划'))),
