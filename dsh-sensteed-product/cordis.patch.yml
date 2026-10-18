@@ -9,6 +9,10 @@
 - insert:
     - id: dofe-product-client
       name: '@dofe/dsh-sensteed-product'
+    - id: dofe-host-auth
+      name: '@dofe/dsh-sensteed-product/dofe-host-auth'
+    - id: dofe-auth-routes
+      name: '@dofe/dsh-sensteed-product/dofe-auth-routes'
     - id: dofe-managed
       name: '@dofe/dsh-sensteed-product/dofe-managed'
     - id: personal-knowledge-files

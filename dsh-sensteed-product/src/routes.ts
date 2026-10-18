@@ -12,7 +12,6 @@ import {
   handleDofeAccessValidationRequest,
   handleDofeModelCatalogRequest,
 } from './dofe-access-route.ts'
-import { DOFE_AUTH_PATHS, handleDofeAuthRequest } from './dofe-auth-route.ts'
 import { watchDofeAuthAudit } from './dofe-auth-audit.ts'
 import { YootunAuditModelsClient } from './yootun-audit-models-client.ts'
 import { handleYootunAuditRequest, YOOTUN_AUDIT_PATH } from './yootun-audit-route.ts'
@@ -45,20 +44,6 @@ function rejectDesktopRequest(
 
 export async function apply(ctx: Context, config: { auditSyncEnabled: boolean }): Promise<void> {
   const rendererOrigin = `http://127.0.0.1:${String(ctx.webServer.port)}`
-  const dofeAuth = ctx.dofeAuth
-  for (const path of DOFE_AUTH_PATHS) {
-    ctx.effect(
-      () => ctx.webServer.register({
-        kind: 'exact',
-        path,
-        handler: (req, res) => {
-          if (rejectDesktopRequest(ctx, req, res)) return
-          return handleDofeAuthRequest(path, req, res, rendererOrigin, dofeAuth)
-        },
-      }),
-      '@dofe/dsh-sensteed-product: private Sensteed auth route',
-    )
-  }
   const dshHomePath = ctx.get('dshHomePath')
   if (dshHomePath === undefined) {
     throw new Error('@dofe/dsh-sensteed-product: dshHomePath is required for the audit outbox')

@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { apply } from '../src/dofe-managed.ts'
+import { apply as applyManaged } from '../src/dofe-managed.ts'
+import { apply as applyAuth } from '../src/dofe-host-auth.ts'
+async function apply(ctx: Parameters<typeof applyAuth>[0]) { await applyAuth(ctx); await applyManaged(ctx) }
 import { DOFE_ACCESS_VALIDATION_VERSION } from '../src/dofe-plugins.ts'
 
 vi.mock('../src/generated-product-identity.ts', () => ({ BRAND_VARIANT: 'sensteed', BRAND_TENANT: 'sensteed' }))
@@ -15,7 +17,9 @@ function harness(overrides = {}) {
   let grant: unknown = { kind: 'grant', payload: { refreshToken: 'refresh-old' } }
   const effects: Array<() => unknown> = []
   const tray = { enabled: () => false }
+  const services: Record<string, unknown> = {}
   const ctx = {
+    get: (name: string) => services[name],
     settings: {
       register: () => ({ get: () => settings, watch: vi.fn() }),
       update: vi.fn(async (_ns, patch) => { settings = { ...settings, ...patch } }),
@@ -35,7 +39,7 @@ function harness(overrides = {}) {
       { name: 'mcp__finance__query' },
     ]) },
     plugin: vi.fn(async () => ({ dispose() {} })),
-    on: vi.fn(), emit: vi.fn(), provide: vi.fn(), logger: { error: vi.fn(), info: vi.fn() },
+    on: vi.fn(), emit: vi.fn(), provide: vi.fn((name: string, value: unknown) => { services[name] = value; Object.assign(ctx, { [name]: value }) }), logger: { error: vi.fn(), info: vi.fn() },
     effect: (effect: () => (() => unknown)) => { effects.push(effect()) },
   }
   return {
@@ -57,6 +61,23 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers() })
 
 describe('Sensteed startup authorization', () => {
+  it('can boot identity alone with no saved grant and no business clients or network', async () => {
+    const h = harness()
+    h.forgetGrant()
+    const fetcher = vi.fn(() => { throw new Error('base auth unexpectedly used network') })
+    vi.stubGlobal('fetch', fetcher)
+    const register = vi.spyOn(h.ctx.settings, 'register')
+    await applyAuth(h.ctx as never)
+    const service = h.ctx.get('dofeAuth') as { getStatus(): { status: string } }
+    expect(service.getStatus().status).toBe('idle')
+    expect(h.ctx.get('dofeAccessSettings')).toBeDefined()
+    expect(h.ctx.plugin).not.toHaveBeenCalled()
+    expect(fetcher).not.toHaveBeenCalled()
+    await applyManaged(h.ctx as never)
+    expect(register).toHaveBeenCalledTimes(1)
+    expect(h.ctx.plugin).not.toHaveBeenCalled()
+    await h.dispose()
+  })
   it('renews identity and removes withdrawn capabilities before starting MCP', async () => {
     const h = harness()
     vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(json(discovery))
@@ -83,7 +104,7 @@ describe('Sensteed startup authorization', () => {
     expect(h.tray.enabled()).toBe(true)
     const section = h.ctx.systemPrompt.section.mock.calls.find(([s]) => s.name === 'dofe:managed-access')![0]
     expect(section.text({})).toContain('财务管理')
-    const getGate = h.ctx.provide.mock.calls.find(([name]) => name === 'dofeAccess')![1]
+    const getGate = h.ctx.provide.mock.calls.find(([name]) => name === 'dofeAccess')![1] as () => { financeAllowed: boolean }
     expect(getGate().financeAllowed).toBe(true)
     expect(h.ctx.emit).toHaveBeenCalledWith('dofe/access-changed')
     expect(section.text({})).toContain('图片与短视频')
@@ -108,7 +129,7 @@ describe('Sensteed startup authorization', () => {
     expect(h.ctx.plugin).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ serverName: 'finance' }))
     const section = h.ctx.systemPrompt.section.mock.calls.find(([s]) => s.name === 'dofe:managed-access')![0]
     expect(section.text({})).not.toContain('财务')
-    const getGate = h.ctx.provide.mock.calls.find(([name]) => name === 'dofeAccess')![1]
+    const getGate = h.ctx.provide.mock.calls.find(([name]) => name === 'dofeAccess')![1] as () => { financeAllowed: boolean }
     expect(getGate().financeAllowed).toBe(false)
     const assemble = h.ctx.on.mock.calls.find(([name]) => name === 'system-prompt/assemble')![1]
     const assembly = { sections: [{ name: 'openmontage:guidance' }, { name: 'other' }] }
