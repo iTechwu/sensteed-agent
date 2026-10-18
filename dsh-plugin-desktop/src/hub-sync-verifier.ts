@@ -28,11 +28,11 @@ export const HubSyncSnapshotSchema = z.strictObject({
   observedStateDigest: digest, catalogDigest: digest, target: HubSyncTargetSchema,
   entries: z.array(entry).max(256), issuedAt: z.iso.datetime(), expiresAt: z.iso.datetime(),
 })
-const signatureSchema = z.strictObject({
+export const HubReleaseSignatureSchema = z.strictObject({
   algorithm: z.literal('Ed25519'), canonicalization: z.literal('RFC8785'), keyId: z.string().min(1).max(120),
   payloadDigest: digest, signature: z.string().max(88),
 })
-const signedSchema = z.strictObject({ snapshot: HubSyncSnapshotSchema, signature: signatureSchema })
+const signedSchema = z.strictObject({ snapshot: HubSyncSnapshotSchema, signature: HubReleaseSignatureSchema })
 export type HubSyncSnapshot = z.infer<typeof HubSyncSnapshotSchema>
 export type HubSyncTarget = z.infer<typeof HubSyncTargetSchema>
 export interface HubReleaseTrust { readonly schemaVersion: 1; readonly keys: Readonly<Record<string, string>>; readonly revokedKeyIds: readonly string[] }
@@ -77,21 +77,26 @@ function canonicalBase64(value: string): Buffer {
   if (bytes.toString('base64') !== value) fail('noncanonical base64')
   return bytes
 }
-function freeze<T>(value: T): Readonly<T> {
-  if (value && typeof value === 'object') { for (const child of Object.values(value)) freeze(child); Object.freeze(value) }
+export function freezeHubValue<T>(value: T): Readonly<T> {
+  if (value && typeof value === 'object') { for (const child of Object.values(value)) freezeHubValue(child); Object.freeze(value) }
   return value
 }
-export function verifyHubSyncSnapshot(value: unknown, trust: HubReleaseTrust, expected: HubSyncExpected, now = Date.now()): VerifiedHubSyncSnapshot {
-  const { snapshot, signature } = signedSchema.parse(value)
-  const bytes = Buffer.from(hubCanonicalJson(snapshot))
-  if (bytes.length > 1024 * 1024) fail('snapshot too large')
+/** Cryptographic check only. Callers must separately parse and bind their protocol domain. */
+export function verifyHubReleaseSignature(payload: unknown, signatureValue: unknown, trust: HubReleaseTrust): void {
+  const signature = HubReleaseSignatureSchema.parse(signatureValue)
+  const bytes = Buffer.from(hubCanonicalJson(payload))
+  if (bytes.length > 1024 * 1024) fail('signed payload too large')
   if (trust.schemaVersion !== 1 || !Object.hasOwn(trust.keys, signature.keyId) || trust.revokedKeyIds.includes(signature.keyId)) fail('untrusted signing key')
-  if (signature.payloadDigest !== hubSyncDigest(snapshot)) fail('payload digest mismatch')
+  if (signature.payloadDigest !== hubSyncDigest(payload)) fail('payload digest mismatch')
   const keyBytes = canonicalBase64(trust.keys[signature.keyId]!)
   if (keyBytes.length > 1024) fail('invalid public key size')
   const key = createPublicKey({ key: keyBytes, type: 'spki', format: 'der' })
   const signatureBytes = canonicalBase64(signature.signature)
   if (key.asymmetricKeyType !== 'ed25519' || signatureBytes.length !== 64 || !verify(null, bytes, key, signatureBytes)) fail('invalid signature')
+}
+export function verifyHubSyncSnapshot(value: unknown, trust: HubReleaseTrust, expected: HubSyncExpected, now = Date.now()): VerifiedHubSyncSnapshot {
+  const { snapshot, signature } = signedSchema.parse(value)
+  verifyHubReleaseSignature(snapshot, signature, trust)
   for (const field of ['origin', 'tenantId', 'actorRef', 'deviceId', 'profileId', 'channel', 'observedStateDigest'] as const) {
     if (snapshot[field] !== expected[field]) fail(`${field} binding mismatch`)
   }
@@ -109,7 +114,7 @@ export function verifyHubSyncSnapshot(value: unknown, trust: HubReleaseTrust, ex
     if (['CURRENT', 'INSTALL', 'UPDATE'].includes(item.disposition) && (!item.releaseId || !item.version || !item.artifactDigest || item.channelRevision < 1 || item.bytes < 1)) fail('incomplete ready release')
   }
   const capability = Object.freeze({}) as VerifiedHubSyncSnapshot
-  verified.set(capability, freeze(snapshot))
+  verified.set(capability, freezeHubValue(snapshot))
   return capability
 }
 export function hubSyncSnapshotData(value: VerifiedHubSyncSnapshot): Readonly<HubSyncSnapshot> {
