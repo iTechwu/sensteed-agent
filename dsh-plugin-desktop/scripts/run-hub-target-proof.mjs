@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /** CI boundary: prefetch private originals, execute only the sealed entry offline, sign outside Agent. */
-import { createHash, createPrivateKey, sign } from 'node:crypto'
+import { createHash, createPrivateKey } from 'node:crypto'
+import { canonicalProofJson as canonical, signHubTargetProofResult } from './hub-target-proof-signature.mjs'
 import { spawnSync } from 'node:child_process'
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve, sep } from 'node:path'
 import { tmpdir } from 'node:os'
 const fail=message=>{throw Error(`Hub proof CI: ${message}`)}
-const canonical=value=>JSON.stringify(value===null||typeof value!=='object'?value:Array.isArray(value)?value.map(v=>JSON.parse(canonical(v))):Object.fromEntries(Object.keys(value).sort().map(k=>[k,JSON.parse(canonical(value[k]))])))
 const sha=bytes=>createHash('sha256').update(bytes).digest('hex')
 const args=process.argv.slice(2),opts={}
 for(let i=0;i<args.length;i+=2){if(!/^--[a-z-]+$/u.test(args[i]??'')||!args[i+1]||opts[args[i]])fail('invalid CLI');opts[args[i]]=args[i+1]}
@@ -57,7 +57,7 @@ try{
  if(!['PASS','FAIL'].includes(result.status)||Object.keys(result.checks??{}).sort().join(',')!=='materializedExactClosure,negativeControls,realHostLoader')fail('invalid result shape')
  if(result.status==='PASS'&&!Object.values(result.checks??{}).every(v=>v===true))fail('inconsistent PASS')
  const privateKey=createPrivateKey(readFileSync(keyPath));if(privateKey.asymmetricKeyType!=='ed25519')fail('runner key must be Ed25519')
- const submission={runnerId:input.job.runnerId,result,signature:sign(null,Buffer.from(canonical(result)),privateKey).toString('base64')}
+ const submission={runnerId:input.job.runnerId,result,signature:signHubTargetProofResult(result,privateKey)}
  writeFileSync(resolve(opts['--output']),JSON.stringify({submission,evidence})+'\n',{flag:'wx',mode:0o600})
  process.stdout.write(`Hub target proof: ${result.status}; signed submission saved.\n`)
 }finally{rmSync(scratch,{force:true,recursive:true})}
