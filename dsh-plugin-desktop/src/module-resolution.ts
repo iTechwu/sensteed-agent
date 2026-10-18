@@ -16,6 +16,7 @@ import {
   PackageOverlayNotFoundError,
   type PackageOverlayCandidate,
 } from './package-overlay.ts'
+import type { HubManagedPackageSelection } from './hub-generation-store.ts'
 import { retainAsarModuleResolver } from './asar-module-resolver-state.ts'
 
 const LOADER_ENTRY_URL = import.meta.resolve('@deepseek-ai/cordis-plugin-loader')
@@ -32,6 +33,7 @@ type ModuleSource = 'install' | 'profile'
 interface ProfileResolverRegistration {
   readonly profileBaseUrl: string
   readonly profileDirectory: string
+  readonly managedSelection?: HubManagedPackageSelection
   readonly sharedFallbackDirectory: string
   readonly moduleSources: Map<string, ModuleSource>
   readonly canonicalPaths: Map<string, string>
@@ -364,10 +366,11 @@ function selectedOverlayCandidate(
   packageName: string,
 ): PackageOverlayCandidate {
   const cached = registration.overlayCandidates.get(packageName)
-  if (cached !== undefined) return cached
+  if (cached !== undefined && registration.managedSelection === undefined) return cached
   const overlay = findOverlayPackage(packageName, {
     installPackageUrl: DESKTOP_PACKAGE_URL,
     profilePackageUrl: registration.profileBaseUrl,
+    ...(registration.managedSelection === undefined ? {} : { managedSelection: registration.managedSelection }),
   })
   // Missing packages are intentionally not cached: Market/HMR can publish one
   // while this process is alive.
@@ -703,7 +706,7 @@ function ensureResolverState(): ProcessResolverState {
  * @param profileBaseUrl - file URL for the Profile package.json.
  * @returns an idempotent registration disposer.
  */
-export function installProfilePackageResolver(profileBaseUrl: string): () => void {
+export function installProfilePackageResolver(profileBaseUrl: string, managedSelection?: HubManagedPackageSelection): () => void {
   const parsed = new URL(profileBaseUrl)
   if (parsed.protocol !== 'file:' || parsed.search.length > 0 || parsed.hash.length > 0) {
     throw new Error('dsh-plugin-desktop: Profile package resolver requires a plain file URL')
@@ -719,6 +722,7 @@ export function installProfilePackageResolver(profileBaseUrl: string): () => voi
   if (registration === undefined) {
     registration = {
       profileBaseUrl: normalizedBaseUrl,
+      ...(managedSelection === undefined ? {} : { managedSelection }),
       profileDirectory,
       sharedFallbackDirectory: join(dirname(profileDirectory), 'node_modules'),
       moduleSources: new Map(),
@@ -733,6 +737,7 @@ export function installProfilePackageResolver(profileBaseUrl: string): () => voi
     state.registrations.set(normalizedBaseUrl, registration)
     refreshCanonicalProfilePath(registration)
   } else {
+    if (registration.managedSelection !== managedSelection) throw new Error('Profile resolver generation authority changed while retained')
     // A retain denotes a new Loader/HMR generation.
     invalidatePackageSelections(registration)
   }

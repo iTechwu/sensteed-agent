@@ -5,6 +5,8 @@ import { readFileSync, statSync } from 'node:fs'
 import { dirname, isAbsolute, join, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { compare, valid } from 'semver'
+import { hubPackageIsHostOwned } from './hub-base-ownership.ts'
+import { hubManagedPackageManifest, type HubManagedPackageSelection } from './hub-generation-store.ts'
 
 const BIN_NAME = 'dsh-plugin-desktop'
 const MAX_MANIFEST_BYTES = 1024 * 1024
@@ -32,6 +34,8 @@ export interface PackageOverlayOptions {
   readonly installPackageUrl: string
   /** File URL for the active Profile package.json. */
   readonly profilePackageUrl: string
+  /** Store-issued exact generation authority; omitted for existing ordinary Profiles. */
+  readonly managedSelection?: HubManagedPackageSelection
 }
 
 export class PackageOverlayNotFoundError extends Error {
@@ -155,6 +159,22 @@ export function findOverlayPackage(
 ): PackageOverlaySelection | undefined {
   if (packageNameFromSpecifier(packageName) !== packageName) {
     throw new Error(`${BIN_NAME}: package overlay requires one exact npm package name`)
+  }
+  if (options.managedSelection !== undefined) {
+    const manifestPath = hubManagedPackageManifest(options.managedSelection, packageName, dirname(fileURLToPath(options.profilePackageUrl)))
+    if (hubPackageIsHostOwned(packageName)) {
+      const install = readCandidate(packageName, options.installPackageUrl, 'install')
+      return install === undefined ? undefined : { packageName, selected: install, install }
+    }
+    if (manifestPath !== undefined) {
+      const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as { name?: unknown; version?: unknown }
+      if (manifest.name !== packageName) throw new Error(`${BIN_NAME}: managed package identity changed`)
+      const candidate: PackageOverlayCandidate = {
+        packageName, packageDir: dirname(manifestPath), manifestPath, source: 'profile',
+        ...(typeof manifest.version === 'string' && valid(manifest.version) !== null ? { version: manifest.version } : {}),
+      }
+      return { packageName, selected: candidate, profile: candidate }
+    }
   }
   const install = readCandidate(packageName, options.installPackageUrl, 'install')
   let profile: PackageOverlayCandidate | undefined

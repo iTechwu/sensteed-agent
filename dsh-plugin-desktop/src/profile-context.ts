@@ -5,13 +5,14 @@ import type { Context } from '@deepseek-ai/cordis'
 
 import type { AppReady } from '@deepseek-ai/dsh-cmdline'
 import type { DesktopPnpmBootstrap } from './pnpm.ts'
+import type { HubManagedPackageSelection } from './hub-generation-store.ts'
 import { findOverlayPackage } from './package-overlay.ts'
 import { withDesktopPnpmPolicy, withDesktopPnpmStoreDir } from './pnpm-policy.ts'
 import { desktopPnpmStoreDir } from './profile-store-dir.ts'
 import { desktopInstallAnchor, prepareDesktopProfile, type PreparedDesktopProfile } from './profile.ts'
 
 /** Keep package operations and subsequent HMR on the launcher's actual Profile. */
-export function createDesktopProfileBoot(prepared: PreparedDesktopProfile, pnpm: DesktopPnpmBootstrap) {
+export function createDesktopProfileBoot(prepared: PreparedDesktopProfile, pnpm: DesktopPnpmBootstrap, managedSelection?: HubManagedPackageSelection) {
   const options = prepared.reloadOptions
   if (pnpm.activeProfileName !== options.profileName || pnpm.activeProfileDir !== prepared.profile.dir
     || pnpm.homeDir !== prepared.homeDir) {
@@ -30,6 +31,7 @@ export function createDesktopProfileBoot(prepared: PreparedDesktopProfile, pnpm:
     resolvePackageManifest: (packageName: string) => findOverlayPackage(packageName, {
       installPackageUrl: pathToFileURL(desktopInstallAnchor()).href,
       profilePackageUrl: pathToFileURL(join(prepared.profile.dir, 'package.json')).href,
+      ...(managedSelection === undefined ? {} : { managedSelection }),
     })?.selected.manifestPath,
     cwd: process.cwd(),
     home: prepared.homeDir,
