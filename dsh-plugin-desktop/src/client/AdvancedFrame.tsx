@@ -6,7 +6,7 @@ import type {} from './contracts.ts'
 import type { DesktopClientPlatform } from './environment.ts'
 import {
   collapsedSidebarWidth, computeDesktopColumns, DesktopLayoutState,
-  SIDEBAR_AUTO_COLLAPSE, SIDEBAR_COLLAPSED, SIDEBAR_DEFAULT, RIGHTBAR_DEFAULT_RATIO,
+  SIDEBAR_AUTO_COLLAPSE, SIDEBAR_DEFAULT, RIGHTBAR_DEFAULT_RATIO,
 } from './layout-state.ts'
 
 /** Private values assembled by one Desktop-owned shell registration. */
@@ -87,9 +87,7 @@ function DesktopOwnedFrameBody({
     panels.rightbarTrack ? rightbarPreference : 0,
     collapsedSidebarWidth(mode, platform),
   )
-  // Enhanced macOS keeps a wider native rail around the centered upstream
-  // sidebar. Extended mode and other platforms retain the upstream 56px rail.
-  const sidebarOwnerWidth = collapsed ? SIDEBAR_COLLAPSED : columns.sidebar
+  const sidebarOwnerWidth = columns.sidebar
   const columnsRef = useRef(columns)
   columnsRef.current = columns
 
