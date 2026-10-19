@@ -290,12 +290,12 @@ function apply(ctx) {
 function FinancePage(props) {
   const allowed = useFinanceWorkspaceAccess()
   const state = useSyncExternalStore(financeDesktopNavigation().subscribe, financeDesktopNavigation().getSnapshot, financeDesktopNavigation().getSnapshot)
-  return allowed === true ? h(Dashboard, { ...props, key: state.epoch }) : h('main', { className: 'sf-page' },
+  return allowed === true ? h(Dashboard, { ...props, key: state.epoch }) : h('main', { className: 'sf-root sf-connection-page' },
     h('h1', null, '财务管理'),
-    h('section', { className: 'sf-card', role: 'status', 'aria-live': 'polite' },
+    h('section', { className: 'sf-connection-card', role: 'status', 'aria-live': 'polite' },
       h('h2', null, state.status === 'unavailable' ? '暂时无法连接财务工作台' : '正在连接财务工作台'),
       h('p', null, allowed === false ? '当前账号无法访问财务工作台，请核对登录身份和授权。' : state.status === 'unavailable' ? '连接检查尚未成功。请确认网络后重试，已有数据不会因此被清除。' : '正在核对当前账号的访问权限…'),
-      h('button', { type: 'button', className: 'sf-button', onClick: () => window.dispatchEvent(new Event('sensteed:finance-retry')) }, '重新连接')))
+      h('button', { type: 'button', className: 'sf-btn', onClick: () => window.dispatchEvent(new Event('sensteed:finance-retry')) }, '重新连接')))
 }
 
 function Overlay({ t }) {

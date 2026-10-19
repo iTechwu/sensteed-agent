@@ -27,17 +27,17 @@ export function DesktopNavigationFrame({ Frame, frameProps, platform }: {
   </RailTarget.Provider>
 }
 
-function RailButton({ label, active, onClick, children }: {
-  label: string; active?: boolean; onClick: () => void; children: ReactNode
+function RailButton({ label, active, onClick, children, hint = true }: {
+  label: string; active?: boolean; onClick: () => void; children: ReactNode; hint?: boolean
 }) {
-  return <PluginRailSeat>
+  return <PluginRailSeat hintEnabled={hint}>
     <button type="button" className="sensteedModuleButton" aria-label={label}
       aria-current={active ? 'page' : undefined} onClick={onClick}>{children}</button>
   </PluginRailSeat>
 }
 
 /** Retain plugin permission checks while portalling help outside the scroll rail. */
-function PluginRailSeat({ children, beforeNavigate }: { children: ReactNode; beforeNavigate?: ((action: () => void) => void) | undefined }) {
+function PluginRailSeat({ children, beforeNavigate, hintEnabled = true }: { children: ReactNode; hintEnabled?: boolean; beforeNavigate?: ((action: () => void) => void) | undefined }) {
   const replaying = useRef(false)
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const [hint, setHint] = useState<{ label: string; top: number; left: number }>()
@@ -49,7 +49,7 @@ function PluginRailSeat({ children, beforeNavigate }: { children: ReactNode; bef
     return () => { clearTimeout(timer.current); window.removeEventListener('scroll', dismiss, true); window.removeEventListener('resize', dismiss) }
   }, [])
   const show = (target: EventTarget | null) => {
-    if (!(target instanceof Element)) return
+    if (!hintEnabled || !(target instanceof Element)) return
     const button = target.closest('button')
     const label = button?.getAttribute('aria-label')
     if (!button || !label) return
@@ -113,7 +113,7 @@ export function DesktopNavigationSidebar({ collapsed, startSession, toggleSideba
     <div className="sensteedModuleScroll">
       <nav aria-label={zh ? '功能模块' : 'Modules'}>
         <div onPointerEnter={openPreview} onPointerLeave={closePreview} onFocus={openPreview}>
-          <RailButton label={homeLabel} active={home} onClick={() => navigate(null)}><Home size={20} /></RailButton>
+          <RailButton label={homeLabel} hint={!collapsed} active={home} onClick={() => navigate(null)}><Home size={20} /></RailButton>
         </div>
         {extensions.includes('dofe-sensteed-knowledge') && <div className="sensteedKnowledgeModule" data-active={active === 'sensteed-knowledge' || undefined}>
           <PluginRailSeat beforeNavigate={action => { if (leaveGuard.current) leaveGuard.current(action); else action() }}>{renderSlot('sidebar.footer.action', { wide: false }, { only: 'dofe-sensteed-knowledge' })}</PluginRailSeat>
@@ -135,7 +135,7 @@ export function DesktopNavigationSidebar({ collapsed, startSession, toggleSideba
   </>
   return <>
     {target !== null && createPortal(rail, target)}
-    <section className="sensteedContextSidebar" data-preview={collapsed && preview || undefined} onPointerEnter={openPreview} onPointerLeave={closePreview} aria-label={preview ? homeLabel : contextLabel} hidden={collapsed && !preview}>
+    <section className="sensteedContextSidebar" data-preview={collapsed && preview || undefined} onPointerEnter={openPreview} onPointerLeave={closePreview} onFocus={openPreview} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) closePreview() }} aria-label={preview ? homeLabel : contextLabel} hidden={collapsed && !preview}>
       <header className="sensteedContextHeader"><strong>{preview ? homeLabel : contextLabel}</strong>
         <RailButton label={toggleLabel} onClick={toggleSidebar}><PanelLeft size={18} /></RailButton>
       </header>
