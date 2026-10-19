@@ -1,5 +1,5 @@
 /** Shared selection lets the context column drive the existing catalog page. */
-import { useState, useSyncExternalStore } from 'react'
+import { useCallback, useState, useSyncExternalStore } from 'react'
 import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { dofePluginsForBrand, type DofeAccessSettings } from '../dofe-plugins.ts'
 import { BRAND_VARIANT } from '../generated-product-identity.ts'
@@ -24,7 +24,9 @@ export function HubContext({ kind, navigation, selectPanel, create, settingsScop
   create: () => Promise<void>
 }) {
   const tab = useSyncExternalStore(navigation.subscribe, navigation.getSnapshot, navigation.getSnapshot)
-  const settings = useSyncExternalStore(settingsScope.subscribe, settingsScope.getSnapshot, settingsScope.getSnapshot).value
+  const subscribeSettings = useCallback((listener: () => void) => settingsScope.subscribe(listener), [settingsScope])
+  const readSettings = useCallback(() => settingsScope.getSnapshot(), [settingsScope])
+  const settings = useSyncExternalStore(subscribeSettings, readSettings, readSettings).value
   const installed = settings?.identity?.ssoSub ? dofePluginsForBrand(BRAND_VARIANT).filter(plugin => ['built-in', 'enabled'].includes(dofePluginCardState(plugin, settings))) : []
   return <nav className="sensteedBusinessNavigation" aria-label="自定义导航">
     <button type="button" aria-current={kind === 'plugin' ? 'page' : undefined} onClick={() => selectPanel('plugins')}><Blocks size={16} /> 插件</button>

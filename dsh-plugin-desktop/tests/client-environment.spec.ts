@@ -219,7 +219,7 @@ describe('advanced desktop layout', () => {
       expect(reducedMotion?.[2]).toMatch(/transition:\s*none !important;/)
       expect(reducedMotion?.[2]).toMatch(/animation-duration:\s*0\.01ms !important;/)
       expect(css).toMatch(/\.sensteedAgentSidebarSurface\s*\{[^}]*--dsw-specific-sidebar-fill:\s*transparent;/)
-      expect(css).toMatch(/data-desktop-mode="advanced"\]\[data-desktop-platform="darwin"\]\[data-sidebar-collapsed\][^{]*\.sensteedAgentUpstreamSidebar \{[^}]*width:\s*56px;[^}]*margin:\s*0 auto;/)
+      expect(css).not.toContain('[data-sidebar-collapsed] .sensteedAgentUpstreamSidebar')
       expect(css).not.toMatch(/data-desktop-mode="extended"[^{}]*data-sidebar-collapsed[^{}]*\.sensteedAgentUpstreamSidebar/)
       expect(css).toMatch(new RegExp(`data-desktop-mode="advanced"\\]\\[data-desktop-platform="darwin"\\] \\.sensteedAgentUpstreamSidebar \\{[^}]*padding-top: ${ADVANCED_MACOS_CONTENT_INSET}px;`))
       expect(css).not.toMatch(/\.sensteedAgentUpstreamSidebar \{[^}]*-webkit-app-region: no-drag;/)
