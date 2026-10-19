@@ -163,13 +163,6 @@
       "resolvedSha": "5117d35b1510bc0756948ac5b765ffb02b993dab"
     },
     {
-      "name": "finance-cost-cash-forecast",
-      "kind": "dir",
-      "path": "finance-cost-cash-forecast",
-      "repository": "https://github.com/iTechwu/helm.dofe.ai",
-      "resolvedSha": "5117d35b1510bc0756948ac5b765ffb02b993dab"
-    },
-    {
       "name": "finance-alert-rules-audit",
       "kind": "dir",
       "path": "finance-alert-rules-audit",
@@ -184,18 +177,25 @@
       "resolvedSha": "576edd33710233fe7d0a08b716a2868cc29d741b"
     },
     {
-      "name": "finance-cash-pressure",
-      "kind": "dir",
-      "path": "finance-cash-pressure",
-      "repository": "https://github.com/iTechwu/helm.dofe.ai",
-      "resolvedSha": "896e6b7e2121c747513c5ab688543b85ba1af95f"
-    },
-    {
       "name": "finance-revenue-attainment",
       "kind": "dir",
       "path": "finance-revenue-attainment",
       "repository": "https://github.com/iTechwu/helm.dofe.ai",
       "resolvedSha": "896e6b7e2121c747513c5ab688543b85ba1af95f"
+    },
+    {
+      "name": "finance-cash-pressure",
+      "kind": "dir",
+      "path": "finance-cash-pressure",
+      "repository": "https://github.com/iTechwu/helm.dofe.ai",
+      "resolvedSha": "34f035bb4068dc7afdf25b2498fc0702c9d412a9"
+    },
+    {
+      "name": "finance-cost-cash-forecast",
+      "kind": "dir",
+      "path": "finance-cost-cash-forecast",
+      "repository": "https://github.com/iTechwu/helm.dofe.ai",
+      "resolvedSha": "34f035bb4068dc7afdf25b2498fc0702c9d412a9"
     }
   ]
 }
