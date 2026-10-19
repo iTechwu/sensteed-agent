@@ -36,10 +36,17 @@ it('retains and opens a session before querying its skill catalog', async () => 
   let retained = false
   const list = vi.fn(async () => { expect(retained).toBe(true); return { ok: true, value: { skills: [{ name: 'local' }] } } })
   const using = vi.fn(async (_id, _options, run) => { retained = true; try { return await run({ binding: { session: { getSnapshot: () => ({ openState: 'open' }) } } }) } finally { retained = false } })
-  registerHubPages({ effect: vi.fn(), sessions: { list: { getSnapshot: () => ({ ids: ['s1'], byId: { s1: { id: 's1', updatedAt: 1 } } }) }, using }, remote: { skills: { list } }, slots: {
+  registerHubPages({ effect: vi.fn(), sessions: { list: { getSnapshot: () => ({ ids: ['child', 's1'], byId: { child: { id: 'child', updatedAt: 99, origin: 'subagent' }, s1: { id: 's1', updatedAt: 1 } } }) }, using }, remote: { skills: { list } }, slots: {
     inject: (_name: string, callback: () => void) => callback(), register: core.register.bind(core),
   } } as never, { settingsScope: {} as never, t: key => DOFE_ACCESS_COPY.zh[key], subscribeReconnect: () => () => {} })
   const props = core.entriesOfSlot('main').find(entry => entry.options.key === 'sensteed-skill-manager')!.inject!() as { loadSkills: (signal: AbortSignal) => Promise<unknown> }
   expect(await props.loadSkills(new AbortController().signal)).toEqual([{ name: 'local' }])
+  expect(using.mock.calls[0]?.[0]).toBe('s1')
   expect(using).toHaveBeenCalledOnce(); expect(list).toHaveBeenCalledOnce(); expect(retained).toBe(false)
+})
+
+
+it('declares the skills remote dependency used by the local catalog', async () => {
+  const { inject } = await import('../src/client/index.ts')
+  expect(inject).toContain('remote.skills')
 })
