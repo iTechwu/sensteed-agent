@@ -64,6 +64,9 @@ const BOOT_SPLASH_CSS = `
 }
 `
 
+const pendingInstalls = new WeakMap<Document, EventListener>()
+const dismissedDocuments = new WeakSet<Document>()
+
 /**
  * Paint a branded launch surface the moment the window first renders, so a
  * cold start or restart shows a transition instead of an empty dark frame.
@@ -71,7 +74,14 @@ const BOOT_SPLASH_CSS = `
  * cap bounds the case where they never do.
  */
 export function installBootSplash(brandName: string): void {
-  if (typeof document === 'undefined') return
+  if (typeof document === 'undefined' || dismissedDocuments.has(document)) return
+  if (document.documentElement === null) {
+    if (pendingInstalls.has(document)) return
+    const ready: EventListener = () => { pendingInstalls.delete(document); installBootSplash(brandName) }
+    pendingInstalls.set(document, ready)
+    document.addEventListener('DOMContentLoaded', ready, { once: true })
+    return
+  }
   if (document.getElementById(DESKTOP_BOOT_SPLASH_ID) !== null) return
   if (document.getElementById(DESKTOP_BOOT_SPLASH_STYLE_ID) === null) {
     const style = document.createElement('style')
@@ -98,6 +108,9 @@ export function installBootSplash(brandName: string): void {
 /** Fade the splash out once; later calls during the fade are no-ops. */
 export function dismissBootSplash(): void {
   if (typeof document === 'undefined') return
+  dismissedDocuments.add(document)
+  const pending = pendingInstalls.get(document)
+  if (pending) { document.removeEventListener('DOMContentLoaded', pending); pendingInstalls.delete(document) }
   const splash = document.getElementById(DESKTOP_BOOT_SPLASH_ID)
   if (splash === null) return
   if (splash.getAttribute(DESKTOP_BOOT_SPLASH_LEAVING) === 'true') return

@@ -109,6 +109,22 @@ describe('boot splash', () => {
     expect(splash.parent).toBeNull()
   })
 
+  it('waits for the DOM root during an early sandboxed preload and cancels a late splash', () => {
+    const listeners = new Map<string, EventListener>()
+    const stub = { head: null, body: null, documentElement: null,
+      getElementById: () => null,
+      addEventListener: (name: string, listener: EventListener) => listeners.set(name, listener),
+      removeEventListener: (name: string) => listeners.delete(name),
+    }
+    vi.stubGlobal('document', stub)
+    expect(() => installBootSplash('哪吒Agent')).not.toThrow()
+    expect(listeners.has('DOMContentLoaded')).toBe(true)
+    dismissBootSplash()
+    expect(listeners.has('DOMContentLoaded')).toBe(false)
+    expect(() => installBootSplash('哪吒Agent')).not.toThrow()
+    expect(listeners.size).toBe(0)
+  })
+
   it('is inert without a document', () => {
     vi.stubGlobal('document', undefined)
     expect(() => installBootSplash('哪吒Agent')).not.toThrow()
