@@ -1,3 +1,4 @@
+import { provideHubSupervisor } from './hub-supervisor-protocol.ts'
 /** Utility-process entrypoint. No BrowserWindow or Electron main APIs are imported here. */
 import { installFailLoud } from '@deepseek-ai/dsh-app-boot'
 import { installProxyFromEnvironment } from '@deepseek-ai/dsh-http-proxy'
@@ -39,6 +40,11 @@ const rpc = new HostRpc({
   },
 }, 120_000)
 let host: DesktopStartupGenerationHost | undefined
+let inspectHubHealth: (() => Promise<import('./hub-generation-health.ts').HubLoadedEvidence>) | undefined
+rpc.handle('hubGenerationHealth', async () => {
+  if (inspectHubHealth === undefined) throw new Error('Managed Hub health is unavailable')
+  return await inspectHubHealth()
+})
 let inspectServices = () => ({ aaRuntime: false, aaOnboarding: false })
 // Set once the generation mounts and the product layer's quit inspection row is live.
 let inspectQuit: (() => Promise<{ activeTasks: boolean; scheduledTasks: boolean }>) | undefined
@@ -106,8 +112,16 @@ rpc.handle('boot', async args => {
     inspectServices = await bootDesktopHost(options, runtime, browser, lan,
       hostCtx => {
         host = hostCtx
+        provideHubSupervisor(hostCtx as never,async request=>{await rpc.call('hubSwitch',[request])},async generationId=>{await rpc.call('hubRendererHealth',[generationId],undefined,180_000)})
         const injectable = hostCtx as unknown as {
           inject(names: readonly string[], wire: (scope: Record<string, never>) => void): void
+        }
+        if (options.prepared.hubGeneration !== undefined || options.hubGeneration !== undefined) {
+          const trusted = options.hubGeneration ?? options.prepared.hubGeneration!
+          const probe = hostCtx as unknown as { inject(names: readonly string[], wire: (scope: { hubGenerationBoot: import('./hub-host-boot.ts').HubGenerationHostHealth; skills: import('./hub-generation-health.ts').HubSkillObservation }) => void): void }
+          probe.inject(['hubGenerationBoot', 'skills'], scope => {
+            inspectHubHealth = () => scope.hubGenerationBoot.inspectLoaded(scope.skills, trusted.skillProviderName)
+          })
         }
         injectable.inject(['sensteedQuitInspection'], scope => {
           inspectQuit = async () => await (scope as never as { sensteedQuitInspection: { inspect(): Promise<{ activeTasks: boolean; scheduledTasks: boolean }> } }).sensteedQuitInspection.inspect()

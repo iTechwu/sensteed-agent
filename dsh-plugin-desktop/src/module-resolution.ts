@@ -16,6 +16,7 @@ import {
   PackageOverlayNotFoundError,
   type PackageOverlayCandidate,
 } from './package-overlay.ts'
+import { hubManagedPackageManifest, hubManagedResolutionAnchor, type HubManagedPackageSelection } from './hub-generation-store.ts'
 import { retainAsarModuleResolver } from './asar-module-resolver-state.ts'
 
 const LOADER_ENTRY_URL = import.meta.resolve('@deepseek-ai/cordis-plugin-loader')
@@ -32,6 +33,8 @@ type ModuleSource = 'install' | 'profile'
 interface ProfileResolverRegistration {
   readonly profileBaseUrl: string
   readonly profileDirectory: string
+  readonly hostOwnedOnly?: boolean
+  readonly managedSelection?: HubManagedPackageSelection
   readonly sharedFallbackDirectory: string
   readonly moduleSources: Map<string, ModuleSource>
   readonly canonicalPaths: Map<string, string>
@@ -364,16 +367,21 @@ function selectedOverlayCandidate(
   packageName: string,
 ): PackageOverlayCandidate {
   const cached = registration.overlayCandidates.get(packageName)
-  if (cached !== undefined) return cached
+  if (cached !== undefined && registration.managedSelection === undefined) return cached
   const overlay = findOverlayPackage(packageName, {
     installPackageUrl: DESKTOP_PACKAGE_URL,
     profilePackageUrl: registration.profileBaseUrl,
+    ...(registration.hostOwnedOnly===true?{hostOwnedOnly:true}:{}),
+    ...(registration.managedSelection === undefined ? {} : { managedSelection: registration.managedSelection }),
   })
   // Missing packages are intentionally not cached: Market/HMR can publish one
   // while this process is alive.
   if (overlay === undefined) throw new PackageOverlayNotFoundError(packageName)
   let selected = overlay.selected
+  const exactManagedManifest = registration.managedSelection === undefined ? undefined
+    : hubManagedPackageManifest(registration.managedSelection, packageName, registration.profileDirectory)
   if (overlay.selected.source === 'profile'
+    && exactManagedManifest !== overlay.selected.manifestPath
     && !isLexicallyWithin(join(registration.profileDirectory, 'node_modules'), overlay.selected.manifestPath)) {
     // findPackageJSON follows Node's ordinary ancestor walk. Only the exact
     // active Profile node_modules tree is an overlay candidate; accepting a
@@ -409,6 +417,12 @@ function track(
   registration.moduleSources.set(canonical, source)
 }
 
+function managedAnchor(registration: ProfileResolverRegistration, specifier: string, source: ModuleSource): string | undefined {
+  const name = resolvablePackageName(specifier)
+  return source === 'profile' && name !== undefined && registration.managedSelection !== undefined
+    ? hubManagedResolutionAnchor(registration.managedSelection, name, registration.profileDirectory) : undefined
+}
+
 function resolveFromAnchor(
   state: ProcessResolverState,
   registration: ProfileResolverRegistration,
@@ -417,10 +431,11 @@ function resolveFromAnchor(
   context: Parameters<ResolveHookSync>[1],
   nextResolve: Parameters<ResolveHookSync>[2],
 ): ReturnType<ResolveHookSync> {
+  const exactAnchor = managedAnchor(registration, specifier, source)
   if (!context.conditions?.includes('require')) {
     return nextResolve(specifier, {
       ...context,
-      parentURL: source === 'profile' ? registration.profileBaseUrl : DESKTOP_ENTRY_URL,
+      parentURL: exactAnchor === undefined ? (source === 'profile' ? registration.profileBaseUrl : DESKTOP_ENTRY_URL) : pathToFileURL(exactAnchor).href,
     })
   }
   // Node's synchronous hook observes require/createRequire, but its CJS
@@ -430,7 +445,7 @@ function resolveFromAnchor(
   // the nested require.resolve call from re-entering our own policy.
   state.bypassDepth += 1
   try {
-    const require = source === 'profile' ? registration.profileRequire : DESKTOP_REQUIRE
+    const require = exactAnchor === undefined ? (source === 'profile' ? registration.profileRequire : DESKTOP_REQUIRE) : createRequire(exactAnchor)
     return {
       url: pathToFileURL(require.resolve(specifier)).href,
       shortCircuit: true,
@@ -448,7 +463,8 @@ function resolveCommonJsFromAnchor(
 ): string {
   state.bypassDepth += 1
   try {
-    const require = source === 'profile' ? registration.profileRequire : DESKTOP_REQUIRE
+    const exactAnchor = managedAnchor(registration, request, source)
+    const require = exactAnchor === undefined ? (source === 'profile' ? registration.profileRequire : DESKTOP_REQUIRE) : createRequire(exactAnchor)
     return require.resolve(request)
   } finally {
     state.bypassDepth -= 1
@@ -703,7 +719,7 @@ function ensureResolverState(): ProcessResolverState {
  * @param profileBaseUrl - file URL for the Profile package.json.
  * @returns an idempotent registration disposer.
  */
-export function installProfilePackageResolver(profileBaseUrl: string): () => void {
+export function installProfilePackageResolver(profileBaseUrl: string, managedSelection?: HubManagedPackageSelection, hostOwnedOnly=false): () => void {
   const parsed = new URL(profileBaseUrl)
   if (parsed.protocol !== 'file:' || parsed.search.length > 0 || parsed.hash.length > 0) {
     throw new Error('dsh-plugin-desktop: Profile package resolver requires a plain file URL')
@@ -719,6 +735,8 @@ export function installProfilePackageResolver(profileBaseUrl: string): () => voi
   if (registration === undefined) {
     registration = {
       profileBaseUrl: normalizedBaseUrl,
+      hostOwnedOnly,
+      ...(managedSelection === undefined ? {} : { managedSelection }),
       profileDirectory,
       sharedFallbackDirectory: join(dirname(profileDirectory), 'node_modules'),
       moduleSources: new Map(),
@@ -733,6 +751,7 @@ export function installProfilePackageResolver(profileBaseUrl: string): () => voi
     state.registrations.set(normalizedBaseUrl, registration)
     refreshCanonicalProfilePath(registration)
   } else {
+    if (registration.managedSelection !== managedSelection||registration.hostOwnedOnly!==hostOwnedOnly) throw new Error('Profile resolver generation authority changed while retained')
     // A retain denotes a new Loader/HMR generation.
     invalidatePackageSelections(registration)
   }
@@ -796,4 +815,17 @@ export function refreshProfilePackageSelections(): void {
   for (const registration of currentResolverState()?.registrations.values() ?? []) {
     invalidatePackageSelections(registration)
   }
+}
+
+/** Resolved module URLs actually observed by this retained managed generation's hooks. Not execution proof alone. */
+export function managedProfilePackageUrls(profileBaseUrl: string, selection: HubManagedPackageSelection, packageName: string): readonly string[] {
+  const registration = currentResolverState()?.registrations.get(profileBaseUrl)
+  if (registration?.managedSelection !== selection) throw new Error('Managed package observation does not match retained Profile')
+  const manifest = hubManagedPackageManifest(selection, packageName, registration.profileDirectory)
+  if (manifest === undefined) throw new Error('Package is outside managed generation')
+  const root = dirname(manifest)
+  return Object.freeze([...registration.moduleSources.entries()].filter(([url, source]) => {
+    const path = filePath(url)
+    return source === 'profile' && path !== undefined && path !== manifest && isLexicallyWithin(root, path)
+  }).map(([url]) => url))
 }

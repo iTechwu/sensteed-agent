@@ -57,3 +57,16 @@ describe('desktop renderer boot route', () => {
     expect(res.statusCode).toBe(403)
   })
 })
+
+
+it('preserves a fresh launcher challenge and rejects malformed challenge data', async () => {
+  const notify = vi.fn()
+  const challenge = '11111111-1111-4111-8111-111111111111'
+  const accepted = response()
+  await handleRendererBootRequest(request(JSON.stringify({ status: 'healthy', challenge })), accepted, 'http://127.0.0.1:43120', notify)
+  expect(notify).toHaveBeenCalledWith({ status: 'healthy', challenge })
+  const rejected = response()
+  await handleRendererBootRequest(request(JSON.stringify({ status: 'healthy', challenge: { generationId: 'forged' } })), rejected, 'http://127.0.0.1:43120', notify)
+  expect(rejected.statusCode).toBe(400)
+  expect(notify).toHaveBeenCalledOnce()
+})

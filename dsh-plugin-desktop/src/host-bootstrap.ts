@@ -1,4 +1,12 @@
+import{join}from'node:path'
+import{registerHubGenerationRoutes}from'./hub-generation-routes.ts'
+import { hubBaseComposition } from './hub-base-composition.ts'
 /** Headless bootstrap for the Beta isolated Host experiment. */
+import type { HubSkillObservation } from './hub-generation-health.ts'
+import { prepareHubHostBoot, type HubTrustedHostBootInput } from './hub-host-boot.ts'
+import { registerHubHostService } from './hub-host-service.ts'
+import { registerHubGenerationManager } from './hub-generation-manager.ts'
+import { registerHubBootstrapSkillRoots, registerHubSkillRoots } from './hub-skill-roots.ts'
 import { boot, resolveProfileDir } from '@deepseek-ai/dsh-app-boot'
 import { provideCmdline } from '@deepseek-ai/dsh-cmdline'
 import { createDesktopProfileBoot } from './profile-context.ts'
@@ -16,7 +24,7 @@ import { desktopMarketSnapshotWithEffective, selectDesktopMarketProvider, type D
 import DesktopSettingsController from './desktop-settings-controller.ts'
 import { clearDesktopProfilePreferences, desktopProfilePreferencesFromSettings, readDesktopProfilePreferences, writeDesktopProfilePreferences, type DesktopProfilePreferences, type DesktopProfilePreferencesStateV1 } from './profile-preferences.ts'
 import { clearDesktopProfileUsageHistory, type DesktopReleaseUserDataLocations } from './profile-channel-admission.ts'
-import { desktopInstallAnchor, type PreparedDesktopProfile } from './profile.ts'
+import { desktopInstallAnchor, prepareSealedDesktopProfile, type PreparedDesktopProfile } from './profile.ts'
 import { desktopLanBrowserUrls, desktopLoopbackBrowserUrl } from './desktop-network.ts'
 import { DESKTOP_LAN_HTTPS_CA_PATH, type DesktopLanHttpsRuntime } from './lan-https-runtime.ts'
 import type { DesktopBrowserAccess } from './desktop-browser-access.ts'
@@ -40,6 +48,10 @@ function desktopProfileMarketSnapshot(market: DesktopMarketProvider): DesktopMar
 }
 
 export interface DesktopHostOptions {
+  /** Actual sealed-base target selected by the launcher, never Profile or renderer input. */
+  hubRuntimeTarget?: import('./hub-sync-verifier.ts').HubSyncTarget
+  /** Launcher supplies only after independent execution authorization; never a renderer input. */
+  hubGeneration?: HubTrustedHostBootInput
   prepared: PreparedDesktopProfile
   profilePreferences: DesktopProfilePreferences
   homeDir: string
@@ -67,11 +79,13 @@ export interface DesktopHostOptions {
 
 export async function bootDesktopHost(options: DesktopHostOptions, runtime: DesktopRuntime,
   browserAccess: DesktopBrowserAccess, lanHttps: DesktopLanHttpsRuntime,
+  // Called once before composed plugins mount, so required supervisor services exist at boot.
   bindHost: (host: DesktopStartupGenerationHost) => void, requestQuit: (code: number) => void,
 ): Promise<() => { aaRuntime: boolean; aaOnboarding: boolean }> {
-  const { prepared, profilePreferences, homeDir, activeProfileName, pluginManagementStatePath,
+  const { prepared: suppliedPrepared, profilePreferences, homeDir, activeProfileName, pluginManagementStatePath,
     selectionStatePath, marketUserDataDir, releaseUserDataLocations, desktopLaunchEnvironment,
     desktopPnpmBootstrap } = options
+  const prepared = options.hubRuntimeTarget === undefined ? suppliedPrepared : prepareSealedDesktopProfile(suppliedPrepared)
   const createFreshDesktopProfile = (name: string) => {
     const created = createDesktopWebProfile(homeDir, name)
     clearDesktopProfileUsageHistory(releaseUserDataLocations, created.dir)
@@ -116,31 +130,37 @@ export async function bootDesktopHost(options: DesktopHostOptions, runtime: Desk
       profilePreferencesStopping = true
       await profilePreferencesWriteTail
     }
-    let effectiveMarket = prepared.market.effective
-    let effectiveAa = prepared.aaEnabled
-    const releasePackageResolver = installProfilePackageResolver(prepared.bareModuleBaseUrl)
-    const profileBoot = createDesktopProfileBoot(prepared, desktopPnpmBootstrap, {
-      onManagedBundlesChanged: state => {
-        effectiveMarket = state.effectiveMarket
-        effectiveAa = state.effectiveAa
-        void enqueueProfilePreferencesWrite(current => desktopProfilePreferencesFromSettings(
-          current,
-          current.notifications,
-          state.requestedMarket,
-          state.requestedAa,
-        )).then(() => selectDesktopMarketProvider(marketUserDataDir, state.requestedMarket))
-          .catch(() => {})
-      },
-    })
+    const trustedHubInput = options.hubGeneration ?? suppliedPrepared.hubGeneration
+    const basePatches=options.hubRuntimeTarget===undefined?prepared.patches:hubBaseComposition(prepared.patches)
+    const hubBoot = trustedHubInput === undefined ? undefined : prepareHubHostBoot(trustedHubInput, prepared.profile.dir, basePatches)
+    const hostPatches = hubBoot === undefined ? basePatches : hubBoot.patches
+    const releasePackageResolver = installProfilePackageResolver(prepared.bareModuleBaseUrl, hubBoot?.selection,options.hubRuntimeTarget!==undefined)
+    const profileBoot = createDesktopProfileBoot(prepared, desktopPnpmBootstrap, hubBoot?.selection, hubBoot === undefined ? [] : [hubBoot.patch],options.hubRuntimeTarget===undefined?undefined:hubBaseComposition,options.hubRuntimeTarget!==undefined, hubBoot?.compose)
+    // dsh 0.2.0 judges every profile row through the pluginPackages service.
+    // Without it the compatibility preflight falls back to Node's own lookup
+    // and reads the Profile's registry-installed @deepseek-ai copies instead
+    // of this installation's workspace versions. Mount it before the composed
+    // tree imports anything, exactly like the upstream CLI launcher.
     const ctx = await boot(
       BIN_NAME,
       prepared.rootConfig,
-      prepared.patches,
+      hostPatches,
       async (hostCtx) => {
         profileBoot.prepare(hostCtx)
+        if(options.hubRuntimeTarget!==undefined&&hubBoot===undefined)registerHubBootstrapSkillRoots(hostCtx,join(prepared.homeDir,'skills'))
+        if (hubBoot !== undefined) {
+          registerHubSkillRoots(hostCtx, hubBoot,options.hubRuntimeTarget===undefined?undefined:join(prepared.homeDir,'skills'))
+          hostCtx.provide('hubGenerationBoot', {
+            generationId: hubBoot.generationId, skillsRoot: hubBoot.skillsRoot,
+            inspectLoaded: (skills: HubSkillObservation, providerName: string) => hubBoot.inspectLoaded(hostCtx.loader, skills, providerName),
+          })
+        }
         // Keep Host imports and browser bundle discovery on the same public
         // profile-overlay resolver used by packaged Electron.
         hostCtx.loader.internal = undefined
+        registerHubHostService(hostCtx)
+          registerHubGenerationRoutes(hostCtx)
+        if(options.hubRuntimeTarget!==undefined)registerHubGenerationManager(hostCtx,{target:options.hubRuntimeTarget,userData:marketUserDataDir,profileDirectory:prepared.profile.dir,managed:hubBoot!==undefined})
         bindHost(hostCtx)
         hostCtx.effect(() => () => logSink.close(), 'dsh-plugin-desktop: Host log sink')
         hostCtx.effect(
@@ -177,7 +197,8 @@ export async function bootDesktopHost(options: DesktopHostOptions, runtime: Desk
               }
             },
           })
-        }        if (logSink !== undefined) {
+        }
+        if (logSink !== undefined) {
           fileExporter = new FileExporter(logSink)
           hostCtx.logger.exporter(fileExporter)
         }
@@ -243,12 +264,12 @@ export async function bootDesktopHost(options: DesktopHostOptions, runtime: Desk
         }, 'dsh-plugin-desktop: pending Desktop settings restart')
         const readMarket = () => desktopMarketSnapshotWithEffective(
           desktopProfileMarketSnapshot(readProfilePreferences().market),
-          effectiveMarket,
+          prepared.market.effective,
         )
         hostCtx.provide('desktopSettingsController', new DesktopSettingsController({
           profiles: hostCtx.desktopProfiles,
           readMarket,
-          readAa: () => ({ requested: readProfilePreferences().aaEnabled === true, effective: effectiveAa }),
+          readAa: () => ({ requested: readProfilePreferences().aaEnabled === true, effective: prepared.aaEnabled }),
           selectAa: async enabled => {
             await enqueueProfilePreferencesWrite(current => desktopProfilePreferencesFromSettings(
               current,
@@ -288,7 +309,7 @@ export async function bootDesktopHost(options: DesktopHostOptions, runtime: Desk
             ))
             return desktopMarketSnapshotWithEffective(
               await selectDesktopMarketProvider(marketUserDataDir, provider),
-              effectiveMarket,
+              prepared.market.effective,
             )
           },
           scheduleRestart: scheduleSettingsRestart,
@@ -317,7 +338,6 @@ export async function bootDesktopHost(options: DesktopHostOptions, runtime: Desk
       releasePackageResolver()
       throw cause
     })
-    bindHost(ctx)
     profileBoot.markReady()
     observeDesktopPreferenceSettings(ctx, fileExporter, enqueueProfilePreferencesWrite)
     void logInactiveStartupEntries(ctx, BIN_NAME)

@@ -245,8 +245,49 @@ describe('DofeAuthService', () => {
     await service.start()
     await vi.waitFor(() => expect(service.getStatus().status).toBe('error'))
     expect(fetcher).toHaveBeenCalledOnce()
-    expect(credentials.modifyRecord).not.toHaveBeenCalled()
+    // Explicit login clears the previous offline owner before discovery, but
+    // never rotates or transmits the refresh token to an untrusted endpoint.
+    expect(await credentials.readRecord()).toEqual({ kind: 'grant', payload: { refreshToken: 'refresh-old' } })
     await service.dispose()
+  })
+
+  it('restores only the credential owner after cold transport loss; no bearer or bound login is synthesized', async () => {
+    const tenantId = '11111111-1111-4111-8111-111111111111'
+    const credentials = credentialStore('refresh')
+    const online = new DofeAuthService({ openExternal: vi.fn() }, credentials as never, withFinance(vi.fn()
+      .mockResolvedValueOnce(response(discovery)).mockResolvedValueOnce(response({ access_token: 'access', refresh_token: 'rotated' }))
+      .mockResolvedValueOnce(response({ ...provisioned, tenant: { ...provisioned.tenant, tenantId } })).mockResolvedValueOnce(response(userinfo))))
+    await online.restore(); await online.dispose()
+    const offline = new DofeAuthService({ openExternal: vi.fn() }, credentials as never, vi.fn().mockRejectedValue(new TypeError('fetch failed')))
+    try {
+      expect((await offline.restore()).status).toBe('error')
+      expect(offline.getDatasourceSession()).toBeUndefined()
+      expect(await offline.getOfflineIdentity()).toEqual({ operator: 'sub-1', tenantId })
+      await credentials.deleteRecord()
+      expect(await offline.getOfflineIdentity()).toBeUndefined()
+    } finally { await offline.dispose() }
+  })
+
+  it.each(['http', 'invalid_grant', 'untrusted'] as const)('does not allow cold offline identity after %s rejection', async mode => {
+    const credentials = credentialStore('refresh')
+    await credentials.modifyRecord('', async () => ({ kind: 'grant', payload: { refreshToken: 'refresh', verifiedOwner: { operator: 'sub-1', tenantId: '11111111-1111-4111-8111-111111111111' } } }))
+    const fetcher = mode === 'http' ? vi.fn().mockResolvedValue(response({}, 503))
+      : mode === 'untrusted' ? vi.fn().mockResolvedValue(response({ ...discovery, token_endpoint: 'https://other.example/token' }))
+      : vi.fn().mockResolvedValueOnce(response(discovery)).mockResolvedValueOnce(response({ error: 'invalid_grant' }, 400))
+    const service = new DofeAuthService({ openExternal: vi.fn() }, credentials as never, fetcher)
+    try { await service.restore(); expect(await service.getOfflineIdentity()).toBeUndefined() }
+    finally { await service.dispose() }
+  })
+  it('retains owner observation after a mid-body transport reset but rejects malformed discovery JSON',async()=>{
+    const credentials=credentialStore('refresh'),owner={operator:'sub-1',tenantId:'11111111-1111-4111-8111-111111111111'}
+    await credentials.modifyRecord('',async()=>({kind:'grant',payload:{refreshToken:'refresh',verifiedOwner:owner}}))
+    const fetcher=vi.fn().mockResolvedValueOnce(new Response(new ReadableStream({start(controller){controller.error(new TypeError('terminated'))}})))
+      .mockResolvedValueOnce(new Response('{broken'))
+    const service=new DofeAuthService({openExternal:vi.fn()},credentials as never,fetcher)
+    try{
+      await service.restore();expect(await service.getOfflineIdentity()).toEqual(owner)
+      await service.restore();expect(await service.getOfflineIdentity()).toBeUndefined()
+    }finally{await service.dispose()}
   })
 
   it('releases the pending loopback listener on dispose', async () => {

@@ -8,6 +8,7 @@
   },
   "beforePack": "./scripts/mac-system-runtime.ts",
   "afterPack": "./scripts/verify-packaged-runtime.ts",
+  "afterSign": "./scripts/seal-hub-build-after-sign.ts",
   "electronDownload": {
     "checksums": {
       "electron-v44.0.0-darwin-arm64.zip": "076d79742986e1b100b69ebecc691cb07368045e54c9087cef631b8622b76a80",

@@ -6,11 +6,12 @@ import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { DofeAccessSection, DofeUserSection, DofeModelSection, DofeCapabilitiesSection, installDofeAccessGate, installDofeAccessStyles } from './DofeAccessSection.tsx'
+import { installHubUpdateNotice } from './HubUpdateNotice.tsx'
+import { HubSetupSection } from './HubSetupSection.tsx'
 import { registerDofePluginItems } from './DofePluginItems.tsx'
 import { DOFE_ACCESS_COPY } from './dofe-access.ts'
 import { DOFE_ACCESS_SETTINGS_NAMESPACE, type DofeAccessSettings } from '../dofe-plugins.ts'
 import { CreatePluginMenuItem, startCreatorConversation } from './CreatePluginMenuItem.tsx'
-import { installHubUpdateNotice } from './HubUpdateNotice.tsx'
 
 export function applyDofeAccess(ctx: Context): void {
   const inject = (ctx as Context & { inject?: Context['inject'] }).inject
@@ -28,7 +29,7 @@ export function applyDofeAccess(ctx: Context): void {
   const settingsScope = ctx.configForms.get<DofeAccessSettings>(DOFE_ACCESS_SETTINGS_NAMESPACE)
   const t = ctx.locale.bind('dofe.access')
   const subscribeReconnect = (listener: () => void) => ctx.on('connection/reset', listener)
-  const props = { credentials: ctx.remote.credentials, settingsApi: ctx.remote.settings, settingsScope, t }
+  const props = { subscribeReconnect, credentials: ctx.remote.credentials, settingsApi: ctx.remote.settings, settingsScope, t }
   ctx.effect(() => installDofeAccessGate(props), 'desktop: mandatory access gate')
   // The Plugins page lists every brand-eligible DoFe datasource as a read-only
   // card; the activation switches live on the Built-in capabilities page.
@@ -42,6 +43,7 @@ export function applyDofeAccess(ctx: Context): void {
   if (BRAND_VARIANT === 'sensteed') {
     for (const section of [
       { id: 'dofe-access', order: -100, label: 'nav', component: DofeUserSection },
+      { id: 'hub-setup', order: -90, label: 'hubNav', component: HubSetupSection },
       { id: 'models', order: 10, label: 'modelNav', component: DofeModelSection },
       { id: 'dofe-capabilities', order: 12, label: 'capabilityNav', component: DofeCapabilitiesSection },
     ] as const) {

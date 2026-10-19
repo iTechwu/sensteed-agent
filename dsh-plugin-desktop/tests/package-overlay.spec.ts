@@ -182,3 +182,5 @@ describe('Desktop package overlay', () => {
     expect(packageNameFromSpecifier('./relative.js')).toBeUndefined()
   })
 })
+
+it('pins enterprise bootstrap core to sealed install even before a managed generation exists',()=>{const f=fixture(),name='@deepseek-ai/dsh-tools';const built=installPackage(f.install,name,'1.0.0');installPackage(f.profile,name,'99.0.0');expect(findOverlayPackage(name,{...f.options,hostOwnedOnly:true})?.selected.packageDir).toBe(built);const missing=fixture();installPackage(missing.profile,name,'99.0.0');expect(findOverlayPackage(name,{...missing.options,hostOwnedOnly:true})).toBeUndefined()})

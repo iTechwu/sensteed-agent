@@ -14,6 +14,8 @@ import { installProfilePackageResolver } from './module-resolution.ts'
 import { withAsarModuleResolver } from './asar-module-resolver-state.ts'
 import { disableAsarArchiveView, type AsarArchiveProcess } from './asar-archive-policy.ts'
 
+import { enforceSealedSensteedCli } from './hub-cli-policy.ts'
+
 const RUN_AS_NODE = 'ELECTRON_RUN_AS_NODE'
 const DEFAULT_PROFILE = 'DSH_DESKTOP_DEFAULT_PROFILE'
 const DSH_ENTRY_URL = pathToFileURL(
@@ -108,6 +110,9 @@ export async function runDesktopDshCli(
   packagedEntry: boolean = /([\\/])app\.asar\1/u.test(fileURLToPath(DSH_ENTRY_URL)),
   asarProcess: AsarArchiveProcess = process,
 ): Promise<void> {
+  // Before profile/env processing, bundled skill roots, resolver registration or upstream import.
+  const readonlyReply = await enforceSealedSensteedCli(import.meta.url, argv.slice(2))
+  if (readonlyReply !== undefined) { process.stdout.write(readonlyReply); return }
   const profileName = takeDefaultProfile(environment)
   clearElectronRunAsNode(environment)
   // Same bundled-skills contract as the Host entries: packaged CLI runs see

@@ -13034,6 +13034,9 @@ importers:
       '@deepseek-ai/dsh-home-paths':
         specifier: workspace:*
         version: link:../../util/home-paths
+      '@deepseek-ai/dsh-scope':
+        specifier: workspace:*
+        version: link:../../core/scope
       '@deepseek-ai/dsh-skill':
         specifier: workspace:*
         version: link:../skill
@@ -17866,7 +17869,7 @@ importers:
         version: link:../dsh-sensteed-product
       '@dofe/dsh-sensteed-skill-manager':
         specifier: file:../../docker-helm.dofe.ai/plugins/dsh-sensteed-skill-manager
-        version: file:../docker-helm.dofe.ai/plugins/dsh-sensteed-skill-manager(@deepseek-ai/cordis@deepseek-harness+vendor+cordis)
+        version: file:../docker-helm.dofe.ai/plugins/dsh-sensteed-skill-manager
       '@dofe/dsh-sensteed-supplier-intelligence':
         specifier: file:../../docker-helm.dofe.ai/plugins/dsh-sensteed-supplier-intelligence
         version: file:../docker-helm.dofe.ai/plugins/dsh-sensteed-supplier-intelligence
@@ -18321,7 +18324,7 @@ importers:
         version: 0.2.0-rc.2(0c223ee5b7240216f8f47f2b6f41e904)
       '@dofe/dsh-sensteed-skill-manager':
         specifier: file:../../docker-helm.dofe.ai/plugins/dsh-sensteed-skill-manager
-        version: file:../docker-helm.dofe.ai/plugins/dsh-sensteed-skill-manager(@deepseek-ai/cordis@deepseek-harness+vendor+cordis)
+        version: file:../docker-helm.dofe.ai/plugins/dsh-sensteed-skill-manager
     devDependencies:
       '@deepseek-ai/dsh-api-remotes':
         specifier: workspace:*
@@ -19320,11 +19323,6 @@ packages:
     peerDependencies:
       '@deepseek-ai/cordis': ~4.0.4
 
-  '@deepseek-ai/dsh-atomic-write@0.2.1-alpha.3':
-    resolution: {integrity: sha512-p9gF/WB1Zr7kggNHdfBkTWMqe3ae//177inI9mqPyRz/i3lQFy3SjJGA5u5L4LbT/uVcZoE/Tj31/ktZjKETxA==}
-    peerDependencies:
-      '@deepseek-ai/cordis': ~4.0.5-alpha.2
-
   '@deepseek-ai/dsh-attachment-local@0.2.0-rc.2':
     resolution: {integrity: sha512-VDyHGvKoN59D+3t3rwkZYNFJJJ1PbCV/6z9ngL5lErd1H98NqmFqFzGgGypGPvBGdmi42ckhVldBPq8ZJWzKcA==}
     peerDependencies:
@@ -20107,11 +20105,6 @@ packages:
     resolution: {integrity: sha512-n4O5C9pNIVWbBklB5RzSTc3kr9hmUnDlZ6Leqj3TIk+CO593DTAmDGTt0rHMQe8H+1Ur+Jqj9Hqgsug/WRkkvQ==}
     peerDependencies:
       '@deepseek-ai/cordis': ~4.0.4
-
-  '@deepseek-ai/dsh-home-paths@0.2.1-alpha.3':
-    resolution: {integrity: sha512-vA9UkY7iPoihH95kBTEnVoSqgd6crbP/wefa0T8J6D+W2WehChQTe89FoaWky+6tbw9easlQAGn6JhxyUJYatA==}
-    peerDependencies:
-      '@deepseek-ai/cordis': ~4.0.5-alpha.2
 
   '@deepseek-ai/dsh-hook-protocol@0.2.0-rc.2':
     resolution: {integrity: sha512-ew0biR00o9ilXExq71XGYYbC0uJl+sr6Ju/zjzNUf/vXSZEuOMs9I89xA0R82Od8KLPMobPtQIs8YMwTHjiJEQ==}
@@ -31062,10 +31055,6 @@ snapshots:
     dependencies:
       '@deepseek-ai/cordis': link:deepseek-harness/vendor/cordis
 
-  '@deepseek-ai/dsh-atomic-write@0.2.1-alpha.3(@deepseek-ai/cordis@deepseek-harness+vendor+cordis)':
-    dependencies:
-      '@deepseek-ai/cordis': link:deepseek-harness/vendor/cordis
-
   '@deepseek-ai/dsh-attachment-local@0.2.0-rc.2(@deepseek-ai/cordis@4.0.5)(@deepseek-ai/dsh-attachment@deepseek-harness+packages+attachment+attachment)(@deepseek-ai/dsh-home-paths@0.2.0-rc.2(@deepseek-ai/cordis@4.0.5))(@types/node@22.20.1)':
     dependencies:
       '@deepseek-ai/cordis': 4.0.5(@deepseek-ai/cordis-plugin-include@1.0.10)(@deepseek-ai/cordis-plugin-loader@1.0.6)
@@ -32159,10 +32148,6 @@ snapshots:
   '@deepseek-ai/dsh-home-paths@0.2.0-rc.2(@deepseek-ai/cordis@4.0.5)':
     dependencies:
       '@deepseek-ai/cordis': 4.0.5(@deepseek-ai/cordis-plugin-include@1.0.10)(@deepseek-ai/cordis-plugin-loader@1.0.6)
-
-  '@deepseek-ai/dsh-home-paths@0.2.1-alpha.3(@deepseek-ai/cordis@deepseek-harness+vendor+cordis)':
-    dependencies:
-      '@deepseek-ai/cordis': link:deepseek-harness/vendor/cordis
 
   '@deepseek-ai/dsh-hook-protocol@0.2.0-rc.2(@deepseek-ai/cordis@deepseek-harness+vendor+cordis)(@deepseek-ai/dsh-invariants@0.1.7-alpha.2(@deepseek-ai/cordis@deepseek-harness+vendor+cordis))(@deepseek-ai/dsh-session@deepseek-harness+packages+core+session)(@deepseek-ai/dsh-shell@0.2.0-rc.2(@deepseek-ai/cordis@deepseek-harness+vendor+cordis)(@deepseek-ai/dsh-sandbox@0.2.0-rc.2(@deepseek-ai/cordis@deepseek-harness+vendor+cordis)(@deepseek-ai/dsh-llm@deepseek-harness+packages+llm+llm)(@deepseek-ai/dsh-session@deepseek-harness+packages+core+session))(@deepseek-ai/dsh-subprocess@0.2.0-rc.2(@deepseek-ai/cordis@deepseek-harness+vendor+cordis)(@deepseek-ai/dsh-http-proxy@0.2.0-rc.2(@deepseek-ai/cordis@4.0.5))))':
     dependencies:
@@ -34996,15 +34981,7 @@ snapshots:
 
   '@dofe/dsh-sensteed-knowledge@file:../docker-helm.dofe.ai/plugins/dsh-sensteed-knowledge': {}
 
-  '@dofe/dsh-sensteed-skill-manager@file:../docker-helm.dofe.ai/plugins/dsh-sensteed-skill-manager(@deepseek-ai/cordis@deepseek-harness+vendor+cordis)':
-    dependencies:
-      '@deepseek-ai/dsh-atomic-write': 0.2.1-alpha.3(@deepseek-ai/cordis@deepseek-harness+vendor+cordis)
-      '@deepseek-ai/dsh-home-paths': 0.2.1-alpha.3(@deepseek-ai/cordis@deepseek-harness+vendor+cordis)
-      fflate: 0.8.3
-      semver: 7.8.5
-      yaml: 2.9.0
-    transitivePeerDependencies:
-      - '@deepseek-ai/cordis'
+  '@dofe/dsh-sensteed-skill-manager@file:../docker-helm.dofe.ai/plugins/dsh-sensteed-skill-manager': {}
 
   '@dofe/dsh-sensteed-supplier-intelligence@file:../docker-helm.dofe.ai/plugins/dsh-sensteed-supplier-intelligence': {}
 

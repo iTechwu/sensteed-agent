@@ -40,6 +40,7 @@ import {
   type MacUniversalArch,
 } from './mac-universal.ts'
 import { expectedDesktopVersion, verifyDesktopRuntimeTree } from './prepare-runtime.ts'
+import { generateHubBuildManifest } from './generate-hub-build-manifest.mjs'
 
 /** Resolve a package root even when its exports hide `package.json`. */
 export function resolveRuntimePackageRoot(
@@ -1565,6 +1566,10 @@ export async function afterPack(
     })
   },
   verifyRuntime: typeof verifyPackagedPrimaryRuntime = verifyPackagedPrimaryRuntime,
+  sealHubBase: (context: PackagedRuntimeContext) => Promise<unknown> = context => {
+    if (!usesAsarLayout(context)) throw new Error('Hub base identity requires the standard ASAR layout')
+    return generateHubBuildManifest(dirname(resolvePackagedAsarPath(context)), join(context.appOutDir, 'hub-build-manifest.pre-sign.json'))
+  },
 
 ): Promise<void> {
   hydrateMac(context)
@@ -1579,6 +1584,7 @@ export async function afterPack(
   report(summary)
   recordSize(context)
   smokeNative(context)
+  await sealHubBase(context)
 }
 
 export default afterPack

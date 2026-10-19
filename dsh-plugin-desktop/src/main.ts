@@ -1,3 +1,13 @@
+import{registerHubGenerationRoutes}from'./hub-generation-routes.ts'
+import{inspectSavedHubPlan}from'./hub-saved-plan.ts'
+import { HubSupervisorRequestSchema,provideHubSupervisor,type HubSupervisorRequest } from './hub-supervisor-protocol.ts'
+import { HubGenerationStore } from './hub-generation-store.ts'
+import { HubExecutionJournal } from './hub-execution-journal.ts'
+import { hubGenerationBootReference } from './hub-generation-boot.ts'
+import { verifyHubBootAuthorization } from './hub-boot-authorization.ts'
+import { readSealedHubReleaseTrust } from './hub-release-trust.ts'
+import { verifyHubGenerationContent } from './hub-generation-content.ts'
+import { HubRendererHealth } from './hub-renderer-health.ts'
 /** Sensteed-Agent executable: minimal Electron bootstrap around the Host Cordis root. */
 
 // Tool subprocesses start the private Node runner through this Electron binary,
@@ -7,6 +17,13 @@
 // before it could launch. The dsh-subprocess-local patch scopes the flag to the
 // runner child alone.
 
+import { prepareHubHostBoot } from './hub-host-boot.ts'
+import { registerHubHostService } from './hub-host-service.ts'
+import { hubBaseComposition } from './hub-base-composition.ts'
+import { HubHostSupervisor } from './hub-host-supervisor.ts'
+import { readHubRuntimeTarget } from './hub-runtime-target.ts'
+import { registerHubGenerationManager } from './hub-generation-manager.ts'
+import { registerHubBootstrapSkillRoots, registerHubSkillRoots } from './hub-skill-roots.ts'
 import { formatUnexpectedHostExit, startIsolatedDesktopHost } from './host-process.ts'
 import * as desktopOffice from './desktop-office.ts'
 import { desktopPrimaryRuntime, resolveDesktopOfficeConfig } from './desktop-office.ts'
@@ -147,7 +164,7 @@ import { DesktopStartupGeneration } from './startup-generation.ts'
 import {
   desktopInstallAnchor,
   healDesktopProfileModuleFallback,
-  prepareDesktopProfile,
+  prepareDesktopProfile, prepareSealedDesktopProfile,
   type SkippedOptionalEntry,
 } from './profile.ts'
 import { DesktopProfileCheckpoint } from './profile-checkpoint.ts'
@@ -528,6 +545,12 @@ async function start(): Promise<void> {
     | Extract<SessionProjectionCacheRecoveryResult, { status: 'quarantined' }>
     | undefined
   let recoveryTerminalAvailable = false
+  let hubBoot: ReturnType<typeof prepareHubHostBoot> | undefined
+  let inspectHubHealth: (() => Promise<import('./hub-generation-health.ts').HubLoadedEvidence>) | undefined
+  const hubRendererHealth = new HubRendererHealth()
+  let finishInitialRenderer!: () => void, failInitialRenderer!: (cause: unknown) => void
+  const initialRendererReady = new Promise<void>((resolve, reject) => { finishInitialRenderer = resolve; failInitialRenderer = reject })
+  void initialRendererReady.catch(() => {})
   let startupStage: DesktopStartupFailureStage = 'electron-ready'
   const desktopUserDataDir = app.getPath('userData')
   const appVersion = desktopProductVersion()
@@ -1625,7 +1648,8 @@ async function start(): Promise<void> {
           'completed',
           setupWizardVersions,
         )
-      }    }
+      }
+    }
     if (profileCheckpoint === undefined) {
       try {
         profileCheckpoint = new DesktopProfileCheckpoint({
@@ -1785,12 +1809,18 @@ async function start(): Promise<void> {
     if (profilePreferences === undefined) {
       throw new Error(`${BIN_NAME}: active Profile preferences were not initialized`)
     }
-    const profileBoot = createDesktopProfileBoot(prepared, desktopPnpmBootstrap)
-    if (process.env.DSH_DESKTOP_ISOLATED_HOST !== '0') {
-      startupStage = 'host-boot'
-      lifecycleRecorder.transitionStartupStage(startupStage)
+    hubBoot = prepared.hubGeneration === undefined ? undefined : prepareHubHostBoot(prepared.hubGeneration, prepared.profile.dir,
+      prepared.patches)
+    const hubRuntimeTarget=await readHubRuntimeTarget({isPackaged:app.isPackaged,appPath:app.getAppPath(),resourcesPath:process.resourcesPath,sensteedVersion:appVersion})
+    if(hubRuntimeTarget!==undefined){prepared=prepareSealedDesktopProfile(prepared);prepared.patches=hubBaseComposition(prepared.patches);hubBoot=undefined}
+    const hostPatches = hubBoot === undefined ? prepared.patches : hubBoot.patches
+    const profileBoot = createDesktopProfileBoot(prepared, desktopPnpmBootstrap, hubBoot?.selection, hubBoot === undefined ? [] : [hubBoot.patch],hubRuntimeTarget===undefined?undefined:hubBaseComposition,hubRuntimeTarget!==undefined,hubBoot?.compose)
+    const hubSupervisor=new HubHostSupervisor()
+    generation.bindHost({fiber:{dispose:()=>hubSupervisor.dispose()}})
+    const hubBasePrepared=prepared
+    const bootIsolatedHost=async(nextPrepared:typeof prepared,bindNext:(host:import('./startup-generation.ts').DesktopStartupGenerationHost)=>void)=>{
       await startIsolatedDesktopHost({
-        host: { prepared, profilePreferences, homeDir, activeProfileName, pluginManagementStatePath,
+        host: { ...(hubRuntimeTarget===undefined?{}:{hubRuntimeTarget}), prepared:nextPrepared, profilePreferences:profilePreferences!, homeDir, activeProfileName, pluginManagementStatePath,
           selectionStatePath, marketUserDataDir, releaseUserDataLocations, desktopLaunchEnvironment,
           desktopProxyOverlay: proxyResolution.overlay,
           desktopPnpmBootstrap, primaryRuntime, logDirectory: join(desktopUserDataDir, 'logs', 'host') },
@@ -1801,12 +1831,15 @@ async function start(): Promise<void> {
         // only binds the generation's minimal lifetime object here — it is
         // `{ fiber: { dispose } }`, never a Context, and must not be handed
         // to `profileBoot.prepare`.
-        bindHost: host => { generation.bindHost(host) }, requestQuit,
+        bindHost: bindNext, requestQuit,
         registerQuitInspection: impl => {
           quitInspectionProbe = impl === undefined
             ? undefined
             : async () => ({ source: 'ready' as const, ...(await impl()) })
         },
+        requestHubSwitch: request=>{setImmediate(()=>{void handleHubSwitch(request).catch(cause=>electronLogger.errorCause(cause))})},
+        registerHubHealth: impl => { inspectHubHealth = impl },
+        waitHubRendererHealthy: generationId => hubRendererHealth.wait(generationId),
         registerMandatoryDownload: impl => {
           mandatoryDownloadProbe = impl ?? undefined
         },
@@ -1824,6 +1857,78 @@ async function start(): Promise<void> {
             .catch((cause: unknown) => { electronLogger.errorCause(cause) })
         },
       })
+    }
+    const bootSwitchedHost = async (nextPrepared: typeof prepared, bind: (host: import('./startup-generation.ts').DesktopStartupGenerationHost) => void, generationId?: string) => {
+      if (generationId !== undefined) hubRendererHealth.begin(generationId)
+      const verdictPromise = runtime.beginGenerationRendererBootMonitoring(randomUUID(), {
+        commitHealthy: async () => {
+          if (generationId === undefined) return
+          if (!inspectHubHealth) throw new Error('Hub managed health unavailable')
+          const evidence = await inspectHubHealth()
+          if (evidence.generationId !== generationId) throw new Error('Hub renderer health generation mismatch')
+        },
+      })
+      void verdictPromise.catch(() => {})
+      try {
+        await bootIsolatedHost(nextPrepared, bind)
+        await runtime.mountScheduled()
+        const verdict = await verdictPromise
+        if ('failureReason' in verdict) throw new RendererStartupFailure(verdict.failureReason, verdict.report)
+        if (generationId !== undefined) hubRendererHealth.healthy(generationId)
+        runtime.show()
+      } catch (cause) {
+        runtime.stopRendererBootMonitoring()
+        hubRendererHealth.fail(cause)
+        throw cause
+      }
+    }
+    let hubSwitchTail: Promise<void> = Promise.resolve()
+    const handleHubSwitch = (raw: HubSupervisorRequest): Promise<void> => {
+      const task = hubSwitchTail.then(() => performHubSwitch(raw))
+      hubSwitchTail = task.catch(() => {})
+      return task
+    }
+    const performHubSwitch=async(raw:HubSupervisorRequest):Promise<void>=>{
+      await initialRendererReady
+      if(hubRuntimeTarget===undefined)throw new Error('Hub sealed target unavailable')
+      const request=HubSupervisorRequestSchema.parse(raw)
+      if(request.kind==='base'){hubRendererHealth.fail(new Error('Hub generation closed'));hubBoot=undefined;await hubSupervisor.replace(async()=>{},async bind=>{await bootSwitchedHost(hubBasePrepared,bind)});return}
+      const store=new HubGenerationStore(marketUserDataDir,request.identity)
+      if(request.kind==='activate'){
+        const record=new HubExecutionJournal(store).read(),state=store.readState()
+        if(!record||record.operationId!==request.operationId||record.phase!=='STAGED'||record.pendingReceipt!==null||state.phase!=='prepared'||state.pending?.descriptorDigest!==record.descriptorDigest)throw new Error('Hub staged restart mismatch')
+        inspectSavedHubPlan(record,request.identity,hubRuntimeTarget,readSealedHubReleaseTrust())
+        try {
+          await hubSupervisor.replace(async()=>{hubBoot=undefined;await store.activate()},async bind=>{await bootSwitchedHost(hubBasePrepared,bind)})
+        } catch (cause) {
+          await hubSupervisor.replace(async()=>{const state=store.readState();if(state.phase==='verifying'||state.phase==='stable'&&state.previous!==null)await store.rollback()},async bind=>{await bootSwitchedHost(hubBasePrepared,bind)})
+          throw cause
+        }
+      }else{
+        const journal=new HubExecutionJournal(store),pendingRecord=journal.read(),active=store.readState().active,record=pendingRecord?.descriptorDigest===active?.descriptorDigest?pendingRecord:journal.readHealthyInventory()
+        if(!record||record.generationDigest!==request.generationDigest||record.phase!=='COMMITTED'&&record.phase!=='ACTIVATED')throw new Error('Hub managed restart mismatch')
+        const saved = inspectSavedHubPlan(record,request.identity,hubRuntimeTarget,readSealedHubReleaseTrust())
+        verifyHubBootAuthorization(request.lease,readSealedHubReleaseTrust(),{...request.identity,target:hubRuntimeTarget,generationDigest:request.generationDigest,minimumPolicyRevision:saved.plan.policyRevision})
+        try{
+        verifyHubGenerationContent(store,saved.plan,readSealedHubReleaseTrust())
+        const reference=hubGenerationBootReference(store,prepared.profile.dir),input={reference,expectedIdentity:request.identity,skillProviderName:`hub-${reference.generationId}`}
+        hubBoot=prepareHubHostBoot(input,prepared.profile.dir,hubBasePrepared.patches)
+        await hubSupervisor.replace(async()=>{},async bind=>{await bootSwitchedHost({...hubBasePrepared,hubGeneration:input},bind,reference.generationId)})
+        if(!inspectHubHealth)throw new Error('Hub managed health unavailable')
+        const evidence=await inspectHubHealth()
+        if(evidence.generationId!==reference.generationId)throw new Error('Hub managed health mismatch')
+        }catch(cause){
+          hubRendererHealth.fail(cause)
+          hubBoot=undefined
+          await hubSupervisor.replace(async()=>{const state=store.readState();if(state.phase==='verifying'||state.phase==='stable'&&state.previous!==null)await store.rollback()},async bind=>{await bootSwitchedHost(hubBasePrepared,bind)})
+          throw cause
+        }
+      }
+    }
+    if (process.env.DSH_DESKTOP_ISOLATED_HOST !== '0') {
+      startupStage = 'host-boot'
+      lifecycleRecorder.transitionStartupStage(startupStage)
+      await bootIsolatedHost(prepared,host=>hubSupervisor.bind(host))
     } else {
       // Same bundled-skills contract as the isolated Host entry: the legacy
       // in-process boot must announce the app-bundled skill root too.
@@ -1857,8 +1962,7 @@ async function start(): Promise<void> {
       }
       startupStage = 'host-boot'
       lifecycleRecorder.transitionStartupStage(startupStage)
-      let effectiveMarket = prepared.market.effective
-      const releasePackageResolver = installProfilePackageResolver(prepared.bareModuleBaseUrl)
+      const releasePackageResolver = installProfilePackageResolver(prepared.bareModuleBaseUrl, hubBoot?.selection,hubRuntimeTarget!==undefined)
       // Same pluginPackages contract as the isolated Host: the compatibility
       // preflight must judge rows against this installation's versions, not
       // the Profile's registry-installed @deepseek-ai copies.
@@ -1866,11 +1970,24 @@ async function start(): Promise<void> {
       const ctx = await boot(
         BIN_NAME,
         prepared.rootConfig,
-        prepared.patches,
+        hostPatches,
         async (hostCtx) => {
           // Keep Host imports and browser bundle discovery on the same public
           // profile-overlay resolver used by packaged Electron.
           hostCtx.loader.internal = undefined
+          provideHubSupervisor(hostCtx,async request=>{setImmediate(()=>{void handleHubSwitch(request).catch(cause=>electronLogger.errorCause(cause))})},generationId=>hubRendererHealth.wait(generationId))
+          if(hubRuntimeTarget!==undefined&&hubBoot===undefined)registerHubBootstrapSkillRoots(hostCtx,join(prepared.homeDir,'skills'))
+          registerHubHostService(hostCtx)
+          registerHubGenerationRoutes(hostCtx)
+          if(hubRuntimeTarget!==undefined)registerHubGenerationManager(hostCtx,{target:hubRuntimeTarget,userData:marketUserDataDir,profileDirectory:prepared.profile.dir,managed:hubBoot!==undefined})
+          if (hubBoot !== undefined) {
+            const managedBoot = hubBoot
+            registerHubSkillRoots(hostCtx, managedBoot,join(prepared.homeDir,'skills'))
+            hostCtx.provide('hubGenerationBoot', {
+              generationId: hubBoot.generationId, skillsRoot: hubBoot.skillsRoot,
+              inspectLoaded: (skills: import('./hub-generation-health.ts').HubSkillObservation, providerName: string) => managedBoot.inspectLoaded(hostCtx.loader, skills, providerName),
+            })
+          }
           hostCtx.inject(['sensteedQuitInspection'], scope => {
             quitInspectionProbe = async () => ({
               source: 'ready' as const,
@@ -1907,12 +2024,14 @@ async function start(): Promise<void> {
             requestRestart: () => runtime.requestRestart(),
             confirmRestart: acknowledge => runtime.confirmRestart(acknowledge),
           })
-          await hostCtx.plugin(DesktopPluginsService, {
-            profileName: activeProfileName,
-            homeDir,
-            statePath: pluginManagementStatePath,
-            installAnchor: desktopInstallAnchor(),
-          })
+          if (prepared.market.effective === 'community-market') {
+            await hostCtx.plugin(DesktopPluginsService, {
+              profileName: activeProfileName,
+              homeDir,
+              statePath: pluginManagementStatePath,
+              installAnchor: desktopInstallAnchor(),
+            })
+          }
           if (logSink !== undefined) {
             fileExporter = new FileExporter(logSink)
             hostCtx.logger.exporter(fileExporter)
@@ -1978,11 +2097,13 @@ async function start(): Promise<void> {
           }, 'dsh-plugin-desktop: pending Desktop settings restart')
           const readMarket = () => desktopMarketSnapshotWithEffective(
             desktopProfileMarketSnapshot(currentProfilePreferences.market),
-            prepared.market.effective,          )
+            prepared.market.effective,
+          )
           hostCtx.provide('desktopSettingsController', new DesktopSettingsController({
             profiles: hostCtx.desktopProfiles,
             readMarket,
-            readAa: () => ({ requested: currentProfilePreferences.aaEnabled === true, effective: prepared.aaEnabled }),            selectAa: async enabled => {
+            readAa: () => ({ requested: currentProfilePreferences.aaEnabled === true, effective: prepared.aaEnabled }),
+            selectAa: async enabled => {
               await enqueueProfilePreferencesWrite(current => desktopProfilePreferencesFromSettings(
                 current,
                 current.notifications,
@@ -2021,7 +2142,7 @@ async function start(): Promise<void> {
               ))
               return desktopMarketSnapshotWithEffective(
                 await selectDesktopMarketProvider(marketUserDataDir, provider),
-                effectiveMarket,
+                prepared.market.effective,
               )
             },
             scheduleRestart: scheduleSettingsRestart,
@@ -2050,7 +2171,11 @@ async function start(): Promise<void> {
         releasePackageResolver()
         throw cause
       })
-      generation.bindHost(ctx)
+      hubSupervisor.bind(ctx)
+      if (hubBoot !== undefined) {
+        const managedBoot = hubBoot
+        inspectHubHealth = () => managedBoot.inspectLoaded(ctx.loader, ctx.skills, managedBoot.skillProviderName)
+      }
       profileBoot.markReady()
       observeDesktopPreferenceSettings(ctx, fileExporter, enqueueProfilePreferencesWrite)
       void logInactiveStartupEntries(ctx, BIN_NAME)
@@ -2060,6 +2185,11 @@ async function start(): Promise<void> {
     lifecycleRecorder.startRendererBoot()
     const rendererBoot = runtime.beginRendererBootMonitoring({
       commitHealthy: async () => {
+        if (hubBoot !== undefined) {
+          if (inspectHubHealth === undefined) throw new Error('Managed Hub health probe is unavailable')
+          const evidence = await inspectHubHealth()
+          if (evidence.generationId !== hubBoot.generationId) throw new Error('Managed Hub health generation mismatch')
+        }
         lifecycleRecorder.finishRendererBoot({ status: 'healthy' }, 'renderer-failed')
         startupStage = 'health-commit'
         lifecycleRecorder.transitionStartupStage(startupStage)
@@ -2083,6 +2213,7 @@ async function start(): Promise<void> {
         rendererVerdict.report,
       )
     }
+    finishInitialRenderer()
     lifecycleRecorder.completeStartup(startupStage, rendererReport)
     setupWizardWindow?.closeStartupSurface()
     setupWizardWindow = undefined
@@ -2103,6 +2234,8 @@ async function start(): Promise<void> {
       notifySessionProjectionCacheRecovery(runtime, electronLogger, sessionProjectionCacheRecovery)
     }
   } catch (cause) {
+    failInitialRenderer(cause)
+    hubRendererHealth.fail(cause)
     setupWizardWindow?.closeStartupSurface()
     setupWizardWindow = undefined
     runtime.stopRendererBootMonitoring()
@@ -2115,6 +2248,9 @@ async function start(): Promise<void> {
       stage: startupStage,
     })
     const recoveryActionsSafe = await generation.quiesceForRecovery()
+    if (hubBoot !== undefined && recoveryActionsSafe && hubBoot.store.readState().phase === 'verifying') {
+      await hubBoot.store.rollback()
+    }
     if (failureRoute === 'startup-recovery') {
       const detail = cause instanceof Error ? cause.message : String(cause)
       const recoveryResult = await openStartupRecoveryWindow(

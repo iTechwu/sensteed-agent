@@ -1,22 +1,15 @@
 /** Headless artifact smoke for the Electron-backed dsh and pnpm command entries. */
 
 import { spawnSync } from 'node:child_process'
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import electronPath from 'electron'
 import { installDesktopPnpmRuntime } from '../lib/desktop-runtime-environment.js'
 
 const packageRoot = new URL('../', import.meta.url)
 const desktopCli = fileURLToPath(new URL('lib/desktop-cli.js', packageRoot))
-const dshAppBootPackage = fileURLToPath(new URL('node_modules/@deepseek-ai/dsh-app-boot/', packageRoot))
-const dshAtomicWritePackage = fileURLToPath(new URL('node_modules/@deepseek-ai/dsh-atomic-write/', packageRoot))
-const cordisPluginLoaderPackage = fileURLToPath(new URL('node_modules/@deepseek-ai/cordis-plugin-loader/', packageRoot))
-const dshHomePathsPackage = fileURLToPath(new URL('node_modules/@deepseek-ai/dsh-home-paths/', packageRoot))
-const dshPackage = fileURLToPath(new URL('node_modules/@deepseek-ai/dsh/', packageRoot))
-const semverPackage = fileURLToPath(new URL('node_modules/semver/', packageRoot))
-const yamlPackage = fileURLToPath(new URL('node_modules/yaml/', packageRoot))
 const pnpmCli = fileURLToPath(new URL('node_modules/pnpm/bin/pnpm.mjs', packageRoot))
 const dshVersion = JSON.parse(readFileSync(new URL('node_modules/@deepseek-ai/dsh/package.json', packageRoot), 'utf8')).version
 const pnpmVersion = JSON.parse(readFileSync(new URL('node_modules/pnpm/package.json', packageRoot), 'utf8')).version
@@ -196,24 +189,24 @@ function runPackagedPnpmShim() {
 function runFlatProfileDshEntry() {
   const root = mkdtempSync(join(tmpdir(), 'sensteed-agent-flat-cli-smoke-'))
   const desktopPackage = join(root, 'node_modules', 'dsh-plugin-desktop')
-  const linkedAppBootPackage = join(root, 'node_modules', '@deepseek-ai', 'dsh-app-boot')
-  const linkedAtomicWritePackage = join(root, 'node_modules', '@deepseek-ai', 'dsh-atomic-write')
-  const linkedCordisPluginLoaderPackage = join(root, 'node_modules', '@deepseek-ai', 'cordis-plugin-loader')
-  const linkedDshHomePathsPackage = join(root, 'node_modules', '@deepseek-ai', 'dsh-home-paths')
-  const linkedDshPackage = join(root, 'node_modules', '@deepseek-ai', 'dsh')
-  const linkedSemverPackage = join(root, 'node_modules', 'semver')
-  const linkedYamlPackage = join(root, 'node_modules', 'yaml')
   try {
-    mkdirSync(join(root, 'node_modules', '@deepseek-ai'), { recursive: true })
+    mkdirSync(desktopPackage, { recursive: true })
     cpSync(fileURLToPath(new URL('lib/', packageRoot)), join(desktopPackage, 'lib'), { recursive: true })
     cpSync(fileURLToPath(new URL('package.json', packageRoot)), join(desktopPackage, 'package.json'))
-    symlinkSync(dshAppBootPackage, linkedAppBootPackage, process.platform === 'win32' ? 'junction' : 'dir')
-    symlinkSync(dshAtomicWritePackage, linkedAtomicWritePackage, process.platform === 'win32' ? 'junction' : 'dir')
-    symlinkSync(cordisPluginLoaderPackage, linkedCordisPluginLoaderPackage, process.platform === 'win32' ? 'junction' : 'dir')
-    symlinkSync(dshHomePathsPackage, linkedDshHomePathsPackage, process.platform === 'win32' ? 'junction' : 'dir')
-    symlinkSync(dshPackage, linkedDshPackage, process.platform === 'win32' ? 'junction' : 'dir')
-    symlinkSync(semverPackage, linkedSemverPackage, process.platform === 'win32' ? 'junction' : 'dir')
-    symlinkSync(yamlPackage, linkedYamlPackage, process.platform === 'win32' ? 'junction' : 'dir')
+    // Match the actual Desktop production dependency owner, not a stale list
+    // of seven imports. Compiled shared chunks (including sealed identity's
+    // zod schema) may add imports even to a non-ASAR help smoke.
+    const manifest = JSON.parse(readFileSync(new URL('package.json', packageRoot), 'utf8'))
+    for (const name of Object.keys(manifest.dependencies ?? {})) {
+      const source = realpathSync(fileURLToPath(new URL(`node_modules/${name}/`, packageRoot)))
+      const installed = JSON.parse(readFileSync(join(source, 'package.json'), 'utf8'))
+      // npm aliases intentionally have a different manifest name; ownership
+      // is the declared edge and its installed link, not a global resolver.
+      if (typeof installed.name !== 'string') throw new Error(`Invalid installed CLI dependency: ${name}`)
+      const target = join(root, 'node_modules', name)
+      mkdirSync(dirname(target), { recursive: true })
+      symlinkSync(source, target, process.platform === 'win32' ? 'junction' : 'dir')
+    }
     // dsh 0.2.0-rc.2 only manages the reserved Desktop Profile after Desktop
     // has initialized it, so give the smoke a private, initialized home.
     const home = join(root, 'home')

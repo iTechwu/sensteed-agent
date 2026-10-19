@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { apply, DOFE_MCP_BASE_URL } from '../src/dofe-managed.ts'
+import { apply as applyManaged, DOFE_MCP_BASE_URL } from '../src/dofe-managed.ts'
+import { apply as applyAuth } from '../src/dofe-host-auth.ts'
 import { DOFE_ACCESS_VALIDATION_VERSION, DEFAULT_DOFE_PLUGIN_IDS, normalizeDofePluginIds, type DofeAccessSettings } from '../src/dofe-plugins.ts'
 import { BRAND_VARIANT } from '../src/generated-product-identity.ts'
 
@@ -14,7 +15,9 @@ function createHarness(settings: DofeAccessSettings, failAt = Number.POSITIVE_IN
     get: () => settings,
     watch: vi.fn(),
   }
+  const services: Record<string, unknown> = {}
   const ctx = {
+    get: (name: string) => services[name],
     settings: { register: vi.fn(() => access), update: vi.fn(async () => {}) },
     // The sensteed branch builds its SSO service on the credential store; this
     // harness holds no saved grant, so the periodic restore stays idle.
@@ -35,9 +38,10 @@ function createHarness(settings: DofeAccessSettings, failAt = Number.POSITIVE_IN
     effect: vi.fn(),
     // The sensteed brand branch provides the SSO auth service; production
     // hands it to the Host plugin through this seam.
-    provide: vi.fn(),
+    provide: vi.fn((name: string, value: unknown) => { services[name] = value; Object.assign(ctx, { [name]: value }) }),
     logger: { error: vi.fn((...args: unknown[]) => errors.push(args)) },
   }
+  Object.assign(ctx, { dofeAccessSettings: access, dofeAuth: { getDatasourceSession: () => undefined, watchBinding: () => () => {} } })
   return { ctx, access, clients, errors }
 }
 
@@ -49,7 +53,7 @@ describe('dofe-managed MCP runtime', () => {
     Object.assign(harness.ctx.desktopRuntime, { requestDofeAuth })
     const nodeFetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('stale Node proxy'))
     try {
-      await apply(harness.ctx as never)
+      await applyAuth(harness.ctx as never)
       expect(requestDofeAuth).toHaveBeenCalledWith('https://user.hozonauto.com/api/.well-known/openid-configuration', expect.objectContaining({ redirect: 'error' }))
       expect(nodeFetch).not.toHaveBeenCalled()
       // A transport failure must not invalidate the user's saved setup.
@@ -70,7 +74,7 @@ describe('dofe-managed MCP runtime', () => {
       entitlements: { plugins: ['openmontage'], defaultModel: 'deepseek-chat', allowedProtocols: ['chat-completions'] },
     })
 
-    await apply(harness.ctx as never)
+    await applyManaged(harness.ctx as never)
 
     expect(harness.clients).toHaveLength(2)
     expect(harness.clients[0]?.config).toMatchObject({
@@ -101,7 +105,7 @@ describe('dofe-managed MCP runtime', () => {
     }
     const harness = createHarness(settings)
 
-    await apply(harness.ctx as never)
+    await applyManaged(harness.ctx as never)
 
     const provideCall = harness.ctx.provide.mock.calls.find(([name]) => name === 'dofeAccess')
     const getGate = provideCall?.[1] as (() => { ready: boolean; enabledPlugins?: readonly string[]; entitlements?: { plugins: string[]; knowledge?: { permissionVersion: number; accesses: string[] } } }) | undefined
@@ -129,7 +133,7 @@ describe('dofe-managed MCP runtime', () => {
       entitlements: { plugins: normalizeDofePluginIds(DEFAULT_DOFE_PLUGIN_IDS, BRAND_VARIANT), defaultModel: 'deepseek-chat', allowedProtocols: ['chat-completions'] },
     }, 4)
 
-    await apply(harness.ctx as never)
+    await applyManaged(harness.ctx as never)
 
     expect(harness.clients).toHaveLength(3)
     // A failure on the fourth route must release all three earlier clients.

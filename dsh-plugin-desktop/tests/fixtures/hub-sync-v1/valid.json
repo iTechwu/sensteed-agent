@@ -1,0 +1,74 @@
+{
+  "provenance": "Hub apps/api/db/hub-canonical.util.ts, ephemeral test Ed25519 key (private key discarded)",
+  "at": 1792281600000,
+  "expected": {
+    "origin": "https://ai.hozonauto.com/plugins/api",
+    "tenantId": "fb9f3bf4-c072-416b-ac95-3302f31db96f",
+    "actorRef": "sso:fixture",
+    "deviceId": "66970ea0-9587-4a66-ae09-5b8bc5ddb1e3",
+    "profileId": "7841f7fb-0f31-40eb-84de-6630c431936b",
+    "channel": "stable",
+    "observedStateDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "target": {
+      "sensteedVersion": "0.2.1-alpha.3",
+      "harnessVersion": "0.2.1-alpha.3",
+      "os": "darwin",
+      "arch": "arm64",
+      "nodeVersion": "22.0.0",
+      "cordisVersion": "4.0.5-alpha.2",
+      "libc": null,
+      "nodeAbi": "127",
+      "hostCapabilities": [
+        "credentials"
+      ],
+      "hostBuildDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "minimumPolicyRevision": 0
+  },
+  "trust": {
+    "schemaVersion": 1,
+    "keys": {
+      "fixture": "MCowBQYDK2VwAyEAUSOteOn4VkOlPfXia5QsqrN51ea87u4WO3NcBZ0L7HY="
+    },
+    "revokedKeyIds": []
+  },
+  "value": {
+    "snapshot": {
+      "origin": "https://ai.hozonauto.com/plugins/api",
+      "tenantId": "fb9f3bf4-c072-416b-ac95-3302f31db96f",
+      "actorRef": "sso:fixture",
+      "deviceId": "66970ea0-9587-4a66-ae09-5b8bc5ddb1e3",
+      "profileId": "7841f7fb-0f31-40eb-84de-6630c431936b",
+      "channel": "stable",
+      "observedStateDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "target": {
+        "sensteedVersion": "0.2.1-alpha.3",
+        "harnessVersion": "0.2.1-alpha.3",
+        "os": "darwin",
+        "arch": "arm64",
+        "nodeVersion": "22.0.0",
+        "cordisVersion": "4.0.5-alpha.2",
+        "libc": null,
+        "nodeAbi": "127",
+        "hostCapabilities": [
+          "credentials"
+        ],
+        "hostBuildDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "schemaVersion": "hub-sync-v1",
+      "snapshotId": "07dde7ae-b6f0-42c4-a88f-df034183d1cb",
+      "policyRevision": 0,
+      "catalogDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "entries": [],
+      "issuedAt": "2026-10-18T00:00:00.000Z",
+      "expiresAt": "2026-10-18T00:05:00.000Z"
+    },
+    "signature": {
+      "algorithm": "Ed25519",
+      "canonicalization": "RFC8785",
+      "keyId": "fixture",
+      "payloadDigest": "a1785a9983ebb7cf282ea32255a36a98752360da7e5204e9bd529699f0716e2b",
+      "signature": "DRqU2lJkLgnJ1dG+ERIwLIgHAhP+PX0DnIM8ndIQ6xReKF9IXkuFzlHScOq7E4UUTMHK2m3m6pgRiiZyBOnwAQ=="
+    }
+  }
+}
