@@ -1,3 +1,4 @@
+import { observeNavigationIdentity, NAVIGATION_IDENTITY_EVENT } from './navigation-identity.ts'
 /** One brand-aware activation gate for every desktop distribution. */
 import { BRAND_VARIANT } from '../generated-product-identity.ts'
 import { SensteedUserSettingsTrigger } from './SensteedUserSettingsTrigger.tsx'
@@ -27,6 +28,9 @@ export function applyDofeAccess(ctx: Context): void {
   ctx.effect(() => ctx.locale.register('dofe.access', DOFE_ACCESS_COPY), 'desktop: access dictionaries')
   ctx.effect(() => installDofeAccessStyles(), 'desktop: access styles')
   const settingsScope = ctx.configForms.get<DofeAccessSettings>(DOFE_ACCESS_SETTINGS_NAMESPACE)
+  if (BRAND_VARIANT === 'sensteed') ctx.effect(() => observeNavigationIdentity(settingsScope, () => {
+    window.dispatchEvent(new Event(NAVIGATION_IDENTITY_EVENT))
+  }), 'desktop: navigation identity boundary')
   const t = ctx.locale.bind('dofe.access')
   const subscribeReconnect = (listener: () => void) => ctx.on('connection/reset', listener)
   const props = { subscribeReconnect, credentials: ctx.remote.credentials, settingsApi: ctx.remote.settings, settingsScope, t }

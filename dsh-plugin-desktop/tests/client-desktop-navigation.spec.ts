@@ -22,6 +22,7 @@ describe('desktop navigation composition', () => {
     expect(entry.registrant).toBe('desktop-navigation')
     expect(entry.children).toHaveProperty('sidebar.workspaces')
     expect(entry.children).toHaveProperty('sidebar.settings')
+    expect(entry.children).toHaveProperty('desktop.navigation.context')
     expect(ctx.slots.entriesOfSlot('root')[0]?.component).toBe(Root)
     const permissionAwareLauncher = () => null
     const disposeKnowledge = ctx.slots.register({ name: 'sidebar.footer.action', id: 'dofe-sensteed-knowledge',
@@ -47,6 +48,7 @@ describe('desktop navigation composition', () => {
     const root = createRoot(container)
     const selectPanel = vi.fn()
     let active: string | null = null, mounts = 0
+    let pendingLeave: (() => void) | undefined
     const Tree = () => { mounts++; return createElement('input', { 'aria-label': 'workspace search', defaultValue: 'retained' }) }
     const Component = (props: Record<string, unknown>) => createElement(DesktopNavigationSidebar as ComponentType<Record<string, unknown>>, {
       ...props, collapsed: true, width: 0, toggleSidebar: vi.fn(), startSession: vi.fn(), selectPanel,
@@ -54,7 +56,13 @@ describe('desktop navigation composition', () => {
       usePanelInfo: (select: (value: { activePanelId: string | null }) => unknown) => select({ activePanelId: active }),
       usePanels: (select: (value: unknown) => unknown) => select([{ id: 'plugins', label: '插件', order: 0 }, { id: 'schedules', label: '定时任务', order: 5 }]),
       t: (key: string) => key === 'session.new' ? '新聊天' : key,
-      renderSlot: (name: string) => name === 'sidebar.workspaces' ? createElement(Tree) : createElement('span', { 'data-slot': name }),
+      renderSlot: (name: string, owner?: Record<string, unknown>) => {
+        if (name === 'desktop.navigation.context') {
+          const register = owner?.registerLeaveGuard as (guard: (action: () => void) => void) => () => void
+          register(action => { pendingLeave = action })
+        }
+        return name === 'sidebar.workspaces' ? createElement(Tree) : createElement('span', { 'data-slot': name })
+      },
     })
     const render = async () => { await act(async () => root.render(createElement(DesktopNavigationFrame, { Frame: Component, frameProps: {}, platform: 'linux' }))) }
     try {
@@ -65,6 +73,10 @@ describe('desktop navigation composition', () => {
       await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="插件"]')!.click())
       expect(selectPanel).toHaveBeenCalledWith('plugins')
       active = 'plugins'; await render()
+      await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="主页"]')!.click())
+      expect(selectPanel).not.toHaveBeenCalledWith(null)
+      pendingLeave?.()
+      expect(selectPanel).toHaveBeenCalledWith(null)
       expect(container.querySelector<HTMLInputElement>('[aria-label="workspace search"]')?.value).toBe('retained')
       expect(mounts).toBeGreaterThan(0)
       const nav = container.querySelector('nav')!

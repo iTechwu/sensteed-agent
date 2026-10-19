@@ -32,6 +32,11 @@ export function installDesktopNavigationStyles(): () => void {
 .sensteedModuleRail .dshSensteedUserSettingsTrigger .dshDofeAccessAvatar { width:26px; height:26px; }
 .sensteedContextSidebar { --dsh-sidebar-inline-padding:12px; box-sizing:border-box; height:100%; min-height:0; display:flex; flex-direction:column; padding:12px; background:var(--dsw-alias-bg-layer-1); }
 .sensteedContextSidebar[hidden],.sensteedContextHome[hidden] { display:none; }
+.sensteedBusinessNavigation { overflow-y:auto; min-height:0; padding:0 4px 12px; }
+.sensteedBusinessNavigation h3 { font-size:12px; color:var(--dsw-alias-label-secondary); margin:18px 8px 6px; font-weight:500; }
+.sensteedBusinessNavigation button { display:block; width:100%; min-height:34px; border:0; border-radius:8px; padding:7px 10px; background:transparent; color:inherit; text-align:left; cursor:pointer; font:inherit; }
+.sensteedBusinessNavigation button:hover,.sensteedBusinessNavigation button[aria-current="page"] { background:var(--dsw-alias-bg-layer-2); }
+.sensteedBusinessNavigationStatus { padding:12px; color:var(--dsw-alias-label-secondary); }
 .sensteedContextHeader { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:0 0 12px 8px; }
 .sensteedContextHeader strong { font-size:16px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .sensteedContextHome { flex:1; display:flex; flex-direction:column; min-height:0; }

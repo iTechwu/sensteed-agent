@@ -3,6 +3,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-shortcuts/client'
 /** Desktop owns this sidebar only when profile composition removes upstream's shell. */
+import type {} from './business-navigation-contract.ts'
 import type { Context } from '@deepseek-ai/cordis'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
@@ -27,6 +28,7 @@ export function applyDesktopNavigation(ctx: Context): void {
   ctx.slots.inject('sidebar', () => ctx.slots.register({
     name: 'sidebar', registrant: 'desktop-navigation',
     children: {
+      'desktop.navigation.context': { kind: 'keyed', scope: 'root' },
       'sidebar.brand.mark': { kind: 'single', scope: 'root' },
       'sidebar.brand.name': { kind: 'single', scope: 'root' },
       'sidebar.toggle.badge': { kind: 'single', scope: 'root' },
