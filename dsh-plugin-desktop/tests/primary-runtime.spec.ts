@@ -140,6 +140,25 @@ it('retains auxiliary wheel scripts without generating command wrappers', async 
   }
 })
 
+it('rejects wheel entries escaping the extraction root', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'desktop-wheel-path-'))
+  try {
+    const archive = join(root, 'escape.whl')
+    await writeFile(archive, zipSync({ '../outside.py': Buffer.from('unsafe') }))
+    await expect(unpackPrimaryRuntimeWheel(archive, join(root, 'site-packages'))).rejects.toThrow()
+    await expect(readFile(join(root, 'outside.py'))).rejects.toMatchObject({ code: 'ENOENT' })
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+it('rejects truncated wheel archives', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'desktop-wheel-truncated-'))
+  try {
+    const archive = join(root, 'truncated.whl')
+    await writeFile(archive, libraryWheel.subarray(0, libraryWheel.length - 12))
+    await expect(unpackPrimaryRuntimeWheel(archive, join(root, 'site-packages'))).rejects.toThrow()
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
 it('rejects library files requiring an unsupported installation scheme', async () => {
   const root = await mkdtemp(join(tmpdir(), 'desktop-wheel-'))
   try {
