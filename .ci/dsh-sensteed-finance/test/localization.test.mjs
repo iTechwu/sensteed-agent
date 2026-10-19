@@ -4,7 +4,7 @@ import test from 'node:test'
 
 const root = new URL('../', import.meta.url)
 async function loadUi(fetch = async () => { throw new Error('Failed to fetch') }) {
-  const files = ['head', 'format', 'components', 'workflows', 'views/budget', 'views/cash', 'views/alerts', 'views/engine', 'views/entry', 'views/permissions']
+  const files = ['head', 'desktop-navigation', 'format', 'components', 'workflows', 'views/budget', 'views/cash', 'views/alerts', 'views/engine', 'views/entry', 'views/permissions']
   const source = (await Promise.all(files.map(file => readFile(new URL(`src/${file}.js`, root), 'utf8')))).join('\n')
   const react = {
     createElement: (type, props, ...children) => ({ type, props: { ...props, children: children.flat(Infinity) } }),

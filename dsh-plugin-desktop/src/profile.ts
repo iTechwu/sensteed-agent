@@ -1841,7 +1841,7 @@ export function prepareDesktopProfile(
   if (layoutMode === 'advanced' || layoutMode === 'extended') {
     patches.push(
       { id: 'ui-layout', disabled: true },
-      { id: 'ui-sidebar', disabled: false },
+      { id: 'ui-sidebar', disabled: true },
       { id: 'ui-conversation', disabled: false },
     )
   }

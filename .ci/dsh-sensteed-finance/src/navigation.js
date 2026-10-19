@@ -145,7 +145,7 @@ function financeBusinessDestination(path) {
 /** 面板内的业务历史，仅保留当前会话最近20步；不缓存接口结果或未提交表单。 */
 function useFinanceNavigation(initialYear) {
   const sequence = useRef(0)
-  const [current, setCurrent] = useState(() => ({ id: 0, tab: 'overview', params: null, year: initialYear, orgId: '', viewState: {}, scrollTop: 0 }))
+  const [current, setCurrent] = useState(() => financeDesktopNavigation().recall() || ({ id: 0, tab: 'overview', params: null, year: initialYear, orgId: '', viewState: {}, scrollTop: 0 }))
   const [past, setPast] = useState([])
   const update = patch => setCurrent(route => ({ ...route, ...(typeof patch === 'function' ? patch(route) : patch) }))
   const navigate = (tab, params, scrollTop = 0) => {

@@ -8,7 +8,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 // 拼接顺序即依赖顺序：head（依赖/字典/数据面）→ format → components → 样式 → 视图 → 外壳
 const FILES = [
-  'src/head.js',
+  'src/head.js', 'src/desktop-navigation.js',
   'src/format.js',
   'src/components.js',
   'src/styles.js', 'src/workflows.js', 'src/navigation.js', 'src/permission-catalog.js',

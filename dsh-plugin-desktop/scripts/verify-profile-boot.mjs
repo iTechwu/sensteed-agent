@@ -47,7 +47,7 @@ const LAN_HTTPS = Object.freeze({
 })
 const home = mkdtempSync(join(tmpdir(), 'sensteed-agent-profile-'))
 process.env.DSH_HOME = home
-const mode = process.argv.includes('--compatibility') ? 'compatibility' : 'advanced'
+const mode = process.argv.includes('--compatibility') ? 'compatibility' : process.argv.includes('--extended') ? 'extended' : 'advanced'
 const verifyRenderer = process.argv.includes('--renderer')
 let rendererReport
 let ctx
@@ -317,7 +317,7 @@ try {
     throw new Error(`assembled Windows browse picker listed ${listing.path} instead of ${home}`)
   }
 
-  const titlebar = mode === 'compatibility' ? '&sensteed-agent-titlebar-inset=36' : ''
+  const titlebar = mode !== 'advanced' ? '&sensteed-agent-titlebar-inset=36' : ''
   const expectedUrl = `http://127.0.0.1:${String(ctx.webServer.port)}/?sensteed-agent-mode=${mode}&sensteed-agent-platform=win32&sensteed-agent-version=2.0.0&sensteed-agent-material=off${titlebar}`
   if (mountedSpec?.url !== expectedUrl) {
     throw new Error(`desktop plugin produced an unexpected renderer URL: ${String(mountedSpec?.url)}`)
@@ -432,7 +432,7 @@ try {
   for (const id of [
     'dsh-plugin-desktop',
     '@deepseek-ai/dsh-client-ui-conversation',
-    '@deepseek-ai/dsh-client-ui-sidebar',
+    ...(mode === 'compatibility' ? ['@deepseek-ai/dsh-client-ui-sidebar'] : []),
     '@deepseek-ai/dsh-client-ui-directory-picker-browse',
   ]) {
     if (!ids.has(id)) {
@@ -442,7 +442,7 @@ try {
     }
   }
   for (const id of [
-    ...(mode === 'advanced' ? ['@deepseek-ai/dsh-client-ui-layout'] : []),
+    ...(mode !== 'compatibility' ? ['@deepseek-ai/dsh-client-ui-layout', '@deepseek-ai/dsh-client-ui-sidebar'] : []),
     '@deepseek-ai/dsh-client-ui-directory-picker-native',
   ]) {
     if (ids.has(id)) throw new Error(`assembled ${mode} Web graph unexpectedly includes ${id}`)
@@ -450,7 +450,7 @@ try {
 
   if (mode === 'compatibility') assert.ok(ids.has('@deepseek-ai/dsh-client-ui-layout'))
   if (verifyRenderer) {
-    await verifyProfileRenderer({ url: expectedUrl, cookie, rendererHeader: BROWSER_ACCESS.rendererHeader })
+    await verifyProfileRenderer({ url: expectedUrl, cookie, rendererHeader: BROWSER_ACCESS.rendererHeader, twoLevelNavigation: mode !== 'compatibility' })
     assert.deepEqual(rendererReport, { status: 'healthy' })
     console.log(`Windows ${mode} renderer mounted both required surfaces and reported healthy`)
   }

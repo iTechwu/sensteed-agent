@@ -241,11 +241,13 @@ window.__ModuleLoader__.load({
     const snapshot = () => opened
 
     async function api(path, options) {
+      const bridge = financeDesktopNavigation(), epoch = bridge.epoch
       let response
       try {
-        response = await fetch(`${BASE}${path}`, { credentials: 'same-origin', redirect: 'error', headers: { Accept: 'application/json', ...(options?.body ? { 'Content-Type': 'application/json' } : {}) }, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS), ...options })
+        response = await fetch(`${BASE}${path}`, { credentials: 'same-origin', redirect: 'error', headers: { Accept: 'application/json', ...(options?.body ? { 'Content-Type': 'application/json' } : {}) }, ...options, signal: AbortSignal.any([AbortSignal.timeout(REQUEST_TIMEOUT_MS), bridge.signal, ...(options?.signal ? [options.signal] : [])]) })
       } catch (error) { throw new Error(financeErrorText(error?.name === 'TimeoutError' ? 'upstream_timeout' : error?.message)) }
       const body = await response.json().catch(() => null)
+      if (epoch !== bridge.epoch) throw new DOMException('Stale identity response', 'AbortError')
       if (!response.ok || !body || (body.ok === false && !Object.keys(body).some(key => !['ok', 'error'].includes(key) && body[key] && !body[key].error))) {
         const error = new Error(financeErrorText(body?.error, response.status))
         error.status = response.status
@@ -263,6 +265,110 @@ window.__ModuleLoader__.load({
         .finally(() => pendingWrites.delete(key))
       pendingWrites.set(key, operation)
       return operation
+    }
+
+    let financeDesktopNavigationBridge
+    function financeDesktopNavigation() { return financeDesktopNavigationBridge ||= createDesktopNavigationBridge(React) }
+
+    /** Build-time shared source, inlined into each plugin. No loader/package entry. */
+    function createDesktopNavigationBridge(React) {
+      let state = Object.freeze({ status: 'loading', items: [], activeId: null, page: 'overview', attached: false, epoch: 0 })
+      let scope = null, route = null, select = null, leave = null, epoch = 0, attached = 0
+      let menuScroll = 0
+      const fields = new Map()
+      let controller = new AbortController()
+      const listeners = new Set()
+      const emit = patch => {
+        const next = { ...state, ...patch }
+        if (JSON.stringify(next) === JSON.stringify(state)) return
+        state = Object.freeze(next)
+        for (const listener of listeners) listener()
+      }
+      const bridge = {
+        subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener) },
+        getSnapshot: () => state,
+        get signal() { return controller.signal },
+        get epoch() { return epoch },
+        remember(value) { if (state.status === 'ready') route = value },
+        recall: () => route,
+        adoptScope(value) {
+          if (typeof value !== 'string' || !value || value === scope) return false
+          const changed = scope !== null
+          scope = value
+          if (changed) bridge.invalidate('loading')
+          return changed
+        },
+        invalidate(status = 'denied') {
+          controller.abort(); controller = new AbortController(); epoch++
+          route = null; select = null; leave = null; menuScroll = 0; fields.clear()
+          emit({ status, items: [], activeId: null, page: 'overview', epoch })
+        },
+        publish(items, activeId, navigate, guard) {
+          if (state.status === 'denied') return
+          select = navigate; leave = guard
+          emit({ status: 'ready', items: items.map(({ id, label, group }) => ({ id, label, ...(group ? { group } : {}) })), activeId })
+        },
+        clearSource() { select = null; leave = null; emit({ status: state.status === 'denied' ? 'denied' : 'loading', items: [], activeId: null }) },
+        resume() { if (state.status === 'denied') emit({ status: 'loading' }) },
+        select(id) { if (state.status !== 'ready' || !state.items.some(item => item.id === id) || !select) return false; select(id); return true },
+        leave(action) { if (leave) leave(action); else action() },
+        attach() { attached++; emit({ attached: true }); return () => { attached--; emit({ attached: attached > 0 }) } },
+        useAccess(url, onScope) {
+          const [allowed, setAllowed] = React.useState(null)
+          const snapshot = React.useSyncExternalStore(bridge.subscribe, bridge.getSnapshot, bridge.getSnapshot)
+          React.useEffect(() => {
+            let disposed = false, pending = false, timer
+            const local = new AbortController()
+            const check = async () => {
+              if (disposed || pending) return
+              pending = true; clearTimeout(timer)
+              const generation = epoch
+              try {
+                const response = await fetch(url, { credentials: 'same-origin', redirect: 'error', signal: AbortSignal.any([local.signal, bridge.signal, AbortSignal.timeout(30000)]) })
+                const body = await response.json()
+                if (disposed || generation !== epoch) return
+                if (response.status === 401 || response.status === 403 || body.allowed === false) { setAllowed(false); bridge.invalidate(); return }
+                if (!response.ok || body.allowed !== true) throw new Error('access_unavailable')
+                if (onScope) onScope(body.scopeId); else bridge.adoptScope(body.scopeId)
+                bridge.resume(); setAllowed(true)
+              } catch { /* Transient outages retain the last confirmed same-identity permission. */ }
+              finally { pending = false; if (!disposed) timer = setTimeout(check, generation !== epoch ? 0 : 15000) }
+            }
+            const reset = () => { setAllowed(null); void check() }
+            const refresh = () => { void check() }
+            refresh(); window.addEventListener('focus', refresh); window.addEventListener('online', refresh); window.addEventListener('sensteed:identity-changed', reset)
+            return () => { disposed = true; clearTimeout(timer); local.abort(); window.removeEventListener('focus', refresh); window.removeEventListener('online', refresh); window.removeEventListener('sensteed:identity-changed', reset) }
+          }, [url, onScope])
+          return { allowed, epoch: snapshot.epoch }
+        },
+        useField(key, initial) {
+          const generation = epoch
+          const [value, setValue] = React.useState(() => fields.has(key) ? fields.get(key) : initial)
+          React.useEffect(() => { setValue(fields.has(key) ? fields.get(key) : initial) }, [generation, key])
+          return [value, next => { if (generation !== epoch) return; setValue(previous => { if (generation !== epoch) return previous; const resolved = typeof next === 'function' ? next(previous) : next; fields.set(key, resolved); return resolved }) }]
+        },
+        usePage() {
+          const current = React.useSyncExternalStore(bridge.subscribe, bridge.getSnapshot, bridge.getSnapshot)
+          return [current.page, value => { if (state.status === 'denied') return; if (state.items.length && !state.items.some(item => item.id === value)) return; emit({ page: value }) }, current.attached]
+        },
+        Menu({ onAccessDenied, registerLeaveGuard }) {
+          const current = React.useSyncExternalStore(bridge.subscribe, bridge.getSnapshot, bridge.getSnapshot)
+          const menu = React.useRef(null)
+          React.useEffect(() => bridge.attach(), [])
+          React.useEffect(() => { if (menu.current) menu.current.scrollTop = menuScroll }, [current.status])
+          React.useEffect(() => registerLeaveGuard(action => bridge.leave(action)), [registerLeaveGuard])
+          React.useEffect(() => { if (current.status === 'denied') onAccessDenied() }, [current.status, onAccessDenied])
+          const h = React.createElement
+          if (current.status !== 'ready') return h('p', { role: 'status', className: 'sensteedBusinessNavigationStatus' }, current.status === 'denied' ? '当前模块不可访问' : '正在加载导航…')
+          let group
+          return h('nav', { ref: menu, onScroll: event => { menuScroll = event.currentTarget.scrollTop }, className: 'sensteedBusinessNavigation', 'aria-label': '业务导航' }, ...current.items.flatMap(item => {
+            const heading = item.group && item.group !== group ? h('h3', { key: `group-${item.group}` }, item.group) : null
+            group = item.group
+            return [heading, h('button', { key: item.id, type: 'button', 'aria-current': current.activeId === item.id ? 'page' : undefined, onClick: () => bridge.select(item.id) }, item.label)].filter(Boolean)
+          }))
+        },
+      }
+      return bridge
     }
 
     // 片段 2/7：数值/日期格式化与口径计算（对齐前端 finance-format.ts：万元 1 位小数千分位，空值 —）
@@ -1126,6 +1232,8 @@ window.__ModuleLoader__.load({
     .sf-assistant-question{display:flex;flex-wrap:wrap;gap:8px;width:100%}.sf-assistant-question input{flex:1;min-width:min(220px,100%);max-width:100%;min-height:36px;padding:8px 10px;border:1px solid var(--sf-line2);border-radius:6px;background:var(--sf-card);color:inherit;font:inherit}.sf-assistant-answer{display:grid;gap:12px;min-width:0;font-size:12px;line-height:1.6;overflow-wrap:anywhere}.sf-assistant-answer>p,.sf-assistant-answer>ul{margin:0}.sf-assistant-answer>ul{padding-left:20px}.sf-assistant-answer>.sf-btn{justify-self:start}
     `
 
+    const desktopContextCss = '.sf-root[data-desktop-context-active] .sf-tabs,.sf-root[data-desktop-context-active] .sf-sidebar-brand,.sf-root[data-desktop-context-active] .sf-mobile-nav{display:none}.sf-root[data-desktop-context-active] .sf-shell{grid-template-columns:minmax(0,1fr)}.sf-root[data-desktop-context-active] .sf-header,.sf-root[data-desktop-context-active] .sf-content{grid-column:1}'
+
     // 与 Datasource 同一公开契约；此处只负责编排交互，不重算服务端财务指标。
     function financeRest(path, method = 'GET', body) {
       return method === 'GET' ? api(`/rest${path}`) : financeWrite(path, method, body)
@@ -1681,7 +1789,7 @@ window.__ModuleLoader__.load({
     /** 面板内的业务历史，仅保留当前会话最近20步；不缓存接口结果或未提交表单。 */
     function useFinanceNavigation(initialYear) {
       const sequence = useRef(0)
-      const [current, setCurrent] = useState(() => ({ id: 0, tab: 'overview', params: null, year: initialYear, orgId: '', viewState: {}, scrollTop: 0 }))
+      const [current, setCurrent] = useState(() => financeDesktopNavigation().recall() || ({ id: 0, tab: 'overview', params: null, year: initialYear, orgId: '', viewState: {}, scrollTop: 0 }))
       const [past, setPast] = useState([])
       const update = patch => setCurrent(route => ({ ...route, ...(typeof patch === 'function' ? patch(route) : patch) }))
       const navigate = (tab, params, scrollTop = 0) => {
@@ -6864,6 +6972,18 @@ window.__ModuleLoader__.load({
         leaveGuard.navigation.leave(navigate)
       }
       const ctx = { year, orgId, orgs, departments, revision, drillParams, viewState: navigation.current.viewState, permissions: capabilities.permissions || [], financeWriter, role: capabilities.role, fullAccess: capabilities.fullAccess, onNavigate: onDrill }
+      const desktopBridge = financeDesktopNavigation()
+      const desktopState = useSyncExternalStore(desktopBridge.subscribe, desktopBridge.getSnapshot, desktopBridge.getSnapshot)
+      useEffect(() => {
+        if (capabilities.permissions === null) return
+        const items = FINANCE_NAVIGATION.flatMap(([group, rows]) => rows.filter(item => financeNavigationAllowed(item, identity)).map(item => ({ id: item[0], label: item[1], group })))
+        desktopBridge.publish(items, financeNavigationItem(tab, drillParams)?.[0] || null, id => {
+          const item = FINANCE_NAVIGATION.flatMap(([, rows]) => rows).find(item => item[0] === id)
+          if (item && financeNavigationAllowed(item, identity)) onDrill(item[2], financeSidebarParams(item, tab, drillParams, year))
+        }, action => leaveGuard.navigation.leave(() => { desktopBridge.remember({ ...navigation.current, scrollTop: contentRef.current?.scrollTop || 0 }); action() }))
+        desktopBridge.remember(navigation.current)
+      })
+      useEffect(() => () => desktopBridge.clearSource(), [])
       const activeItem = financeNavigationItem(tab, drillParams)
       useEffect(() => { if (capabilities.permissions !== null && (!canOpen(tab) || (activeItem && !financeNavigationAllowed(activeItem, identity)))) { navigation.reset() } }, [tab, capabilities.permissions, financeWriter, capabilities.role, activeItem])
       const previous = navigation.previous
@@ -6903,7 +7023,7 @@ window.__ModuleLoader__.load({
             tab === 'notifications' ? h(NotificationsView, { ctx, t, onDrill }) : null,
             tab === 'permissions' ? h(PermissionsView, { ctx, t }) : null)
 
-      return h('div', { className: `sf-overlay sf-root${embedded ? ' sf-page' : ''}`, role: embedded ? 'region' : 'dialog', 'aria-modal': embedded ? undefined : true, 'aria-labelledby': 'sf-title' },
+      return h('div', { className: `sf-overlay sf-root${embedded ? ' sf-page' : ''}`, 'data-desktop-context-active': desktopState.attached || undefined, role: embedded ? 'region' : 'dialog', 'aria-modal': embedded ? undefined : true, 'aria-labelledby': 'sf-title' },
         h('main', { className: 'sf-shell', 'aria-labelledby': 'sf-title', ref: shellRef, tabIndex: -1 },
           h('div', { className: 'sf-sidebar-brand' },
             h('span', { className: 'sf-sidebar-brand-mark' }, h(Glyph, { name: 'data', size: 18 })),
@@ -6943,9 +7063,15 @@ window.__ModuleLoader__.load({
     }
 
     function apply(ctx) {
+      ctx.effect(() => {
+        const reset = () => { closeOverlay(); financeDesktopNavigation().invalidate(); if (ctx.layout.panelInfo.getSnapshot().activePanelId === 'sensteed-finance') ctx.layout.selectPanel(null) }
+        window.addEventListener('sensteed:identity-changed', reset)
+        return () => { window.removeEventListener('sensteed:identity-changed', reset); financeDesktopNavigation().invalidate() }
+      }, 'desktop context identity isolation')
+      ctx.slots.inject('desktop.navigation.context', () => ctx.slots.register({ name: 'desktop.navigation.context', key: 'sensteed-finance' }, financeDesktopNavigation().Menu))
       ctx.effect(() => ctx.locale.register(NS, copy), 'dofe-sensteed-finance: dictionaries')
       ctx.effect(() => { window.addEventListener(OVERLAY_EVENT, closeOtherOverlay); return () => window.removeEventListener(OVERLAY_EVENT, closeOtherOverlay) }, 'dofe-sensteed-finance: exclusive-overlay')
-      ctx.effect(() => { const style = document.createElement('style'); style.dataset.plugin = '@dofe/dsh-sensteed-finance'; style.textContent = css + sfAnalysisGrid; document.head.appendChild(style); return () => style.remove() }, 'dofe-sensteed-finance: styles')
+      ctx.effect(() => { const style = document.createElement('style'); style.dataset.plugin = '@dofe/dsh-sensteed-finance'; style.textContent = css + sfAnalysisGrid + desktopContextCss; document.head.appendChild(style); return () => style.remove() }, 'dofe-sensteed-finance: styles')
       // 深度分析入口走宿主 conversation 服务（由 desktop 宿主在浏览器侧注册）；
       // 通过惰性 getter 注入，避免插件客户端与宿主模块产生编译期耦合。
       ctx.effect(() => {
@@ -7027,7 +7153,8 @@ window.__ModuleLoader__.load({
 
     function FinancePage(props) {
       const allowed = useFinanceWorkspaceAccess()
-      return allowed === true ? h(Dashboard, props) : null
+      const state = useSyncExternalStore(financeDesktopNavigation().subscribe, financeDesktopNavigation().getSnapshot, financeDesktopNavigation().getSnapshot)
+      return allowed === true ? h(Dashboard, { ...props, key: state.epoch }) : null
     }
 
     function Overlay({ t }) {
@@ -7048,27 +7175,33 @@ window.__ModuleLoader__.load({
           checking = true
           clearTimeout(timer)
           let nextCheckMs = 5000
+          const generation = financeDesktopNavigation().epoch
           try {
             const response = await fetch(`${BASE}/access${permission ? `?permission=${encodeURIComponent(permission)}` : ''}`, {
               credentials: 'same-origin', redirect: 'error',
               headers: { Accept: 'application/json' },
-              signal: AbortSignal.any([controller.signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]),
+              signal: AbortSignal.any([controller.signal, financeDesktopNavigation().signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]),
             })
-            if (cancelled) return
+            if (cancelled || generation !== financeDesktopNavigation().epoch) return
             if (response.status === 401 || response.status === 403) {
+              financeDesktopNavigation().invalidate()
               setAllowed(false)
             } else {
               if (!response.ok) throw new Error('finance_access_unavailable')
               const body = await response.json()
+              if (cancelled || generation !== financeDesktopNavigation().epoch) return
               if (body?.ok !== true || typeof body.allowed !== 'boolean') throw new Error('finance_access_unavailable')
               if (cancelled) return
               setAllowed(body.allowed)
+              financeDesktopNavigation().adoptScope(body.scopeId)
+              if (!body.allowed) financeDesktopNavigation().invalidate()
+              if (body.allowed) financeDesktopNavigation().resume()
               if (body.allowed) nextCheckMs = 60000
             }
-          } catch { /* An outage does not revoke a previously confirmed permission. */ }
+          } catch { if (generation !== financeDesktopNavigation().epoch) setAllowed(null) }
           finally {
             checking = false
-            if (!cancelled) timer = setTimeout(() => { void check() }, nextCheckMs)
+            if (!cancelled) timer = setTimeout(() => { void check() }, generation !== financeDesktopNavigation().epoch ? 0 : nextCheckMs)
           }
         }
         const refresh = () => { void check() }
@@ -7076,6 +7209,7 @@ window.__ModuleLoader__.load({
         refresh()
         window.addEventListener('focus', refresh)
         window.addEventListener('online', refresh)
+        window.addEventListener('sensteed:identity-changed', refresh)
         document.addEventListener('visibilitychange', onVisible)
         return () => {
           cancelled = true
@@ -7083,6 +7217,7 @@ window.__ModuleLoader__.load({
           controller.abort()
           window.removeEventListener('focus', refresh)
           window.removeEventListener('online', refresh)
+          window.removeEventListener('sensteed:identity-changed', refresh)
           document.removeEventListener('visibilitychange', onVisible)
         }
       }, [permission])

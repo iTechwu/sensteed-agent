@@ -856,7 +856,7 @@ virtualStoreDirMaxLength: 120
     }))
     expect(prepared.settingsDocument).toBe(join(home, 'settings.yaml'))
     expect(rows.find(row => row.id === 'ui-layout')?.disabled).toBe(true)
-    expect(rows.find(row => row.id === 'ui-sidebar')?.disabled).toBe(false)
+    expect(rows.find(row => row.id === 'ui-sidebar')?.disabled).toBe(true)
     expect(rows.find(row => row.id === 'ui-conversation')?.disabled).toBe(false)
   })
 
@@ -1130,7 +1130,7 @@ virtualStoreDirMaxLength: 120
       windowsMaterial: 'off',
     }))
     expect(rows.find(row => row.id === 'ui-layout')?.disabled).toBe(true)
-    expect(rows.find(row => row.id === 'ui-sidebar')?.disabled).toBe(false)
+    expect(rows.find(row => row.id === 'ui-sidebar')?.disabled).toBe(true)
     expect(rows.find(row => row.id === 'ui-conversation')?.disabled).toBe(false)
     expect(rows.find(row => row.id === 'desktop-shell')).toEqual(expect.objectContaining({
       config: expect.objectContaining({

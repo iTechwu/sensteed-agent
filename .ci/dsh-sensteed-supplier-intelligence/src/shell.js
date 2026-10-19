@@ -1,18 +1,23 @@
 function Workbench() {
-  const [tab, setTab] = useRemembered('active-tab', 'overview')
+  const bridge = supplierNavigation()
+  const [tab, setTab, externalNavigation] = bridge.usePage()
   const [revision, setRevision] = useState(0)
   const [error, setError] = useState('')
   const [access, setAccess] = useState(null)
   const [accessReason, setAccessReason] = useState('')
   const [scopeReady, setScopeReady] = useState(false)
   const [unread, setUnread] = useState(0)
+  const accessRequest = useRef(null)
   const retryAccess = () => {
+    accessRequest.current?.abort()
+    const controller = new AbortController(), generation = bridge.epoch
+    accessRequest.current = controller
     setAccess(null)
     setAccessReason('')
-    fetch(`${BASE}/access`, { credentials: 'same-origin', redirect: 'error', signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
+    fetch(`${BASE}/access`, { credentials: 'same-origin', redirect: 'error', signal: AbortSignal.any([controller.signal, bridge.signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]) })
       .then(response => response.json())
-      .then(body => { adoptScope(body?.scopeId); setScopeReady(Boolean(body?.scopeId)); setAccessReason(body?.reason || 'unavailable'); setAccess(body?.allowed === true) })
-      .catch(() => { setAccessReason('connection_unavailable'); setAccess(false) })
+      .then(body => { if (controller.signal.aborted || generation !== bridge.epoch) return; adoptScope(body?.scopeId); setScopeReady(Boolean(body?.scopeId)); setAccessReason(body?.reason || 'unavailable'); setAccess(body?.allowed === true) })
+      .catch(() => { if (controller.signal.aborted || generation !== bridge.epoch) return; setAccessReason('connection_unavailable'); setAccess(false) })
   }
   useEffect(() => {
     const refreshEvent = () => refresh()
@@ -30,7 +35,7 @@ function Workbench() {
       window.removeEventListener('supplier-risk:agent-error', agentError)
     }
   }, [])
-  useEffect(() => { retryAccess() }, [])
+  useEffect(() => { retryAccess(); return () => accessRequest.current?.abort() }, [])
   // Synchronous reload lock: bursts of refresh events must not stack revisions.
   const loadingRef = useRef(false)
   const refresh = () => {
@@ -40,22 +45,27 @@ function Workbench() {
     setRevision(value => value + 1)
     setTimeout(() => { loadingRef.current = false }, 400)
   }
+  useEffect(() => {
+    if (access === true) bridge.publish(TABS.map(([id, label]) => ({ id, label })), tab, id => { setError(''); setTab(id) })
+    else if (access === false && bridge.getSnapshot().status !== 'denied') bridge.invalidate()
+  })
+  useEffect(() => () => bridge.clearSource(), [])
   if (access === null) return h('main', { className: 'sr-page', role: 'status' }, '正在连接供应链工作台…')
   if (!access) return h('main', { className: 'sr-page' }, h('h1', null, '供应商风险'), h('p', null, accessMessage(accessReason)), h('button', { type: 'button', className: 'sr-button sr-secondary', onClick: retryAccess }, '重新连接'))
   return h('main', { className: 'sr-page' },
     h('header', { className: 'sr-header' },
-      h('div', null, h('p', { className: 'sr-eyebrow' }, 'SUPPLIER INTELLIGENCE'), h('h1', null, '供应商风险'), h('p', { className: 'sr-subtitle' }, '已归集事实、待核验线索与业务判断分开展示。')),
+      h('div', null, h('p', { className: 'sr-eyebrow' }, 'SUPPLIER INTELLIGENCE'), h('h1', null, '供应商风险'), h('p', { className: 'sr-subtitle' }, '查看供应商风险变化，核验线索，评估交付与经营影响。')),
       h('button', { type: 'button', className: 'sr-icon-button', 'aria-label': '刷新数据', title: '刷新数据', onClick: refresh }, h(IconRefreshOutlineRegular, { size: 18 }))),
-    h('nav', { className: 'sr-tabs', 'aria-label': '供应商风险页面' }, ...TABS.map(([id, label]) => h('button', {
+    !externalNavigation ? h('nav', { className: 'sr-tabs', 'aria-label': '供应商风险页面' }, ...TABS.map(([id, label]) => h('button', {
       key: id, type: 'button', 'aria-current': tab === id ? 'page' : undefined,
       onClick: () => { setError(''); setTab(id) },
-    }, label, id === 'weekly' && unread > 0 ? h('span', { className: 'sr-unread' }, unread) : null))),
+    }, label, id === 'weekly' && unread > 0 ? h('span', { className: 'sr-unread' }, unread) : null))) : null,
     error ? h('div', { className: 'sr-error', role: 'alert' }, error, h('button', { type: 'button', onClick: refresh }, '重试')) : null,
-    h('section', { className: 'sr-content', 'aria-busy': false },
-      tab === 'overview' ? h(Overview, { revision, setError, onUnread: setUnread, onOpen: id => { setSelected(id); setTab('business') } }) : null,
-      tab === 'suppliers' ? h(Suppliers, { revision, setError, onSelect: id => { setSelected(id); setTab('business') }, onImported: refresh }) : null,
-      tab === 'enterprise' ? h(Evidence, { kind: 'enterprise', revision, setError, onSelect: row => { setEvidence(row.evidenceId, 'enterprise', row.eventId); setSelected(row.supplierId); setTab('business') } }) : null,
-      tab === 'media' ? h(Evidence, { kind: 'media', revision, setError, onSelect: row => { setEvidence(row.evidenceId, 'media', row.eventId); setSelected(row.supplierId); setTab('business') } }) : null,
+    h('section', { className: 'sr-content' },
+      tab === 'overview' ? h(Overview, { revision, setError, onUnread: setUnread, onOpen: (id, name) => { setSelected(id, name); setTab('business') } }) : null,
+      tab === 'suppliers' ? h(Suppliers, { revision, setError, onSelect: (id, name) => { setSelected(id, name); setTab('business') }, onImported: refresh }) : null,
+      tab === 'enterprise' ? h(Evidence, { kind: 'enterprise', revision, setError, onSelect: row => { setSelected(row.supplierId, row.supplierName); setEvidence(row.evidenceId, 'enterprise', row.eventId); setTab('business') } }) : null,
+      tab === 'media' ? h(Evidence, { kind: 'media', revision, setError, onSelect: row => { setSelected(row.supplierId, row.supplierName); setEvidence(row.evidenceId, 'media', row.eventId); setTab('business') } }) : null,
       tab === 'business' ? h(Business, { revision, setError, onScopeReady: scopeReady }) : null,
       tab === 'weekly' ? h(Weekly, { revision, setError, onUnread: setUnread, onScopeReady: scopeReady }) : null))
 }
@@ -71,7 +81,11 @@ function accessMessage(reason) {
   }[reason] || '当前插件、凭据或供应链 MCP 暂不可用。'
 }
 
-function setSelected(value) { selectedSupplier = value }
+function setSelected(value, name = '') {
+  if (value !== selectedSupplier) setEvidence('')
+  selectedSupplier = value
+  selectedSupplierName = name
+}
 function setEvidence(value, kind = '', eventId = '') { selectedEvidence = value; selectedEvidenceKind = kind; selectedEvidenceEventId = eventId }
 
 function useLoad(loader, deps, setError) {
@@ -88,7 +102,7 @@ function useLoad(loader, deps, setError) {
 }
 
 function Loading({ state, empty }) {
-  if (state.loading && !state.data) return h('p', { className: 'sr-muted', role: 'status' }, '正在读取已归集数据…')
+  if (state.loading && !state.data) return h('p', { className: 'sr-muted', role: 'status', 'aria-busy': true }, '正在读取已归集数据…')
   if (state.error) return h('p', { className: 'sr-muted', role: 'alert' }, state.error)
   if (!state.data) return h('p', { className: 'sr-muted' }, empty || '暂无可显示的数据。')
   return null
@@ -107,23 +121,23 @@ function Overview({ revision, setError, onUnread, onOpen }) {
   const sourceGapCount = (value.sources || []).filter(source => source.status !== 'available' || source.stale).length
   return h(React.Fragment, null,
     h('div', { className: 'sr-metrics' },
-      h(Metric, { label: '供应商', value: counts.suppliers ?? 0, hint: '当前租户台账' }),
+      h(Metric, { label: '供应商', value: counts.suppliers ?? 0, hint: '当前团队台账' }),
       h(Metric, { label: '高优先级事项', value: counts.priorityItems ?? 0, hint: '已确认风险' }),
       h(Metric, { label: '待核验线索', value: counts.pendingClues ?? 0 }),
       h(Metric, { label: '来源缺口', value: sourceGapCount, hint: `统计于 ${fmt(value.statisticsAt)}` })),
     h('div', { className: 'sr-columns' },
       h('section', { className: 'sr-section' }, h('h2', null, '近期变化'),
-        changes.length ? h('div', { className: 'sr-list' }, ...changes.slice(0, 10).map((item, index) => h('button', { type: 'button', className: 'sr-list-row', key: item.evidenceId || item.eventId || index, onClick: () => onOpen(item.supplierId) },
+        changes.length ? h('div', { className: 'sr-list' }, ...changes.slice(0, 10).map((item, index) => h('button', { type: 'button', className: 'sr-list-row', key: item.evidenceId || item.eventId || index, onClick: () => onOpen(item.supplierId, item.supplierName) },
           h('span', { className: 'sr-status', 'data-tone': item.isConfirmed ? 'confirmed' : 'candidate' }, item.isConfirmed ? '已确认' : '待核验'),
           h('span', null, h('strong', null, item.supplierName || item.supplierId), h('small', null, item.title || item.summary || '证据摘要未提供')),
-          h('time', null, fmt(item.riskPromptedAt || item.retrievedAt))))) : h('p', { className: 'sr-muted' }, '当前数据库范围内没有近期变化。')),
+          h('time', null, fmt(item.riskPromptedAt || item.retrievedAt))))) : h('p', { className: 'sr-muted' }, '暂无已记录的风险变化。可先查看供应商台账，确认来源覆盖与更新时间。')),
       h('section', { className: 'sr-section' }, h('h2', null, '来源覆盖'),
         ...(value.sources || []).map(source => h('div', { className: 'sr-source', key: source.sourceId || source.source || source.name },
           h('span', null, source.name || source.platform || source.sourceId || source.source || '未命名来源'),
-          h('span', { className: 'sr-status', 'data-tone': source.status === 'available' && !source.stale ? 'confirmed' : 'candidate' }, source.stale ? '数据滞后' : source.status || '未知'),
+          h('span', { className: 'sr-status', 'data-tone': source.status === 'available' && !source.stale ? 'confirmed' : 'candidate' }, source.stale ? '数据滞后' : ({ available: '已覆盖', unavailable: '暂不可用', pending: '待接入' }[source.status] || '待核对')),
           h('small', null, source.lastSuccessAt ? `最近成功 ${fmt(source.lastSuccessAt)}` : source.reason || '暂无成功记录'))),
         h('p', { className: 'sr-source-note' }, '页面只读取已保存数据，不触发外部采集。'))),
-    h('p', { className: 'sr-footnote' }, `数据来源：${value.dataSource || 'database'} · 未发起外部调用`))
+    h('p', { className: 'sr-footnote' }, '数据来自已保存的台账与证据；暂无记录不代表没有风险。'))
 }
 
 function Suppliers({ revision, setError, onSelect, onImported }) {
@@ -154,7 +168,7 @@ function Suppliers({ revision, setError, onSelect, onImported }) {
         h('button', { type: 'button', className: 'sr-button sr-secondary', onClick: () => setShowAdd(true) }, '新增 / 导入供应商')) : null,
     data && data.items.length > 0 ? h(React.Fragment, null,
       h('div', { className: 'sr-table-wrap' }, h('table', { className: 'sr-table' }, h('thead', null, h('tr', null, ...['供应商', '统一社会信用代码', '类别', '主体核验', '监控范围', '来源覆盖', '更新时间', ''].map(label => h('th', { key: label }, label)))), h('tbody', null,
-        ...data.items.map(row => h('tr', { key: row.supplierId }, h('td', null, h('strong', null, row.displayName)), h('td', null, row.creditCode || '未关联'), h('td', null, row.category || '未分类'), h('td', null, h(Status, { value: row.verificationStatus })), h('td', null, row.monitoringScope || '未设置'), h('td', null, row.coverage?.status === 'partial' ? '部分来源' : '待接入'), h('td', null, fmt(row.updatedAt)), h('td', null, h('button', { type: 'button', className: 'sr-link', onClick: () => onSelect(row.supplierId) }, '业务影响'))))))),
+        ...data.items.map(row => h('tr', { key: row.supplierId }, h('td', null, h('strong', null, row.displayName)), h('td', null, row.creditCode || '未关联'), h('td', null, row.category || '未分类'), h('td', null, h(Status, { value: row.verificationStatus })), h('td', null, ({ LEGAL_ENTITY_ONLY: '仅法人主体', LEGAL_ENTITY_AND_SUBSIDIARIES: '法人及子公司', LEGAL_ENTITY_AND_SUBSIDIARIES_AND_INVESTMENTS: '法人、子公司及投资企业' }[row.monitoringScope] || '未设置')), h('td', null, ({ partial: '部分覆盖', complete: '完整覆盖', available: '已覆盖' }[row.coverage?.status] || '待接入')), h('td', null, fmt(row.updatedAt)), h('td', null, h('button', { type: 'button', className: 'sr-link', onClick: () => onSelect(row.supplierId, row.displayName) }, '业务影响'))))))),
       h(Pagination, { page, pageSize: 20, total: data.total, onChange: setPage })) : null)
 }
 
@@ -207,7 +221,7 @@ function SupplierIntake({ newName, setNewName, importText, setImportText, busy, 
 
 function Status({ value }) {
   const confirmed = ['CONFIRMED', 'VERIFIED', 'APPROVED', 'available'].includes(value)
-  const label = { CONFIRMED: '已确认', VERIFIED: '已核验', APPROVED: '已通过', PENDING_REVIEW: '待核验', CANDIDATE: '候选', available: '可用' }[value] || value || '未知'
+  const label = { rejected: '已排除', PENDING: '待处理', FAILED: '失败', RUNNING: '处理中', REJECTED: '已排除', STALE: '需重新评估', running: '处理中', pending: '等待处理', queued: '排队中', succeeded: '已完成', failed: '失败', cancelled: '已取消', CONFIRMED: '已确认', VERIFIED: '已核验', APPROVED: '已通过', PENDING_REVIEW: '待核验', CANDIDATE: '候选', available: '可用' }[value] || value || '未知'
   return h('span', { className: 'sr-status', 'data-tone': confirmed ? 'confirmed' : 'candidate' }, label)
 }
 
@@ -238,14 +252,14 @@ function Evidence({ kind, revision, setError, onSelect }) {
   return h(React.Fragment, null,
     h('div', { className: 'sr-toolbar' }, h('div', null, h('h2', null, kind === 'enterprise' ? '工商与司法风险' : '媒体舆情线索'), h('p', { className: 'sr-muted' }, kind === 'enterprise' ? '仅展示已持久化风险事件和来源时间。' : '媒体命中属于候选线索，主体匹配不等同于事实核验。')),
       h('label', { className: 'sr-select-label' }, '核验状态', h('select', { value: status, onChange: event => { setPage(1); setStatus(event.target.value) }, 'aria-label': '按核验状态筛选' }, h('option', { value: '' }, '全部'), h('option', { value: 'PENDING_REVIEW' }, '待核验'), h('option', { value: 'CONFIRMED' }, '已确认'), h('option', { value: 'REJECTED' }, '已排除')))),
-    h(Loading, { state }), data ? h(React.Fragment, null,
-      h('div', { className: 'sr-evidence-list' }, ...data.items.map(row => h('article', { className: 'sr-evidence', key: row.evidenceId },
+    h(Loading, { state }), data?.items?.length === 0 ? h('section', { className: 'sr-section sr-empty-panel', role: 'status' }, h('h2', null, status ? '没有符合筛选条件的记录' : '暂无已归集证据'), h('p', { className: 'sr-muted' }, '暂无记录不代表没有风险。请核对供应商台账与来源覆盖，或调整核验状态筛选。'), status ? h('button', { type: 'button', className: 'sr-button sr-secondary', onClick: () => { setStatus(''); setPage(1) } }, '查看全部状态') : null) : null, data ? h(React.Fragment, null,
+      h('div', { className: 'sr-evidence-list', hidden: Boolean(detailId) }, ...data.items.map(row => h('article', { className: 'sr-evidence', key: row.evidenceId },
         h('div', { className: 'sr-evidence-head' }, h(Status, { value: row.reviewStatus }), h('span', null, row.supplierName || row.supplierId), h('time', null, fmt(row.occurredAt || row.exposedAt || row.riskPromptedAt || row.retrievedAt))),
         h('h3', null, row.title || row.category || '未命名证据'), h('p', null, row.summary || row.description || '未提供摘要'),
         h('div', { className: 'sr-evidence-meta' }, h('span', null, `来源 ${row.platform || row.source || '未知'}`), row.readCount !== null && row.readCount !== undefined ? h('span', null, `阅读量 ${row.readCount}${row.readCountScope ? ` · ${row.readCountScope}` : ''}`) : null, h('span', null, `采集 ${fmt(row.retrievedAt)}`)),
         h('div', { className: 'sr-evidence-actions' }, row.sourceUrl ? h('a', { href: row.sourceUrl, target: '_blank', rel: 'noreferrer' }, '查看原文', h(IconRightUpOutlineRegular, { size: 14 })) : null, h('button', { type: 'button', className: 'sr-link', onClick: () => setDetailId(row.evidenceId) }, '查看证据'), h('button', { type: 'button', className: 'sr-link', onClick: () => onSelect(row) }, '加入业务分析'))))),
       detailId ? h('section', { className: 'sr-section sr-detail' }, detail ? h(React.Fragment, null,
-        h('div', { className: 'sr-section-heading' }, h('h2', null, '证据详情'), h('button', { type: 'button', className: 'sr-link', onClick: () => setDetailId('') }, '关闭')),
+        h('div', { className: 'sr-section-heading' }, h('h2', null, '证据详情'), h('button', { type: 'button', className: 'sr-link', onClick: () => setDetailId('') }, '返回证据列表')),
         h('h3', null, detail.title || '未命名证据'), h('p', null, detail.summary || detail.description || '未提供摘要'),
         h('p', { className: 'sr-footnote' }, `主体 ${detail.supplierName || detail.supplierId} · 来源 ${detail.platform || detail.source || '未知'} · 发布时间 ${fmt(detail.exposedAt || detail.occurredAt)} · 采集时间 ${fmt(detail.retrievedAt)}`),
         detail.sourceUrl ? h('a', { href: detail.sourceUrl, target: '_blank', rel: 'noreferrer' }, '打开来源') : null,
@@ -287,33 +301,40 @@ function Business({ revision, setError, onScopeReady }) {
   const [form, setForm] = useRemembered(`business-form:${supplierId}`, null)
   const [analysis, setAnalysis] = useRemembered(`business-analysis:${supplierId}`, { dimension: 'other', externalSignal: '', possibleImpact: '', assumptions: '', informationGaps: '', suggestedActions: '', kind: 'human' })
   const [busy, setBusy] = useState(false)
+  const [notice, setNotice] = useState('')
+  const [mode, setMode] = useRemembered(`business-mode:${supplierId}`, selectedEvidence ? 'analysis' : 'context')
+  useEffect(() => { if (selectedEvidence) setMode('analysis') }, [selectedEvidence])
   const state = useLoad(() => (onScopeReady && supplierId ? Promise.all([
     api('supply_chain_business_context_get', { supplierId }),
     api('supply_chain_business_analysis_list', { supplierId, page: 1, pageSize: 20 }),
-    api('supply_chain_workbench_suppliers_list', { page: 1, pageSize: 100, query: supplierId }),
+    loadSupplierOptions(),
     selectedEvidence ? api('supply_chain_workbench_evidence_get', { kind: selectedEvidenceKind, evidenceId: selectedEvidence }) : Promise.resolve(null),
   ]) : Promise.resolve(null)), [supplierId, revision, selectedEvidence, selectedEvidenceKind], setError)
   const context = state.data?.[0]
   const analyses = state.data?.[1]
-  const supplier = state.data?.[2]?.items?.find(item => item.supplierId === supplierId)
+  const supplier = state.data?.[2]?.find(item => item.supplierId === supplierId)
   const selectedEvidenceDetail = state.data?.[3]?.evidence
   useEffect(() => {
-    if (context) setForm(current => current ?? ({ category: '', criticalMaterials: [], inventoryDays: '', inTransitOrders: '', alternatives: '', alternativeCapacity: '', procurementOwner: '', logisticsOwner: '', sqeOwner: '', impactAnalysis: '', ...(context.context?.fields || {}) }))
-  }, [context])
+    if (context) setForm(current => current ?? ({ _baseVersion: context.version, category: '', criticalMaterials: [], inventoryDays: '', inTransitOrders: '', alternatives: '', alternativeCapacity: '', procurementOwner: '', logisticsOwner: '', sqeOwner: '', impactAnalysis: '', ...(context.context?.fields || {}) }))
+  }, [context, form === null])
   const setField = (key, value) => setForm(current => ({ ...current, [key]: value }))
   const saveContext = async event => {
-    event.preventDefault(); setBusy(true); setError('')
+    event.preventDefault(); setBusy(true); setError(''); setNotice('')
     try {
-      const fields = { ...form, inventoryDays: form.inventoryDays === '' ? null : Number(form.inventoryDays), criticalMaterials: Array.isArray(form.criticalMaterials) ? form.criticalMaterials : String(form.criticalMaterials || '').split(/[,，\n]/u).map(item => item.trim()).filter(Boolean) }
-      await api('supply_chain_business_context_save', { supplierId, expectedVersion: context.version, fields, idempotencyKey: crypto.randomUUID(), confirm: true })
+      const { _baseVersion, ...draftFields } = form
+      const fields = { ...draftFields, inventoryDays: form.inventoryDays === '' ? null : Number(form.inventoryDays), criticalMaterials: Array.isArray(form.criticalMaterials) ? form.criticalMaterials : String(form.criticalMaterials || '').split(/[,，\n]/u).map(item => item.trim()).filter(Boolean) }
+      const saved = await api('supply_chain_business_context_save', { supplierId, expectedVersion: _baseVersion ?? context.version, fields, idempotencyKey: crypto.randomUUID(), confirm: true })
+      setForm({ ...form, _baseVersion: saved.version })
+      setNotice('业务背景已保存。可继续评估业务影响。')
       setRevisionAfterSave()
     } catch (error) { setError(errorText(error)) } finally { setBusy(false) }
   }
   const saveAnalysis = async event => {
-    event.preventDefault(); setBusy(true); setError('')
+    event.preventDefault(); setBusy(true); setError(''); setNotice('')
     try {
       const evidenceIds = selectedEvidence && supplierId === selectedSupplier ? [selectedEvidenceEventId || selectedEvidence] : []
       await api('supply_chain_business_analysis_save', { supplierId, expectedVersion: analyses.total ? analyses.items[0].version : 0, backgroundVersion: context.version, evidenceVersion: context.evidenceVersion, evidenceIds, fields: analysis, idempotencyKey: crypto.randomUUID(), confirm: true })
+      setNotice('人工判断已保存，可在历史分析中查看。')
       setAnalysis(current => ({ ...current, externalSignal: '', possibleImpact: '', assumptions: '', informationGaps: '', suggestedActions: '' }))
       setRevisionAfterSave()
     } catch (error) { setError(errorText(error)) } finally { setBusy(false) }
@@ -321,31 +342,35 @@ function Business({ revision, setError, onScopeReady }) {
   if (!supplierId) return h('section', { className: 'sr-section sr-empty-panel' }, h('h2', null, '选择供应商'), h('p', { className: 'sr-muted' }, '从供应商台账打开一家供应商，补充库存、订单、替代产能和业务影响。'), h('button', { type: 'button', className: 'sr-button', onClick: () => window.dispatchEvent(new CustomEvent('supplier-risk:open-suppliers')) }, '浏览供应商台账'))
   if (!context || !form) return h(Loading, { state })
   return h(React.Fragment, null,
-    h('div', { className: 'sr-toolbar' }, h('div', null, h('h2', null, supplier?.displayName || supplierId), h('p', { className: 'sr-muted' }, `背景版本 ${context.version} · 证据版本 ${String(context.evidenceVersion).slice(0, 12)}`)), h('button', { type: 'button', className: 'sr-link', onClick: () => { setSelected(''); setSupplierId('') } }, '更换供应商')),
+    h('div', { className: 'sr-toolbar' }, h('div', null, h('h2', null, supplier?.displayName || selectedSupplierName || '供应商详情'), h('p', { className: 'sr-muted' }, context.version ? '已保存业务背景 · 可补充或更新' : '尚未补充业务背景 · 可先填写已知信息')), h('button', { type: 'button', className: 'sr-link', onClick: () => { setSelected(''); setSupplierId('') } }, '更换供应商')),
+    notice ? h('p', { className: 'sr-success', role: 'status' }, notice) : null,
+    form._baseVersion !== undefined && form._baseVersion < context.version ? h('div', { className: 'sr-error', role: 'alert' }, '业务背景已在其他位置更新。当前草稿仍保留，请核对后重新填写。', h('button', { type: 'button', onClick: () => { if (window.confirm('放弃当前业务背景草稿，读取最新保存的内容？')) setForm(null) } }, '读取最新背景')) : null,
+    h('div', { className: 'sr-mode-switch', 'aria-label': '业务评估步骤' }, ...[['context', '1 · 补充业务背景'], ['analysis', '2 · 评估业务影响']].map(([id, label]) => h('button', { type: 'button', key: id, 'aria-pressed': mode === id, onClick: () => setMode(id) }, label))),
     h('div', { className: 'sr-business-grid' },
-      h('form', { className: 'sr-section sr-form', onSubmit: saveContext }, h('h3', null, '业务背景'), h('p', { className: 'sr-muted' }, '只保存采购、物流和质量团队提供的背景，不会改写外部证据。'),
-        Field('关键物料', h('textarea', { value: Array.isArray(form.criticalMaterials) ? form.criticalMaterials.join('，') : form.criticalMaterials, onChange: event => setField('criticalMaterials', event.target.value), rows: 2 })),
-        Field('库存天数', h('input', { type: 'number', min: 0, step: 'any', value: form.inventoryDays ?? '', onChange: event => setField('inventoryDays', event.target.value) })),
+      h('form', { className: 'sr-section sr-form', hidden: mode !== 'context', onSubmit: saveContext }, h('h3', null, '业务背景'), h('p', { className: 'sr-muted' }, '只保存采购、物流和质量团队提供的背景，不会改写外部证据。'),
+        Field('关键物料', h('textarea', { placeholder: '填写物料名称，多个物料用逗号分隔', value: Array.isArray(form.criticalMaterials) ? form.criticalMaterials.join('，') : form.criticalMaterials, onChange: event => setField('criticalMaterials', event.target.value), rows: 2 })),
+        Field('库存天数', h('input', { type: 'number', min: 0, step: 'any', placeholder: '例如：14（天），未知可留空', value: form.inventoryDays ?? '', onChange: event => setField('inventoryDays', event.target.value) })),
         Field('在途订单', h('textarea', { value: form.inTransitOrders || '', onChange: event => setField('inTransitOrders', event.target.value), rows: 2 })),
-        Field('替代供应商', h('textarea', { value: form.alternatives || '', onChange: event => setField('alternatives', event.target.value), rows: 2 })),
+        h('details', { className: 'sr-disclosure' }, h('summary', null, '替代方案与经营影响（选填）'), Field('替代供应商', h('textarea', { value: form.alternatives || '', onChange: event => setField('alternatives', event.target.value), rows: 2 })),
         Field('替代产能', h('textarea', { value: form.alternativeCapacity || '', onChange: event => setField('alternativeCapacity', event.target.value), rows: 2 })),
         Field('经营影响', h('textarea', { value: form.impactAnalysis || '', onChange: event => setField('impactAnalysis', event.target.value), rows: 3 })),
-        h('button', { type: 'submit', className: 'sr-button', disabled: busy }, busy ? '保存中…' : '保存业务背景')),
-      h('section', { className: 'sr-section' }, h('h3', null, '人工判断'), h('p', { className: 'sr-muted' }, selectedEvidence ? `引用证据 ${selectedEvidence}` : '从工商或媒体页面打开证据后，可在此关联分析。'),
+        ), h('p', { className: 'sr-footnote' }, '切换页面会保留本次草稿。保存后才会用于 Agent 分析；退出或刷新应用前请保存。'), h('button', { type: 'submit', className: 'sr-button', disabled: busy }, busy ? '保存中…' : '保存业务背景')),
+      h('section', { className: 'sr-section', hidden: mode !== 'analysis' }, h('h3', null, '业务影响评估'), h('p', { className: 'sr-muted' }, selectedEvidence ? '已关联下方证据。请区分事实、假设和可能影响。' : '从工商或媒体页面打开证据后，可在此关联分析。'),
         selectedEvidenceDetail ? h('article', { className: 'sr-selected-evidence' }, h(Status, { value: selectedEvidenceDetail.reviewStatus }), h('strong', null, selectedEvidenceDetail.title || '引用证据'), h('p', null, selectedEvidenceDetail.summary || selectedEvidenceDetail.description || '未提供摘要'), h('small', null, `来源 ${selectedEvidenceDetail.source || selectedEvidenceDetail.platform || '未知'} · 采集 ${fmt(selectedEvidenceDetail.retrievedAt)}`)) : null,
         h('form', { className: 'sr-form', onSubmit: saveAnalysis }, Field('风险维度', h('select', { value: analysis.dimension, onChange: event => setAnalysis({ ...analysis, dimension: event.target.value }) }, ...[['delivery', '交付'], ['capacity', '产能'], ['quality', '质量'], ['compliance', '合规'], ['finance', '财务'], ['other', '其他']].map(([id, name]) => h('option', { key: id, value: id }, name)))),
           Field('外部信号', textArea(analysis.externalSignal, value => setAnalysis({ ...analysis, externalSignal: value }))),
-          Field('可能影响', textArea(analysis.possibleImpact, value => setAnalysis({ ...analysis, possibleImpact: value }))),
-          Field('假设', textArea(analysis.assumptions, value => setAnalysis({ ...analysis, assumptions: value }))),
+          Field('可能影响（必填）', textArea(analysis.possibleImpact, value => setAnalysis({ ...analysis, possibleImpact: value }))),
+          h('details', { className: 'sr-disclosure' }, h('summary', null, '补充假设与待核实信息（选填）'), Field('假设', textArea(analysis.assumptions, value => setAnalysis({ ...analysis, assumptions: value }))),
           Field('信息缺口', textArea(analysis.informationGaps, value => setAnalysis({ ...analysis, informationGaps: value }))),
+          ),
           Field('建议动作', textArea(analysis.suggestedActions, value => setAnalysis({ ...analysis, suggestedActions: value }))),
-          h('button', { type: 'submit', className: 'sr-button', disabled: busy }, '保存人工判断')),
-        h('div', { className: 'sr-history' }, h('h3', null, '历史分析'), ...(analyses.items || []).map(item => h('article', { key: item.id }, h('span', null, `版本 ${item.version} · ${fmt(item.createdAt)}`), item.stale ? h(Status, { value: 'STALE' }) : null, h('p', null, item.fields?.possibleImpact || '未填写影响描述')))),
-        h('button', { type: 'button', className: 'sr-button sr-secondary', onClick: () => sendSupplierAnalysis(supplierId, context, selectedEvidence) }, '交由 Agent 分析')))
+          h('button', { type: 'submit', className: 'sr-button', disabled: busy || !analysis.possibleImpact.trim() }, busy ? '保存中…' : '保存人工判断')),
+        h('div', { className: 'sr-history' }, h('h3', null, '历史分析'), !analyses.items?.length ? h('p', { className: 'sr-muted' }, '暂无已保存判断。补充可能影响后保存，或交由 Agent 分析已保存的数据。') : null, ...(analyses.items || []).map(item => h('article', { key: item.id }, h('span', null, `版本 ${item.version} · ${fmt(item.createdAt)}`), item.stale ? h(Status, { value: 'STALE' }) : null, h('p', null, item.fields?.possibleImpact || '未填写影响描述')))),
+        h('button', { type: 'button', className: 'sr-button sr-secondary', onClick: () => sendSupplierAnalysis(supplierId, context, selectedEvidence) }, '用已保存数据发起 Agent 分析')))
   )
 }
 
-function textArea(value, onChange) { return h('textarea', { rows: 3, value: value || '', onChange: event => onChange(event.target.value) }) }
+function textArea(value, onChange) { return h('textarea', { rows: 2, value: value || '', onChange: event => onChange(event.target.value) }) }
 function normalizeSupplierIds(value) {
   const values = Array.isArray(value) ? value : String(value || '').split(/[,，\n]/u)
   return [...new Set(values.map(item => String(item).trim()).filter(Boolean))]
@@ -367,6 +392,7 @@ function Weekly({ revision, setError, onUnread, onScopeReady }) {
   const [reportId, setReportId] = useRemembered('weekly-report', '')
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
+  const [scopeQuery, setScopeQuery] = useState('')
   const [planFields, setPlanFields] = useRemembered('weekly-plan-draft', null)
   const state = useLoad(() => (onScopeReady ? Promise.all([
     api('supply_chain_weekly_report_plan_get'),
@@ -404,16 +430,16 @@ function Weekly({ revision, setError, onUnread, onScopeReady }) {
     h('div', { className: 'sr-weekly-layout' },
       h('section', { className: 'sr-section' }, h('h2', null, '周报计划'), h('p', { className: 'sr-muted' }, '服务端每周一 09:00（Asia/Shanghai）汇总已保存事实，不会启动外部采集或模型调用。'),
         h('form', { className: 'sr-form', onSubmit: savePlan }, h('label', { className: 'sr-toggle' }, h('input', { type: 'checkbox', checked: planFields.enabled === true, onChange: event => setPlanFields({ ...planFields, enabled: event.target.checked }) }), h('span', null, '启用每周风险周报')),
-          Field('供应商范围', h(React.Fragment, null,
-            h('select', {
-              className: 'sr-multi-select', multiple: true, size: Math.min(Math.max(suppliers.length, 3), 8),
-              value: selectedIds, disabled: supplierState.loading || !supplierState.data,
-              onChange: event => setPlanFields({ ...planFields, supplierIds: Array.from(event.target.selectedOptions, option => option.value) }),
-              'aria-label': '选择周报供应商',
-            }, ...suppliers.map(supplier => h('option', { key: supplier.supplierId, value: supplier.supplierId }, supplier.displayName || supplier.supplierId)),
-            ...unavailableIds.map(id => h('option', { key: id, value: id }, '已选供应商（当前不可用）'))),
-            h('small', { className: 'sr-field-hint' }, supplierState.loading ? '正在读取供应商台账…' : !supplierState.data ? '供应商台账读取失败，请刷新重试；已保存范围保留。' : suppliers.length ? `已录入 ${suppliers.length} 家供应商，可按住 Command 或 Ctrl 多选。未选择表示全部供应商（含后续新增）。` : '当前团队暂无供应商，请先核对台账或历史数据迁移。'))),
-          Field('采集预算记录', h('input', { type: 'number', min: 0, value: planFields.collectionBudget || 0, onChange: event => setPlanFields({ ...planFields, collectionBudget: event.target.value }) })),
+          h('fieldset', { className: 'sr-scope-picker', disabled: supplierState.loading || !supplierState.data },
+            h('legend', null, '供应商范围'),
+            h('p', { className: 'sr-footnote' }, selectedIds.length ? `已选择 ${selectedIds.length} 家供应商` : '全部供应商，包含后续新增'),
+            h('label', { className: 'sr-search' }, h('input', { type: 'search', value: scopeQuery, onChange: event => setScopeQuery(event.target.value), placeholder: '搜索供应商名称', 'aria-label': '搜索周报供应商' })),
+            selectedIds.length ? h('button', { type: 'button', className: 'sr-link', onClick: () => setPlanFields({ ...planFields, supplierIds: [] }) }, '改为全部供应商') : null,
+            h('div', { className: 'sr-scope-options' }, ...suppliers.filter(supplier => (supplier.displayName || '').toLocaleLowerCase().includes(scopeQuery.trim().toLocaleLowerCase())).map(supplier => h('label', { key: supplier.supplierId, className: 'sr-toggle' }, h('input', { type: 'checkbox', checked: selectedIds.includes(supplier.supplierId), onChange: event => setPlanFields({ ...planFields, supplierIds: event.target.checked ? [...selectedIds, supplier.supplierId] : selectedIds.filter(id => id !== supplier.supplierId) }) }), h('span', null, supplier.displayName || '未命名供应商')))),
+            scopeQuery && !suppliers.some(supplier => (supplier.displayName || '').toLocaleLowerCase().includes(scopeQuery.trim().toLocaleLowerCase())) ? h('p', { className: 'sr-muted', role: 'status' }, '没有匹配的供应商，请调整搜索词。') : null,
+            unavailableIds.length ? h('p', { className: 'sr-footnote' }, `有 ${unavailableIds.length} 家已选供应商当前不可用，原选择仍保留。`) : null),
+          h('small', { className: 'sr-field-hint', role: 'status' }, supplierState.loading ? '正在读取供应商台账…' : !supplierState.data ? '供应商台账读取失败，请刷新重试；已保存范围保留。' : suppliers.length ? '勾选限定范围；不勾选表示全部供应商。' : '当前团队暂无供应商，请先核对台账或历史数据迁移。'),
+          h('details', { className: 'sr-disclosure' }, h('summary', null, '预算备注（选填）'), h('p', { className: 'sr-footnote' }, '仅记录预算，不会启动采集或限制支出。'), Field('采集预算记录', h('input', { type: 'number', min: 0, value: planFields.collectionBudget || 0, onChange: event => setPlanFields({ ...planFields, collectionBudget: event.target.value }) }))),
           h('p', { className: 'sr-footnote' }, `下次执行：${fmt(plan.nextRunAt)} · 当前运行：${plan.currentRunStatus || '无'}${plan.failureCode ? ` · ${plan.failureCode}` : ''}`),
           h('button', { type: 'submit', className: 'sr-button', disabled: busy }, busy ? '保存中…' : '保存计划'))),
       h('section', { className: 'sr-section' }, h('div', { className: 'sr-section-heading' }, h('h2', null, '历史周报'), h('span', { className: 'sr-unread-count' }, `未读 ${reports.unreadCount || 0}`)),
@@ -433,6 +459,12 @@ function ReportContent({ content }) {
 }
 
 function apply(ctx) {
+  ctx.effect(() => {
+    const reset = () => { supplierNavigation().invalidate(); if (ctx.layout.panelInfo.getSnapshot().activePanelId === 'supplier-risk') ctx.layout.selectPanel(null) }
+    window.addEventListener('sensteed:identity-changed', reset)
+    return () => { window.removeEventListener('sensteed:identity-changed', reset); supplierNavigation().invalidate() }
+  }, 'desktop context identity isolation')
+  ctx.slots.inject('desktop.navigation.context', () => ctx.slots.register({ name: 'desktop.navigation.context', key: 'supplier-risk' }, supplierNavigation().Menu))
   const t = ctx.locale.bind('dofe.supplier-risk')
   ctx.effect(() => {
     const style = document.createElement('style')
@@ -469,15 +501,19 @@ function apply(ctx) {
       window.removeEventListener('supplier-risk:agent-error', onAgentError)
     }
   }, 'supplier risk agent bridge')
-  ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID, locale: 'dofe.supplier-risk' }, Workbench))
+  ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID, locale: 'dofe.supplier-risk' }, SupplierPage))
   ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({ name: 'sidebar.footer.action', id: PANEL_ID, order: 57, locale: 'dofe.supplier-risk', inject: () => ({ t, onOpen: () => ctx.layout.selectPanel(PANEL_ID) }) }, FooterButton))
   ctx.effect(() => ctx.locale.register('dofe.supplier-risk', { zh: { panel: '供应链管理' }, en: { panel: 'Supply chain' } }), 'supplier risk locale')
 }
 
 function FooterButton({ wide, t, onOpen }) {
+  const { allowed } = supplierNavigation().useAccess(`${BASE}/access`, adoptScope)
+  if (allowed !== true) return null
   return h(Tooltip, { label: t('panel'), disabled: wide },
     h('button', { type: 'button', className: `sr-launcher${wide ? ' sr-wide' : ''}`, 'aria-label': t('panel'), onClick: onOpen },
       h(IconShieldOutlineRegular, { size: wide ? 14 : 18 }), wide ? h('span', null, t('panel')) : null))
 }
 exports.apply = apply
 exports.inject = ['slots', 'locale', 'sessions', 'uiWorkspace', 'layout']
+
+function SupplierPage() { const { allowed, epoch } = supplierNavigation().useAccess(`${BASE}/access`, adoptScope); return allowed === true ? h(Workbench, { key: epoch }) : h('p', { role: 'status' }, allowed === false ? '当前模块不可访问' : '正在确认访问权限…') }

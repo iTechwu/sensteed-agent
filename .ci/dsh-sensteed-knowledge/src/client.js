@@ -312,24 +312,30 @@ const subscribe = (listener) => {
 };
 const snapshot = () => opened;
 async function load(signal) {
+  const bridge = knowledgeNavigation(), epoch = bridge.epoch
   const response = await fetch(PATH, {
     credentials: "same-origin",
     redirect: "error",
-    signal: AbortSignal.any([signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)].filter(Boolean)),
+    signal: AbortSignal.any([signal, bridge.signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)].filter(Boolean)),
     headers: { Accept: "application/json" },
   });
   if (!response.ok) throw new Error("knowledge request failed");
-  return response.json();
+  const body = await response.json();
+  if (epoch !== bridge.epoch) throw new DOMException('Stale identity response', 'AbortError');
+  bridge.adoptScope(body.scopeId);
+  return body;
 }
 async function mutate(body) {
+  const bridge = knowledgeNavigation(), epoch = bridge.epoch;
   const response = await fetch(PATH, {
     method: "POST",
     credentials: "same-origin",
     redirect: "error",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS), body: JSON.stringify(body),
+    signal: AbortSignal.any([bridge.signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]), body: JSON.stringify(body),
   });
   const value = await response.json().catch(() => ({}));
+  if (epoch !== bridge.epoch) throw new DOMException('Stale identity response', 'AbortError');
   if (!response.ok || value?.ok === false || value?.status === "error") {
     const error = new Error("knowledge mutation failed");
     error.code = typeof value?.error === "string" ? value.error : `knowledge_mcp_http_${response.status}`;
@@ -1280,7 +1286,8 @@ function Overlay({ t, embedded = false, onClose = closeOverlay }) {
   const overlayVisible = useSyncExternalStore(subscribe, snapshot, snapshot);
   const visible = embedded || overlayVisible;
   const shellRef = useRef(null);
-  const [tab, setTab] = useState("overview");
+  const bridge = knowledgeNavigation();
+  const [tab, setTab, externalNavigation] = bridge.usePage();
   const [managementResult, setManagementResult] = useState(null);
   const [managementBusy, setManagementBusy] = useState(false);
   const [revision, setRevision] = useState(0);
@@ -1289,13 +1296,14 @@ function Overlay({ t, embedded = false, onClose = closeOverlay }) {
   const [actionError, setActionError] = useState(false);
   const [loading, setLoading] = useState(false);
   const loadingRef = useRef(false);
-  const [graphQuery, setGraphQuery] = useState("");
+  useEffect(() => { setData(null); setManagementResult(null); setGraph(null); setRecallResults([]) }, [bridge.epoch]);
+  const [graphQuery, setGraphQuery] = bridge.useField("graph-query", "");
   const [graph, setGraph] = useState(null);
   const [graphBusy, setGraphBusy] = useState(false);
   const graphBusyRef = useRef(false);
   const [graphError, setGraphError] = useState(false);
-  const [memoryQuery, setMemoryQuery] = useState("");
-  const [memoryFilter, setMemoryFilter] = useState("all");
+  const [memoryQuery, setMemoryQuery] = bridge.useField("memory-query", "");
+  const [memoryFilter, setMemoryFilter] = bridge.useField("memory-filter", "all");
   const [recallResults, setRecallResults] = useState([]);
   const [recallBusy, setRecallBusy] = useState(false);
   const recallBusyRef = useRef(false);
@@ -1330,7 +1338,7 @@ function Overlay({ t, embedded = false, onClose = closeOverlay }) {
       controller.abort();
       loadingRef.current = false;
     };
-  }, [visible, revision]);
+  }, [visible, revision, bridge.epoch]);
   useEffect(() => {
     if (!visible) return undefined;
     const key = (event) => {
@@ -1342,6 +1350,13 @@ function Overlay({ t, embedded = false, onClose = closeOverlay }) {
   useEffect(() => {
     if (visible) requestAnimationFrame(() => shellRef.current?.focus?.());
   }, [visible]);
+  useEffect(() => {
+    if (!data || loading) return
+    if (data.permissions?.allowed === false) { if (bridge.getSnapshot().status !== 'denied') bridge.invalidate(); return }
+    const pages = [['overview','overview'],['memories','memoriesTab'],['memoryManage','memoryManageTab'],['knowledge','knowledgeTab'],['console','consoleTab'],['graph','graphTab'],['ontology','ontologyTab'],['assertions','assertionsTab'],['lineage','lineageTab']]
+    bridge.publish(pages.map(([id, key]) => ({ id, label: t(key) })), tab, setTab)
+  })
+  useEffect(() => () => bridge.clearSource(), [])
   if (!visible) return null;
   const interactionBusy = loading || graphBusy || recallBusy || actionBusy;
   const refresh = () => {
@@ -1572,7 +1587,7 @@ function Overlay({ t, embedded = false, onClose = closeOverlay }) {
     { className: `yk-overlay${embedded ? " yk-page" : ""}`, ...(embedded ? { role: "region" } : { role: "dialog", "aria-modal": true }), "aria-labelledby": "yk-title" },
     h(
       "main",
-      { className: "yk-shell", "aria-labelledby": "yk-title", ref: shellRef, tabIndex: -1 },
+      { className: "yk-shell", style: externalNavigation ? { gridTemplateRows: "auto minmax(0,1fr)" } : undefined, "aria-labelledby": "yk-title", ref: shellRef, tabIndex: -1 },
       h(
         "header",
         { className: "yk-header" },
@@ -1619,7 +1634,7 @@ function Overlay({ t, embedded = false, onClose = closeOverlay }) {
       ),
       h(
         "nav",
-        { className: "yk-tabs", "aria-label": t("title") },
+        { className: "yk-tabs", hidden: externalNavigation, style: externalNavigation ? { display: "none" } : undefined, "aria-label": t("title") },
         [
           ["overview", t("overview")],
           ["memories", t("memoriesTab")],
@@ -1656,6 +1671,8 @@ function Overlay({ t, embedded = false, onClose = closeOverlay }) {
   );
 }
 function Button({ wide, t, onOpen = openOverlay }) {
+  const { allowed } = knowledgeNavigation().useAccess(`${PATH}?access=1`);
+  if (allowed !== true) return null;
   return h(
     Tooltip,
     { label: t("open"), disabled: wide },
@@ -1682,6 +1699,12 @@ const themeRefinementCss = `.yk-metric,.yk-record,.yk-memory-row{border-color:va
 const contentLayoutCss = `.yk-page,.yk-graph-panel,.yk-graph-wrap,.yk-node-detail{min-width:0}.yk-graph-panel,.yk-graph-wrap{grid-template-columns:minmax(0,1fr)}.yk-node-detail{overflow-wrap:anywhere}`;
 const managementCss = `.yk-management-list{display:grid;gap:8px}.yk-management-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--dsw-alias-border-l1);border-radius:7px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font-size:12px}.yk-management-row span{color:var(--dsw-alias-label-secondary);font-size:11px}.yk-management-records{display:grid;gap:8px;max-height:420px;overflow:auto}.yk-management-records pre{margin:0;padding:10px;border:1px solid var(--dsw-alias-border-l1);border-radius:7px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-secondary);font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere}.yk-management-input{box-sizing:border-box;width:100%;padding:9px 10px;border:1px solid var(--dsw-alias-border-l1);border-radius:7px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;resize:vertical}.yk-management-actions{display:flex;flex-wrap:wrap;gap:8px}.yk-management-form{display:grid;gap:8px;padding-top:12px;border-top:1px solid var(--dsw-alias-border-l1)}.yk-management-console{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.yk-management-card{display:grid;gap:4px;padding:12px;border:1px solid var(--dsw-alias-border-l1);border-radius:7px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);text-align:left;cursor:pointer}.yk-management-card span{color:var(--dsw-alias-label-secondary);font-size:11px}.yk-management-card:disabled{cursor:not-allowed;opacity:.45}@media(max-width:720px){.yk-management-console{grid-template-columns:repeat(2,minmax(0,1fr))}}`;
 function apply(ctx) {
+  ctx.effect(() => {
+    const reset = () => { closeOverlay(); knowledgeNavigation().invalidate(); if (ctx.layout.panelInfo.getSnapshot().activePanelId === 'sensteed-knowledge') ctx.layout.selectPanel(null) }
+    window.addEventListener('sensteed:identity-changed', reset)
+    return () => { window.removeEventListener('sensteed:identity-changed', reset); knowledgeNavigation().invalidate() }
+  }, 'desktop context identity isolation')
+  ctx.slots.inject('desktop.navigation.context', () => ctx.slots.register({ name: 'desktop.navigation.context', key: 'sensteed-knowledge' }, knowledgeNavigation().Menu))
   ctx.effect(
     () => ctx.locale.register(NS, copy),
     "dofe-sensteed-knowledge: dictionaries",
@@ -1738,3 +1761,6 @@ module.exports = {
     toolData,
   },
 };
+
+let knowledgeNavigationBridge
+function knowledgeNavigation() { return knowledgeNavigationBridge ||= createDesktopNavigationBridge(React) }

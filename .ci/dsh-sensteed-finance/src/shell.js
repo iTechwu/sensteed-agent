@@ -108,6 +108,18 @@ function Dashboard({ t, embedded = false, onClose = closeOverlay }) {
     leaveGuard.navigation.leave(navigate)
   }
   const ctx = { year, orgId, orgs, departments, revision, drillParams, viewState: navigation.current.viewState, permissions: capabilities.permissions || [], financeWriter, role: capabilities.role, fullAccess: capabilities.fullAccess, onNavigate: onDrill }
+  const desktopBridge = financeDesktopNavigation()
+  const desktopState = useSyncExternalStore(desktopBridge.subscribe, desktopBridge.getSnapshot, desktopBridge.getSnapshot)
+  useEffect(() => {
+    if (capabilities.permissions === null) return
+    const items = FINANCE_NAVIGATION.flatMap(([group, rows]) => rows.filter(item => financeNavigationAllowed(item, identity)).map(item => ({ id: item[0], label: item[1], group })))
+    desktopBridge.publish(items, financeNavigationItem(tab, drillParams)?.[0] || null, id => {
+      const item = FINANCE_NAVIGATION.flatMap(([, rows]) => rows).find(item => item[0] === id)
+      if (item && financeNavigationAllowed(item, identity)) onDrill(item[2], financeSidebarParams(item, tab, drillParams, year))
+    }, action => leaveGuard.navigation.leave(() => { desktopBridge.remember({ ...navigation.current, scrollTop: contentRef.current?.scrollTop || 0 }); action() }))
+    desktopBridge.remember(navigation.current)
+  })
+  useEffect(() => () => desktopBridge.clearSource(), [])
   const activeItem = financeNavigationItem(tab, drillParams)
   useEffect(() => { if (capabilities.permissions !== null && (!canOpen(tab) || (activeItem && !financeNavigationAllowed(activeItem, identity)))) { navigation.reset() } }, [tab, capabilities.permissions, financeWriter, capabilities.role, activeItem])
   const previous = navigation.previous
@@ -147,7 +159,7 @@ function Dashboard({ t, embedded = false, onClose = closeOverlay }) {
         tab === 'notifications' ? h(NotificationsView, { ctx, t, onDrill }) : null,
         tab === 'permissions' ? h(PermissionsView, { ctx, t }) : null)
 
-  return h('div', { className: `sf-overlay sf-root${embedded ? ' sf-page' : ''}`, role: embedded ? 'region' : 'dialog', 'aria-modal': embedded ? undefined : true, 'aria-labelledby': 'sf-title' },
+  return h('div', { className: `sf-overlay sf-root${embedded ? ' sf-page' : ''}`, 'data-desktop-context-active': desktopState.attached || undefined, role: embedded ? 'region' : 'dialog', 'aria-modal': embedded ? undefined : true, 'aria-labelledby': 'sf-title' },
     h('main', { className: 'sf-shell', 'aria-labelledby': 'sf-title', ref: shellRef, tabIndex: -1 },
       h('div', { className: 'sf-sidebar-brand' },
         h('span', { className: 'sf-sidebar-brand-mark' }, h(Glyph, { name: 'data', size: 18 })),
@@ -187,9 +199,15 @@ function Button({ wide, t, onOpen = openOverlay }) {
 }
 
 function apply(ctx) {
+  ctx.effect(() => {
+    const reset = () => { closeOverlay(); financeDesktopNavigation().invalidate(); if (ctx.layout.panelInfo.getSnapshot().activePanelId === 'sensteed-finance') ctx.layout.selectPanel(null) }
+    window.addEventListener('sensteed:identity-changed', reset)
+    return () => { window.removeEventListener('sensteed:identity-changed', reset); financeDesktopNavigation().invalidate() }
+  }, 'desktop context identity isolation')
+  ctx.slots.inject('desktop.navigation.context', () => ctx.slots.register({ name: 'desktop.navigation.context', key: 'sensteed-finance' }, financeDesktopNavigation().Menu))
   ctx.effect(() => ctx.locale.register(NS, copy), 'dofe-sensteed-finance: dictionaries')
   ctx.effect(() => { window.addEventListener(OVERLAY_EVENT, closeOtherOverlay); return () => window.removeEventListener(OVERLAY_EVENT, closeOtherOverlay) }, 'dofe-sensteed-finance: exclusive-overlay')
-  ctx.effect(() => { const style = document.createElement('style'); style.dataset.plugin = '@dofe/dsh-sensteed-finance'; style.textContent = css + sfAnalysisGrid; document.head.appendChild(style); return () => style.remove() }, 'dofe-sensteed-finance: styles')
+  ctx.effect(() => { const style = document.createElement('style'); style.dataset.plugin = '@dofe/dsh-sensteed-finance'; style.textContent = css + sfAnalysisGrid + desktopContextCss; document.head.appendChild(style); return () => style.remove() }, 'dofe-sensteed-finance: styles')
   // 深度分析入口走宿主 conversation 服务（由 desktop 宿主在浏览器侧注册）；
   // 通过惰性 getter 注入，避免插件客户端与宿主模块产生编译期耦合。
   ctx.effect(() => {
@@ -271,7 +289,8 @@ function apply(ctx) {
 
 function FinancePage(props) {
   const allowed = useFinanceWorkspaceAccess()
-  return allowed === true ? h(Dashboard, props) : null
+  const state = useSyncExternalStore(financeDesktopNavigation().subscribe, financeDesktopNavigation().getSnapshot, financeDesktopNavigation().getSnapshot)
+  return allowed === true ? h(Dashboard, { ...props, key: state.epoch }) : null
 }
 
 function Overlay({ t }) {
@@ -292,27 +311,33 @@ function useFinanceWorkspaceAccess(permission) {
       checking = true
       clearTimeout(timer)
       let nextCheckMs = 5000
+      const generation = financeDesktopNavigation().epoch
       try {
         const response = await fetch(`${BASE}/access${permission ? `?permission=${encodeURIComponent(permission)}` : ''}`, {
           credentials: 'same-origin', redirect: 'error',
           headers: { Accept: 'application/json' },
-          signal: AbortSignal.any([controller.signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]),
+          signal: AbortSignal.any([controller.signal, financeDesktopNavigation().signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]),
         })
-        if (cancelled) return
+        if (cancelled || generation !== financeDesktopNavigation().epoch) return
         if (response.status === 401 || response.status === 403) {
+          financeDesktopNavigation().invalidate()
           setAllowed(false)
         } else {
           if (!response.ok) throw new Error('finance_access_unavailable')
           const body = await response.json()
+          if (cancelled || generation !== financeDesktopNavigation().epoch) return
           if (body?.ok !== true || typeof body.allowed !== 'boolean') throw new Error('finance_access_unavailable')
           if (cancelled) return
           setAllowed(body.allowed)
+          financeDesktopNavigation().adoptScope(body.scopeId)
+          if (!body.allowed) financeDesktopNavigation().invalidate()
+          if (body.allowed) financeDesktopNavigation().resume()
           if (body.allowed) nextCheckMs = 60000
         }
-      } catch { /* An outage does not revoke a previously confirmed permission. */ }
+      } catch { if (generation !== financeDesktopNavigation().epoch) setAllowed(null) }
       finally {
         checking = false
-        if (!cancelled) timer = setTimeout(() => { void check() }, nextCheckMs)
+        if (!cancelled) timer = setTimeout(() => { void check() }, generation !== financeDesktopNavigation().epoch ? 0 : nextCheckMs)
       }
     }
     const refresh = () => { void check() }
@@ -320,6 +345,7 @@ function useFinanceWorkspaceAccess(permission) {
     refresh()
     window.addEventListener('focus', refresh)
     window.addEventListener('online', refresh)
+    window.addEventListener('sensteed:identity-changed', refresh)
     document.addEventListener('visibilitychange', onVisible)
     return () => {
       cancelled = true
@@ -327,6 +353,7 @@ function useFinanceWorkspaceAccess(permission) {
       controller.abort()
       window.removeEventListener('focus', refresh)
       window.removeEventListener('online', refresh)
+      window.removeEventListener('sensteed:identity-changed', refresh)
       document.removeEventListener('visibilitychange', onVisible)
     }
   }, [permission])
