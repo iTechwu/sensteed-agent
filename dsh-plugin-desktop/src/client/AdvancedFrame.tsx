@@ -124,7 +124,7 @@ function DesktopOwnedFrameBody({
       data-dragging={dragging || undefined}
       style={{ gridTemplateColumns: `${columns.sidebar}px minmax(0, 1fr) ${columns.rightbar}px` }}
     >
-      <a className="sensteedSkipLink" href="#sensteed-main-workspace">{document.documentElement.lang.startsWith('zh') ? '跳到工作区' : 'Skip to workspace'}</a>
+      <a className="sensteedSkipLink" href="#sensteed-main-workspace">{(typeof document !== 'undefined' && document.documentElement?.lang?.startsWith('zh')) ? '跳到工作区' : 'Skip to workspace'}</a>
       {mode === 'advanced' && platform === 'darwin' && <div className="sensteedAgentMacCaptionRow" aria-hidden="true" />}
       <aside className="sensteedAgentSidebarSurface">
         {/*
