@@ -100,6 +100,9 @@ function financeBusinessDestination(path) {
     const keyword = url.searchParams.get('q')?.trim()
     if (keyword && keyword.length > 200) return null
     if (keyword) params.keyword = keyword
+    const incomeTypeName = url.searchParams.get('incomeTypeName')?.trim()
+    if (incomeTypeName && incomeTypeName.length > 100) return null
+    if (incomeTypeName) params.incomeTypeName = incomeTypeName
     if (url.searchParams.get('unassigned') === '1') params.unassigned = true
     const page = Number(url.searchParams.get('page'))
     if (Number.isSafeInteger(page) && page > 0) params.page = page
@@ -136,4 +139,42 @@ function financeBusinessDestination(path) {
   if (params.orgId === 'all') params.orgId = ''
   if (params.orgId || params.orgIds?.length) delete params.unassigned
   return { tab: route[0], params }
+}
+
+/** 面板内的业务历史，仅保留当前会话最近20步；不缓存接口结果或未提交表单。 */
+function useFinanceNavigation(initialYear) {
+  const sequence = useRef(0)
+  const [current, setCurrent] = useState(() => ({ id: 0, tab: 'overview', params: null, year: initialYear, orgId: '', viewState: {}, scrollTop: 0 }))
+  const [past, setPast] = useState([])
+  const update = patch => setCurrent(route => ({ ...route, ...(typeof patch === 'function' ? patch(route) : patch) }))
+  const navigate = (tab, params, scrollTop = 0) => {
+    if (tab === current.tab && JSON.stringify(params) === JSON.stringify(current.params)) return
+    setPast(history => [...history.slice(-19), { ...current, scrollTop }])
+    setCurrent({ id: ++sequence.current, tab, params, year: String(params.year || current.year), orgId: params.orgId || '', viewState: {}, scrollTop: 0 })
+  }
+  const back = () => {
+    if (!past.length) return
+    setCurrent(past[past.length - 1]); setPast(history => history.slice(0, -1))
+  }
+  const reset = () => { setPast([]); setCurrent(route => ({ ...route, id: ++sequence.current, tab: 'overview', params: null, viewState: {}, scrollTop: 0 })) }
+  return { current, previous: past[past.length - 1], update, navigate, back, reset }
+}
+
+/** 返回时等待异步列表撑开高度；用户主动操作后立即停止恢复。 */
+function restoreFinanceScroll(element, top) {
+  if (!element) return () => {}
+  let observer = null
+  const events = ['wheel', 'touchstart', 'pointerdown', 'keydown']
+  const stop = () => { observer?.disconnect(); events.forEach(event => element.removeEventListener(event, stop)) }
+  const restore = () => {
+    element.scrollTop = top
+    if (element.scrollHeight - element.clientHeight >= top) stop()
+  }
+  if (top > 0) {
+    observer = new MutationObserver(restore)
+    observer.observe(element, { childList: true, subtree: true, attributes: true })
+    events.forEach(event => element.addEventListener(event, stop, { passive: true }))
+  }
+  restore()
+  return stop
 }

@@ -157,3 +157,68 @@ for (const value of priorityCases) assert.equal(pluginSchedule.normalizePaymentP
 assert.equal(destination('/data-center#source-records').tab, 'sources', '来源记录锚点未映射到来源工作台')
 assert.match(await readFile(resolve(datasource, 'apps/web/components/finance/source-records-browser.tsx'), 'utf8'), /id="source-records"/, '网页来源记录锚点变更')
 console.log(`PASS: ${dateCases.length} 组排款日期、${priorityCases.length} 组历史优先级与网页一致，来源记录锚点直达`)
+
+// 收入执行偏差与未到账金额分别对照，不把来源差额直接当未到账。
+const revenueHelpers = new Function(await readFile(resolve(root, 'src/format.js'), 'utf8') + '\n' + cashView + '\nreturn { revenueRemaining, revenueVariance }')()
+const receiptCases = [
+  { plannedAmount: 100, actualAmount: 40, varianceAmount: null },
+  { plannedAmount: 100, actualAmount: 120, varianceAmount: null },
+  { plannedAmount: 100, actualAmount: null, varianceAmount: null },
+  { plannedAmount: null, actualAmount: 40, varianceAmount: null },
+  { plannedAmount: 0, actualAmount: 0, varianceAmount: 0 },
+  { plannedAmount: 0.3, actualAmount: 0.1, varianceAmount: null },
+  { plannedAmount: 100, actualAmount: null, varianceAmount: 0 },
+]
+for (const name of ['revenueRemaining', 'revenueVariance']) {
+  const webHelper = upstreamFunction(filterSource, name)
+  for (const row of receiptCases) assert.equal(revenueHelpers[name](row), webHelper(row), `收入金额口径漂移 ${name}`)
+}
+assert.equal(destination('/cash?tab=revenue&incomeTypeName=销售收入').params.incomeTypeName, '销售收入')
+console.log('PASS: 7 组收入执行偏差及未到账口径与网页一致，类型深链保留')
+
+// 两端直接执行同一组问答场景，比较结论、金额、证据和来源路由。
+function assistantModule(source, dependencies = {}) {
+  const exports = {}
+  new Function('exports', 'require', ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(exports, name => {
+    assert.ok(dependencies[name], `问答核验遇到未知依赖 ${name}`)
+    return dependencies[name]
+  })
+  return exports
+}
+const assistantFormat = assistantModule(formatSource)
+const assistantUrl = assistantModule(await readFile(resolve(datasource, 'apps/web/components/finance/finance-url.ts'), 'utf8'))
+const assistantWeb = assistantModule(await readFile(resolve(datasource, 'apps/web/components/finance/assistant-answer.ts'), 'utf8'), { './finance-format': assistantFormat, './finance-url': assistantUrl })
+const assistantPlugin = new Function(await readFile(resolve(root, 'src/views/assistant-answer.js'), 'utf8') + '\nreturn { build: financeInlineAnswer, intent: financeQuestionIntent }')()
+const assistantCases = [
+  ['预算超支', {}],
+  ['预算超支', { budget: { budgetVersionId: 'v1', list: [{ month: 1, budgetAmount: 0, prSubmittedAmount: 100.001, expenseType: 'MODEL_SPECIFIC' }, { month: 2, budgetAmount: 1000, prSubmittedAmount: 600 }] } }],
+  ['预算超支', { budget: { budgetVersionId: 'v1', list: [{ budgetAmount: 100, prSubmittedAmount: 100 }] } }],
+  ['资金缺口', { cash: { list: [{ projectedBalance: null, actualBalance: 100 }] } }],
+  ['资金缺口', { cash: { list: [{ month: 2, projectedBalance: -1250.123 }, { month: 3, projectedBalance: null }] } }],
+  ['资金缺口', { cash: { list: [{ projectedBalance: 0 }, { projectedBalance: null }] } }],
+  ['资金缺口', { cash: { list: [{ projectedBalance: 100 }] } }],
+  ['收支达成', { cash: { list: [] } }],
+  ['收支达成', { cash: { list: [{ plannedIncome: 100, actualIncome: null, plannedExpense: 50, actualExpense: 0 }] } }],
+  ['收支达成', { cash: { list: [{ plannedIncome: 0, actualIncome: 0, plannedExpense: 100, actualExpense: 120 }] } }],
+  ['数据质量', { quality: { issues: [{ label: '缺失主体', count: 2, severity: 'WARN' }, { label: '缺失金额', count: 0, severity: 'INFO' }] } }],
+  ['为什么利润下降', {}],
+]
+for (const [text, data] of assistantCases) {
+  const context = { year: 2027, orgId: 'org-a', ...data }
+  assert.equal(assistantPlugin.intent(text), assistantWeb.getQuestionIntent(text))
+  assert.deepEqual(assistantPlugin.build(text, context), assistantWeb.buildFinanceAnswer(text, context), `可信问答口径漂移 ${text}`)
+}
+console.log(`PASS: ${assistantCases.length} 组可信财务问答结论、缺失值、金额与来源链接均与网页一致`)
+
+// 报价台账：直接执行网页展示规则，比对币种精度、不可采用原因与有效期边界。
+const quotePresentationModule = { exports: {} }
+const quotePresentationSource = await readFile(resolve(datasource, 'apps/web/components/ce/ce-quote-presentation.ts'), 'utf8')
+new Function('exports', ts.transpileModule(quotePresentationSource, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(quotePresentationModule.exports)
+const pluginQuotePresentation = new Function(await readFile(resolve(root, 'src/views/bom.js'), 'utf8') + '\nreturn { reason: financeQuoteUnavailableReason, amount: financeQuoteAmount }')()
+const quoteNow = Date.parse('2026-10-19T12:00:00Z')
+for (const patch of [{}, { partNo: '' }, { partNo: '  ' }, { currency: 'USD' }, { currency: null }, { currency: ' cny ' }, { validUntil: 'invalid' }, { validUntil: '2026-10-19T11:59:59Z' }, { validUntil: '2026-10-19T12:00:00Z' }, { validUntil: '2026-10-19T12:00:01Z' }, { price: 50.1234 }, { price: 0 }, { price: 999999999999.9999 }]) {
+  const quote = { partNo: 'P1', currency: 'CNY', price: 120, validUntil: null, ...patch }
+  for (const editable of [true, false]) assert.equal(pluginQuotePresentation.reason(quote, editable, quoteNow), quotePresentationModule.exports.ceQuoteUnavailableReason(quote, editable, quoteNow), `报价可采用规则漂移 ${JSON.stringify(patch)}`)
+  assert.equal(pluginQuotePresentation.amount(quote), quotePresentationModule.exports.ceQuoteAmount(quote), `报价精度或币种展示漂移 ${JSON.stringify(patch)}`)
+}
+console.log('OK: supplier quote eligibility, expiry boundary and four-decimal currency display')

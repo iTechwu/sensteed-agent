@@ -16,17 +16,19 @@ function normalizePaymentPriority(value) {
 
 function CashView({ ctx, t, onDrill }) {
   const { year, orgId, departments, revision } = ctx
-  const canWrite = ctx.financeWriter && ctx.permissions.includes('cash.plan.write')
-  const canVerify = ctx.financeWriter && ctx.permissions.includes('cash.plan.verify')
+  const canWrite = Boolean(ctx.financeWriter && ctx.permissions.includes('cash.plan.write'))
+  const canVerify = Boolean(ctx.financeWriter && ctx.permissions.includes('cash.plan.verify'))
   const writeLock = useRef(false)
-  const [tab, setTab] = useState(() => ['summary', 'plans', 'revenue', 'accuracy'].includes(ctx.drillParams?.view) ? ctx.drillParams.view : 'summary')
+  const [tab, setTab] = useFinanceViewState(ctx, 'tab', () => ['summary', 'plans', 'revenue', 'accuracy'].includes(ctx.drillParams?.view) ? ctx.drillParams.view : 'summary')
   const [cash, setCash] = useState(null)
   const [plans, setPlans] = useState(null)
   const [revenues, setRevenues] = useState(null)
-  const [filters, setFilters] = useState({ planType: ctx.drillParams?.planType || '', departmentId: ctx.drillParams?.departmentId || '', months: ctx.drillParams?.months || financePlanMonths(null, ctx.drillParams?.month), expenseType: ctx.drillParams?.expenseType || '', keyword: ctx.drillParams?.keyword || '', unassigned: ctx.drillParams?.unassigned === true })
-  const [page, setPage] = useState(ctx.drillParams?.page || 1)
-  const [revenuePage, setRevenuePage] = useState(ctx.drillParams?.page || 1)
-  const [keywordDraft, setKeywordDraft] = useState(ctx.drillParams?.keyword || '')
+  const [filters, setFilters] = useFinanceViewState(ctx, 'filters', { planType: ctx.drillParams?.planType || '', departmentId: ctx.drillParams?.departmentId || '', months: ctx.drillParams?.months || financePlanMonths(null, ctx.drillParams?.month), expenseType: ctx.drillParams?.expenseType || '', keyword: ctx.drillParams?.keyword || '', unassigned: ctx.drillParams?.unassigned === true })
+  const [page, setPage] = useFinanceViewState(ctx, 'page', ctx.drillParams?.page || 1)
+  const [revenuePage, setRevenuePage] = useFinanceViewState(ctx, 'revenuePage', ctx.drillParams?.page || 1)
+  const [keywordDraft, setKeywordDraft] = useFinanceViewState(ctx, 'keywordDraft', ctx.drillParams?.keyword || '')
+  const [incomeTypeName, setIncomeTypeName] = useFinanceViewState(ctx, 'incomeTypeName', ctx.drillParams?.incomeTypeName || '')
+  const [incomeTypeDraft, setIncomeTypeDraft] = useFinanceViewState(ctx, 'incomeTypeDraft', ctx.drillParams?.incomeTypeName || '')
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState(null)
   const [dialog, setDialog] = useState(null)
@@ -46,7 +48,7 @@ function CashView({ ctx, t, onDrill }) {
   }
 
   const planPath = `/payment-plans?${query({ page, limit: PAGE_SIZE })}`
-  const revenuePath = `/revenue-plans?${new URLSearchParams({ year, ...(orgId ? { orgId } : {}), ...(filters.months.length ? { months: filters.months.join(',') } : {}), ...(filters.keyword.trim() ? { keyword: filters.keyword.trim() } : {}), page: String(revenuePage), limit: String(PAGE_SIZE) })}`
+  const revenuePath = `/revenue-plans?${new URLSearchParams({ year, ...(orgId ? { orgId } : {}), ...(filters.months.length ? { months: filters.months.join(',') } : {}), ...(filters.keyword.trim() ? { keyword: filters.keyword.trim() } : {}), ...(incomeTypeName ? { incomeTypeName } : {}), page: String(revenuePage), limit: String(PAGE_SIZE) })}`
   const currentPlans = plans?.path === planPath ? plans : null
   const currentRevenues = revenues?.path === revenuePath ? revenues : null
   const retryList = () => setReloadTick(value => value + 1)
@@ -85,7 +87,10 @@ function CashView({ ctx, t, onDrill }) {
       h(Select, { key: 'type', 'aria-label': t('planType'), value: filters.planType, onChange: value => updateFilters({ planType: value }), options: PLAN_TYPES.map(([id, label]) => [id, t(label)]), placeholder: t('planType') }),
       h(Select, { key: 'expense', 'aria-label': t('expenseType'), value: filters.expenseType, onChange: value => updateFilters({ expenseType: value }), options: EXPENSE_TYPES.map(([id, label]) => [id, t(label)]), placeholder: t('expenseType') }),
       h(SearchSelect, { key: 'department', value: filters.departmentId, onChange: value => updateFilters({ departmentId: value }), options: (departments || []).map(d => [d.id, d.name]), placeholder: t('department') }),
-    ] : null,
+    ] : h('form', { className: 'sf-row', 'aria-label': '筛选收入类型', onSubmit: event => { event.preventDefault(); setIncomeTypeName(incomeTypeDraft.trim()); setRevenuePage(1) } },
+      h(Field, { 'aria-label': '收入类型（精确匹配）', value: incomeTypeDraft, onChange: setIncomeTypeDraft, placeholder: '收入类型（精确匹配）', maxLength: 100 }),
+      h(GhostButton, { type: 'submit' }, '筛选类型'),
+      incomeTypeName ? h(GhostButton, { onClick: () => { setIncomeTypeDraft(''); setIncomeTypeName(''); setRevenuePage(1) } }, '清空类型') : null),
     h(MultiSearchSelect, { selectedLabel: filters.months.length ? `${filters.months.join('、')}月` : '全部月份', value: filters.months.map(String), onChange: values => updateFilters({ months: values.map(Number).sort((a, b) => a - b) }), options: Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1}月`]), placeholder: '计划月份（可多选）' }),
     h('form', { className: 'sf-row', onSubmit: event => { event.preventDefault(); updateFilters({ keyword: keywordDraft.trim() }) } },
       h(Field, { 'aria-label': tab === 'plans' ? '搜索付款描述、收款方、PR 编号、部门' : '搜索收入项目、付款方、类型', value: keywordDraft, onChange: setKeywordDraft, placeholder: tab === 'plans' ? '搜索付款描述、收款方、PR 编号、部门' : '搜索收入项目、付款方、类型', maxLength: 200 }),
@@ -138,7 +143,10 @@ function SummaryTab({ cash, t, year, now, onDrill }) {
   if (cash?.error) return h(EmptyState, null, t('loadError'))
   const rows = cash?.data?.list || cash?.list || []
   const model = cashSummaryModel(rows, year, now)
+  const caliber = cash?.data?.caliber || cash?.caliber
   return h('div', { className: 'sf-stack' },
+    h('p', { className: 'sf-note' }, caliber === 'PUBLISHED_FACTS' ? '按已生效财务代录及已审核发布的付款/收入计划汇总，仅含年度、月份齐全的行；未知金额保留为空，余额及来源剩余金额暂不可用。' : caliber === 'IMPORTED' ? '每行是主体×月份导入快照，未经拆分；余额不跨月累加。' : '来源口径暂未返回，请核对服务版本与导入发布状态；未知金额不按零处理。'),
+    !rows.length ? h('p', { role: 'status' }, '当前年度与主体暂无资金汇总记录，可切换范围或到数据中心核查导入与发布状态。') : null,
     model.isCurrentYear ? h(Card, { title: `${model.year}-${String(model.month).padStart(2, '0')} · ${t('cashMonthlyExecution')}`, unit: t('unitNote') },
       h('div', { className: 'sf-kpis' },
         ...[['actualBalance', 'cashBalance'], ['plannedIncome', 'plannedIncome'], ['plannedExpense', 'plannedExpense'], ['actualIncome', 'actualIncome'], ['actualExpense', 'actualExpense'], ['remainingPayment', 'remainingUnpaid']].map(([key, label]) =>
@@ -392,22 +400,24 @@ function PlanDetailDialog({ plan, ctx, t, onClose }) {
 function RevenueTab({ revenues, page, onPage, t, canWrite = true, onBackfill, onLedger }) {
   const rows = revenues?.data?.list || revenues?.list || []
   return h(Card, { title: t('revenueVs'), unit: t('unitNote') },
+    h('p', { className: 'sf-note' }, t('remainingReceiptHint')),
     h(Table, { tableId: 'finance-RevenueTab-1',
       columns: [
-        { label: t('org'), key: 'orgName', stickyLeft: true },
         { label: t('itemName'), key: 'itemName' },
+        { label: t('incomeType'), key: 'incomeTypeName' },
         { label: t('payer'), key: 'payerName' },
         { label: t('monthCol'), key: 'month', sortValue: row => row.month, render: row => mm(row.month), num: true },
         { label: t('planned'), key: 'plannedAmount', render: row => wan(row.plannedAmount) ?? '—', num: true },
         { label: t('actual'), key: 'actualAmount', render: row => wan(row.actualAmount) ?? '—', num: true },
         {
-          label: t('variance'), key: 'varianceAmount', num: true,
+          label: t('receiptVariance'), key: 'varianceAmount', num: true, sortValue: revenueVariance,
           render: row => {
-            const value = finite(row.varianceAmount)
+            const value = revenueVariance(row)
             if (value === null) return '—'
             return h('span', { className: value < 0 ? 'sf-neg' : 'sf-pos' }, wan(value))
           },
         },
+        { label: t('remainingReceipt'), key: 'remainingReceipt', num: true, sortValue: revenueRemaining, render: row => wan(revenueRemaining(row)) ?? '—' },
         { label: t('actions'), key: 'actions', sortable: false, render: row => h('div', { className: 'sf-row', style: { flexWrap: 'nowrap', justifyContent: 'flex-end' } },
         canWrite ? h(LinkButton, { onClick: () => onBackfill(row) }, t('backfill')) : null,
         canWrite ? h(LinkButton, { onClick: () => onLedger(row) }, t('settlementSectionReceipt')) : null) },
@@ -415,6 +425,18 @@ function RevenueTab({ revenues, page, onPage, t, canWrite = true, onBackfill, on
       rows, empty: t('empty'),
     }),
     h(Pager, { page, total: revenues?.data?.total ?? revenues?.total, limit: PAGE_SIZE, onPage }))
+}
+
+function revenueRemaining(row) {
+  const planned = finite(row.plannedAmount), actual = finite(row.actualAmount)
+  return planned === null || actual === null ? null : Math.max(0, Math.round((planned - actual) * 100) / 100)
+}
+
+function revenueVariance(row) {
+  const source = finite(row.varianceAmount)
+  if (source !== null) return source
+  const planned = finite(row.plannedAmount), actual = finite(row.actualAmount)
+  return planned === null || actual === null ? null : planned - actual
 }
 
 function BackfillDialog({ row, t, onClose, act }) {

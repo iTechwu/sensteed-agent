@@ -195,7 +195,7 @@ export function apply(ctx, overrides = {}) {
 
 const QUERY_KEYS = ['orgIds', 'departmentIds', 'expenseTypes',
   'year', 'month', 'months', 'page', 'limit', 'severity', 'status', 'orgId', 'expenseType', 'recordType', 'planType',
-  'versionId', 'departmentId', 'unassigned', 'operator', 'keyword', 'onlyUnmapped', 'systemUserId', 'days',
+  'versionId', 'departmentId', 'unassigned', 'operator', 'keyword', 'incomeTypeName', 'onlyUnmapped', 'systemUserId', 'days',
   'project', 'sortBy', 'sortDirection', 'alertType', 'baseVersionId', 'targetVersionId', 'planId', 'type', 'scope', 'kind', 'bizSystem', 'transport',
 ]
 
@@ -261,7 +261,7 @@ async function dispatchGet(fetchImpl, config, sub, url, res, logger) {
       }]]
       break
     case '/revenue-plans':
-      calls = [['finance_get_revenue_plans', { ...tenant(), year: query.year, orgId: query.orgId, month: query.month, months: query.months, keyword: query.keyword, page: query.page, limit: query.limit }]]
+      calls = [['finance_get_revenue_plans', { ...tenant(), year: query.year, orgId: query.orgId, month: query.month, months: query.months, incomeTypeName: query.incomeTypeName, keyword: query.keyword, page: query.page, limit: query.limit }]]
       break
     case '/cash':
       calls = [['finance_get_cash_summary', { ...tenant(), year: query.year, orgId: query.orgId }]]

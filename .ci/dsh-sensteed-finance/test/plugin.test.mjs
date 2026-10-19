@@ -52,6 +52,113 @@ function clientNodes(node) {
   return [node, ...(node?.children || []).flatMap(clientNodes)]
 }
 
+test('finance back navigation restores the visited scope and list state without reusing it on a new visit', async () => {
+  const source = await readFile(new URL('src/navigation.js', root), 'utf8')
+  const harness = clientHarness(source, 'useFinanceNavigation')
+  let nav = harness.render('2026')
+  nav.navigate('cash', { year: '2027', orgId: 'org-a', view: 'plans' })
+  nav = harness.render('2026')
+  nav.current.viewState.page = 7
+  nav.current.viewState.filters = { keyword: '设备', months: [1, 10] }
+  nav.navigate('alerts', { year: '2028', orgId: 'org-b' }, 630)
+  nav = harness.render('2026')
+  assert.equal(nav.current.year, '2028'); assert.deepEqual(nav.current.viewState, {})
+  nav.back(); nav = harness.render('2026')
+  assert.equal(nav.current.tab, 'cash'); assert.equal(nav.current.year, '2027'); assert.equal(nav.current.orgId, 'org-a')
+  assert.equal(nav.current.scrollTop, 630); assert.equal(nav.current.viewState.page, 7)
+  assert.deepEqual(nav.current.viewState.filters, { keyword: '设备', months: [1, 10] })
+  nav.navigate('cash', { year: '2026', view: 'plans' }); nav = harness.render('2026')
+  assert.deepEqual(nav.current.viewState, {}, 'a new visit must honor its own route filters')
+  for (let i = 0; i < 25; i++) { nav.navigate('alerts', { year: String(2020 + i) }); nav = harness.render('2026') }
+  let count = 0
+  while (nav.previous) { nav.back(); nav = harness.render('2026'); count++ }
+  assert.equal(count, 20, 'history is bounded to the last twenty transitions')
+  nav.reset(); nav = harness.render('2026')
+  assert.equal(nav.current.tab, 'overview'); assert.equal(nav.previous, undefined)
+})
+
+test('a remounted cash list fetches its saved filters and page while leaving write dialogs closed', async () => {
+  const source = (await Promise.all(['src/components.js', 'src/views/cash.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  const paths = []
+  const overrides = { PAGE_SIZE: 20, api: async path => { paths.push(path); return { data: { list: [], total: 200 } } } }
+  const props = { ctx: { year: '2027', orgId: 'org-a', permissions: [], departments: [], drillParams: { view: 'plans' }, viewState: {} }, t: key => key }
+  let harness = clientHarness(source, 'CashView', overrides)
+  let tree = harness.render(props)
+  clientNodes(tree).find(node => node.type?.name === 'Field').props.onChange('设备')
+  tree = harness.render(props)
+  clientNodes(tree).find(node => node.type === 'form').props.onSubmit({ preventDefault() {} })
+  harness.render(props); harness.flushEffects(); await new Promise(resolve => setImmediate(resolve))
+  tree = harness.render(props)
+  const plans = clientNodes(tree).find(node => node.type?.name === 'PlansTab')
+  plans.props.onPage(4)
+  harness.render(props); harness.flushEffects()
+  harness = clientHarness(source, 'CashView', overrides)
+  harness.render(props); harness.flushEffects(); await new Promise(resolve => setImmediate(resolve))
+  tree = harness.render(props)
+  const query = new URL(paths.at(-1), 'https://test.invalid').searchParams
+  assert.equal(query.get('page'), '4'); assert.equal(query.get('keyword'), '设备'); assert.equal(query.get('orgId'), 'org-a')
+  assert.equal(clientNodes(tree).find(node => node.type?.name === 'PlansTab').props.page, 4)
+  assert.equal(clientNodes(tree).some(node => node.type?.name === 'PaymentDialog'), false)
+})
+
+test('back scroll waits for asynchronous content and cancels when the user interacts', async () => {
+  let changed, disconnected = 0
+  const restore = new Function('MutationObserver', await readFile(new URL('src/navigation.js', root), 'utf8') + '\nreturn restoreFinanceScroll')(class {
+    constructor(callback) { changed = callback }
+    observe() {} disconnect() { disconnected++ }
+  })
+  const events = new Map()
+  let position = 0
+  const element = { scrollHeight: 200, clientHeight: 200,
+    get scrollTop() { return position }, set scrollTop(value) { position = Math.min(value, this.scrollHeight - this.clientHeight) },
+    addEventListener: (name, callback) => events.set(name, callback), removeEventListener: name => events.delete(name),
+  }
+  const cleanup = restore(element, 600)
+  assert.equal(position, 0); assert.equal(disconnected, 0)
+  element.scrollHeight = 1200; changed()
+  assert.equal(position, 600); assert.equal(events.size, 0); assert.equal(disconnected, 1)
+  cleanup()
+  element.scrollHeight = 200
+  restore(element, 800)
+  events.get('wheel')()
+  assert.equal(events.size, 0); assert.equal(disconnected, 3)
+})
+
+test('inline assistant isolates failed data sources and navigates to evidence in the same scope', async () => {
+  const source = (await Promise.all(['src/components.js', 'src/navigation.js', 'src/views/assistant-answer.js', 'src/views/analyze.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  const paths = [], navigated = []
+  let budget = { loading: false, error: null, data: { budgetVersionId: 'v1', list: [{ budgetAmount: 0, prSubmittedAmount: 100 }] } }
+  const harness = clientHarness(source, 'FinanceInlineAssistant', { useFinanceResource: path => {
+    paths.push(path)
+    return path.includes('budget/summary') ? budget : path.includes('data-quality') ? { error: '离线' } : { data: { list: [{ month: 1, projectedBalance: -100 }] } }
+  }, GhostButton() {}, PrimaryButton() {}, Field() {} })
+  const props = { ctx: { year: '2027', orgId: 'org-a', viewState: {}, onNavigate: (...args) => navigated.push(args) } }
+  let tree = harness.render(props)
+  assert.ok(paths.includes('/finance/budget/summary?year=2027&orgId=org-a'))
+  assert.ok(paths.includes('/finance/cash-summary?year=2027&orgId=org-a'))
+  assert.ok(paths.includes('/finance/data-quality'))
+  assert.equal(clientNodes(tree).find(node => node.children.includes('哪些项目已超预算？')).props.disabled, false)
+  assert.equal(clientNodes(tree).find(node => node.children.includes('数据质量检查结果如何？')).props.disabled, true)
+  clientNodes(tree).find(node => node.children.includes('哪些项目已超预算？')).props.onClick()
+  tree = harness.render(props)
+  assert.ok(clientNodes(tree).some(node => node.children.includes('发现 1 个预算分组超支')))
+  harness.flushEffects()
+  assert.equal(props.ctx.viewState.assistantSubmission.text, '哪些项目已超预算？')
+  clientNodes(tree).find(node => node.children.includes('核对来源数据')).props.onClick()
+  assert.deepEqual(navigated, [['budget', { year: '2027', orgId: 'org-a', view: 'lines' }]])
+  budget = { loading: false, error: '暂不可用', data: null }
+  tree = harness.render(props)
+  assert.equal(clientNodes(tree).some(node => node.children.includes('发现 1 个预算分组超支')), false)
+  clientNodes(tree).find(node => node.type === 'form').props.onSubmit({ preventDefault() {} })
+  assert.equal(clientNodes(harness.render(props)).some(node => node.children.includes('暂无可用于判断的预算数据')), false, 'Enter cannot turn a read failure into a no-data answer')
+  budget = { data: { budgetVersionId: 'v1', list: [{ budgetAmount: 100, prSubmittedAmount: 50 }] } }
+  tree = harness.render(props)
+  assert.ok(clientNodes(tree).some(node => node.children.includes('已检查的预算分组未发现超支')), 'recovery recalculates with current data')
+  props.ctx = { ...props.ctx, year: '2028', orgId: 'org-b' }
+  tree = harness.render(props)
+  assert.equal(clientNodes(tree).some(node => node.children.includes('已检查的预算分组未发现超支')), false)
+})
+
 test('selector popups stay within the viewport and reposition on resize without leaking listeners', async () => {
   const source = await readFile(new URL('src/components.js', root), 'utf8')
   const listeners = new Map()
@@ -1643,7 +1750,7 @@ test('cash plan columns translate actual, remaining and variance amounts', async
   const source = (await Promise.all(['src/components.js', 'src/format.js', 'src/views/cash.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
   for (const [component, props, expected] of [
     ['PlansTab', { rows: [], page: 1 }, ['计划金额', '实际金额', '剩余金额']],
-    ['RevenueTab', { revenues: { list: [] }, page: 1 }, ['计划金额', '实际金额', '差额']],
+    ['RevenueTab', { revenues: { list: [] }, page: 1 }, ['计划金额', '实际金额', '执行偏差', '收入类型', '剩余未到账金额']],
   ]) {
     const harness = clientHarness(source, component, { PAGE_SIZE: 20 })
     const tree = harness.render({ ...props, t: key => copy.zh[key] ?? key, onPage() {} })
@@ -1718,7 +1825,7 @@ test('navigation gives each task one destination and preserves role boundaries',
 })
 
 test('filing destinations load their own context without mounting direct entry or identity maintenance', async () => {
-  const source = await readFile(new URL('src/views/filing.js', root), 'utf8')
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/filing.js', root), 'utf8')
   for (const section of ['assignments', 'department', 'mine', 'tasks']) {
     const paths = []
     const harness = clientHarness(source, 'FilingParityView', {
@@ -2796,15 +2903,15 @@ test('CE quote application requires preview, invalidates it on input change and 
   let tree = harness.render(props)
   const set = (label, value) => { clientNodes(tree).find(node => node.props['aria-label'] === label).props.onChange(value); tree = harness.render(props) }
   set('报价装配位置', 'node-1'); set('报价计价口径', 'OWN'); set('报价分项口径', 'UNALLOCATED')
-  assert.equal(clientNodes(tree).find(node => node.children.includes('确认采用此报价')).props.disabled, true)
+  assert.equal(clientNodes(tree).find(node => node.children.includes('确认采用报价')).props.disabled, true)
   await clientNodes(tree).find(node => node.children.includes('预览成本影响')).props.onClick()
   tree = harness.render(props)
   assert.equal(writes[0].path, '/ce/packages/p1/quotes/q1/preview')
   set('报价计价口径', 'PACKAGE')
-  assert.equal(clientNodes(tree).find(node => node.children.includes('确认采用此报价')).props.disabled, true)
+  assert.equal(clientNodes(tree).find(node => node.children.includes('确认采用报价')).props.disabled, true)
   await clientNodes(tree).find(node => node.children.includes('预览成本影响')).props.onClick()
   tree = harness.render(props)
-  await clientNodes(tree).find(node => node.children.includes('确认采用此报价')).props.onClick()
+  await clientNodes(tree).find(node => node.children.includes('确认采用报价')).props.onClick()
   assert.deepEqual(writes.at(-1), { path: '/ce/packages/p1/quotes/q1/apply', body: { nodeId: 'node-1', pricingMode: 'PACKAGE', baseline: 'a'.repeat(64) } })
   assert.equal(closed.length, 1)
 })
@@ -2847,7 +2954,7 @@ test('quality repair destinations preserve unassigned meaning and sources expose
   const source = await readFile(new URL('src/views/datacenter.js', root), 'utf8')
   const destination = new Function(source + '\nreturn financeQualityDestination')()
   assert.deepEqual(destination({ dataset: 'budget_line', label: '未分配主体' }), { tab: 'budget', params: { year: String(new Date().getFullYear()), orgId: '', view: 'lines', unassigned: true } })
-  const sources = await readFile(new URL('src/views/sources.js', root), 'utf8')
+  const sources = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/sources.js', root), 'utf8')
   const harness = clientHarness(sources, 'SourcesView', { useFinanceResource: () => ({ data: { list: [{ id: 's1', financialAnalysis: { primaryAmount: { amount: 0, unit: '万元', currency: 'USD' } } }], total: 1 } }), financeRows: data => data?.list || [], financeColumns: () => [], financeDisplayValue: value => value, financeLabel: value => value, formatNumber: value => String(value), FinanceResource() {}, Card() {}, GhostButton() {}, Select() {}, Field() {}, Table() {}, Pager() {} })
   const tree = harness.render({ ctx: { revision: 0 } })
   const table = clientNodes(tree).find(node => node.props.tableId === 'finance-source-HEADQUARTERS')
@@ -2873,4 +2980,347 @@ test('historical permission revocation stays separate from complete policies and
   const pager = clientNodes(harness.render(props)).find(node => node.type?.name === 'Pager')
   pager.props.onPage(2); harness.render(props)
   assert.ok(paths.at(-1).includes('page=2'))
+})
+
+
+test('revenue type filter survives deep links, explicit submission and host forwarding', async () => {
+  const navigation = await readFile(new URL('src/navigation.js', root), 'utf8')
+  const resolve = new Function(navigation + '\nreturn financeBusinessDestination')()
+  const destination = resolve('/cash?tab=revenue&incomeTypeName=销售收入&months=2,10&q=回款&page=3')
+  assert.equal(destination.params.incomeTypeName, '销售收入')
+  assert.equal(resolve('/cash?incomeTypeName=' + '字'.repeat(101)), null)
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/cash.js', root), 'utf8')
+  const paths = []
+  const harness = clientHarness(source, 'CashView', { PAGE_SIZE: 20, api: async path => { paths.push(path); return { list: [], total: 0 } } })
+  const props = { ctx: { year: '2026', orgId: 'org-a', departments: [], permissions: [], drillParams: destination.params }, t: key => key }
+  const render = () => harness.render(props)
+  const settle = async () => { render(); harness.flushEffects(); await new Promise(resolve => setImmediate(resolve)); return render() }
+  await settle()
+  assert.equal(clientNodes(render()).find(node => node.type?.name === 'RevenueTab').props.canWrite, false, 'missing writer identity must not enable the default write buttons')
+  const before = paths.length
+  clientNodes(render()).find(node => node.props['aria-label'] === '收入类型（精确匹配）').props.onChange(' 服务收入 ')
+  await settle()
+  assert.equal(paths.length, before)
+  clientNodes(render()).find(node => node.type === 'form' && node.props['aria-label'] === '筛选收入类型').props.onSubmit({ preventDefault() {} })
+  await settle()
+  const query = new URL(paths.at(-1), 'https://example.test').searchParams
+  assert.equal(query.get('incomeTypeName'), '服务收入')
+  assert.equal(query.get('months'), '2,10')
+  assert.equal(query.get('keyword'), '回款')
+  assert.equal(query.get('page'), '1')
+  const urls = []
+  const { routes } = await loadHost({ fetch: async url => { urls.push(String(url)); return mcpJson({ list: [] }) } })
+  await invokeRoute(routes.get(BASE), 'GET', BASE + '/revenue-plans?incomeTypeName=' + encodeURIComponent('服务收入') + '&months=2,10&keyword=回款')
+  const upstream = new URL(urls.find(url => url.includes('/finance/revenue-plans')))
+  assert.equal(upstream.searchParams.get('incomeTypeName'), '服务收入')
+  assert.equal(upstream.searchParams.get('months'), '2,10')
+  urls.length = 0
+  await invokeRoute(routes.get(BASE), 'GET', BASE + '/rest/finance/revenue-plans?incomeTypeName=' + encodeURIComponent('服务收入'))
+  assert.equal(new URL(urls.find(url => url.includes('/finance/revenue-plans'))).searchParams.get('incomeTypeName'), '服务收入')
+})
+
+test('revenue remaining receipts preserve missing values, over-receipt and source variance semantics', async () => {
+  const source = await readFile(new URL('src/format.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/cash.js', root), 'utf8')
+  const { remaining, variance } = new Function(source + '\nreturn { remaining: revenueRemaining, variance: revenueVariance }')()
+  for (const [plannedAmount, actualAmount, expected] of [[100, 40, 60], [100, 120, 0], [0, 0, 0], [100, null, null], [null, 40, null], [0.3, 0.1, 0.2]]) {
+    assert.equal(remaining({ plannedAmount, actualAmount }), expected)
+  }
+  assert.equal(variance({ plannedAmount: 100, actualAmount: 40, varianceAmount: null }), 60)
+  assert.equal(variance({ plannedAmount: 100, actualAmount: 120, varianceAmount: null }), -20)
+  assert.equal(variance({ plannedAmount: 100, actualAmount: null, varianceAmount: 0 }), 0)
+})
+
+test('filing stages filter before pagination and distinguish submission versions from confirmed facts', async () => {
+  const source = (await Promise.all(['src/components.js', 'src/format.js', 'src/views/filing.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  const paths = [], harness = clientHarness(source, 'FilingParityView', { useFinanceResource: path => { paths.push(path); return { data: { list: [], total: 45 } } }, useFinanceAction: () => ({ revision: 0 }), financeRows: data => data?.list || [], financeColumns: () => [], FinanceResource() {}, Notice() {} })
+  const props = { ctx: { year: 2026, permissions: [], departments: [], drillParams: { section: 'assignments' } }, t: key => key }
+  let tree = harness.render(props)
+  let request = new URL('https://test.invalid' + paths.find(path => path?.includes('/assignments?')))
+  assert.ok(!JSON.parse(request.searchParams.get('statuses')).includes('VOIDED'))
+  clientNodes(tree).find(node => node.children.includes('待修改')).props.onClick()
+  harness.render(props)
+  request = new URL('https://test.invalid' + paths.filter(path => path?.includes('/assignments?')).at(-1))
+  assert.deepEqual(JSON.parse(request.searchParams.get('statuses')), ['REJECTED'])
+  assert.equal(request.searchParams.get('page'), '1')
+  const history = clientHarness(source, 'FinanceFilingHistory', { financeRows: data => data.list, financeColumns: () => [], FinanceResource() {} })
+  tree = history.render({ resource: { data: { list: [{ submissionNo: 1 }, { submissionNo: 3 }], total: 30 } }, assignment: { submissionNo: 3 }, page: 1 })
+  const table = clientNodes(tree).find(node => node.props.tableId === 'finance-filing-submission-history')
+  const status = table.props.columns.find(column => column.key === 'validity').render
+  assert.equal(status({ submissionNo: 1 }), '已被新版本替代，不进入统计')
+  assert.match(status({ submissionNo: 3 }), /入库以确认状态为准/)
+  const window = new Function(source + '\nreturn financeFilingWindow')()
+  assert.equal(window({ status: 'DRAFT', task: { status: 'OPEN', dueAt: '2020-01-01T00:00:00Z' } }), '已截止，不可编辑')
+})
+
+test('saved filter refresh failures retain the dialog and retry without creating a duplicate view', async () => {
+  const source = (await Promise.all(['src/components.js', 'src/views/budget.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  let writes = 0, reads = 0, closes = 0
+  const harness = clientHarness(source, 'SaveViewDialog', { post: async () => { writes++ }, api: async () => { if (++reads === 1) throw new Error('列表暂不可用'); return { data: { list: [{ id: 'saved' }] } } } })
+  const props = { view: 'lines', filters: {}, t: key => key, onClose: () => closes++, onSaved() {} }
+  let tree = harness.render(props)
+  clientNodes(tree).find(node => node.type?.name === 'Field').props.onChange('年度跟踪')
+  tree = harness.render(props)
+  await tree.props.footer.find(node => node.children.includes('submit')).props.onClick()
+  tree = harness.render(props)
+  assert.equal(closes, 0); assert.equal(writes, 1)
+  assert.equal(clientNodes(tree).find(node => node.type?.name === 'Field').props.value, '年度跟踪')
+  await tree.props.footer.find(node => node.children.includes('重试刷新视图列表')).props.onClick()
+  assert.equal(writes, 1); assert.equal(reads, 2); assert.equal(closes, 1)
+})
+
+test('adjustment budget line options load independently and preserve selection across pages and filters', async () => {
+  const source = (await Promise.all(['src/components.js', 'src/views/budget.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  const paths = [], changes = []
+  const harness = clientHarness(source, 'FinanceAdjustmentLinePicker', { useFinanceResource: path => { paths.push(path); return { data: { list: [{ id: 'line-1', orgName: '测试主体', costItemName: '试验费用' }], total: 45 } } }, financeRows: data => data.list, FinanceResource() {} })
+  const props = { year: 2027, orgs: [{ id: 'org-1', name: '测试主体' }], departments: [], value: '', allowNew: false, t: key => key, onChange: id => changes.push(id) }
+  let tree = harness.render(props)
+  let request = new URL('https://test.invalid' + paths.at(-1))
+  assert.equal(request.searchParams.get('year'), '2027')
+  assert.equal(request.searchParams.get('limit'), '20')
+  clientNodes(tree).find(node => node.props.placeholder?.startsWith('本页预算行')).props.onChange('line-1')
+  props.value = 'line-1'
+  tree = harness.render(props)
+  clientNodes(tree).find(node => node.type?.name === 'Pager').props.onPage(2)
+  tree = harness.render(props)
+  assert.match(paths.at(-1), /page=2/)
+  assert.match(clientNodes(tree).find(node => node.props.placeholder?.startsWith('本页预算行')).props.selectedLabel, /试验费用/)
+  clientNodes(tree).find(node => node.props.placeholder === '筛选预算行主体').props.onChange('org-1')
+  harness.render(props)
+  request = new URL('https://test.invalid' + paths.at(-1))
+  assert.equal(request.searchParams.get('page'), '1')
+  assert.equal(request.searchParams.get('orgId'), 'org-1')
+  assert.deepEqual(changes, ['line-1'])
+})
+
+test('employment directory and history paginate independently without losing the chosen member', async () => {
+  const source = (await Promise.all(['src/components.js', 'src/views/entry.js', 'src/views/members.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  const paths = []
+  const harness = clientHarness(source, 'FinanceEmploymentView', { useFinanceResource: path => { paths.push(path); const page = Number(new URL('https://test.invalid' + (path || '/')).searchParams.get('page')); return { data: { list: path?.includes('contacts') ? page === 1 ? [{ id: 'c1', name: '张三', systemUserId: 'u1' }] : [{ id: 'c2', name: '李四', systemUserId: 'u2' }] : [], total: 45 } } }, useFinanceAction: () => ({ revision: 0 }), financeRows: data => data?.list || [], FinanceResource() {}, Notice() {} })
+  const props = { ctx: { revision: 0, departments: [] }, t: key => key }
+  let tree = harness.render(props)
+  clientNodes(tree).find(node => node.props['aria-label'] === '选择人员').props.onChange('c1')
+  tree = harness.render(props)
+  let card = clientNodes(tree).find(node => node.type?.name === 'EmploymentCard')
+  card.props.onPage(2)
+  tree = harness.render(props)
+  assert.ok(paths.some(path => path?.includes('systemUserId=u1&page=2&limit=20')))
+  clientNodes(tree).find(node => node.type?.name === 'Pager').props.onPage(2)
+  tree = harness.render(props)
+  const picker = clientNodes(tree).find(node => node.props['aria-label'] === '选择人员')
+  assert.equal(picker.props.value, 'c1'); assert.equal(picker.props.options[0][1], '张三')
+  picker.props.onChange('c2'); tree = harness.render(props)
+  card = clientNodes(tree).find(node => node.type?.name === 'EmploymentCard')
+  assert.equal(card.props.page, 1); assert.equal(card.props.userName, '李四')
+  assert.ok(paths.some(path => path?.includes('/finance/employment/records?systemUserId=u2&page=1&limit=20')))
+})
+
+test('source batch pages retain the chosen batch and changing source resets both lists', async () => {
+  const source = (await Promise.all(['src/components.js', 'src/views/sources.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  const paths = []
+  const harness = clientHarness(source, 'SourcesView', { useFinanceResource: path => { paths.push(path); return { data: { list: path.includes('/runs?') ? [{ id: path.includes('page=2') ? 'r2' : 'r1', batchId: path.includes('page=2') ? '第二批' : '第一批' }] : [], total: 45 } } }, financeRows: data => data?.list || [], financeColumns: () => [], financeLabel: value => value, FinanceResource() {} })
+  const props = { ctx: { revision: 0 }, t: key => key }
+  let tree = harness.render(props)
+  clientNodes(tree).find(node => node.props['aria-label'] === '同步批次').props.onChange('r1')
+  tree = harness.render(props)
+  clientNodes(tree).find(node => node.type?.name === 'Pager').props.onPage(2)
+  tree = harness.render(props)
+  const picker = clientNodes(tree).find(node => node.props['aria-label'] === '同步批次')
+  assert.equal(picker.props.value, 'r1'); assert.equal(picker.props.options.length, 2)
+  assert.ok(paths.some(path => path.includes('/records?') && path.includes('runId=r1')))
+  clientNodes(tree).find(node => node.props['aria-label'] === '来源范围').props.onChange('HEZHONG')
+  harness.render(props)
+  assert.ok(paths.at(-1).includes('scope=HEZHONG&page=1&limit=20'))
+  assert.ok(!paths.at(-2).includes('runId='))
+})
+
+
+test('comparison return restores both manual versions, prefers published defaults and only resets the target on year change', async () => {
+  const source = (await Promise.all(['src/components.js', 'src/format.js', 'src/views/comparisons.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  const ctx = { year: '2026', drillParams: { mode: 'yearly' }, permissions: [], revision: 0, viewState: {} }
+  const overrides = { useFinanceAction: () => ({ revision: 0 }), useFinanceResource: path => ({ data: { list: ['DRAFT', 'PUBLISHED'].map(status => ({ id: `${path?.includes('2027') ? 'target' : 'base'}-${status}`, status })) } }), financeRows: data => data?.list || [], financeColumns: () => [], financeDisplayValue: value => value, FinanceResource() {}, Notice() {} }
+  let harness = clientHarness(source, 'ComparisonsView', overrides)
+  const render = () => harness.render({ ctx })
+  const picker = label => clientNodes(render()).find(node => node.props['aria-label'] === label)
+  assert.equal(picker('基准快照或版本').props.value, 'base-PUBLISHED')
+  picker('基准快照或版本').props.onChange('base-DRAFT')
+  picker('对比快照或版本').props.onChange('target-DRAFT')
+  render(); harness.flushEffects()
+  harness = clientHarness(source, 'ComparisonsView', overrides)
+  render(); harness.flushEffects()
+  assert.equal(picker('基准快照或版本').props.value, 'base-DRAFT')
+  assert.equal(picker('对比快照或版本').props.value, 'target-DRAFT')
+  assert.ok(clientNodes(render()).some(node => node.children.includes('试算比较：含未正式发布的预算版本，不能作为正式同比结论。')))
+  picker('对比年度').props.onChange('2028')
+  assert.equal(picker('基准快照或版本').props.value, 'base-DRAFT')
+  assert.equal(picker('对比快照或版本').props.value, 'base-PUBLISHED')
+})
+
+test('engine, review and permission history re-query saved browsing choices without restoring mutation dialogs', async () => {
+  for (const [file, component, viewState, expected] of [
+    ['engine', 'EngineView', { engineVersion: 'v1', engineParam: 'p1', engineRun: 'r1', engineBaseRun: 'r2' }, '/budget-engine/runs/diff?baseRunId=r2&targetRunId=r1'],
+    ['review', 'ReviewView', { reviewSection: 'facts', reviewPage: 3 }, '/data-source/fact-batches?status=PENDING_REVIEW&page=3&limit=20'],
+    ['permissions', 'FinancePermissionHistory', { permissionHistoryPage: 4, permissionHistoryUser: 'u1', permissionHistoryCode: 'cash.plan.read', permissionHistoryActive: true }, '/finance/permissions?page=4&limit=20&activeOnly=true&userId=u1&permission=cash.plan.read'],
+  ]) {
+    const source = (await Promise.all(['src/components.js', 'src/format.js', `src/views/${file}.js`].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+    const paths = [], ctx = { year: '2026', drillParams: {}, permissions: [], revision: 0, orgs: [], departments: [], viewState }
+    const harness = clientHarness(source, component, { FINANCE_PERMISSION_NAMES: {}, useFinanceAction: () => ({ revision: 0 }), useFinanceResource: path => { paths.push(path); return { data: { list: [{ id: 'v1', status: 'DRAFT', lineCount: 0 }, { id: 'p1', params: {} }, { id: 'r1' }, { id: 'r2' }], total: 100 } } }, financeRows: data => data?.list || [], financeColumns: () => [], financeDisplayValue: value => value, FinanceResource() {}, Notice() {}, FinanceEvidence() {} })
+    let tree = harness.render({ ctx, directory: {} }); harness.flushEffects()
+    tree = harness.render({ ctx, directory: {} })
+    assert.ok(paths.includes(expected), component + ' must request the saved scope')
+    assert.equal(clientNodes(tree).some(node => ['FinanceFormDialog', 'FinanceRowsDialog', 'Dialog'].includes(node.type?.name)), false)
+  }
+})
+
+
+test('common finance fields validate required, zero, numeric bounds, stale options and visible nested values', async () => {
+  const source = await readFile(new URL('src/workflows.js', root), 'utf8')
+  const validate = new Function(source + '\nreturn financeFormErrors')()
+  const fields = [{ key: 'name', label: '名称', required: true }, { key: 'params.rate', label: '回款率', type: 'number', min: 0, max: 1, required: true }, { key: 'people', label: '人员', multi: true, options: [['u1', '甲']], required: true }, { key: 'note', label: '说明', required: true, when: values => values.name === '专项' }]
+  assert.deepEqual(validate(fields, { name: '普通', params: { rate: 0 }, people: ['u1'] }), {})
+  assert.deepEqual(validate(fields, { name: ' ', params: { rate: 2 }, people: ['gone'] }), { name: '请填写名称', 'params.rate': '回款率不能大于 1', people: '请重新选择人员' })
+  assert.equal(validate(fields, { name: '专项', params: { rate: 'bad' }, people: [] }).note, '请填写说明')
+  assert.equal(validate(fields, { name: '普通', params: { rate: -1 }, people: ['u1'] })['params.rate'], '回款率不能小于 0')
+})
+
+test('common form focuses field errors, blocks invalid writes, retains failed input and protects dirty exit', async () => {
+  const source = (await Promise.all(['src/components.js', 'src/workflows.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  const writes = []; let closed = 0, focused = 0
+  const harness = clientHarness(source, 'FinanceFormDialog')
+  const props = { title: '参数', fields: [{ key: 'amount', label: '金额', type: 'number', min: 0, max: 10, required: true }], initial: { amount: 0 }, onSubmit: async body => { writes.push(body); throw new Error('版本已锁定') }, onClose: () => closed++ }
+  const render = () => harness.render(props)
+  const form = () => clientNodes(render()).find(node => node.type === 'form')
+  const input = () => clientNodes(render()).find(node => node.props['aria-label'] === '金额')
+  input().props.onChange('12')
+  form().props.ref.current = { querySelector: () => ({ focus: () => focused++ }) }
+  await form().props.onSubmit({ preventDefault() {} })
+  assert.equal(writes.length, 0); assert.equal(focused, 1)
+  assert.equal(input().props['aria-invalid'], true)
+  assert.ok(clientNodes(render()).some(node => node.children.includes('金额不能大于 10')))
+  input().props.onChange('8')
+  assert.equal(input().props['aria-invalid'], undefined)
+  await form().props.onSubmit({ preventDefault() {} })
+  assert.deepEqual(writes, [{ amount: 8 }]); assert.equal(input().props.value, '8'); assert.equal(closed, 0)
+  assert.ok(clientNodes(render()).some(node => node.children.includes('版本已锁定')))
+  render().props.onClose()
+  assert.equal(closed, 0)
+  let tree = render()
+  assert.ok(clientNodes(tree).some(node => node.children.includes('有尚未保存的修改。离开后这些内容将丢失。')))
+  clientNodes(tree).find(node => node.children.includes('继续编辑')).props.onClick()
+  assert.equal(input().props.value, '8')
+  render().props.onClose(); tree = render()
+  clientNodes(tree).find(node => node.children.includes('放弃修改并关闭')).props.onClick()
+  assert.equal(closed, 1)
+})
+
+test('common rows locate the failing row, retain valid rows and serialize nested numeric fields', async () => {
+  const source = (await Promise.all(['src/components.js', 'src/workflows.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  const writes = []; let closed = 0, focused = 0
+  const harness = clientHarness(source, 'FinanceRowsDialog')
+  const props = { title: '月度输入', fields: [{ key: 'params.amount', label: '金额', type: 'number', min: 0, required: true }], initial: [{ params: { amount: 0 } }, {}], onSubmit: async rows => writes.push(rows), onClose: () => closed++ }
+  const render = () => harness.render(props)
+  const form = () => clientNodes(render()).find(node => node.type === 'form')
+  form().props.ref.current = { querySelector: () => ({ focus: () => focused++ }) }
+  await form().props.onSubmit({ preventDefault() {} })
+  assert.equal(writes.length, 0); assert.equal(focused, 1)
+  assert.ok(clientNodes(render()).some(node => node.children.includes('第 2 行存在输入错误，已定位到首个错误。')))
+  clientNodes(render()).find(node => node.props['aria-label'] === '金额 2').props.onChange('5.25')
+  await form().props.onSubmit({ preventDefault() {} })
+  assert.deepEqual(writes, [[{ params: { amount: 0 } }, { params: { amount: 5.25 } }]])
+  assert.equal(closed, 1)
+})
+
+test('pending common form prevents duplicate submission and dismissal until the same request settles', async () => {
+  const source = (await Promise.all(['src/components.js', 'src/workflows.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  let resolve, writes = 0, closed = 0
+  const harness = clientHarness(source, 'FinanceFormDialog')
+  const props = { title: '提交', fields: [], onSubmit: () => { writes++; return new Promise(done => { resolve = done }) }, onClose: () => closed++ }
+  const render = () => harness.render(props)
+  const submit = () => clientNodes(render()).find(node => node.type === 'form').props.onSubmit({ preventDefault() {} })
+  const pending = submit()
+  await submit(); render().props.onClose()
+  assert.equal(writes, 1); assert.equal(closed, 0); assert.equal(render().props.dismissDisabled, true)
+  resolve(); await pending
+  assert.equal(closed, 1)
+})
+
+
+test('search and multiple selection triggers expose field error descriptions for focus and screen readers', async () => {
+  const source = await readFile(new URL('src/components.js', root), 'utf8')
+  for (const [component, label] of [['SearchSelect', '基础岗位模板'], ['MultiSearchSelect', '成员']]) {
+    const harness = clientHarness(source, component)
+    const tree = harness.render({ buttonTrigger: true, value: component === 'SearchSelect' ? '' : [], placeholder: label, 'aria-label': label, 'aria-invalid': true, 'aria-describedby': 'field-error', options: [] })
+    const trigger = clientNodes(tree).find(node => node.type === 'button' && node.props['aria-label'] === label)
+    assert.equal(trigger.props['aria-invalid'], true)
+    assert.equal(trigger.props['aria-describedby'], 'field-error')
+  }
+})
+
+test('quote ledger searches all pages, clamps after refresh and explains blocked quotes without rounding price', async () => {
+  const source = await readFile(new URL('src/views/bom.js', root), 'utf8')
+  const harness = clientHarness(source, 'FinanceQuoteLedger', {
+    Card() {}, FormRow() {}, Field() {}, FinanceResource() {}, Table() {}, Pager() {}, GhostButton() {},
+    financeRows: data => data?.list || [], financeColumns: columns => columns.map(([key, label]) => ({ key, label })),
+  })
+  const applied = [], quotes = Array.from({ length: 45 }, (_, i) => ({ id: `q${i}`, supplierName: `供方${i}`, partNo: `P${i}`, price: 50.1234, currency: 'CNY', batchNo: `B${i}` }))
+  quotes[0].validUntil = '2000-01-01'; quotes[1].currency = 'USD'; quotes[2].partNo = ''
+  const props = { resource: { data: { list: quotes } }, editable: true, onApply: q => applied.push(q.id) }
+  let tree = harness.render(props)
+  const table = () => clientNodes(tree).find(node => node.props.tableId === 'finance-quote-ledger')
+  const action = row => table().props.columns.find(c => c.key === 'actions').render(row)
+  for (const quote of quotes.slice(0, 3)) {
+    assert.equal(clientNodes(action(quote)).find(n => n.type.name === 'GhostButton').props.disabled, true)
+    assert.ok(clientNodes(action(quote)).some(n => n.props.id?.startsWith('finance-quote-reason-')))
+  }
+  assert.equal(table().props.columns.find(c => c.key === 'price').render(quotes[1]), '50.1234 USD')
+  assert.equal(table().props.rows.length, 20)
+  clientNodes(tree).find(n => n.props.onPage).props.onPage(3); tree = harness.render(props)
+  assert.equal(table().props.rows[0].id, 'q40')
+  clientNodes(tree).find(n => n.props['aria-label'] === '查找报价').props.onChange('b44'); tree = harness.render(props)
+  assert.deepEqual(table().props.rows.map(q => q.id), ['q44'])
+  clientNodes(action(quotes[44])).find(n => n.type.name === 'GhostButton').props.onClick()
+  assert.deepEqual(applied, ['q44'])
+  quotes[44].validUntil = '2000-01-01'
+  clientNodes(action(quotes[44])).find(n => n.type.name === 'GhostButton').props.onClick()
+  assert.deepEqual(applied, ['q44'], 'recheck expiry at the moment of clicking')
+  clientNodes(tree).find(n => n.props['aria-label'] === '查找报价').props.onChange(''); tree = harness.render(props)
+  clientNodes(tree).find(n => n.props.onPage).props.onPage(3)
+  tree = harness.render({ ...props, resource: { data: { list: quotes.slice(0, 1) } } })
+  assert.deepEqual(table().props.rows.map(q => q.id), ['q0'])
+})
+
+test('EBOM import preserves full preview on failure, prevents duplicates and permits retry without reupload', async () => {
+  const source = await readFile(new URL('src/views/bom.js', root), 'utf8')
+  const rows = Array.from({ length: 25 }, (_, sort) => ({ partNo: `P${sort}`, name: `零件${sort}`, sort }))
+  let calls = 0, changed = 0, rejectImport
+  const harness = clientHarness(source, 'FinanceEbomExcel', {
+    Card() {}, FormRow() {}, Field() {}, Table() {}, Pager() {}, GhostButton() {}, PrimaryButton() {}, FinanceEvidence() {},
+    financeColumns: columns => columns.map(([key, label]) => ({ key, label })),
+    FileReader: class { readAsDataURL() { this.result = 'data:base64,eA=='; this.onload() } },
+    financeRest: async path => {
+      if (path.endsWith('/preview')) return { data: { rowCount: 25, newCount: 25, existingCount: 0, warnings: [], nodes: rows } }
+      calls++
+      if (calls === 1) return new Promise((_, reject) => { rejectImport = reject })
+      return { data: { created: 25, skipped: 0 } }
+    },
+  })
+  const props = { packageId: 'p', onChanged: () => changed++ }
+  let tree = harness.render(props)
+  clientNodes(tree).find(n => n.props.type === 'file').props.onChange({ target: { files: [{ name: '测试.xlsx', size: 2 }], value: '' } })
+  await new Promise(resolve => setImmediate(resolve)); tree = harness.render(props)
+  let confirm = clientNodes(tree).find(n => n.children.includes('确认导入 25 条'))
+  assert.equal(confirm.props.disabled, false, 'no warning needs no acknowledgement')
+  const table = clientNodes(tree).find(n => n.props.tableId === 'finance-ebom-preview')
+  assert.equal(table.props.columns[0].render(rows[24]), 26)
+  clientNodes(tree).find(n => n.props.onPage).props.onPage(2); tree = harness.render(props)
+  assert.equal(clientNodes(tree).find(n => n.props.tableId === 'finance-ebom-preview').props.rows.length, 5)
+  const pending = confirm.props.onClick(); await confirm.props.onClick()
+  assert.equal(calls, 1)
+  rejectImport(new Error('第 26 行导入失败')); await pending
+  tree = harness.render(props)
+  assert.ok(clientNodes(tree).some(n => n.children.includes('第 26 行导入失败')))
+  confirm = clientNodes(tree).find(n => n.children.includes('确认导入 25 条'))
+  assert.ok(confirm, 'preview remains available')
+  await confirm.props.onClick(); tree = harness.render(props)
+  assert.equal(calls, 2); assert.equal(changed, 1)
+  assert.ok(clientNodes(tree).some(n => n.children.includes('导入完成：新增 25，已有装配位置跳过 0')))
 })

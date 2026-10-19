@@ -6,7 +6,7 @@ const panelListeners = new Set()
 const components = new Map()
 const layout = { selectPanel(value) { selectedPanel = value; panelListeners.forEach(listener => listener()) } }
 const skillNames = ['finance-monthly-risk', 'finance-cost-structure', 'finance-cash-pressure', 'finance-budget-review', 'finance-revenue-attainment', 'finance-data-quality', 'finance-cost-cash-forecast', 'finance-budget-version-health', 'finance-alert-rules-audit']
-window.analysisFixture = { created: [], sent: [], opened: [], catalogMode: 'ready', sendMode: 'ready' }
+window.analysisFixture = { created: [], sent: [], opened: [], openAttempts: [], openMode: 'ready', catalogMode: 'ready', sendMode: 'ready' }
 const fixture = window.analysisFixture
 window.__ModuleLoader__ = { load(definition) { plugin = definition.factory(name => {
   if (name === 'react') return React
@@ -29,7 +29,7 @@ const skills = { list: async ({ sessionId }) => {
 } }
 plugin.apply({
   effect: setup => setup(),
-  get: name => name === 'sessions' ? sessions : name === 'remote.skills' ? skills : name === 'uiWorkspace' ? { openSession(id) { fixture.opened.push(id); layout.selectPanel(null) } } : undefined,
+  get: name => name === 'sessions' ? sessions : name === 'remote.skills' ? skills : name === 'uiWorkspace' ? { async openSession(id) { fixture.openAttempts.push(id); await Promise.resolve(); if (fixture.openMode === 'failed') throw new Error('synthetic navigation failure'); fixture.opened.push(id); layout.selectPanel(null) } } : undefined,
   layout,
   locale: { register: (_ns, value) => { dictionaries = value }, bind: () => (key, values = {}) => (dictionaries.zh?.[key] ?? key).replace(/\{(\w+)\}/g, (_, name) => values[name] ?? '') },
   slots: { inject: (_name, setup) => setup(), register: (options, component) => { components.set(options.name, { component, options }) } },

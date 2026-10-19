@@ -9,9 +9,9 @@ const ALERT_STATUS_OPTIONS = [['OPEN', 'stPending'], ['CONFIRMED', 'stConfirmed'
 
 function AlertsView({ ctx, t, onDrill }) {
   const { year, orgId, revision } = ctx
-  const [filters, setFilters] = useState({ severity: ctx.drillParams?.severity || '', alertType: ctx.drillParams?.alertType || '', month: ctx.drillParams?.month || '', status: ctx.drillParams?.status || 'OPEN' })
-  const [activeStat, setActiveStat] = useState('')
-  const [page, setPage] = useState(1)
+  const [filters, setFilters] = useFinanceViewState(ctx, 'filters', { severity: ctx.drillParams?.severity || '', alertType: ctx.drillParams?.alertType || '', month: ctx.drillParams?.month || '', status: ctx.drillParams?.status || 'OPEN' })
+  const [activeStat, setActiveStat] = useFinanceViewState(ctx, 'activeStat', '')
+  const [page, setPage] = useFinanceViewState(ctx, 'page', 1)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState(null)
   const [detail, setDetail] = useState(null)

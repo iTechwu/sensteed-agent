@@ -44,7 +44,7 @@ function financePolicyRequest(value, people, roles, orgs, departments) {
 function PermissionsView({ ctx }) {
   const action = useFinanceAction()
   const [dialog, setDialog] = useState(null)
-  const [tab, setTab] = useState('USER')
+  const [tab, setTab] = useFinanceViewState(ctx, 'permissionTab', 'USER')
   const revision = `${ctx.revision}-${action.revision}`
   const manage = ctx.permissions?.includes('finance.permission.manage')
   const me = useFinanceResource('/finance/permissions/me', revision)
@@ -158,8 +158,8 @@ function financeHistoricalGrantStatus(grant, now = Date.now()) {
     : grant.startsAt && Date.parse(grant.startsAt) > now ? '待生效' : '未撤销且在有效期内'
 }
 function FinancePermissionHistory({ ctx, directory }) {
-  const [page, setPage] = useState(1), [userId, setUserId] = useState(''), [permission, setPermission] = useState('')
-  const [activeOnly, setActiveOnly] = useState(false), [selected, setSelected] = useState(null)
+  const [page, setPage] = useFinanceViewState(ctx, 'permissionHistoryPage', 1), [userId, setUserId] = useFinanceViewState(ctx, 'permissionHistoryUser', ''), [permission, setPermission] = useFinanceViewState(ctx, 'permissionHistoryCode', '')
+  const [activeOnly, setActiveOnly] = useFinanceViewState(ctx, 'permissionHistoryActive', false), [selected, setSelected] = useState(null)
   const action = useFinanceAction()
   const query = new URLSearchParams({ page: String(page), limit: '20', activeOnly: String(activeOnly) })
   if (userId) query.set('userId', userId)

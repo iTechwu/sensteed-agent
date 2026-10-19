@@ -216,10 +216,10 @@ function Table({ columns, rows, empty, onRowClick, rowKey, minColumns, tableId }
 function Pager({ page, total, limit, onPage }) {
   const pages = Math.max(1, Math.ceil((total ?? 0) / (limit ?? PAGE_SIZE)))
   if (pages <= 1) return null
-  return h('div', { className: 'sf-pager' },
-    h('button', { type: 'button', disabled: page <= 1, onClick: () => onPage(page - 1) }, h(Glyph, { name: 'left', size: 12 })),
-    h('span', null, `${page} / ${pages}`),
-    h('button', { type: 'button', disabled: page >= pages, onClick: () => onPage(page + 1) }, h(Glyph, { name: 'right', size: 12 })))
+  return h('div', { className: 'sf-pager', role: 'group', 'aria-label': '分页' },
+    h('button', { type: 'button', 'aria-label': '上一页', disabled: page <= 1, onClick: () => onPage(page - 1) }, h(Glyph, { name: 'left', size: 12 })),
+    h('span', { 'aria-live': 'polite' }, `${page} / ${pages}`),
+    h('button', { type: 'button', 'aria-label': '下一页', disabled: page >= pages, onClick: () => onPage(page + 1) }, h(Glyph, { name: 'right', size: 12 })))
 }
 
 /** pill 页签条（预算子视图/审批状态筛选；role=tablist 语义） */
@@ -356,8 +356,8 @@ function SearchSelect({ value, defaultValue = '', onChange, options = [], placeh
     onBlur: event => { if (!event.currentTarget.contains(event.relatedTarget)) closeMenu() },
   },
     buttonTrigger ? h('button', {
-      type: 'button', ref: triggerRef, className: 'sf-search-trigger', disabled, id: rest.id, 'aria-required': required || undefined, 'aria-describedby': rest['aria-describedby'],
-      'aria-label': placeholder, 'aria-expanded': open, 'aria-haspopup': 'listbox', 'aria-controls': menuId,
+      type: 'button', ref: triggerRef, className: 'sf-search-trigger', disabled, id: rest.id, 'aria-required': required || undefined, 'aria-describedby': rest['aria-describedby'], 'aria-invalid': rest['aria-invalid'],
+      'aria-label': rest['aria-label'] || placeholder, 'aria-expanded': open, 'aria-haspopup': 'listbox', 'aria-controls': menuId,
       'data-finance-pending': pendingDraft ? rest.name : undefined,
       onClick: () => { setOpen(value => !value); if (!preserveDraft) setQuery(''); requestAnimationFrame(() => inputRef.current?.focus()) },
     }, h('span', null, pendingDraft || selectedLabel || placeholder), h('span', { 'aria-hidden': true }, '⌄')) : h('div', { className: 'sf-search-input-wrap' },
@@ -394,7 +394,7 @@ function SearchSelect({ value, defaultValue = '', onChange, options = [], placeh
     h('input', { type: 'hidden', name: rest.name, value: chosen, disabled }))
 }
 
-function MultiSearchSelect({ value = [], onChange, options = [], placeholder = '选项', disabled, selectedLabel }) {
+function MultiSearchSelect({ value = [], onChange, options = [], placeholder = '选项', disabled, selectedLabel, ...rest }) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const rootRef = useRef(null)
@@ -451,8 +451,8 @@ function MultiSearchSelect({ value = [], onChange, options = [], placeholder = '
     onBlur: event => { if (!event.currentTarget.contains(event.relatedTarget)) close() },
   },
     h('button', {
-      ref: triggerRef, type: 'button', className: 'sf-multi-trigger', disabled,
-      'aria-haspopup': 'listbox', 'aria-expanded': open, 'aria-label': placeholder,
+      ...rest, ref: triggerRef, type: 'button', className: 'sf-multi-trigger', disabled,
+      'aria-haspopup': 'listbox', 'aria-expanded': open, 'aria-label': rest['aria-label'] || placeholder,
       onClick: () => { if (open) close(); else setOpen(true) },
       onKeyDown: event => { if (event.key === 'Escape') handleKeyDown(event) },
     },
@@ -652,4 +652,11 @@ function StatCard({ label, value, tone, active, onClick }) {
     type: 'button', className: `sf-stat sf-stat-${tone}${active ? ' is-active' : ''}${clickable ? ' is-clickable' : ''}`,
     onClick: clickable ? onClick : undefined,
   }, h('strong', null, value ?? 0), h('span', null, label))
+}
+
+// 只对显式声明的浏览状态启用（筛选、页码、问答问题）；请求和业务草稿不写入导航历史。
+function useFinanceViewState(ctx, key, initial) {
+  const [value, setValue] = useState(() => Object.hasOwn(ctx.viewState || {}, key) ? ctx.viewState[key] : typeof initial === 'function' ? initial() : initial)
+  useEffect(() => { if (ctx.viewState) ctx.viewState[key] = value }, [ctx.viewState, key, value])
+  return [value, setValue]
 }

@@ -22,12 +22,12 @@ function Dashboard({ t, embedded = false, onClose = closeOverlay }) {
   const financeWriter = ['FINANCE_STAFF', 'FINANCE_OWNER'].includes(capabilities.role)
   const identity = { ...capabilities, financeWriter }
   const canOpen = section => financeSectionAllowed(section, identity)
-  const [tab, setTab] = useState('overview')
-  // 下钻参数：onDrill(target, params) 切 tab 时可带子视图/月份等初始状态
-  const [drillParams, setDrillParams] = useState(null)
-  const currentYear = new Date().getFullYear()
-  const [year, setYear] = useState(String(currentYear))
-  const [orgId, setOrgId] = useState('')
+  const navigation = useFinanceNavigation(String(new Date().getFullYear()))
+  const { tab, params: drillParams, year, orgId } = navigation.current
+  const setYear = value => navigation.update({ year: value, viewState: {} })
+  const setOrgId = value => navigation.update({ orgId: value, viewState: {} })
+  const setDrillParams = value => navigation.update(route => ({ params: typeof value === 'function' ? value(route.params) : value }))
+  const contentRef = useRef(null)
   const [revision, setRevision] = useState(0)
   const [context, setContext] = useState(null) // { orgs, departments }
   const [operator, setOperator] = useState(null) // 登录身份（审计可见性；写操作由宿主自动注入）
@@ -102,17 +102,23 @@ function Dashboard({ t, embedded = false, onClose = closeOverlay }) {
     if (!canOpen(target) || (item && !financeNavigationAllowed(item, identity))) return
     const navigate = () => {
       const next = { year, orgId, ...params }
-      setDrillParams(next)
-      if (next.year) setYear(String(next.year))
-      setOrgId(next.orgId || '')
-      setTab(target)
+      navigation.navigate(target, next, contentRef.current?.scrollTop || 0)
     }
     if (entryLeaveRef.current) entryLeaveRef.current(navigate)
     else navigate()
   }
-  const ctx = { year, orgId, orgs, departments, revision, drillParams, permissions: capabilities.permissions || [], financeWriter, role: capabilities.role, fullAccess: capabilities.fullAccess, onNavigate: onDrill }
+  const ctx = { year, orgId, orgs, departments, revision, drillParams, viewState: navigation.current.viewState, permissions: capabilities.permissions || [], financeWriter, role: capabilities.role, fullAccess: capabilities.fullAccess, onNavigate: onDrill }
   const activeItem = financeNavigationItem(tab, drillParams)
-  useEffect(() => { if (capabilities.permissions !== null && (!canOpen(tab) || (activeItem && !financeNavigationAllowed(activeItem, identity)))) { setTab('overview'); setDrillParams(null) } }, [tab, capabilities.permissions, financeWriter, capabilities.role, activeItem])
+  useEffect(() => { if (capabilities.permissions !== null && (!canOpen(tab) || (activeItem && !financeNavigationAllowed(activeItem, identity)))) { navigation.reset() } }, [tab, capabilities.permissions, financeWriter, capabilities.role, activeItem])
+  const previous = navigation.previous
+  const previousItem = previous ? financeNavigationItem(previous.tab, previous.params) : null
+  const canBack = previous && canOpen(previous.tab) && (!previousItem || financeNavigationAllowed(previousItem, identity))
+  const goBack = () => {
+    if (!canBack) return
+    if (entryLeaveRef.current) entryLeaveRef.current(navigation.back)
+    else navigation.back()
+  }
+  useEffect(() => restoreFinanceScroll(contentRef.current, navigation.current.scrollTop), [navigation.current.id])
   const briefProps = { brief, t, onDrill, orgId }
 
   // 各 tab 的错误/空态由视图内部处理；这里只处理 brief 类视图的加载与失败
@@ -120,7 +126,7 @@ function Dashboard({ t, embedded = false, onClose = closeOverlay }) {
     ? h('div', { className: 'sf-loading', role: 'status' }, h(Glyph, { name: 'loading' }), t('loading'))
     : (tab === 'overview' || tab === 'operations') && briefState === 'error' && !brief
       ? h('div', { className: 'sf-fatal', role: 'alert' }, h(Glyph, { name: 'warning' }), h('strong', null, t('loadError')), h(GhostButton, { onClick: refresh }, t('retry')))
-      : h(React.Fragment, { key: `${tab}-${year}-${JSON.stringify(drillParams)}` },
+      : h(React.Fragment, { key: `${navigation.current.id}-${tab}-${year}-${JSON.stringify(drillParams)}` },
         tab === 'overview' ? h(OverviewView, { key: `ov-${year}-${orgId}-${revision}`, ...briefProps, workQueue }) : null,
         tab === 'operations' ? h(OperationsView, { key: `op-${year}-${orgId}-${revision}`, ...briefProps }) : null,
         tab === 'budget' ? ctx.drillParams?.lineId ? h(BudgetSavedRecordView, { ctx, t }) : h(BudgetView, { ctx, t }) : null,
@@ -131,7 +137,7 @@ function Dashboard({ t, embedded = false, onClose = closeOverlay }) {
         tab === 'entry' ? h(EntryPanel, { year, orgId, orgs, departments, role: ctx.role, t, onSaved: refresh, onYearChange: setYear, onNavigate: onDrill, onLeaveGuardChange: registerEntryLeave }) : null,
         tab === 'budget-filing' ? h(BudgetFilingView, { key: `budget-filing-${year}-${drillParams?.taskId || ''}`, ctx, t }) : null,
         tab === 'filing' ? h(FilingParityView, { key: `filing-${year}-${drillParams?.section || 'assignments'}-${drillParams?.taskId || ''}`, ctx, t }) : null,
-        tab === 'identity' ? drillParams?.directorySection === 'members' ? h(FinanceMembersView, { ctx, t }) : drillParams?.directorySection === 'directory' ? h(FinanceDirectoryView, { ctx }) : h(EntryView, { ctx, t, directoryOnly: true, directorySection: drillParams?.directorySection }) : null,
+        tab === 'identity' ? drillParams?.directorySection === 'members' ? h(FinanceMembersView, { ctx, t }) : drillParams?.directorySection === 'directory' ? h(FinanceDirectoryView, { ctx }) : h(FinanceEmploymentView, { ctx, t }) : null,
         tab === 'bom' && canOpen('bom') ? h(BomView, { ctx, t }) : null,
         tab === 'analyze' ? h(AnalyzeView, { ctx, t }) : null,
         tab === 'engine' ? h(EngineView, { ctx, t }) : null,
@@ -150,6 +156,7 @@ function Dashboard({ t, embedded = false, onClose = closeOverlay }) {
       h('header', { className: 'sf-header' },
         h('div', { className: 'sf-header-main' },
           h('p', { className: 'sf-eyebrow' }, t('eyebrow')),
+          canBack ? h(GhostButton, { onClick: goBack, 'aria-label': `返回${previousItem?.[1] || '上一页'}` }, h(Glyph, { name: 'left', size: 12 }), `返回${previousItem?.[1] || '上一页'}`) : null,
           h('h1', { id: 'sf-title' }, activeItem?.[1] ?? t(SECTION_META[tab]?.[0] ?? 'title')),
           h('p', { className: 'sf-desc' }, [operator ? `${t('operatorAs')} ${operator}` : null, tab === 'budget-filing' ? '本人填报、两级审核与部门预算确认' : tab === 'filing' ? '完成部门填报并跟踪提交、退回与确认进度' : tab === 'identity' ? '维护成员职责、组织身份与部门归属' : t(SECTION_META[tab]?.[1] ?? 'subtitle')].filter(Boolean).join(' · '))),
         h('div', { className: 'sf-header-side' },
@@ -171,7 +178,7 @@ function Dashboard({ t, embedded = false, onClose = closeOverlay }) {
           const visible = items.filter(item => financeNavigationAllowed(item, identity))
           return visible.length ? h('optgroup', { key: label, label }, ...visible.map(item => h('option', { key: item[0], value: item[0] }, item[1]))) : null
         }))),
-      h('div', { className: `sf-content${briefState === 'loading' && !brief ? ' sf-refreshing' : ''}`, 'aria-busy': briefState === 'loading' && !brief }, body)))
+      h('div', { ref: contentRef, className: `sf-content${briefState === 'loading' && !brief ? ' sf-refreshing' : ''}`, 'aria-busy': briefState === 'loading' && !brief }, body)))
 }
 
 function Button({ wide, t, onOpen = openOverlay }) {
@@ -206,7 +213,9 @@ function apply(ctx) {
       // 每次深度分析都从独立会话开始，避免把上一次分析的上下文带入本次结论。
       const id = await sessions.create()
       // Retain until ready, catalog check and submission finish; an unknown /skill is plain prose to the Host.
-      await sessions.using(id, { source: 'controllerOperation' }, async reference => {
+      let accepted = false
+      let opened = false
+      try { await sessions.using(id, { source: 'controllerOperation' }, async reference => {
         await reference.ready
         const scoped = sessions.scope(id)
         if (!scoped) throw new Error('session_unavailable')
@@ -218,8 +227,14 @@ function apply(ctx) {
         const conversation = scoped.get('conversation')
         if (!conversation) throw new Error('conversation_service_unavailable')
         await conversation.send(prompt)
-        navigation.openSession(id)
-      })
+        accepted = true
+        // Transfer ownership to the visible session before releasing the operation reference.
+        try { await navigation.openSession(id); opened = true } catch {}
+      }) } catch (error) {
+        // Once accepted, a reference cleanup failure must not offer to resend the same request.
+        if (!accepted) throw error
+      }
+      return { sessionId: id, opened, open: () => navigation.openSession(id) }
     } })
     globalThis.__sensteed_finance_close = closeOverlay
     return () => { delete globalThis.__sensteed_finance_conversation; delete globalThis.__sensteed_finance_close }

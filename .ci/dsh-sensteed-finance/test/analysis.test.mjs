@@ -9,7 +9,7 @@ const shell = await readFile(new URL('src/shell.js', root), 'utf8')
 const entries = new Function(head.slice(head.indexOf('const ANALYSIS_ENTRIES'), head.indexOf('\nconst copy =')) + '\nreturn ANALYSIS_ENTRIES')()
 const expected = ['finance-monthly-risk', 'finance-cost-structure', 'finance-cash-pressure', 'finance-budget-review', 'finance-revenue-attainment', 'finance-data-quality', 'finance-cost-cash-forecast', 'finance-budget-version-health', 'finance-alert-rules-audit']
 
-function bridge(sessions, globals = {}, catalog = async () => ({ ok: true, value: { skills: expected.map(name => ({ name })) } }), access = async () => ({ ok: true, allowed: true })) {
+function bridge(sessions, globals = {}, catalog = async () => ({ ok: true, value: { skills: expected.map(name => ({ name })) } }), access = async () => ({ ok: true, allowed: true }), openSession) {
   const inheritedUsing = sessions.using
   sessions.using = async (id, options, callback) => inheritedUsing
     ? inheritedUsing.call(sessions, id, options, callback)
@@ -19,7 +19,7 @@ function bridge(sessions, globals = {}, catalog = async () => ({ ok: true, value
   const apply = new Function('globalThis', 'closeOverlay', 'NS', 'REQUEST_TIMEOUT_MS', 'ANALYSIS_ENTRIES', 'api', `${shell}\nreturn apply`)(globals, () => {}, 'dofe.sensteed-finance', 30000, entries, access)
   apply({
     effect: (callback, label) => effects.set(label, callback),
-    get: name => name === 'sessions' ? sessions : name === 'remote.skills' ? { list: catalog } : { openSession: id => opened.push(id) },
+    get: name => name === 'sessions' ? sessions : name === 'remote.skills' ? { list: catalog } : { openSession: id => openSession ? openSession(id) : opened.push(id) },
     locale: { bind: () => key => key }, slots: { inject() {} },
   })
   effects.get('dofe-sensteed-finance: scoped conversation')()
@@ -269,4 +269,84 @@ test('visible scope matches the selected year and stable entity id including unr
     else assert.ok(scope.includes('org-a'))
     if (context.orgs) assert.ok(scope.includes('Name pending verification'))
   }
+})
+
+test('accepted analysis survives navigation failure and reopening never creates or sends a second request', async () => {
+  for (const language of ['zh', 'en']) {
+    let created = 0, sends = 0, copies = 0, navigationFails = true
+    const destinations = []
+    const { globals } = bridge({
+      create: async () => `accepted-${++created}`,
+      scope: () => ({ get: () => ({ send: async () => { sends++ } }) }),
+    }, {}, undefined, undefined, async id => {
+      destinations.push(id)
+      if (navigationFails) throw new Error('private navigation diagnostic')
+    })
+    const t = translate(language)
+    const ui = analysis(globals, { clipboard: { writeText: async () => { copies++ } } }, {}, t)
+    await ui.render()[0].props.onClick()
+    assert.equal(ui.notice(), t('analysisSentNotOpened'))
+    assert.equal(ui.tree().some(node => node.type === 'textarea'), false)
+    const starts = ui.render().filter(button => button.props['aria-label'] !== t('analysisOpenSession'))
+    assert.ok(starts.every(button => button.props.disabled))
+    await starts[0].props.onClick()
+    const reopen = () => ui.render().find(button => button.props['aria-label'] === t('analysisOpenSession'))
+    await reopen().props.onClick()
+    assert.equal(ui.notice(), t('analysisSentNotOpened'))
+    navigationFails = false
+    await reopen().props.onClick()
+    assert.equal(ui.notice(), t('sent'))
+    assert.equal(created, 1)
+    assert.equal(sends, 1)
+    assert.equal(copies, 0)
+    assert.deepEqual(destinations, ['accepted-1', 'accepted-1', 'accepted-1'])
+  }
+})
+
+test('post-submission reference cleanup failure cannot turn accepted work into an unsent prompt', async () => {
+  let sends = 0, copies = 0
+  const { globals, opened } = bridge({
+    create: async () => 'accepted-cleanup',
+    scope: () => ({ get: () => ({ send: async () => { sends++ } }) }),
+    async using(_id, _options, run) { await run({ ready: Promise.resolve() }); throw new Error('reference cleanup failed') },
+  })
+  const ui = analysis(globals, { clipboard: { writeText: async () => { copies++ } } })
+  await ui.render()[0].props.onClick()
+  assert.equal(ui.notice(), 'sent')
+  assert.deepEqual(opened, ['accepted-cleanup'])
+  assert.equal(sends, 1)
+  assert.equal(copies, 0)
+})
+
+test('closing the finance panel after accepted submission cannot report a send failure', async () => {
+  for (const close of [() => { throw new Error('panel cleanup failed') }, async () => { throw new Error('panel cleanup rejected') }]) {
+    let copies = 0
+    const { globals, opened } = bridge({ create: async () => 'accepted-close', scope: () => ({ get: () => ({ send: async () => {} }) }) })
+    globals.__sensteed_finance_close = close
+    const ui = analysis(globals, { clipboard: { writeText: async () => { copies++ } } })
+    await ui.render()[0].props.onClick()
+    assert.equal(ui.notice(), 'sent')
+    assert.deepEqual(opened, ['accepted-close'])
+    assert.equal(copies, 0)
+  }
+})
+
+test('the operation keeps session ownership until asynchronous navigation has completed', async () => {
+  let retained = false
+  const order = []
+  const { globals } = bridge({
+    create: async () => 'accepted-retained',
+    scope: () => ({ get: () => ({ send: async () => { order.push('send') } }) }),
+    async using(_id, _options, run) {
+      retained = true
+      try { await run({ ready: Promise.resolve() }) }
+      finally { retained = false; order.push('release') }
+    },
+  }, {}, undefined, undefined, async () => {
+    await Promise.resolve()
+    assert.equal(retained, true)
+    order.push('open')
+  })
+  await analysis(globals).render()[0].props.onClick()
+  assert.deepEqual(order, ['send', 'open', 'release'])
 })

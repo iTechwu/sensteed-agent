@@ -1,8 +1,8 @@
 function ComparisonsView({ ctx }) {
-  const [mode, setMode] = useState(ctx.drillParams?.mode || 'monthly')
-  const [targetYear, setTargetYear] = useState(String(Number(ctx.year) + 1))
-  const [a, setA] = useState('')
-  const [b, setB] = useState('')
+  const [mode, setMode] = useFinanceViewState(ctx, 'comparisonMode', ctx.drillParams?.mode || 'monthly')
+  const [targetYear, setTargetYear] = useFinanceViewState(ctx, 'comparisonTargetYear', String(Number(ctx.year) + 1))
+  const [a, setA] = useFinanceViewState(ctx, 'comparisonBase', '')
+  const [b, setB] = useFinanceViewState(ctx, 'comparisonTarget', '')
   const [dialog, setDialog] = useState(null)
   const action = useFinanceAction()
   const revision = `${ctx.revision}-${action.revision}`
@@ -11,11 +11,10 @@ function ComparisonsView({ ctx }) {
   const snapshots = useFinanceResource(mode === 'monthly' ? `/finance/budget-snapshots?year=${ctx.year}` : null, revision)
   const baseRows = mode === 'monthly' ? financeRows(snapshots.data).filter(row => row.status === 'ACTIVE') : financeRows(versions.data)
   const targetRows = mode === 'yearly' ? financeRows(targetVersions.data) : baseRows
-  const validA = baseRows.some(row => row.id === a) ? a : mode === 'monthly' ? baseRows[1]?.id || baseRows[0]?.id || '' : baseRows.find(row => row.isPrimary)?.id || baseRows[0]?.id || ''
-  const validB = targetRows.some(row => row.id === b) ? b : mode === 'yearly' ? targetRows.find(row => row.isPrimary)?.id || targetRows[0]?.id || '' : targetRows.find(row => row.id !== validA)?.id || ''
+  const validA = baseRows.some(row => row.id === a) ? a : mode === 'monthly' ? baseRows[1]?.id || baseRows[0]?.id || '' : baseRows.find(row => row.isPrimary)?.id || baseRows.find(row => row.status === 'PUBLISHED')?.id || baseRows[0]?.id || ''
+  const validB = targetRows.some(row => row.id === b) ? b : mode === 'yearly' ? targetRows.find(row => row.isPrimary)?.id || targetRows.find(row => row.status === 'PUBLISHED')?.id || targetRows[0]?.id || '' : targetRows.find(row => row.id !== validA)?.id || ''
   const path = validA && validB && validA !== validB ? mode === 'monthly' ? `/finance/budget-snapshots/compare?snapshotAId=${validA}&snapshotBId=${validB}` : mode === 'versions' ? `/finance/budget-versions/detail-diff?baseVersionId=${validA}&targetVersionId=${validB}` : `/finance/budget/versions/diff?baseVersionId=${validA}&targetVersionId=${validB}` : null
   const comparison = useFinanceResource(path, revision)
-  useEffect(() => { setA(''); setB(''); setDialog(null) }, [mode, ctx.year, targetYear])
   const versionLabel = row => mode === 'monthly' ? `${row.label} · 已冻结${row.frozenThroughMonth}个月 / 剩余预测${12 - row.frozenThroughMonth}个月` : `${row.name} · ${financeDisplayValue(row.status, 'status')}${row.isPrimary ? ' · 主版本' : ''}`
   const selectedVersions = [baseRows.find(row => row.id === validA), targetRows.find(row => row.id === validB)]
   const trial = mode !== 'monthly' && selectedVersions.some(row => row?.status === 'DRAFT' || row?.status === 'CONFIRMED')
@@ -29,7 +28,7 @@ function ComparisonsView({ ctx }) {
     mode === 'monthly' && snapshots.data && baseRows.length < 2 ? h('p', { role: 'status' }, baseRows.length ? '当前仅有一份有效快照，请封存另一份月结快照后比较。' : '当前尚无有效快照，请先封存初始或月结快照。') : null,
     mode === 'versions' ? h(FinanceVersionsPanel, { ctx, resource: versions, onChanged: action.invalidate }) : null,
     validA && validB && validA === validB ? h('p', { role: 'status' }, '请选择不同的快照或预算版本') : null,
-    mode === 'yearly' ? h(FormRow, { label: '对比年度' }, h(Select, { 'aria-label': '对比年度', value: targetYear, onChange: setTargetYear, options: yearOptions(targetYear) })) : null,
+    mode === 'yearly' ? h(FormRow, { label: '对比年度' }, h(Select, { 'aria-label': '对比年度', value: targetYear, onChange: value => { setTargetYear(value); setB('') }, options: yearOptions(targetYear) })) : null,
     h('div', { className: 'sf-row' },
       h(Select, { 'aria-label': '基准快照或版本', value: validA, onChange: setA, options: baseRows.map(row => [row.id, versionLabel(row)]), placeholder: '选择基准' }),
       h(Select, { 'aria-label': '对比快照或版本', value: validB, onChange: setB, options: targetRows.map(row => [row.id, versionLabel(row)]), placeholder: '选择对比' })),

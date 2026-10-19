@@ -398,7 +398,7 @@ function employmentDateLabel(value) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
-function EmploymentCard({ employments, busy, t, onDialog, onRetry }) {
+function EmploymentCard({ employments, busy, t, onDialog, onRetry, page = 1, onPage, userName }) {
   const rows = [...(employments?.list || [])].sort((left, right) => new Date(right.startDate).getTime() - new Date(left.startDate).getTime())
   return h(Card, { title: t('employmentRecords'), actions: [h(LinkButton, { key: 'add', disabled: busy, onClick: () => onDialog({ kind: 'employment' }) }, h(Glyph, { name: 'plus', size: 12 }), t('empCreate'))] },
   employments?.error ? h('div', { role: 'alert', className: 'sf-stack' },
@@ -406,7 +406,7 @@ function EmploymentCard({ employments, busy, t, onDialog, onRetry }) {
     h(LinkButton, { onClick: onRetry }, '重试加载')) : null,
   h(Table, {
     columns: [
-      { label: t('empUser'), key: 'systemUserId', stickyLeft: true },
+      { label: t('empUser'), key: 'systemUserId', stickyLeft: true, render: row => userName || row.systemUserId },
       { label: t('empDept'), key: 'departmentName', sortValue: row => row.departmentName ?? row.departmentId, render: row => row.departmentName ?? row.departmentId },
       { label: t('empStart'), key: 'startDate', sortValue: row => new Date(row.startDate).getTime(), render: row => employmentDateLabel(row.startDate), num: true },
       { label: '结束日期', key: 'endDate', sortValue: row => row.endDate ? new Date(row.endDate).getTime() : Infinity, render: row => row.endDate ? employmentDateLabel(row.endDate) : '至今', num: true },
@@ -414,11 +414,11 @@ function EmploymentCard({ employments, busy, t, onDialog, onRetry }) {
     ],
     rows, empty: employments?.error ? null : !employments ? t('loading') : '暂无归属记录', rowKey: 'id', tableId: 'finance-employments',
   }),
-  employments?.total > rows.length ? h('p', { className: 'sf-note' }, `仅展示前 ${rows.length} 条记录，排序仅作用于已加载记录。`) : null)
+  onPage ? h(Pager, { page, total: employments?.total, limit: 20, onPage }) : employments?.total > rows.length ? h('p', { className: 'sf-note' }, `仅展示前 ${rows.length} 条记录，排序仅作用于已加载记录。`) : null)
 }
 
-function EmploymentDialog({ contacts, contactsLoading, contactsError, departments, busy, t, onClose, onRetry, act }) {
-  const [systemUserId, setSystemUserId] = useState('')
+function EmploymentDialog({ contacts, contactsLoading, contactsError, departments, busy, t, onClose, onRetry, act, initialUserId = '' }) {
+  const [systemUserId, setSystemUserId] = useState(initialUserId)
   const [departmentId, setDepartmentId] = useState('')
   const [startDate, setStartDate] = useState('')
   const [saving, setSaving] = useState(false)
@@ -810,4 +810,30 @@ function FinanceCostItemsView({ ctx, t }) {
       creating ? h(CostItemCreator, { t, submitLabel: '新增费用类别', onBusyChange: setBusy, onCancel: () => setCreating(false), onCreated: () => { setCreating(false); setPage(1); setRevision(value => value + 1) } }) : null,
       h(FinanceResource, { resource: items }, h(Table, { tableId: 'finance-cost-items', rows: financeRows(items.data), rowKey: 'id', columns: financeColumns([['code', '费用类别编号'], ['name', '费用类别名称']]), empty: '暂无费用类别，请先新增' })),
       h(Pager, { page, total: items.data?.total, limit: 20, onPage: setPage })))
+}
+
+/** 按人员查看完整归属历史；目录与历史分别分页，保留已选人员。 */
+function FinanceEmploymentView({ ctx, t }) {
+  const [contactPage, setContactPage] = useFinanceViewState(ctx, 'contactPage', 1)
+  const [page, setPage] = useFinanceViewState(ctx, 'page', 1)
+  const [searchInput, setSearchInput] = useFinanceViewState(ctx, 'searchInput', '')
+  const [keyword, setKeyword] = useFinanceViewState(ctx, 'keyword', '')
+  const [selected, setSelected] = useFinanceViewState(ctx, 'selected', null)
+  const [open, setOpen] = useState(false)
+  const [tick, setTick] = useState(0)
+  const action = useFinanceAction()
+  const params = new URLSearchParams({ page: contactPage, limit: 20 })
+  if (keyword) params.set('keyword', keyword)
+  const contacts = useFinanceResource(`/finance/feishu/contacts?${params}`, ctx.revision)
+  const records = useFinanceResource(selected?.systemUserId ? `/finance/employment/records?${new URLSearchParams({ systemUserId: selected.systemUserId, page, limit: 20 })}` : null, `${ctx.revision}-${tick}`)
+  const people = financeRows(contacts.data)
+  const options = selected && !people.some(person => person.id === selected.id) ? [selected, ...people] : people
+  const act = async (path, body) => { try { await action.run('/finance/employment/records', body); setTick(value => value + 1); return true } catch { return false } }
+  return h('div', { className: 'sf-stack' },
+    h('p', { className: 'sf-note' }, '按人员核对归属时间段；人员与记录每页20条，跨页保留已选人员。调岗登记会自动闭合旧归属，排序仅作用于当前页。'),
+    h('form', { className: 'sf-row', onSubmit: event => { event.preventDefault(); setKeyword(searchInput.trim()); setContactPage(1) } }, h(Field, { 'aria-label': '搜索归属人员', value: searchInput, maxLength: 100, placeholder: '姓名、手机号或邮箱', onChange: setSearchInput }), h(GhostButton, { type: 'submit' }, '搜索人员')),
+    h(FinanceResource, { resource: contacts }, h(SearchSelect, { 'aria-label': '选择人员', value: selected?.id || '', selectedLabel: selected?.name, options: options.map(person => [person.id, `${person.name}${person.systemUserId ? '' : '（未绑定）'}`]), onChange: id => { setSelected(options.find(person => person.id === id) || null); setPage(1) }, placeholder: '选择人员' }), h(Pager, { page: contactPage, total: contacts.data?.total, limit: 20, onPage: setContactPage })),
+    h(Notice, null, action.notice),
+    !selected ? h('p', null, '请先选择人员') : !selected.systemUserId ? h('p', null, '该人员尚未绑定系统身份，请先核对组织通讯录。') : h(FinanceResource, { resource: records }, h(EmploymentCard, { employments: records.data, page, onPage: setPage, userName: selected.name, busy: contacts.loading || Boolean(contacts.error), t, onDialog: () => setOpen(true), onRetry: records.retry })),
+    open ? h(EmploymentDialog, { contacts: [selected], initialUserId: selected.systemUserId, departments: ctx.departments, busy: action.busy, t, act, onClose: () => setOpen(false) }) : null)
 }

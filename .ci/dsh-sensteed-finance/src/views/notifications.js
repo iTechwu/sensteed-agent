@@ -1,7 +1,7 @@
 function NotificationsView({ ctx, onDrill }) {
-  const [category, setCategory] = useState('ACTION_REQUIRED')
-  const [unread, setUnread] = useState(false)
-  const [page, setPage] = useState(1)
+  const [category, setCategory] = useFinanceViewState(ctx, 'category', 'ACTION_REQUIRED')
+  const [unread, setUnread] = useFinanceViewState(ctx, 'unread', false)
+  const [page, setPage] = useFinanceViewState(ctx, 'page', 1)
   const action = useFinanceAction()
   const revision = `${ctx.revision}-${action.revision}`
   const list = useFinanceResource(`/finance/notifications?category=${category}&page=${page}&limit=20${unread ? '&unread=true' : ''}`, revision)
