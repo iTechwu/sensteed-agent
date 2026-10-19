@@ -43,6 +43,7 @@ window.__ModuleLoader__.load({
           emit({ status: 'ready', items: items.map(({ id, label, group }) => ({ id, label, ...(group ? { group } : {}) })), activeId })
         },
         clearSource() { select = null; leave = null; emit({ status: state.status === 'denied' ? 'denied' : 'loading', items: [], activeId: null }) },
+        unavailable() { if (state.status !== 'ready' && state.status !== 'denied') emit({ status: 'unavailable' }) },
         resume() { if (state.status === 'denied') emit({ status: 'loading' }) },
         select(id) { if (state.status !== 'ready' || !state.items.some(item => item.id === id) || !select) return false; select(id); return true },
         leave(action) { if (leave) leave(action); else action() },
@@ -66,7 +67,7 @@ window.__ModuleLoader__.load({
                 if (!response.ok || body.allowed !== true) throw new Error('access_unavailable')
                 if (onScope) onScope(body.scopeId); else bridge.adoptScope(body.scopeId)
                 bridge.resume(); setAllowed(true)
-              } catch { /* Transient outages retain the last confirmed same-identity permission. */ }
+              } catch { if (!disposed && generation === epoch) bridge.unavailable() }
               finally { pending = false; if (!disposed) timer = setTimeout(check, generation !== epoch ? 0 : 15000) }
             }
             const reset = () => { setAllowed(null); void check() }
@@ -90,11 +91,12 @@ window.__ModuleLoader__.load({
           const current = React.useSyncExternalStore(bridge.subscribe, bridge.getSnapshot, bridge.getSnapshot)
           const menu = React.useRef(null)
           React.useEffect(() => bridge.attach(), [])
+          React.useEffect(() => { if (current.status !== 'loading') return; const timer = setTimeout(() => bridge.unavailable(), 10000); return () => clearTimeout(timer) }, [current.status])
           React.useEffect(() => { if (menu.current) menu.current.scrollTop = menuScroll }, [current.status])
           React.useEffect(() => registerLeaveGuard(action => bridge.leave(action)), [registerLeaveGuard])
           React.useEffect(() => { if (current.status === 'denied') onAccessDenied() }, [current.status, onAccessDenied])
           const h = React.createElement
-          if (current.status !== 'ready') return h('p', { role: 'status', className: 'sensteedBusinessNavigationStatus' }, current.status === 'denied' ? '当前模块不可访问' : '正在加载导航…')
+          if (current.status !== 'ready') return h('p', { role: 'status', className: 'sensteedBusinessNavigationStatus' }, current.status === 'denied' ? '当前模块不可访问' : current.status === 'unavailable' ? '暂时无法加载导航，请在工作区重新连接。' : '正在加载导航…')
           let group
           return h('nav', { ref: menu, onScroll: event => { menuScroll = event.currentTarget.scrollTop }, className: 'sensteedBusinessNavigation', 'aria-label': '业务导航' }, ...current.items.flatMap(item => {
             const heading = item.group && item.group !== group ? h('h3', { key: `group-${item.group}` }, item.group) : null

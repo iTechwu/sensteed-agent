@@ -10,7 +10,7 @@ export function installDesktopNavigationStyles(): () => void {
 .sensteedNavigationFrame[data-navigation-platform="darwin"] > .sensteedModuleRail { padding-top:52px; }
 .sensteedNavigationFrame[data-navigation-platform="win32"] > .sensteedModuleRail { padding-top:40px; }
 .sensteedModuleRail [role="tooltip"] { display:none !important; }
-.sensteedRailTooltip { position:fixed; z-index:10000; transform:translateY(-50%); pointer-events:none; max-width:min(280px,calc(100vw - 68px)); overflow-wrap:anywhere; padding:6px 10px; border-radius:7px; border:1px solid var(--dsw-alias-border-l1); background:var(--dsw-alias-bg-layer-2); color:var(--dsw-alias-label-primary); font-size:12px; }
+.sensteedRailTooltip { position:fixed; z-index:10000; transform:translateY(-50%); pointer-events:none; max-width:min(280px,calc(100vw - 68px)); overflow-wrap:anywhere; padding:6px 10px; border-radius:7px; border:1px solid var(--dsw-alias-border-l1); background:#292a2d; color:#fff; font-size:12px; line-height:18px; box-shadow:0 2px 8px #0002; }
 .sensteedModuleBrand { height:40px; display:grid; place-items:center; margin-bottom:10px; }
 .sensteedModuleBrand img { width:24px; height:24px; object-fit:contain; }
 .sensteedModuleScroll { width:40px; flex:1; min-height:0; overflow-y:auto; scrollbar-width:none; }
@@ -34,10 +34,12 @@ body .sensteedNavigationFrame .sensteedModuleRail [data-slot="sidebar.footer.act
 .sensteedModuleButton,.sensteedBusinessNavigation button { transition:background-color 150ms ease,color 150ms ease; }
 @media(prefers-reduced-motion:reduce) { .sensteedModuleButton,.sensteedBusinessNavigation button { transition:none; } }
 .sensteedContextSidebar { --dsh-sidebar-inline-padding:12px; box-sizing:border-box; height:100%; min-height:0; display:flex; flex-direction:column; padding:12px; background:var(--dsw-alias-bg-layer-1); }
+.sensteedContextSidebar[data-preview] { position:fixed; z-index:9000; left:52px; top:44px; bottom:8px; height:auto; width:304px; border:1px solid var(--dsw-alias-border-l1); border-radius:12px; box-shadow:0 8px 28px #0002; }
+.sensteedContextSidebar { font-size:14px; line-height:20px; font-weight:400; }
 .sensteedContextSidebar[hidden],.sensteedContextHome[hidden] { display:none; }
 .sensteedBusinessNavigation { overflow-y:auto; min-height:0; padding:0 4px 12px; }
 .sensteedBusinessNavigation h3,.sensteedContextGroup { font-size:12px; color:var(--dsw-alias-label-secondary); margin:18px 8px 6px; font-weight:500; }
-.sensteedBusinessNavigation button { display:block; width:100%; min-height:34px; border:0; border-radius:8px; padding:7px 10px; background:transparent; color:inherit; text-align:left; cursor:pointer; font:inherit; }
+.sensteedBusinessNavigation button { display:block; width:100%; min-height:34px; border:0; border-radius:8px; padding:7px 10px; background:transparent; color:inherit; text-align:left; cursor:pointer; font:inherit; font-size:14px; line-height:20px; font-weight:400; }
 .sensteedBusinessNavigation button:hover,.sensteedBusinessNavigation button[aria-current="page"] { background:var(--dsw-alias-bg-layer-2); }
 .sensteedBusinessNavigation small { display:block; margin-top:4px; color:var(--dsw-alias-label-secondary); font-size:11px; }
 .sensteedBusinessNavigation button svg { vertical-align:middle; margin-right:6px; }

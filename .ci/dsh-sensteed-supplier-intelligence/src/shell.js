@@ -54,6 +54,7 @@ function Workbench() {
   }
   useEffect(() => {
     if (access === true) bridge.publish(TABS.map(([id, label]) => ({ id, label })), tab, id => { setError(''); setTab(id) })
+    else if (access === false && bridge.accessUnavailable(accessReason)) bridge.unavailable()
     else if (access === false && !bridge.accessUnavailable(accessReason) && bridge.getSnapshot().status !== 'denied') bridge.invalidate()
   })
   useEffect(() => () => bridge.clearSource(), [])
@@ -83,9 +84,9 @@ function accessMessage(reason) {
     plugin_disabled: '供应商风险插件已关闭，请在插件设置中启用后重试。',
     entitlement_required: '当前账号未获得供应链数据权限，请联系管理员开通。',
     credential_unavailable: '本机 Models 凭据不可用，请重新登录后重试。',
-    supply_chain_unavailable: '供应链 MCP 当前未连接，请稍后重试。',
+    supply_chain_unavailable: '供应链数据服务尚未连接。请确认网络后重新连接；若仍不可用，请在插件页面核对连接状态。',
     connection_unavailable: '本地工作台连接失败，请重新连接。',
-  }[reason] || '当前插件、凭据或供应链 MCP 暂不可用。'
+  }[reason] || '供应链工作台暂不可用，请重新连接或核对当前登录身份。'
 }
 
 function setSelected(value, name = '') {
