@@ -54,7 +54,7 @@ function Workbench() {
   }
   useEffect(() => {
     if (access === true) bridge.publish(TABS.map(([id, label]) => ({ id, label })), tab, id => { setError(''); setTab(id) })
-    else if (access === false && bridge.getSnapshot().status !== 'denied') bridge.invalidate()
+    else if (access === false && !bridge.accessUnavailable(accessReason) && bridge.getSnapshot().status !== 'denied') bridge.invalidate()
   })
   useEffect(() => () => bridge.clearSource(), [])
   if (access === null) return h('main', { className: 'sr-page', role: 'status' }, '正在连接供应链工作台…')
@@ -562,4 +562,4 @@ function FooterButton({ wide, t, onOpen }) {
 exports.apply = apply
 exports.inject = ['slots', 'locale', 'sessions', 'uiWorkspace', 'layout']
 
-function SupplierPage() { const { allowed, epoch } = supplierNavigation().useAccess(`${BASE}/access`, adoptScope); return allowed === true ? h(Workbench, { key: epoch }) : h('p', { role: 'status' }, allowed === false ? '当前模块不可访问' : '正在确认访问权限…') }
+function SupplierPage() { const { allowed, epoch } = supplierNavigation().useAccess(`${BASE}/access`, adoptScope); return allowed !== false ? h(Workbench, { key: epoch }) : h('p', { role: 'status' }, '当前模块不可访问') }
