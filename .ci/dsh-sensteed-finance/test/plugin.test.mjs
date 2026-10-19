@@ -5,7 +5,9 @@ import test from 'node:test'
 const root = new URL('../', import.meta.url)
 const planMonths = new Function(await readFile(new URL('src/navigation.js', root), 'utf8') + '\nreturn financePlanMonths')()
 
+const guardSource = (await readFile(new URL('src/workflows.js', root), 'utf8')).split('let financeNavigationGlobal = null')[1].split('function FinanceFormDialog')[0]
 function clientHarness(source, componentName, overrides = {}) {
+  if (['AssignmentDialog', 'FilingExcelDraft', 'BudgetFilingExcel'].includes(componentName) && !source.includes('function useFinanceFormExit')) source = 'let financeNavigationGlobal = null' + guardSource + '\n' + source
   const state = []
   const effects = []
   let cursor = 0
@@ -36,6 +38,7 @@ function clientHarness(source, componentName, overrides = {}) {
     window: { innerWidth: 1024, innerHeight: 768, addEventListener() {}, removeEventListener() {} },
     requestAnimationFrame: callback => callback(),
     financePlanMonths: planMonths,
+    financeDesktopNavigation: () => ({ recall: () => null }),
     yearOptions: () => [['2026', '2026']],
     budgetVersionLabel: version => version.name,
     PLAN_TYPES: [], EXPENSE_TYPES: [], ConfiguredBudgetEntry() {}, BudgetSaveReceipt() {}, FilingExcelDraft() {},
@@ -225,7 +228,7 @@ test('matrix and detail tables expose sortable raw values for formatted finance 
 })
 
 test('finance enum codes are translated at every user-facing selector and data-center table', async () => {
-  const files = ['src/head.js', 'src/workflows.js', 'src/views/budget.js', 'src/views/cash.js', 'src/views/datacenter.js']
+  const files = ['src/head.js', 'src/desktop-navigation.js', 'src/workflows.js', 'src/views/budget.js', 'src/views/cash.js', 'src/views/datacenter.js']
   const source = (await Promise.all(files.map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
   assert.match(source, /bizSystem:\s*'业务系统'/)
   assert.match(source, /docType:\s*'单据类型'/)
@@ -624,15 +627,15 @@ test('entry lists distinguish loading, empty, and failed requests with retry act
 })
 
 test('client preserves HTTP status so member permission failures are distinguished from network errors', async () => {
-  const head = await readFile(new URL('src/head.js', root), 'utf8')
+  const head = ((await readFile(new URL('src/desktop-navigation.js', root), 'utf8')) + '\n' + (await readFile(new URL('src/head.js', root), 'utf8')))
   const requestSource = head.slice(head.indexOf('async function api('), head.indexOf('// One idempotency key'))
   const workflows = await readFile(new URL('src/workflows.js', root), 'utf8')
   const financeErrorText = new Function(workflows + '\nreturn financeErrorText')()
-  const read = new Function('fetch', 'AbortSignal', 'BASE', 'REQUEST_TIMEOUT_MS', 'financeErrorText', requestSource + '\nreturn api')
+  const read = new Function('fetch', 'AbortSignal', 'BASE', 'REQUEST_TIMEOUT_MS', 'financeErrorText', 'financeDesktopNavigation', requestSource + '\nreturn api')
   const response = status => ({ ok: status === 200, status, json: async () => status === 200 ? { data: { list: [] } } : { error: 'permission_denied' } })
-  const denied = read(async () => response(403), { timeout: () => undefined }, '/finance', 30000, financeErrorText)
+  const denied = read(async () => response(403), { timeout: () => undefined, any: () => undefined }, '/finance', 30000, financeErrorText, () => ({ epoch: 0, signal: undefined }))
   await assert.rejects(denied('/members'), error => error.status === 403 && error.message.includes('权限'))
-  const unavailable = read(async () => response(503), { timeout: () => undefined }, '/finance', 30000, financeErrorText)
+  const unavailable = read(async () => response(503), { timeout: () => undefined, any: () => undefined }, '/finance', 30000, financeErrorText, () => ({ epoch: 0, signal: undefined }))
   await assert.rejects(unavailable('/members'), error => error.status === 503)
 
   const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/members.js', root), 'utf8')
@@ -834,7 +837,7 @@ async function invokeRoute(route, method, url, body, headers = {}) {
 
 // 客户端片段清单（与 scripts/build.mjs 的 FILES 保持一致；顺序即依赖顺序）
 const CLIENT_FILES = [
-  'src/head.js', 'src/format.js', 'src/components.js', 'src/styles.js', 'src/workflows.js', 'src/navigation.js', 'src/permission-catalog.js',
+  'src/head.js', 'src/desktop-navigation.js', 'src/format.js', 'src/components.js', 'src/styles.js', 'src/workflows.js', 'src/navigation.js', 'src/permission-catalog.js',
   'src/views/overview.js', 'src/views/budget.js', 'src/views/operations.js', 'src/views/cash.js',
   'src/views/alerts.js', 'src/views/datacenter.js', 'src/views/entry.js', 'src/views/configured-entry.js', 'src/views/analyze.js',
   'src/views/bom.js', 'src/views/notifications.js', 'src/views/permissions.js', 'src/views/members.js', 'src/views/review.js', 'src/views/sources.js', 'src/views/comparisons.js', 'src/views/facts.js', 'src/views/engine.js', 'src/views/filing.js',
@@ -1631,7 +1634,7 @@ test('cash viewers cannot schedule, increase or backfill plans', async () => {
 
 
 test('expense and payment type options have translated labels in both locales', async () => {
-  const head = await readFile(new URL('src/head.js', root), 'utf8')
+  const head = ((await readFile(new URL('src/desktop-navigation.js', root), 'utf8')) + '\n' + (await readFile(new URL('src/head.js', root), 'utf8')))
   const constants = head.slice(head.indexOf('const EXPENSE_TYPES'), head.indexOf('const LEDGER_LIMIT'))
   const dictionary = head.slice(head.indexOf('const copy ='), head.indexOf('\n// ---- 打开/关闭状态'))
   const { expenses, plans, copy } = new Function(constants + '\n' + dictionary + '\nreturn { expenses: EXPENSE_TYPES, plans: PLAN_TYPES, copy }')()
@@ -1759,7 +1762,7 @@ test('empty backfill offers creation for the selected plan type', async () => {
 })
 
 test('direct-entry amounts render business labels rather than unresolved translation keys', async () => {
-  const head = await readFile(new URL('src/head.js', root), 'utf8')
+  const head = ((await readFile(new URL('src/desktop-navigation.js', root), 'utf8')) + '\n' + (await readFile(new URL('src/head.js', root), 'utf8')))
   const dictionary = head.slice(head.indexOf('const copy ='), head.indexOf('\n// ---- 打开/关闭状态'))
   const copy = new Function(dictionary + '\nreturn copy')()
   const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/workflows.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/members.js', root), 'utf8')
@@ -1774,7 +1777,7 @@ test('direct-entry amounts render business labels rather than unresolved transla
 })
 
 test('cash plan columns translate actual, remaining and variance amounts', async () => {
-  const head = await readFile(new URL('src/head.js', root), 'utf8')
+  const head = ((await readFile(new URL('src/desktop-navigation.js', root), 'utf8')) + '\n' + (await readFile(new URL('src/head.js', root), 'utf8')))
   const copy = new Function(head.slice(head.indexOf('const copy ='), head.indexOf('\n// ---- 打开/关闭状态')) + '\nreturn copy')()
   const source = (await Promise.all(['src/components.js', 'src/format.js', 'src/views/cash.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
   for (const [component, props, expected] of [
@@ -1827,8 +1830,8 @@ test('entry blocks unconfirmed text and clears the warning once a value is confi
 test('business links retain the filing destination, task and year rather than landing on direct entry', async () => {
   const source = await readFile(new URL('src/navigation.js', root), 'utf8')
   const resolve = new Function(source + '\nreturn financeBusinessDestination')()
-  assert.deepEqual(resolve('/zh-CN/data-entry?tab=tasks&task=task-1&year=2027'), { tab: 'filing', params: { section: 'assignments', taskId: 'task-1', year: '2027' } })
-  assert.deepEqual(resolve('/filing/records?task=task-2&year=2026'), { tab: 'filing', params: { section: 'mine', taskId: 'task-2', year: '2026' } })
+  assert.deepEqual(resolve('/zh-CN/data-entry?tab=tasks&task=11111111-1111-4111-8111-111111111111&year=2027'), { tab: 'filing', params: { section: 'assignments', taskId: '11111111-1111-4111-8111-111111111111', year: '2027' } })
+  assert.deepEqual(resolve('/filing/records?task=22222222-2222-4222-8222-222222222222&year=2026'), { tab: 'filing', params: { section: 'mine', taskId: '22222222-2222-4222-8222-222222222222', year: '2026' } })
   assert.deepEqual(resolve('/budget/comparison/monthly-roll?year=2025'), { tab: 'comparisons', params: { mode: 'monthly', year: '2025' } })
   assert.equal(resolve('/budget/comparison/yearly').params.mode, 'yearly')
   assert.equal(resolve('/budget/comparison/versions').params.mode, 'versions')
@@ -2921,7 +2924,7 @@ test('filing Excel applies a validated preview only to the editor and never writ
   clientNodes(tree).find(node => node.props.type === 'file').props.onChange({ target: { files: [{ name: 'draft.xlsx', size: 10 }], value: 'draft.xlsx' } })
   await new Promise(resolve => setImmediate(resolve))
   tree = harness.render(props)
-  clientNodes(tree).find(node => node.children.includes('确认替换当前编辑内容')).props.onClick()
+  clientNodes(tree).find(node => node.children.includes('替换当前编辑行（1 行）')).props.onClick()
   assert.deepEqual(applied, [preview.rows])
   assert.deepEqual(writes, [{ path: '/finance/filing/assignments/a1/excel-preview', method: 'POST' }])
 })
@@ -3503,4 +3506,83 @@ test('complete policy field errors locate scope rows and protect dirty changes a
   control('配置对象').props.onChange('USER');nodes().find(node=>node.children.includes('继续编辑')).props.onClick();assert.equal(control('配置对象').props.value,'ROLE')
   control('配置对象').props.onChange('USER');nodes().find(node=>node.children.includes('放弃修改并继续')).props.onClick();assert.equal(control('配置对象').props.value,'USER')
   render().props.onClose();assert.equal(closed,1,'new subject starts from a clean baseline')
+})
+
+
+test('filing never silently drops partially entered rows and validates draft dimensions', async () => {
+  const source = (await Promise.all(['src/components.js', 'src/views/entry.js', 'src/views/members.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  for (const row of [{ costItemId: 'c1', month: 10, description: '不可丢失', plannedAmount: '' }, { month: 13, plannedAmount: '10' }, { month: 10, plannedAmount: '-1' }, { month: 10, plannedAmount: '20', description: '字'.repeat(501) }]) {
+    const writes = [], harness = clientHarness(source, 'AssignmentDialog')
+    const props = { assignment: { id: 'a', status: 'DRAFT', task: { status: 'OPEN', month: 10 }, rows: [row] }, t: key => key, onClose() {}, act: async (...args) => { writes.push(args); return true } }
+    let tree = harness.render(props)
+    await tree.props.footer.find(node => node?.props.key === 'save').props.onClick()
+    assert.equal(writes.length, 0, JSON.stringify(row))
+    tree = harness.render(props)
+    assert.ok(clientNodes(tree).some(node => node.props.role === 'alert'))
+  }
+})
+
+test('filing links reject an invalid explicit activity instead of showing unrelated records', async () => {
+  const resolve = new Function(await readFile(new URL('src/navigation.js', root), 'utf8') + '\nreturn financeBusinessDestination')()
+  for (const path of ['/filing/tasks', '/filing/department', '/filing/records', '/filing/activities', '/data-entry?tab=tasks']) {
+    for (const task of ['', 'broken', 'all', 'primary']) assert.equal(resolve(path + (path.includes('?') ? '&' : '?') + 'task=' + task), null)
+  }
+})
+
+test('assignment dirty close keeps input until discard is confirmed', async () => {
+  const source = (await Promise.all(['src/components.js', 'src/views/entry.js', 'src/views/members.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  const harness = clientHarness(source, 'AssignmentDialog')
+  let closed = 0
+  const props = { assignment: { id: 'a', status: 'DRAFT', task: { status: 'OPEN', month: 10 }, rows: [] }, t: key => key, onClose: () => closed++, act: async () => false }
+  let tree = harness.render(props)
+  clientNodes(tree).find(node => node.type?.name === 'Field' && node.props.inputMode === 'decimal').props.onChange('33.50')
+  tree = harness.render(props); tree.props.onClose(); tree = harness.render(props)
+  assert.equal(closed, 0)
+  assert.ok(clientNodes(tree).some(node => node.children.includes('有尚未保存的修改。离开后这些内容将丢失。')))
+  clientNodes(tree).find(node => node.children.includes('继续编辑')).props.onClick()
+  tree = harness.render(props)
+  assert.equal(clientNodes(tree).find(node => node.type?.name === 'Field' && node.props.inputMode === 'decimal').props.value, '33.50')
+  tree.props.onClose(); tree = harness.render(props)
+  clientNodes(tree).find(node => node.children.includes('放弃修改并关闭')).props.onClick()
+  assert.equal(closed, 1)
+})
+
+test('advanced budget parameters preload selected assumptions and retain monthly outflows on save', async () => {
+  const source = await readFile(new URL('src/views/engine.js', root), 'utf8')
+  const { draft, body } = new Function(source + '\nreturn { draft: financeEngineParameterDraft, body: financeEngineParameterBody }')()
+  const selected = { params: { openingBalance: 1200, safetyLine: 80, monthlyOutflows: [{ year: 2027, month: 1, amount: 900 }], tax: { outputRate: .13, inputRate: .06 }, formulaOption: 'preserve' }, sourceRef: '经营测算', note: '已核对' }
+  const initial = draft(selected, [{ version: 'P3' }])
+  assert.equal(initial.version, 'P4')
+  assert.deepEqual(initial.params, selected.params)
+  initial.params.monthlyOutflows[0].amount = 1
+  assert.equal(selected.params.monthlyOutflows[0].amount, 900)
+  const saved = body(selected, { version: 'P4', params: { openingBalance: 1500, safetyLine: 80 } })
+  assert.equal(saved.params.monthlyOutflows[0].amount, 900)
+  assert.equal(saved.params.formulaOption, 'preserve')
+  assert.equal(saved.params.tax, null, 'cleared optional group is removed explicitly like the web')
+})
+test('month and year fields reject fractional numbers before submitting advanced budget rows', async () => {
+  const validate = new Function(await readFile(new URL('src/workflows.js', root), 'utf8') + '\nreturn financeFormErrors')()
+  assert.ok(validate([{ key: 'month', label: '月份', type: 'number', min: 1, max: 12, integer: true }], { month: 1.5 }).month)
+  assert.deepEqual(validate([{ key: 'month', label: '月份', type: 'number', min: 1, max: 12, integer: true }], { month: 10 }), {})
+})
+
+test('monthly outflow edits create the next parameter batch and preserve prior tax assumptions', async () => {
+  const source = (await Promise.all(['src/components.js', 'src/format.js', 'src/views/engine.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  const writes = [], parameter = { id: 'p3', version: 'P3', params: { openingBalance: 100, safetyLine: 10, tax: { outputRate: .13, inputRate: .06 }, monthlyOutflows: [] } }
+  const harness = clientHarness(source, 'EngineView', {
+    useFinanceAction: () => ({ revision: 0, run: async (...args) => { writes.push(args); return {} } }),
+    useFinanceResource: path => ({ data: { list: path?.includes('/versions?') ? [{ id: 'v1', name: '草稿', status: 'DRAFT' }] : path?.endsWith('/params') ? [parameter] : [] } }),
+    financeRows: data => data?.list || [], financeColumns: () => [], financeDisplayValue: value => value,
+    FinanceResource() {}, FinanceRowsDialog() {}, FinanceFormDialog() {}, FinanceEvidence() {}, Notice() {},
+  })
+  const props = { ctx: { year: '2027', permissions: ['budget.version.manage'], financeWriter: true, orgs: [] } }
+  let tree = harness.render(props)
+  clientNodes(tree).find(node => node.children.includes('维护月度支出')).props.onClick()
+  tree = harness.render(props)
+  const dialog = clientNodes(tree).find(node => node.type?.name === 'FinanceRowsDialog')
+  await dialog.props.onSubmit([{ year: 2027, month: 1, amount: 900 }])
+  assert.equal(writes[0][1].version, 'P4')
+  assert.deepEqual(writes[0][1].params.tax, parameter.params.tax)
+  assert.equal(parameter.params.monthlyOutflows.length, 0)
 })

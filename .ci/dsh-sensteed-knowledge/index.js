@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 const MCP_URL = 'https://ai.hozonauto.com/mcp/knowledge'
 const REQUEST_TIMEOUT_MS = 30000
 const KNOWLEDGE_PERMISSION_VERSION = 1
@@ -230,6 +231,8 @@ const KNOWLEDGE_ROUTING_PROMPT = [
 export function apply(ctx, overrides = {}) {
   const fetchImpl = overrides.fetch || globalThis.fetch
   const disposers = []
+  let navigationCredential, navigationScopeId
+  const navigationScope = credential => { if (credential !== navigationCredential) { navigationCredential = credential; navigationScopeId = randomUUID() } return navigationScopeId }
   const accessState = () => {
     const access = typeof ctx.get === 'function' ? ctx.get('dofeAccess') : ctx.dofeAccess
     return typeof access === 'function' ? access() : access
@@ -299,10 +302,12 @@ export function apply(ctx, overrides = {}) {
         const credential = await resolveModelsKey(ctx)
         if (req.method === 'GET') {
           const permission = resolveKnowledgePermission('knowledge.overview', accessState())
+          if (new URL(req.url || '/', 'http://localhost').searchParams.has('access')) return sendJson(res, 200, { ok: true, allowed: Boolean(credential && permission.allowed), scopeId: navigationScope(credential) })
           const contract = permission.allowed
             ? await loadKnowledgeContract(fetchImpl, credential)
             : { status: 'forbidden', reason: permission.reason }
           sendJson(res, 200, {
+            scopeId: navigationScope(credential),
             status: credential && permission.allowed ? 'ready' : credential ? 'degraded' : 'unavailable',
             mcp: { route: MCP_URL, auth: credential ? 'credential-store' : 'missing' },
             permissionVersion: KNOWLEDGE_PERMISSION_VERSION,

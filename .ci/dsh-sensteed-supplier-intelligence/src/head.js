@@ -10,6 +10,7 @@ const TABS = [
   ['media', '媒体舆情'], ['business', '业务影响'], ['weekly', '风险周报'],
 ]
 let selectedSupplier = ''
+let selectedSupplierName = ''
 let selectedEvidence = ''
 let selectedEvidenceKind = ''
 let selectedEvidenceEventId = ''
@@ -18,9 +19,11 @@ const panelMemory = Object.create(null)
 
 function adoptScope(scopeId) {
   if (typeof scopeId !== 'string' || !scopeId || scopeId === currentScopeId) return
+  supplierNavigation().adoptScope(scopeId)
   const hadScope = Boolean(currentScopeId)
   currentScopeId = scopeId
   selectedSupplier = ''
+  selectedSupplierName = ''
   selectedEvidence = ''
   selectedEvidenceKind = ''
   selectedEvidenceEventId = ''
@@ -29,14 +32,16 @@ function adoptScope(scopeId) {
 }
 
 async function api(action, args = {}, signal) {
+  const bridge = supplierNavigation(), epoch = bridge.epoch
   const response = await fetch(`${BASE}/call`, {
     method: 'POST', credentials: 'same-origin', redirect: 'error',
     headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
     body: JSON.stringify({ action, args }),
-    signal: AbortSignal.any([AbortSignal.timeout(REQUEST_TIMEOUT_MS), ...(signal ? [signal] : [])]),
+    signal: AbortSignal.any([AbortSignal.timeout(REQUEST_TIMEOUT_MS), bridge.signal, ...(signal ? [signal] : [])]),
   })
   const body = await response.json().catch(() => null)
   if (!response.ok || body?.ok !== true) throw new Error(body?.error || `http_${response.status}`)
+  if (epoch !== bridge.epoch) throw new DOMException('Stale identity response', 'AbortError')
   adoptScope(body.scopeId)
   return body.data
 }
@@ -81,3 +86,6 @@ function errorText(error) {
   }
   return map[error?.message] || `加载或保存失败（${error?.message || '未知错误'}）`
 }
+
+let supplierNavigationBridge
+function supplierNavigation() { return supplierNavigationBridge ||= createDesktopNavigationBridge(React) }

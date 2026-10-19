@@ -42,6 +42,8 @@ export function apply(ctx, overrides = {}) {
   const fetchImpl = overrides.fetch || globalThis.fetch
   const now = overrides.now || (() => new Date())
   let accessCache
+  let navigationScopeKey, navigationScopeId
+  const navigationScope = config => { const key = JSON.stringify([config.tenantId, config.operatorId, config.token]); if (key !== navigationScopeKey) { navigationScopeKey = key; navigationScopeId = randomUUID() } return navigationScopeId }
 
   const resolveWorkspaceAccess = async config => {
     const cacheKey = `${config.token}\0${config.tenantId}`
@@ -163,12 +165,12 @@ export function apply(ctx, overrides = {}) {
       if (allowed === undefined) return sendJson(res, 503, { ok: false, error: '财务权限服务暂不可用，请稍后重试。' })
       const permission = new URL(req.url, rendererOrigin).searchParams.get('permission')
       if (sub === '/access' && permission) {
-        if (!allowed) return sendJson(res, 200, { ok: true, allowed: false })
+        if (!allowed) return sendJson(res, 200, { ok: true, allowed: false, scopeId: navigationScope(config) })
         const result = await financeApiCall(fetchImpl, config, 'finance_get_permissions', {}, now(), ctx.logger)
         if (!result.ok || !Array.isArray(result.data?.permissions)) return sendJson(res, 503, { ok: false, error: '财务功能权限服务暂不可用，请稍后重试。' })
-        return sendJson(res, 200, { ok: true, allowed: result.data.permissions.includes(permission) })
+        return sendJson(res, 200, { ok: true, allowed: result.data.permissions.includes(permission), scopeId: navigationScope(config) })
       }
-      if (sub === '/access') return sendJson(res, 200, { ok: true, allowed })
+      if (sub === '/access') return sendJson(res, 200, { ok: true, allowed, scopeId: navigationScope(config) })
       if (!allowed) {
         ctx.logger?.info?.(`sensteed finance: ${req.method} ${sub} rejected — finance workspace access denied`)
         return sendJson(res, 403, { ok: false, error: '当前账号没有财务团队权限，无法使用财务管理。' })

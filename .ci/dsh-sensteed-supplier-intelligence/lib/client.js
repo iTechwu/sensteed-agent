@@ -13,6 +13,7 @@ window.__ModuleLoader__.load({
       ['media', '媒体舆情'], ['business', '业务影响'], ['weekly', '风险周报'],
     ]
     let selectedSupplier = ''
+    let selectedSupplierName = ''
     let selectedEvidence = ''
     let selectedEvidenceKind = ''
     let selectedEvidenceEventId = ''
@@ -21,9 +22,11 @@ window.__ModuleLoader__.load({
 
     function adoptScope(scopeId) {
       if (typeof scopeId !== 'string' || !scopeId || scopeId === currentScopeId) return
+      supplierNavigation().adoptScope(scopeId)
       const hadScope = Boolean(currentScopeId)
       currentScopeId = scopeId
       selectedSupplier = ''
+      selectedSupplierName = ''
       selectedEvidence = ''
       selectedEvidenceKind = ''
       selectedEvidenceEventId = ''
@@ -32,14 +35,16 @@ window.__ModuleLoader__.load({
     }
 
     async function api(action, args = {}, signal) {
+      const bridge = supplierNavigation(), epoch = bridge.epoch
       const response = await fetch(`${BASE}/call`, {
         method: 'POST', credentials: 'same-origin', redirect: 'error',
         headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, args }),
-        signal: AbortSignal.any([AbortSignal.timeout(REQUEST_TIMEOUT_MS), ...(signal ? [signal] : [])]),
+        signal: AbortSignal.any([AbortSignal.timeout(REQUEST_TIMEOUT_MS), bridge.signal, ...(signal ? [signal] : [])]),
       })
       const body = await response.json().catch(() => null)
       if (!response.ok || body?.ok !== true) throw new Error(body?.error || `http_${response.status}`)
+      if (epoch !== bridge.epoch) throw new DOMException('Stale identity response', 'AbortError')
       adoptScope(body.scopeId)
       return body.data
     }
@@ -85,31 +90,152 @@ window.__ModuleLoader__.load({
       return map[error?.message] || `加载或保存失败（${error?.message || '未知错误'}）`
     }
 
+    let supplierNavigationBridge
+    function supplierNavigation() { return supplierNavigationBridge ||= createDesktopNavigationBridge(React) }
+
+    /** Build-time shared source, inlined into each plugin. No loader/package entry. */
+    function createDesktopNavigationBridge(React) {
+      let state = Object.freeze({ status: 'loading', items: [], activeId: null, page: 'overview', attached: false, epoch: 0 })
+      let scope = null, route = null, select = null, leave = null, epoch = 0, attached = 0
+      let menuScroll = 0
+      const fields = new Map()
+      let controller = new AbortController()
+      const listeners = new Set()
+      const emit = patch => {
+        const next = { ...state, ...patch }
+        if (JSON.stringify(next) === JSON.stringify(state)) return
+        state = Object.freeze(next)
+        for (const listener of listeners) listener()
+      }
+      const bridge = {
+        subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener) },
+        getSnapshot: () => state,
+        get signal() { return controller.signal },
+        get epoch() { return epoch },
+        remember(value) { if (state.status === 'ready') route = value },
+        recall: () => route,
+        adoptScope(value) {
+          if (typeof value !== 'string' || !value || value === scope) return false
+          const changed = scope !== null
+          scope = value
+          if (changed) bridge.invalidate('loading')
+          return changed
+        },
+        invalidate(status = 'denied') {
+          controller.abort(); controller = new AbortController(); epoch++
+          route = null; select = null; leave = null; menuScroll = 0; fields.clear()
+          emit({ status, items: [], activeId: null, page: 'overview', epoch })
+        },
+        publish(items, activeId, navigate, guard) {
+          if (state.status === 'denied') return
+          select = navigate; leave = guard
+          emit({ status: 'ready', items: items.map(({ id, label, group }) => ({ id, label, ...(group ? { group } : {}) })), activeId })
+        },
+        clearSource() { select = null; leave = null; emit({ status: state.status === 'denied' ? 'denied' : 'loading', items: [], activeId: null }) },
+        resume() { if (state.status === 'denied') emit({ status: 'loading' }) },
+        select(id) { if (state.status !== 'ready' || !state.items.some(item => item.id === id) || !select) return false; select(id); return true },
+        leave(action) { if (leave) leave(action); else action() },
+        attach() { attached++; emit({ attached: true }); return () => { attached--; emit({ attached: attached > 0 }) } },
+        useAccess(url, onScope) {
+          const [allowed, setAllowed] = React.useState(null)
+          const snapshot = React.useSyncExternalStore(bridge.subscribe, bridge.getSnapshot, bridge.getSnapshot)
+          React.useEffect(() => {
+            let disposed = false, pending = false, timer
+            const local = new AbortController()
+            const check = async () => {
+              if (disposed || pending) return
+              pending = true; clearTimeout(timer)
+              const generation = epoch
+              try {
+                const response = await fetch(url, { credentials: 'same-origin', redirect: 'error', signal: AbortSignal.any([local.signal, bridge.signal, AbortSignal.timeout(30000)]) })
+                const body = await response.json()
+                if (disposed || generation !== epoch) return
+                if (response.status === 401 || response.status === 403 || body.allowed === false) { setAllowed(false); bridge.invalidate(); return }
+                if (!response.ok || body.allowed !== true) throw new Error('access_unavailable')
+                if (onScope) onScope(body.scopeId); else bridge.adoptScope(body.scopeId)
+                bridge.resume(); setAllowed(true)
+              } catch { /* Transient outages retain the last confirmed same-identity permission. */ }
+              finally { pending = false; if (!disposed) timer = setTimeout(check, generation !== epoch ? 0 : 15000) }
+            }
+            const reset = () => { setAllowed(null); void check() }
+            const refresh = () => { void check() }
+            refresh(); window.addEventListener('focus', refresh); window.addEventListener('online', refresh); window.addEventListener('sensteed:identity-changed', reset)
+            return () => { disposed = true; clearTimeout(timer); local.abort(); window.removeEventListener('focus', refresh); window.removeEventListener('online', refresh); window.removeEventListener('sensteed:identity-changed', reset) }
+          }, [url, onScope])
+          return { allowed, epoch: snapshot.epoch }
+        },
+        useField(key, initial) {
+          const generation = epoch
+          const [value, setValue] = React.useState(() => fields.has(key) ? fields.get(key) : initial)
+          React.useEffect(() => { setValue(fields.has(key) ? fields.get(key) : initial) }, [generation, key])
+          return [value, next => { if (generation !== epoch) return; setValue(previous => { if (generation !== epoch) return previous; const resolved = typeof next === 'function' ? next(previous) : next; fields.set(key, resolved); return resolved }) }]
+        },
+        usePage() {
+          const current = React.useSyncExternalStore(bridge.subscribe, bridge.getSnapshot, bridge.getSnapshot)
+          return [current.page, value => { if (state.status === 'denied') return; if (state.items.length && !state.items.some(item => item.id === value)) return; emit({ page: value }) }, current.attached]
+        },
+        Menu({ onAccessDenied, registerLeaveGuard }) {
+          const current = React.useSyncExternalStore(bridge.subscribe, bridge.getSnapshot, bridge.getSnapshot)
+          const menu = React.useRef(null)
+          React.useEffect(() => bridge.attach(), [])
+          React.useEffect(() => { if (menu.current) menu.current.scrollTop = menuScroll }, [current.status])
+          React.useEffect(() => registerLeaveGuard(action => bridge.leave(action)), [registerLeaveGuard])
+          React.useEffect(() => { if (current.status === 'denied') onAccessDenied() }, [current.status, onAccessDenied])
+          const h = React.createElement
+          if (current.status !== 'ready') return h('p', { role: 'status', className: 'sensteedBusinessNavigationStatus' }, current.status === 'denied' ? '当前模块不可访问' : '正在加载导航…')
+          let group
+          return h('nav', { ref: menu, onScroll: event => { menuScroll = event.currentTarget.scrollTop }, className: 'sensteedBusinessNavigation', 'aria-label': '业务导航' }, ...current.items.flatMap(item => {
+            const heading = item.group && item.group !== group ? h('h3', { key: `group-${item.group}` }, item.group) : null
+            group = item.group
+            return [heading, h('button', { key: item.id, type: 'button', 'aria-current': current.activeId === item.id ? 'page' : undefined, onClick: () => bridge.select(item.id) }, item.label)].filter(Boolean)
+          }))
+        },
+      }
+      return bridge
+    }
+
     const css = `
+    /* Host theme tokens take precedence over OS appearance. */
+    .sr-page{--sr-bg:var(--dsw-alias-bg-base);--sr-text:var(--dsw-alias-label-primary,light-dark(#202a25,#eef3ef));--sr-muted:var(--dsw-alias-label-secondary,light-dark(#526159,#b2c0b7));--sr-border:var(--dsw-alias-border-l1,light-dark(#ccd6cf,#46554b));--sr-surface:var(--dsw-alias-bg-base,light-dark(#fff,#141817));--sr-soft:var(--dsw-alias-interactive-bg-hover,light-dark(#edf2ee,#263129));--sr-accent:light-dark(#21643e,#9dd9b3);--sr-error-bg:light-dark(#fff0ed,#3d2423);--sr-error-text:light-dark(#902b25,#ffc4be);color-scheme:inherit}
+
     .sr-launcher{box-sizing:border-box;display:flex;width:36px;height:36px;align-items:center;justify-content:center;gap:8px;border:0;border-radius:7px;background:transparent;color:var(--dsw-alias-label-primary);font:inherit;cursor:pointer}.sr-launcher:hover{background:var(--dsw-alias-interactive-bg-hover)}.sr-launcher:focus-visible{outline:2px solid var(--dsw-alias-brand-primary)}.sr-launcher.sr-wide{width:100%;height:34px;justify-content:flex-start;padding:0 10px;font-size:13px}
 
-    .sr-page{height:100%;min-height:0;overflow:auto;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);padding:24px clamp(16px,3vw,40px);font:14px/1.5 var(--dsh-font-sans,system-ui,sans-serif)}
-    .sr-header{display:flex;min-height:72px;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--dsw-alias-border-l1,var(--dsh-border,#dfe4df));padding:4px 0 20px}.sr-header h1{margin:2px 0;font-size:24px;line-height:1.2}.sr-header p{margin:0}.sr-eyebrow{color:#4a785c;font-size:11px;font-weight:700}.sr-subtitle,.sr-muted{color:var(--dsh-muted-foreground,#69716b)}.sr-tabs{display:flex;overflow:auto;gap:4px;border-bottom:1px solid var(--dsh-border,#dfe4df);margin-bottom:22px}.sr-tabs button{flex:0 0 auto;padding:12px 14px;border:0;border-bottom:2px solid transparent;background:transparent;color:inherit;font:inherit;cursor:pointer}.sr-tabs button[aria-current=page]{border-bottom-color:#27754a;color:#1f6840;font-weight:650}.sr-icon-button{display:grid;place-items:center;width:36px;height:36px;border:1px solid var(--dsh-border,#dfe4df);border-radius:6px;background:transparent;color:inherit;cursor:pointer}.sr-unread,.sr-unread-count{display:inline-grid;place-items:center;min-width:20px;height:20px;margin-left:7px;padding:0 5px;border-radius:10px;background:#b43c39;color:#fff;font-size:11px}.sr-content{max-width:1320px;margin:auto}.sr-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:22px}.sr-metric{display:grid;gap:4px;min-height:104px;align-content:center;padding:15px 18px;border:1px solid var(--dsh-border,#dfe4df);border-left:3px solid #43835a;border-radius:5px}.sr-metric span,.sr-metric small{color:var(--dsh-muted-foreground,#69716b)}.sr-metric strong{font-size:25px;font-variant-numeric:tabular-nums}.sr-metric small{font-size:11px}.sr-columns{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(280px,.8fr);gap:16px}.sr-section{min-width:0;padding:18px;border:1px solid var(--dsh-border,#dfe4df);border-radius:6px}.sr-section h2,.sr-section h3{margin:0;font-size:16px}.sr-list{display:grid;margin-top:12px}.sr-list-row{display:grid;grid-template-columns:auto minmax(0,1fr) minmax(110px,auto);align-items:center;gap:12px;width:100%;padding:12px 4px;border:0;border-bottom:1px solid var(--dsh-border,#e6e9e6);background:transparent;color:inherit;text-align:left;font:inherit;cursor:pointer}.sr-list-row>span:nth-child(2){display:grid;min-width:0}.sr-list-row small{overflow:hidden;color:var(--dsh-muted-foreground,#69716b);text-overflow:ellipsis;white-space:nowrap}.sr-list-row time,.sr-evidence time{color:var(--dsh-muted-foreground,#69716b);font-size:11px}.sr-status{display:inline-flex;width:max-content;align-items:center;padding:2px 7px;border:1px solid #c9d5ca;border-radius:4px;color:#3c6649;font-size:11px;white-space:nowrap}.sr-status[data-tone=candidate]{border-color:#e5d2a4;color:#84621b}.sr-source{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 12px;padding:12px 0;border-bottom:1px solid var(--dsh-border,#e6e9e6)}.sr-source small{grid-column:1/-1;color:var(--dsh-muted-foreground,#69716b)}.sr-source-note,.sr-footnote{color:var(--dsh-muted-foreground,#69716b);font-size:12px}.sr-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0 0 14px}.sr-toolbar h2{margin:0;font-size:17px}.sr-toolbar p{margin:3px 0}.sr-toolbar form{display:flex;gap:8px}.sr-search{display:flex;align-items:center;gap:8px;width:min(520px,50vw);padding:0 10px;border:1px solid var(--dsh-border,#dfe4df);border-radius:5px}.sr-search input{width:100%;min-width:0;height:36px;border:0;outline:0;background:transparent;color:inherit;font:inherit}.sr-button{min-height:36px;padding:7px 14px;border:1px solid #27754a;border-radius:5px;background:#27754a;color:#fff;font:inherit;font-weight:600;cursor:pointer}.sr-button:disabled{opacity:.55;cursor:wait}.sr-secondary{border-color:var(--dsh-border,#ccd4cd);background:transparent;color:inherit}.sr-link{padding:4px 7px;border:0;background:transparent;color:#176a40;font:inherit;cursor:pointer}.sr-select-label{display:flex;align-items:center;gap:8px;color:var(--dsh-muted-foreground,#69716b)}.sr-select-label select,.sr-field input,.sr-field textarea,.sr-field select{width:100%;min-width:0;padding:8px;border:1px solid var(--dsh-border,#dfe4df);border-radius:4px;background:var(--dsh-surface,#fff);color:inherit;font:inherit}.sr-table-wrap{overflow:auto;border:1px solid var(--dsh-border,#dfe4df);border-radius:5px}.sr-table{width:100%;border-collapse:collapse;white-space:nowrap}.sr-table th,.sr-table td{padding:10px 12px;border-bottom:1px solid var(--dsh-border,#e6e9e6);text-align:left}.sr-table th{background:var(--dsh-muted,#f5f7f5);color:var(--dsh-muted-foreground,#69716b);font-size:11px;font-weight:600}.sr-table tbody tr:last-child td{border-bottom:0}.sr-evidence-list{display:grid;gap:10px}.sr-evidence{padding:15px;border:1px solid var(--dsh-border,#dfe4df);border-radius:5px}.sr-evidence-head,.sr-evidence-meta,.sr-evidence-actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px}.sr-evidence-head{justify-content:space-between}.sr-evidence h3{margin:11px 0 4px;font-size:15px}.sr-evidence p{margin:0;color:var(--dsh-muted-foreground,#69716b)}.sr-evidence-meta{margin-top:12px;color:var(--dsh-muted-foreground,#69716b);font-size:12px}.sr-evidence-actions{justify-content:flex-end;margin-top:8px}.sr-evidence-actions a{display:inline-flex;align-items:center;gap:4px;color:#176a40;text-decoration:none}.sr-pagination{display:flex;justify-content:space-between;align-items:center;margin-top:14px;color:var(--dsh-muted-foreground,#69716b);font-size:12px}.sr-pagination div{display:flex;gap:6px}.sr-pagination button{padding:6px 10px;border:1px solid var(--dsh-border,#dfe4df);border-radius:4px;background:transparent;color:inherit;font:inherit;cursor:pointer}.sr-pagination button:disabled{opacity:.4;cursor:default}.sr-business-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start;gap:14px}.sr-form{display:grid;gap:12px}.sr-form>h3{margin:0}.sr-field{display:grid;gap:5px;font-size:12px;font-weight:600}.sr-field input,.sr-field select{height:36px}.sr-field textarea{resize:vertical;min-height:72px;font-weight:400}.sr-history{display:grid;gap:10px;margin-top:18px;padding-top:14px;border-top:1px solid var(--dsh-border,#dfe4df)}.sr-history h3{font-size:14px}.sr-history article{padding:10px;background:var(--dsh-muted,#f5f7f5);border-radius:4px}.sr-history article p{margin:4px 0}.sr-empty-panel{padding:30px}.sr-weekly-layout{display:grid;grid-template-columns:minmax(280px,.75fr) minmax(0,1.25fr);align-items:start;gap:14px}.sr-toggle{display:flex;align-items:center;gap:9px}.sr-toggle input{width:16px;height:16px;accent-color:#27754a}.sr-section-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}.sr-section-heading>div{display:flex;gap:8px}.sr-report{margin-top:14px}.sr-report-summary{font-size:17px}.sr-report-columns{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.sr-report-columns section{padding:12px;background:var(--dsh-muted,#f5f7f5);border-radius:4px}.sr-report-columns h3{font-size:13px}.sr-report-columns ul{padding-left:18px}.sr-report-columns li{margin:8px 0;overflow-wrap:anywhere}.sr-success{color:#27754a}.sr-error{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;padding:10px 12px;border-left:3px solid #b43c39;background:#fff6f5;color:#8c2f2d}.sr-error button{border:0;background:transparent;color:inherit;text-decoration:underline;cursor:pointer}.sr-page button:focus-visible,.sr-page a:focus-visible,.sr-page input:focus-visible,.sr-page select:focus-visible,.sr-page textarea:focus-visible{outline:2px solid #387b58;outline-offset:2px}
-    .sr-field select.sr-multi-select{height:auto;min-height:112px;line-height:1.7}.sr-field-hint{color:var(--dsh-muted-foreground,#69716b);font-size:11px;font-weight:400}
+    .sr-page{height:100%;min-height:0;overflow:auto;background:var(--sr-bg);color:var(--sr-text);padding:24px clamp(16px,3vw,40px);font:14px/1.5 var(--dsh-font-sans,system-ui,sans-serif)}
+    .sr-header{display:flex;min-height:72px;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--sr-border);padding:4px 0 20px}.sr-header h1{margin:2px 0;font-size:24px;line-height:1.2}.sr-header p{margin:0}.sr-eyebrow{color:var(--sr-accent);font-size:11px;font-weight:700}.sr-subtitle,.sr-muted{color:var(--sr-muted)}.sr-tabs{display:flex;overflow:auto;gap:4px;border-bottom:1px solid var(--sr-border);margin-bottom:22px}.sr-tabs button{flex:0 0 auto;padding:12px 14px;border:0;border-bottom:2px solid transparent;background:transparent;color:inherit;font:inherit;cursor:pointer}.sr-tabs button[aria-current=page]{border-bottom-color:var(--sr-accent);color:var(--sr-accent);font-weight:650}.sr-icon-button{display:grid;place-items:center;width:36px;height:36px;flex-shrink:0;border:1px solid var(--sr-border);border-radius:6px;background:transparent;color:inherit;cursor:pointer}.sr-unread,.sr-unread-count{display:inline-grid;place-items:center;min-width:20px;height:20px;margin-left:7px;padding:0 5px;border-radius:10px;background:#b43c39;color:#fff;font-size:11px}.sr-content{max-width:1320px;margin:auto}.sr-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:22px}.sr-metric{display:grid;gap:4px;min-height:104px;align-content:center;padding:15px 18px;border:1px solid var(--sr-border);border-left:3px solid #43835a;border-radius:5px}.sr-metric span,.sr-metric small{color:var(--sr-muted)}.sr-metric strong{font-size:25px;font-variant-numeric:tabular-nums}.sr-metric small{font-size:11px}.sr-columns{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(280px,.8fr);gap:16px}.sr-section{min-width:0;padding:18px;border:1px solid var(--sr-border);border-radius:6px}.sr-section h2,.sr-section h3{margin:0;font-size:16px}.sr-list{display:grid;margin-top:12px}.sr-list-row{display:grid;grid-template-columns:auto minmax(0,1fr) minmax(110px,auto);align-items:center;gap:12px;width:100%;padding:12px 4px;border:0;border-bottom:1px solid var(--sr-border);background:transparent;color:inherit;text-align:left;font:inherit;cursor:pointer}.sr-list-row>span:nth-child(2){display:grid;min-width:0}.sr-list-row small{overflow:hidden;color:var(--sr-muted);text-overflow:ellipsis;white-space:nowrap}.sr-list-row time,.sr-evidence time{color:var(--sr-muted);font-size:11px}.sr-status{display:inline-flex;width:max-content;align-items:center;padding:2px 7px;border:1px solid #c9d5ca;border-radius:4px;color:#3c6649;font-size:11px;white-space:nowrap}.sr-status[data-tone=candidate]{border-color:#e5d2a4;color:#84621b}.sr-source{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 12px;padding:12px 0;border-bottom:1px solid var(--sr-border)}.sr-source small{grid-column:1/-1;color:var(--sr-muted)}.sr-source-note,.sr-footnote{color:var(--sr-muted);font-size:12px}.sr-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0 0 14px}.sr-toolbar h2{margin:0;font-size:17px}.sr-toolbar p{margin:3px 0}.sr-toolbar form{display:flex;gap:8px}.sr-search{display:flex;align-items:center;gap:8px;width:min(520px,50vw);padding:0 10px;border:1px solid var(--sr-border);border-radius:5px}.sr-search input{width:100%;min-width:0;height:36px;border:0;outline:0;background:transparent;color:inherit;font:inherit}.sr-button{min-height:36px;padding:7px 14px;border:1px solid #27754a;border-radius:5px;background:#27754a;color:#fff;font:inherit;font-weight:600;cursor:pointer}.sr-button:disabled{opacity:.55;cursor:wait}.sr-secondary{border-color:var(--sr-border);background:transparent;color:inherit}.sr-link{padding:4px 7px;border:0;background:transparent;color:var(--sr-accent);font:inherit;cursor:pointer}.sr-select-label{display:flex;align-items:center;gap:8px;color:var(--sr-muted)}.sr-select-label select,.sr-field input,.sr-field textarea,.sr-field select{width:100%;min-width:0;padding:8px;border:1px solid var(--sr-border);border-radius:4px;background:var(--sr-surface);color:inherit;font:inherit}.sr-table-wrap{overflow:auto;border:1px solid var(--sr-border);border-radius:5px}.sr-table{width:100%;border-collapse:collapse;white-space:nowrap}.sr-table th,.sr-table td{padding:10px 12px;border-bottom:1px solid var(--sr-border);text-align:left}.sr-table th{background:var(--sr-soft);color:var(--sr-muted);font-size:11px;font-weight:600}.sr-table tbody tr:last-child td{border-bottom:0}.sr-evidence-list{display:grid;gap:10px}.sr-evidence{padding:15px;border:1px solid var(--sr-border);border-radius:5px}.sr-evidence-head,.sr-evidence-meta,.sr-evidence-actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px}.sr-evidence-head{justify-content:space-between}.sr-evidence h3{margin:11px 0 4px;font-size:15px}.sr-evidence p{margin:0;color:var(--sr-muted)}.sr-evidence-meta{margin-top:12px;color:var(--sr-muted);font-size:12px}.sr-evidence-actions{justify-content:flex-end;margin-top:8px}.sr-evidence-actions a{display:inline-flex;align-items:center;gap:4px;color:var(--sr-accent);text-decoration:none}.sr-pagination{display:flex;justify-content:space-between;align-items:center;margin-top:14px;color:var(--sr-muted);font-size:12px}.sr-pagination div{display:flex;gap:6px}.sr-pagination button{padding:6px 10px;border:1px solid var(--sr-border);border-radius:4px;background:transparent;color:inherit;font:inherit;cursor:pointer}.sr-pagination button:disabled{opacity:.4;cursor:default}.sr-business-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start;gap:14px}.sr-form{display:grid;gap:12px}.sr-form>h3{margin:0}.sr-field{display:grid;gap:5px;font-size:12px;font-weight:600}.sr-field input,.sr-field select{height:36px}.sr-field textarea{resize:vertical;min-height:72px;font-weight:400}.sr-history{display:grid;gap:10px;margin-top:18px;padding-top:14px;border-top:1px solid var(--sr-border)}.sr-history h3{font-size:14px}.sr-history article{padding:10px;background:var(--sr-soft);border-radius:4px}.sr-history article p{margin:4px 0}.sr-empty-panel{padding:30px}.sr-weekly-layout{display:grid;grid-template-columns:minmax(280px,.75fr) minmax(0,1.25fr);align-items:start;gap:14px}.sr-toggle{display:flex;align-items:center;gap:9px;min-height:44px}.sr-toggle input{width:16px;height:16px;min-height:0;accent-color:var(--sr-accent)}.sr-section-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}.sr-section-heading>div{display:flex;gap:8px}.sr-report{margin-top:14px}.sr-report-summary{font-size:17px}.sr-report-columns{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.sr-report-columns section{padding:12px;background:var(--sr-soft);border-radius:4px}.sr-report-columns h3{font-size:13px}.sr-report-columns ul{padding-left:18px}.sr-report-columns li{margin:8px 0;overflow-wrap:anywhere}.sr-success{color:var(--sr-accent)}.sr-error{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;padding:10px 12px;border-left:3px solid #b43c39;background:var(--sr-error-bg);color:var(--sr-error-text)}.sr-error button{border:0;background:transparent;color:inherit;text-decoration:underline;cursor:pointer}.sr-page button:focus-visible,.sr-page a:focus-visible,.sr-page input:focus-visible,.sr-page select:focus-visible,.sr-page textarea:focus-visible{outline:2px solid #387b58;outline-offset:2px}
+    .sr-field select.sr-multi-select{height:auto;min-height:112px;line-height:1.7}.sr-field-hint{color:var(--sr-muted);font-size:11px;font-weight:400}
     @media(max-width:900px){.sr-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.sr-columns,.sr-business-grid,.sr-weekly-layout{grid-template-columns:1fr}.sr-report-columns{grid-template-columns:1fr}.sr-page{padding:18px 14px}.sr-toolbar{align-items:flex-start;flex-direction:column}.sr-search{width:min(520px,70vw)}}
-    @media(prefers-color-scheme:dark){.sr-status[data-tone=confirmed]{border-color:#557c60;color:#a2d4ac}.sr-status[data-tone=candidate]{border-color:#8d7845;color:#e7ce84}.sr-tabs button[aria-current=page]{color:#91d3a4}.sr-link,.sr-evidence-actions a{color:#91d3a4}.sr-error{background:#371f1e;color:#f0b5b0}.sr-source-note,.sr-report-columns section,.sr-history article{background:var(--dsh-muted,#242824)}}
+
+    .sr-page,.sr-page *{box-sizing:border-box;color-scheme:inherit}.sr-page [hidden]{display:none!important}
+    .sr-page p{max-width:75ch}.sr-content{padding-bottom:32px}.sr-header,.sr-tabs{max-width:1320px;margin-left:auto;margin-right:auto}
+    .sr-page button,.sr-page select,.sr-page input{min-height:44px}.sr-field{font-size:14px;font-weight:500;gap:8px}.sr-field textarea{min-height:80px;line-height:1.6}.sr-field input,.sr-field select{height:44px}.sr-field input,.sr-field textarea,.sr-field select{color:var(--sr-text);background:var(--sr-surface);border-color:var(--sr-border);padding:10px 12px}.sr-field input::placeholder,.sr-field textarea::placeholder{color:var(--sr-muted);opacity:1}
+    .sr-section{padding:24px;border-radius:10px}.sr-section h2,.sr-section h3{font-size:18px}.sr-section p{line-height:1.65}.sr-form{gap:20px}.sr-form>p{margin:0}.sr-form>.sr-button{justify-self:start}.sr-business-grid{display:block;max-width:880px}.sr-mode-switch{display:flex;gap:8px;margin:0 0 20px;flex-wrap:wrap}.sr-mode-switch button{padding:10px 16px;border:1px solid var(--sr-border);border-radius:6px;background:transparent;color:var(--sr-muted);font:inherit;cursor:pointer}.sr-mode-switch button[aria-pressed=true]{color:var(--sr-accent);border-color:var(--sr-accent);background:var(--sr-soft);font-weight:600}
+    .sr-disclosure{border-top:1px solid var(--sr-border);padding-top:12px}.sr-disclosure summary{cursor:pointer;color:var(--sr-accent);padding:8px 0;min-height:44px}.sr-disclosure .sr-field{margin-top:16px}.sr-selected-evidence{display:grid;gap:8px;margin:16px 0;padding:16px;background:var(--sr-soft);border-left:3px solid var(--sr-accent);border-radius:4px}.sr-selected-evidence p{margin:0}
+    .sr-toolbar-actions,.sr-review-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.sr-intake{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}.sr-intake-result{grid-column:1/-1}.sr-detail{margin:16px 0}.sr-review-box{display:grid;gap:16px;margin-top:20px}.sr-status{color:var(--sr-accent);border-color:var(--sr-border);font-size:12px}.sr-status[data-tone=candidate]{color:light-dark(#78520b,#f0cf88);border-color:light-dark(#c8ac72,#8d7845)}.sr-metric small,.sr-table th,.sr-field-hint,.sr-list-row time,.sr-evidence time{font-size:12px}.sr-table th{font-weight:600}.sr-table td:first-child{white-space:normal;min-width:180px}.sr-table tbody tr:hover,.sr-list-row:hover{background:var(--sr-soft)}.sr-page button:not(:disabled):hover{filter:brightness(.95)}.sr-page button:disabled{cursor:not-allowed}.sr-success{padding:12px 16px;border-left:3px solid var(--sr-accent);background:var(--sr-soft)}
+    .sr-scope-picker{min-width:0;border:1px solid var(--sr-border);border-radius:6px;padding:16px}.sr-scope-picker legend{padding:0 8px;font-weight:600}.sr-scope-picker .sr-search{width:100%}.sr-scope-options{max-height:280px;overflow:auto;margin-top:12px}.sr-scope-options label{min-height:44px;cursor:pointer}.sr-scope-options input{min-height:0}.sr-scope-picker:disabled{opacity:.65}
+    @media(max-width:600px){.sr-intake{grid-template-columns:1fr}.sr-section{padding:16px}.sr-toolbar form{width:100%;flex-wrap:wrap}.sr-search{width:100%;flex:1;min-width:180px}.sr-header h1{font-size:22px}.sr-metrics{gap:8px}.sr-metric{padding:12px;min-height:90px}.sr-list-row{grid-template-columns:auto minmax(0,1fr)}.sr-list-row time{grid-column:2}.sr-mode-switch button{flex:1;padding:8px}.sr-tabs button{padding:12px 10px}.sr-header{align-items:flex-start}.sr-section-heading{flex-wrap:wrap}}
+    @media(prefers-reduced-motion:no-preference){.sr-page button,.sr-page a{transition:background-color 160ms,color 160ms,border-color 160ms}}
     `
 
     function Workbench() {
-      const [tab, setTab] = useRemembered('active-tab', 'overview')
+      const bridge = supplierNavigation()
+      const [tab, setTab, externalNavigation] = bridge.usePage()
       const [revision, setRevision] = useState(0)
       const [error, setError] = useState('')
       const [access, setAccess] = useState(null)
       const [accessReason, setAccessReason] = useState('')
       const [scopeReady, setScopeReady] = useState(false)
       const [unread, setUnread] = useState(0)
+      const accessRequest = useRef(null)
       const retryAccess = () => {
+        accessRequest.current?.abort()
+        const controller = new AbortController(), generation = bridge.epoch
+        accessRequest.current = controller
         setAccess(null)
         setAccessReason('')
-        fetch(`${BASE}/access`, { credentials: 'same-origin', redirect: 'error', signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
+        fetch(`${BASE}/access`, { credentials: 'same-origin', redirect: 'error', signal: AbortSignal.any([controller.signal, bridge.signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]) })
           .then(response => response.json())
-          .then(body => { adoptScope(body?.scopeId); setScopeReady(Boolean(body?.scopeId)); setAccessReason(body?.reason || 'unavailable'); setAccess(body?.allowed === true) })
-          .catch(() => { setAccessReason('connection_unavailable'); setAccess(false) })
+          .then(body => { if (controller.signal.aborted || generation !== bridge.epoch) return; adoptScope(body?.scopeId); setScopeReady(Boolean(body?.scopeId)); setAccessReason(body?.reason || 'unavailable'); setAccess(body?.allowed === true) })
+          .catch(() => { if (controller.signal.aborted || generation !== bridge.epoch) return; setAccessReason('connection_unavailable'); setAccess(false) })
       }
       useEffect(() => {
         const refreshEvent = () => refresh()
@@ -127,7 +253,7 @@ window.__ModuleLoader__.load({
           window.removeEventListener('supplier-risk:agent-error', agentError)
         }
       }, [])
-      useEffect(() => { retryAccess() }, [])
+      useEffect(() => { retryAccess(); return () => accessRequest.current?.abort() }, [])
       // Synchronous reload lock: bursts of refresh events must not stack revisions.
       const loadingRef = useRef(false)
       const refresh = () => {
@@ -137,22 +263,27 @@ window.__ModuleLoader__.load({
         setRevision(value => value + 1)
         setTimeout(() => { loadingRef.current = false }, 400)
       }
+      useEffect(() => {
+        if (access === true) bridge.publish(TABS.map(([id, label]) => ({ id, label })), tab, id => { setError(''); setTab(id) })
+        else if (access === false && bridge.getSnapshot().status !== 'denied') bridge.invalidate()
+      })
+      useEffect(() => () => bridge.clearSource(), [])
       if (access === null) return h('main', { className: 'sr-page', role: 'status' }, '正在连接供应链工作台…')
       if (!access) return h('main', { className: 'sr-page' }, h('h1', null, '供应商风险'), h('p', null, accessMessage(accessReason)), h('button', { type: 'button', className: 'sr-button sr-secondary', onClick: retryAccess }, '重新连接'))
       return h('main', { className: 'sr-page' },
         h('header', { className: 'sr-header' },
-          h('div', null, h('p', { className: 'sr-eyebrow' }, 'SUPPLIER INTELLIGENCE'), h('h1', null, '供应商风险'), h('p', { className: 'sr-subtitle' }, '已归集事实、待核验线索与业务判断分开展示。')),
+          h('div', null, h('p', { className: 'sr-eyebrow' }, 'SUPPLIER INTELLIGENCE'), h('h1', null, '供应商风险'), h('p', { className: 'sr-subtitle' }, '查看供应商风险变化，核验线索，评估交付与经营影响。')),
           h('button', { type: 'button', className: 'sr-icon-button', 'aria-label': '刷新数据', title: '刷新数据', onClick: refresh }, h(IconRefreshOutlineRegular, { size: 18 }))),
-        h('nav', { className: 'sr-tabs', 'aria-label': '供应商风险页面' }, ...TABS.map(([id, label]) => h('button', {
+        !externalNavigation ? h('nav', { className: 'sr-tabs', 'aria-label': '供应商风险页面' }, ...TABS.map(([id, label]) => h('button', {
           key: id, type: 'button', 'aria-current': tab === id ? 'page' : undefined,
           onClick: () => { setError(''); setTab(id) },
-        }, label, id === 'weekly' && unread > 0 ? h('span', { className: 'sr-unread' }, unread) : null))),
+        }, label, id === 'weekly' && unread > 0 ? h('span', { className: 'sr-unread' }, unread) : null))) : null,
         error ? h('div', { className: 'sr-error', role: 'alert' }, error, h('button', { type: 'button', onClick: refresh }, '重试')) : null,
-        h('section', { className: 'sr-content', 'aria-busy': false },
-          tab === 'overview' ? h(Overview, { revision, setError, onUnread: setUnread, onOpen: id => { setSelected(id); setTab('business') } }) : null,
-          tab === 'suppliers' ? h(Suppliers, { revision, setError, onSelect: id => { setSelected(id); setTab('business') }, onImported: refresh }) : null,
-          tab === 'enterprise' ? h(Evidence, { kind: 'enterprise', revision, setError, onSelect: row => { setEvidence(row.evidenceId, 'enterprise', row.eventId); setSelected(row.supplierId); setTab('business') } }) : null,
-          tab === 'media' ? h(Evidence, { kind: 'media', revision, setError, onSelect: row => { setEvidence(row.evidenceId, 'media', row.eventId); setSelected(row.supplierId); setTab('business') } }) : null,
+        h('section', { className: 'sr-content' },
+          tab === 'overview' ? h(Overview, { revision, setError, onUnread: setUnread, onOpen: (id, name) => { setSelected(id, name); setTab('business') } }) : null,
+          tab === 'suppliers' ? h(Suppliers, { revision, setError, onSelect: (id, name) => { setSelected(id, name); setTab('business') }, onImported: refresh }) : null,
+          tab === 'enterprise' ? h(Evidence, { kind: 'enterprise', revision, setError, onSelect: row => { setSelected(row.supplierId, row.supplierName); setEvidence(row.evidenceId, 'enterprise', row.eventId); setTab('business') } }) : null,
+          tab === 'media' ? h(Evidence, { kind: 'media', revision, setError, onSelect: row => { setSelected(row.supplierId, row.supplierName); setEvidence(row.evidenceId, 'media', row.eventId); setTab('business') } }) : null,
           tab === 'business' ? h(Business, { revision, setError, onScopeReady: scopeReady }) : null,
           tab === 'weekly' ? h(Weekly, { revision, setError, onUnread: setUnread, onScopeReady: scopeReady }) : null))
     }
@@ -168,7 +299,11 @@ window.__ModuleLoader__.load({
       }[reason] || '当前插件、凭据或供应链 MCP 暂不可用。'
     }
 
-    function setSelected(value) { selectedSupplier = value }
+    function setSelected(value, name = '') {
+      if (value !== selectedSupplier) setEvidence('')
+      selectedSupplier = value
+      selectedSupplierName = name
+    }
     function setEvidence(value, kind = '', eventId = '') { selectedEvidence = value; selectedEvidenceKind = kind; selectedEvidenceEventId = eventId }
 
     function useLoad(loader, deps, setError) {
@@ -185,7 +320,7 @@ window.__ModuleLoader__.load({
     }
 
     function Loading({ state, empty }) {
-      if (state.loading && !state.data) return h('p', { className: 'sr-muted', role: 'status' }, '正在读取已归集数据…')
+      if (state.loading && !state.data) return h('p', { className: 'sr-muted', role: 'status', 'aria-busy': true }, '正在读取已归集数据…')
       if (state.error) return h('p', { className: 'sr-muted', role: 'alert' }, state.error)
       if (!state.data) return h('p', { className: 'sr-muted' }, empty || '暂无可显示的数据。')
       return null
@@ -204,23 +339,23 @@ window.__ModuleLoader__.load({
       const sourceGapCount = (value.sources || []).filter(source => source.status !== 'available' || source.stale).length
       return h(React.Fragment, null,
         h('div', { className: 'sr-metrics' },
-          h(Metric, { label: '供应商', value: counts.suppliers ?? 0, hint: '当前租户台账' }),
+          h(Metric, { label: '供应商', value: counts.suppliers ?? 0, hint: '当前团队台账' }),
           h(Metric, { label: '高优先级事项', value: counts.priorityItems ?? 0, hint: '已确认风险' }),
           h(Metric, { label: '待核验线索', value: counts.pendingClues ?? 0 }),
           h(Metric, { label: '来源缺口', value: sourceGapCount, hint: `统计于 ${fmt(value.statisticsAt)}` })),
         h('div', { className: 'sr-columns' },
           h('section', { className: 'sr-section' }, h('h2', null, '近期变化'),
-            changes.length ? h('div', { className: 'sr-list' }, ...changes.slice(0, 10).map((item, index) => h('button', { type: 'button', className: 'sr-list-row', key: item.evidenceId || item.eventId || index, onClick: () => onOpen(item.supplierId) },
+            changes.length ? h('div', { className: 'sr-list' }, ...changes.slice(0, 10).map((item, index) => h('button', { type: 'button', className: 'sr-list-row', key: item.evidenceId || item.eventId || index, onClick: () => onOpen(item.supplierId, item.supplierName) },
               h('span', { className: 'sr-status', 'data-tone': item.isConfirmed ? 'confirmed' : 'candidate' }, item.isConfirmed ? '已确认' : '待核验'),
               h('span', null, h('strong', null, item.supplierName || item.supplierId), h('small', null, item.title || item.summary || '证据摘要未提供')),
-              h('time', null, fmt(item.riskPromptedAt || item.retrievedAt))))) : h('p', { className: 'sr-muted' }, '当前数据库范围内没有近期变化。')),
+              h('time', null, fmt(item.riskPromptedAt || item.retrievedAt))))) : h('p', { className: 'sr-muted' }, '暂无已记录的风险变化。可先查看供应商台账，确认来源覆盖与更新时间。')),
           h('section', { className: 'sr-section' }, h('h2', null, '来源覆盖'),
             ...(value.sources || []).map(source => h('div', { className: 'sr-source', key: source.sourceId || source.source || source.name },
               h('span', null, source.name || source.platform || source.sourceId || source.source || '未命名来源'),
-              h('span', { className: 'sr-status', 'data-tone': source.status === 'available' && !source.stale ? 'confirmed' : 'candidate' }, source.stale ? '数据滞后' : source.status || '未知'),
+              h('span', { className: 'sr-status', 'data-tone': source.status === 'available' && !source.stale ? 'confirmed' : 'candidate' }, source.stale ? '数据滞后' : ({ available: '已覆盖', unavailable: '暂不可用', pending: '待接入' }[source.status] || '待核对')),
               h('small', null, source.lastSuccessAt ? `最近成功 ${fmt(source.lastSuccessAt)}` : source.reason || '暂无成功记录'))),
             h('p', { className: 'sr-source-note' }, '页面只读取已保存数据，不触发外部采集。'))),
-        h('p', { className: 'sr-footnote' }, `数据来源：${value.dataSource || 'database'} · 未发起外部调用`))
+        h('p', { className: 'sr-footnote' }, '数据来自已保存的台账与证据；暂无记录不代表没有风险。'))
     }
 
     function Suppliers({ revision, setError, onSelect, onImported }) {
@@ -251,7 +386,7 @@ window.__ModuleLoader__.load({
             h('button', { type: 'button', className: 'sr-button sr-secondary', onClick: () => setShowAdd(true) }, '新增 / 导入供应商')) : null,
         data && data.items.length > 0 ? h(React.Fragment, null,
           h('div', { className: 'sr-table-wrap' }, h('table', { className: 'sr-table' }, h('thead', null, h('tr', null, ...['供应商', '统一社会信用代码', '类别', '主体核验', '监控范围', '来源覆盖', '更新时间', ''].map(label => h('th', { key: label }, label)))), h('tbody', null,
-            ...data.items.map(row => h('tr', { key: row.supplierId }, h('td', null, h('strong', null, row.displayName)), h('td', null, row.creditCode || '未关联'), h('td', null, row.category || '未分类'), h('td', null, h(Status, { value: row.verificationStatus })), h('td', null, row.monitoringScope || '未设置'), h('td', null, row.coverage?.status === 'partial' ? '部分来源' : '待接入'), h('td', null, fmt(row.updatedAt)), h('td', null, h('button', { type: 'button', className: 'sr-link', onClick: () => onSelect(row.supplierId) }, '业务影响'))))))),
+            ...data.items.map(row => h('tr', { key: row.supplierId }, h('td', null, h('strong', null, row.displayName)), h('td', null, row.creditCode || '未关联'), h('td', null, row.category || '未分类'), h('td', null, h(Status, { value: row.verificationStatus })), h('td', null, ({ LEGAL_ENTITY_ONLY: '仅法人主体', LEGAL_ENTITY_AND_SUBSIDIARIES: '法人及子公司', LEGAL_ENTITY_AND_SUBSIDIARIES_AND_INVESTMENTS: '法人、子公司及投资企业' }[row.monitoringScope] || '未设置')), h('td', null, ({ partial: '部分覆盖', complete: '完整覆盖', available: '已覆盖' }[row.coverage?.status] || '待接入')), h('td', null, fmt(row.updatedAt)), h('td', null, h('button', { type: 'button', className: 'sr-link', onClick: () => onSelect(row.supplierId, row.displayName) }, '业务影响'))))))),
           h(Pagination, { page, pageSize: 20, total: data.total, onChange: setPage })) : null)
     }
 
@@ -304,7 +439,7 @@ window.__ModuleLoader__.load({
 
     function Status({ value }) {
       const confirmed = ['CONFIRMED', 'VERIFIED', 'APPROVED', 'available'].includes(value)
-      const label = { CONFIRMED: '已确认', VERIFIED: '已核验', APPROVED: '已通过', PENDING_REVIEW: '待核验', CANDIDATE: '候选', available: '可用' }[value] || value || '未知'
+      const label = { rejected: '已排除', PENDING: '待处理', FAILED: '失败', RUNNING: '处理中', REJECTED: '已排除', STALE: '需重新评估', running: '处理中', pending: '等待处理', queued: '排队中', succeeded: '已完成', failed: '失败', cancelled: '已取消', CONFIRMED: '已确认', VERIFIED: '已核验', APPROVED: '已通过', PENDING_REVIEW: '待核验', CANDIDATE: '候选', available: '可用' }[value] || value || '未知'
       return h('span', { className: 'sr-status', 'data-tone': confirmed ? 'confirmed' : 'candidate' }, label)
     }
 
@@ -335,14 +470,14 @@ window.__ModuleLoader__.load({
       return h(React.Fragment, null,
         h('div', { className: 'sr-toolbar' }, h('div', null, h('h2', null, kind === 'enterprise' ? '工商与司法风险' : '媒体舆情线索'), h('p', { className: 'sr-muted' }, kind === 'enterprise' ? '仅展示已持久化风险事件和来源时间。' : '媒体命中属于候选线索，主体匹配不等同于事实核验。')),
           h('label', { className: 'sr-select-label' }, '核验状态', h('select', { value: status, onChange: event => { setPage(1); setStatus(event.target.value) }, 'aria-label': '按核验状态筛选' }, h('option', { value: '' }, '全部'), h('option', { value: 'PENDING_REVIEW' }, '待核验'), h('option', { value: 'CONFIRMED' }, '已确认'), h('option', { value: 'REJECTED' }, '已排除')))),
-        h(Loading, { state }), data ? h(React.Fragment, null,
-          h('div', { className: 'sr-evidence-list' }, ...data.items.map(row => h('article', { className: 'sr-evidence', key: row.evidenceId },
+        h(Loading, { state }), data?.items?.length === 0 ? h('section', { className: 'sr-section sr-empty-panel', role: 'status' }, h('h2', null, status ? '没有符合筛选条件的记录' : '暂无已归集证据'), h('p', { className: 'sr-muted' }, '暂无记录不代表没有风险。请核对供应商台账与来源覆盖，或调整核验状态筛选。'), status ? h('button', { type: 'button', className: 'sr-button sr-secondary', onClick: () => { setStatus(''); setPage(1) } }, '查看全部状态') : null) : null, data ? h(React.Fragment, null,
+          h('div', { className: 'sr-evidence-list', hidden: Boolean(detailId) }, ...data.items.map(row => h('article', { className: 'sr-evidence', key: row.evidenceId },
             h('div', { className: 'sr-evidence-head' }, h(Status, { value: row.reviewStatus }), h('span', null, row.supplierName || row.supplierId), h('time', null, fmt(row.occurredAt || row.exposedAt || row.riskPromptedAt || row.retrievedAt))),
             h('h3', null, row.title || row.category || '未命名证据'), h('p', null, row.summary || row.description || '未提供摘要'),
             h('div', { className: 'sr-evidence-meta' }, h('span', null, `来源 ${row.platform || row.source || '未知'}`), row.readCount !== null && row.readCount !== undefined ? h('span', null, `阅读量 ${row.readCount}${row.readCountScope ? ` · ${row.readCountScope}` : ''}`) : null, h('span', null, `采集 ${fmt(row.retrievedAt)}`)),
             h('div', { className: 'sr-evidence-actions' }, row.sourceUrl ? h('a', { href: row.sourceUrl, target: '_blank', rel: 'noreferrer' }, '查看原文', h(IconRightUpOutlineRegular, { size: 14 })) : null, h('button', { type: 'button', className: 'sr-link', onClick: () => setDetailId(row.evidenceId) }, '查看证据'), h('button', { type: 'button', className: 'sr-link', onClick: () => onSelect(row) }, '加入业务分析'))))),
           detailId ? h('section', { className: 'sr-section sr-detail' }, detail ? h(React.Fragment, null,
-            h('div', { className: 'sr-section-heading' }, h('h2', null, '证据详情'), h('button', { type: 'button', className: 'sr-link', onClick: () => setDetailId('') }, '关闭')),
+            h('div', { className: 'sr-section-heading' }, h('h2', null, '证据详情'), h('button', { type: 'button', className: 'sr-link', onClick: () => setDetailId('') }, '返回证据列表')),
             h('h3', null, detail.title || '未命名证据'), h('p', null, detail.summary || detail.description || '未提供摘要'),
             h('p', { className: 'sr-footnote' }, `主体 ${detail.supplierName || detail.supplierId} · 来源 ${detail.platform || detail.source || '未知'} · 发布时间 ${fmt(detail.exposedAt || detail.occurredAt)} · 采集时间 ${fmt(detail.retrievedAt)}`),
             detail.sourceUrl ? h('a', { href: detail.sourceUrl, target: '_blank', rel: 'noreferrer' }, '打开来源') : null,
@@ -384,33 +519,40 @@ window.__ModuleLoader__.load({
       const [form, setForm] = useRemembered(`business-form:${supplierId}`, null)
       const [analysis, setAnalysis] = useRemembered(`business-analysis:${supplierId}`, { dimension: 'other', externalSignal: '', possibleImpact: '', assumptions: '', informationGaps: '', suggestedActions: '', kind: 'human' })
       const [busy, setBusy] = useState(false)
+      const [notice, setNotice] = useState('')
+      const [mode, setMode] = useRemembered(`business-mode:${supplierId}`, selectedEvidence ? 'analysis' : 'context')
+      useEffect(() => { if (selectedEvidence) setMode('analysis') }, [selectedEvidence])
       const state = useLoad(() => (onScopeReady && supplierId ? Promise.all([
         api('supply_chain_business_context_get', { supplierId }),
         api('supply_chain_business_analysis_list', { supplierId, page: 1, pageSize: 20 }),
-        api('supply_chain_workbench_suppliers_list', { page: 1, pageSize: 100, query: supplierId }),
+        loadSupplierOptions(),
         selectedEvidence ? api('supply_chain_workbench_evidence_get', { kind: selectedEvidenceKind, evidenceId: selectedEvidence }) : Promise.resolve(null),
       ]) : Promise.resolve(null)), [supplierId, revision, selectedEvidence, selectedEvidenceKind], setError)
       const context = state.data?.[0]
       const analyses = state.data?.[1]
-      const supplier = state.data?.[2]?.items?.find(item => item.supplierId === supplierId)
+      const supplier = state.data?.[2]?.find(item => item.supplierId === supplierId)
       const selectedEvidenceDetail = state.data?.[3]?.evidence
       useEffect(() => {
-        if (context) setForm(current => current ?? ({ category: '', criticalMaterials: [], inventoryDays: '', inTransitOrders: '', alternatives: '', alternativeCapacity: '', procurementOwner: '', logisticsOwner: '', sqeOwner: '', impactAnalysis: '', ...(context.context?.fields || {}) }))
-      }, [context])
+        if (context) setForm(current => current ?? ({ _baseVersion: context.version, category: '', criticalMaterials: [], inventoryDays: '', inTransitOrders: '', alternatives: '', alternativeCapacity: '', procurementOwner: '', logisticsOwner: '', sqeOwner: '', impactAnalysis: '', ...(context.context?.fields || {}) }))
+      }, [context, form === null])
       const setField = (key, value) => setForm(current => ({ ...current, [key]: value }))
       const saveContext = async event => {
-        event.preventDefault(); setBusy(true); setError('')
+        event.preventDefault(); setBusy(true); setError(''); setNotice('')
         try {
-          const fields = { ...form, inventoryDays: form.inventoryDays === '' ? null : Number(form.inventoryDays), criticalMaterials: Array.isArray(form.criticalMaterials) ? form.criticalMaterials : String(form.criticalMaterials || '').split(/[,，\n]/u).map(item => item.trim()).filter(Boolean) }
-          await api('supply_chain_business_context_save', { supplierId, expectedVersion: context.version, fields, idempotencyKey: crypto.randomUUID(), confirm: true })
+          const { _baseVersion, ...draftFields } = form
+          const fields = { ...draftFields, inventoryDays: form.inventoryDays === '' ? null : Number(form.inventoryDays), criticalMaterials: Array.isArray(form.criticalMaterials) ? form.criticalMaterials : String(form.criticalMaterials || '').split(/[,，\n]/u).map(item => item.trim()).filter(Boolean) }
+          const saved = await api('supply_chain_business_context_save', { supplierId, expectedVersion: _baseVersion ?? context.version, fields, idempotencyKey: crypto.randomUUID(), confirm: true })
+          setForm({ ...form, _baseVersion: saved.version })
+          setNotice('业务背景已保存。可继续评估业务影响。')
           setRevisionAfterSave()
         } catch (error) { setError(errorText(error)) } finally { setBusy(false) }
       }
       const saveAnalysis = async event => {
-        event.preventDefault(); setBusy(true); setError('')
+        event.preventDefault(); setBusy(true); setError(''); setNotice('')
         try {
           const evidenceIds = selectedEvidence && supplierId === selectedSupplier ? [selectedEvidenceEventId || selectedEvidence] : []
           await api('supply_chain_business_analysis_save', { supplierId, expectedVersion: analyses.total ? analyses.items[0].version : 0, backgroundVersion: context.version, evidenceVersion: context.evidenceVersion, evidenceIds, fields: analysis, idempotencyKey: crypto.randomUUID(), confirm: true })
+          setNotice('人工判断已保存，可在历史分析中查看。')
           setAnalysis(current => ({ ...current, externalSignal: '', possibleImpact: '', assumptions: '', informationGaps: '', suggestedActions: '' }))
           setRevisionAfterSave()
         } catch (error) { setError(errorText(error)) } finally { setBusy(false) }
@@ -418,31 +560,35 @@ window.__ModuleLoader__.load({
       if (!supplierId) return h('section', { className: 'sr-section sr-empty-panel' }, h('h2', null, '选择供应商'), h('p', { className: 'sr-muted' }, '从供应商台账打开一家供应商，补充库存、订单、替代产能和业务影响。'), h('button', { type: 'button', className: 'sr-button', onClick: () => window.dispatchEvent(new CustomEvent('supplier-risk:open-suppliers')) }, '浏览供应商台账'))
       if (!context || !form) return h(Loading, { state })
       return h(React.Fragment, null,
-        h('div', { className: 'sr-toolbar' }, h('div', null, h('h2', null, supplier?.displayName || supplierId), h('p', { className: 'sr-muted' }, `背景版本 ${context.version} · 证据版本 ${String(context.evidenceVersion).slice(0, 12)}`)), h('button', { type: 'button', className: 'sr-link', onClick: () => { setSelected(''); setSupplierId('') } }, '更换供应商')),
+        h('div', { className: 'sr-toolbar' }, h('div', null, h('h2', null, supplier?.displayName || selectedSupplierName || '供应商详情'), h('p', { className: 'sr-muted' }, context.version ? '已保存业务背景 · 可补充或更新' : '尚未补充业务背景 · 可先填写已知信息')), h('button', { type: 'button', className: 'sr-link', onClick: () => { setSelected(''); setSupplierId('') } }, '更换供应商')),
+        notice ? h('p', { className: 'sr-success', role: 'status' }, notice) : null,
+        form._baseVersion !== undefined && form._baseVersion < context.version ? h('div', { className: 'sr-error', role: 'alert' }, '业务背景已在其他位置更新。当前草稿仍保留，请核对后重新填写。', h('button', { type: 'button', onClick: () => { if (window.confirm('放弃当前业务背景草稿，读取最新保存的内容？')) setForm(null) } }, '读取最新背景')) : null,
+        h('div', { className: 'sr-mode-switch', 'aria-label': '业务评估步骤' }, ...[['context', '1 · 补充业务背景'], ['analysis', '2 · 评估业务影响']].map(([id, label]) => h('button', { type: 'button', key: id, 'aria-pressed': mode === id, onClick: () => setMode(id) }, label))),
         h('div', { className: 'sr-business-grid' },
-          h('form', { className: 'sr-section sr-form', onSubmit: saveContext }, h('h3', null, '业务背景'), h('p', { className: 'sr-muted' }, '只保存采购、物流和质量团队提供的背景，不会改写外部证据。'),
-            Field('关键物料', h('textarea', { value: Array.isArray(form.criticalMaterials) ? form.criticalMaterials.join('，') : form.criticalMaterials, onChange: event => setField('criticalMaterials', event.target.value), rows: 2 })),
-            Field('库存天数', h('input', { type: 'number', min: 0, step: 'any', value: form.inventoryDays ?? '', onChange: event => setField('inventoryDays', event.target.value) })),
+          h('form', { className: 'sr-section sr-form', hidden: mode !== 'context', onSubmit: saveContext }, h('h3', null, '业务背景'), h('p', { className: 'sr-muted' }, '只保存采购、物流和质量团队提供的背景，不会改写外部证据。'),
+            Field('关键物料', h('textarea', { placeholder: '填写物料名称，多个物料用逗号分隔', value: Array.isArray(form.criticalMaterials) ? form.criticalMaterials.join('，') : form.criticalMaterials, onChange: event => setField('criticalMaterials', event.target.value), rows: 2 })),
+            Field('库存天数', h('input', { type: 'number', min: 0, step: 'any', placeholder: '例如：14（天），未知可留空', value: form.inventoryDays ?? '', onChange: event => setField('inventoryDays', event.target.value) })),
             Field('在途订单', h('textarea', { value: form.inTransitOrders || '', onChange: event => setField('inTransitOrders', event.target.value), rows: 2 })),
-            Field('替代供应商', h('textarea', { value: form.alternatives || '', onChange: event => setField('alternatives', event.target.value), rows: 2 })),
+            h('details', { className: 'sr-disclosure' }, h('summary', null, '替代方案与经营影响（选填）'), Field('替代供应商', h('textarea', { value: form.alternatives || '', onChange: event => setField('alternatives', event.target.value), rows: 2 })),
             Field('替代产能', h('textarea', { value: form.alternativeCapacity || '', onChange: event => setField('alternativeCapacity', event.target.value), rows: 2 })),
             Field('经营影响', h('textarea', { value: form.impactAnalysis || '', onChange: event => setField('impactAnalysis', event.target.value), rows: 3 })),
-            h('button', { type: 'submit', className: 'sr-button', disabled: busy }, busy ? '保存中…' : '保存业务背景')),
-          h('section', { className: 'sr-section' }, h('h3', null, '人工判断'), h('p', { className: 'sr-muted' }, selectedEvidence ? `引用证据 ${selectedEvidence}` : '从工商或媒体页面打开证据后，可在此关联分析。'),
+            ), h('p', { className: 'sr-footnote' }, '切换页面会保留本次草稿。保存后才会用于 Agent 分析；退出或刷新应用前请保存。'), h('button', { type: 'submit', className: 'sr-button', disabled: busy }, busy ? '保存中…' : '保存业务背景')),
+          h('section', { className: 'sr-section', hidden: mode !== 'analysis' }, h('h3', null, '业务影响评估'), h('p', { className: 'sr-muted' }, selectedEvidence ? '已关联下方证据。请区分事实、假设和可能影响。' : '从工商或媒体页面打开证据后，可在此关联分析。'),
             selectedEvidenceDetail ? h('article', { className: 'sr-selected-evidence' }, h(Status, { value: selectedEvidenceDetail.reviewStatus }), h('strong', null, selectedEvidenceDetail.title || '引用证据'), h('p', null, selectedEvidenceDetail.summary || selectedEvidenceDetail.description || '未提供摘要'), h('small', null, `来源 ${selectedEvidenceDetail.source || selectedEvidenceDetail.platform || '未知'} · 采集 ${fmt(selectedEvidenceDetail.retrievedAt)}`)) : null,
             h('form', { className: 'sr-form', onSubmit: saveAnalysis }, Field('风险维度', h('select', { value: analysis.dimension, onChange: event => setAnalysis({ ...analysis, dimension: event.target.value }) }, ...[['delivery', '交付'], ['capacity', '产能'], ['quality', '质量'], ['compliance', '合规'], ['finance', '财务'], ['other', '其他']].map(([id, name]) => h('option', { key: id, value: id }, name)))),
               Field('外部信号', textArea(analysis.externalSignal, value => setAnalysis({ ...analysis, externalSignal: value }))),
-              Field('可能影响', textArea(analysis.possibleImpact, value => setAnalysis({ ...analysis, possibleImpact: value }))),
-              Field('假设', textArea(analysis.assumptions, value => setAnalysis({ ...analysis, assumptions: value }))),
+              Field('可能影响（必填）', textArea(analysis.possibleImpact, value => setAnalysis({ ...analysis, possibleImpact: value }))),
+              h('details', { className: 'sr-disclosure' }, h('summary', null, '补充假设与待核实信息（选填）'), Field('假设', textArea(analysis.assumptions, value => setAnalysis({ ...analysis, assumptions: value }))),
               Field('信息缺口', textArea(analysis.informationGaps, value => setAnalysis({ ...analysis, informationGaps: value }))),
+              ),
               Field('建议动作', textArea(analysis.suggestedActions, value => setAnalysis({ ...analysis, suggestedActions: value }))),
-              h('button', { type: 'submit', className: 'sr-button', disabled: busy }, '保存人工判断')),
-            h('div', { className: 'sr-history' }, h('h3', null, '历史分析'), ...(analyses.items || []).map(item => h('article', { key: item.id }, h('span', null, `版本 ${item.version} · ${fmt(item.createdAt)}`), item.stale ? h(Status, { value: 'STALE' }) : null, h('p', null, item.fields?.possibleImpact || '未填写影响描述')))),
-            h('button', { type: 'button', className: 'sr-button sr-secondary', onClick: () => sendSupplierAnalysis(supplierId, context, selectedEvidence) }, '交由 Agent 分析')))
+              h('button', { type: 'submit', className: 'sr-button', disabled: busy || !analysis.possibleImpact.trim() }, busy ? '保存中…' : '保存人工判断')),
+            h('div', { className: 'sr-history' }, h('h3', null, '历史分析'), !analyses.items?.length ? h('p', { className: 'sr-muted' }, '暂无已保存判断。补充可能影响后保存，或交由 Agent 分析已保存的数据。') : null, ...(analyses.items || []).map(item => h('article', { key: item.id }, h('span', null, `版本 ${item.version} · ${fmt(item.createdAt)}`), item.stale ? h(Status, { value: 'STALE' }) : null, h('p', null, item.fields?.possibleImpact || '未填写影响描述')))),
+            h('button', { type: 'button', className: 'sr-button sr-secondary', onClick: () => sendSupplierAnalysis(supplierId, context, selectedEvidence) }, '用已保存数据发起 Agent 分析')))
       )
     }
 
-    function textArea(value, onChange) { return h('textarea', { rows: 3, value: value || '', onChange: event => onChange(event.target.value) }) }
+    function textArea(value, onChange) { return h('textarea', { rows: 2, value: value || '', onChange: event => onChange(event.target.value) }) }
     function normalizeSupplierIds(value) {
       const values = Array.isArray(value) ? value : String(value || '').split(/[,，\n]/u)
       return [...new Set(values.map(item => String(item).trim()).filter(Boolean))]
@@ -464,6 +610,7 @@ window.__ModuleLoader__.load({
       const [reportId, setReportId] = useRemembered('weekly-report', '')
       const [busy, setBusy] = useState(false)
       const [notice, setNotice] = useState('')
+      const [scopeQuery, setScopeQuery] = useState('')
       const [planFields, setPlanFields] = useRemembered('weekly-plan-draft', null)
       const state = useLoad(() => (onScopeReady ? Promise.all([
         api('supply_chain_weekly_report_plan_get'),
@@ -501,16 +648,16 @@ window.__ModuleLoader__.load({
         h('div', { className: 'sr-weekly-layout' },
           h('section', { className: 'sr-section' }, h('h2', null, '周报计划'), h('p', { className: 'sr-muted' }, '服务端每周一 09:00（Asia/Shanghai）汇总已保存事实，不会启动外部采集或模型调用。'),
             h('form', { className: 'sr-form', onSubmit: savePlan }, h('label', { className: 'sr-toggle' }, h('input', { type: 'checkbox', checked: planFields.enabled === true, onChange: event => setPlanFields({ ...planFields, enabled: event.target.checked }) }), h('span', null, '启用每周风险周报')),
-              Field('供应商范围', h(React.Fragment, null,
-                h('select', {
-                  className: 'sr-multi-select', multiple: true, size: Math.min(Math.max(suppliers.length, 3), 8),
-                  value: selectedIds, disabled: supplierState.loading || !supplierState.data,
-                  onChange: event => setPlanFields({ ...planFields, supplierIds: Array.from(event.target.selectedOptions, option => option.value) }),
-                  'aria-label': '选择周报供应商',
-                }, ...suppliers.map(supplier => h('option', { key: supplier.supplierId, value: supplier.supplierId }, supplier.displayName || supplier.supplierId)),
-                ...unavailableIds.map(id => h('option', { key: id, value: id }, '已选供应商（当前不可用）'))),
-                h('small', { className: 'sr-field-hint' }, supplierState.loading ? '正在读取供应商台账…' : !supplierState.data ? '供应商台账读取失败，请刷新重试；已保存范围保留。' : suppliers.length ? `已录入 ${suppliers.length} 家供应商，可按住 Command 或 Ctrl 多选。未选择表示全部供应商（含后续新增）。` : '当前团队暂无供应商，请先核对台账或历史数据迁移。'))),
-              Field('采集预算记录', h('input', { type: 'number', min: 0, value: planFields.collectionBudget || 0, onChange: event => setPlanFields({ ...planFields, collectionBudget: event.target.value }) })),
+              h('fieldset', { className: 'sr-scope-picker', disabled: supplierState.loading || !supplierState.data },
+                h('legend', null, '供应商范围'),
+                h('p', { className: 'sr-footnote' }, selectedIds.length ? `已选择 ${selectedIds.length} 家供应商` : '全部供应商，包含后续新增'),
+                h('label', { className: 'sr-search' }, h('input', { type: 'search', value: scopeQuery, onChange: event => setScopeQuery(event.target.value), placeholder: '搜索供应商名称', 'aria-label': '搜索周报供应商' })),
+                selectedIds.length ? h('button', { type: 'button', className: 'sr-link', onClick: () => setPlanFields({ ...planFields, supplierIds: [] }) }, '改为全部供应商') : null,
+                h('div', { className: 'sr-scope-options' }, ...suppliers.filter(supplier => (supplier.displayName || '').toLocaleLowerCase().includes(scopeQuery.trim().toLocaleLowerCase())).map(supplier => h('label', { key: supplier.supplierId, className: 'sr-toggle' }, h('input', { type: 'checkbox', checked: selectedIds.includes(supplier.supplierId), onChange: event => setPlanFields({ ...planFields, supplierIds: event.target.checked ? [...selectedIds, supplier.supplierId] : selectedIds.filter(id => id !== supplier.supplierId) }) }), h('span', null, supplier.displayName || '未命名供应商')))),
+                scopeQuery && !suppliers.some(supplier => (supplier.displayName || '').toLocaleLowerCase().includes(scopeQuery.trim().toLocaleLowerCase())) ? h('p', { className: 'sr-muted', role: 'status' }, '没有匹配的供应商，请调整搜索词。') : null,
+                unavailableIds.length ? h('p', { className: 'sr-footnote' }, `有 ${unavailableIds.length} 家已选供应商当前不可用，原选择仍保留。`) : null),
+              h('small', { className: 'sr-field-hint', role: 'status' }, supplierState.loading ? '正在读取供应商台账…' : !supplierState.data ? '供应商台账读取失败，请刷新重试；已保存范围保留。' : suppliers.length ? '勾选限定范围；不勾选表示全部供应商。' : '当前团队暂无供应商，请先核对台账或历史数据迁移。'),
+              h('details', { className: 'sr-disclosure' }, h('summary', null, '预算备注（选填）'), h('p', { className: 'sr-footnote' }, '仅记录预算，不会启动采集或限制支出。'), Field('采集预算记录', h('input', { type: 'number', min: 0, value: planFields.collectionBudget || 0, onChange: event => setPlanFields({ ...planFields, collectionBudget: event.target.value }) }))),
               h('p', { className: 'sr-footnote' }, `下次执行：${fmt(plan.nextRunAt)} · 当前运行：${plan.currentRunStatus || '无'}${plan.failureCode ? ` · ${plan.failureCode}` : ''}`),
               h('button', { type: 'submit', className: 'sr-button', disabled: busy }, busy ? '保存中…' : '保存计划'))),
           h('section', { className: 'sr-section' }, h('div', { className: 'sr-section-heading' }, h('h2', null, '历史周报'), h('span', { className: 'sr-unread-count' }, `未读 ${reports.unreadCount || 0}`)),
@@ -530,6 +677,12 @@ window.__ModuleLoader__.load({
     }
 
     function apply(ctx) {
+      ctx.effect(() => {
+        const reset = () => { supplierNavigation().invalidate(); if (ctx.layout.panelInfo.getSnapshot().activePanelId === 'supplier-risk') ctx.layout.selectPanel(null) }
+        window.addEventListener('sensteed:identity-changed', reset)
+        return () => { window.removeEventListener('sensteed:identity-changed', reset); supplierNavigation().invalidate() }
+      }, 'desktop context identity isolation')
+      ctx.slots.inject('desktop.navigation.context', () => ctx.slots.register({ name: 'desktop.navigation.context', key: 'supplier-risk' }, supplierNavigation().Menu))
       const t = ctx.locale.bind('dofe.supplier-risk')
       ctx.effect(() => {
         const style = document.createElement('style')
@@ -566,18 +719,22 @@ window.__ModuleLoader__.load({
           window.removeEventListener('supplier-risk:agent-error', onAgentError)
         }
       }, 'supplier risk agent bridge')
-      ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID, locale: 'dofe.supplier-risk' }, Workbench))
+      ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID, locale: 'dofe.supplier-risk' }, SupplierPage))
       ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({ name: 'sidebar.footer.action', id: PANEL_ID, order: 57, locale: 'dofe.supplier-risk', inject: () => ({ t, onOpen: () => ctx.layout.selectPanel(PANEL_ID) }) }, FooterButton))
       ctx.effect(() => ctx.locale.register('dofe.supplier-risk', { zh: { panel: '供应链管理' }, en: { panel: 'Supply chain' } }), 'supplier risk locale')
     }
 
     function FooterButton({ wide, t, onOpen }) {
+      const { allowed } = supplierNavigation().useAccess(`${BASE}/access`, adoptScope)
+      if (allowed !== true) return null
       return h(Tooltip, { label: t('panel'), disabled: wide },
         h('button', { type: 'button', className: `sr-launcher${wide ? ' sr-wide' : ''}`, 'aria-label': t('panel'), onClick: onOpen },
           h(IconShieldOutlineRegular, { size: wide ? 14 : 18 }), wide ? h('span', null, t('panel')) : null))
     }
     exports.apply = apply
     exports.inject = ['slots', 'locale', 'sessions', 'uiWorkspace', 'layout']
+
+    function SupplierPage() { const { allowed, epoch } = supplierNavigation().useAccess(`${BASE}/access`, adoptScope); return allowed === true ? h(Workbench, { key: epoch }) : h('p', { role: 'status' }, allowed === false ? '当前模块不可访问' : '正在确认访问权限…') }
 
     exports.apply = apply; exports.inject = ['slots', 'locale', 'sessions', 'uiWorkspace', 'layout']; return module.exports; },
 });

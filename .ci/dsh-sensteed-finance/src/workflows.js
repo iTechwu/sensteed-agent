@@ -220,6 +220,7 @@ function financeFormErrors(fields, values) {
     else if (field.type === 'number') {
       const number = Number(value)
       if (!Number.isFinite(number)) errors[field.key] = `${field.label}须为有效数字`
+      else if (field.integer && !Number.isInteger(number)) errors[field.key] = `${field.label}须为整数`
       else if (field.min != null && number < field.min) errors[field.key] = `${field.label}不能小于 ${field.min}`
       else if (field.max != null && number > field.max) errors[field.key] = `${field.label}不能大于 ${field.max}`
     } else if (['date', 'datetime-local'].includes(field.type) && !Number.isFinite(new Date(value).getTime())) errors[field.key] = `请填写有效的${field.label}`

@@ -154,7 +154,7 @@ test('client bundle registers a keyed main panel and a footer launcher', async (
   assert.match(bundle, /supply_chain_weekly_report_plan_save/u)
   assert.match(bundle, /supply_chain_business_analysis_save/u)
   assert.match(bundle, /supply_chain_workbench_suppliers_list/u)
-  assert.match(bundle, /className: 'sr-multi-select', multiple: true/u)
+  assert.match(bundle, /className: 'sr-scope-picker'/u)
   assert.doesNotMatch(bundle, /供应商范围（每行一个 ID）/u)
 })
 
