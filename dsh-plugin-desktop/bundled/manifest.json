@@ -188,14 +188,14 @@
       "kind": "dir",
       "path": "finance-cash-pressure",
       "repository": "https://github.com/iTechwu/helm.dofe.ai",
-      "resolvedSha": "34f035bb4068dc7afdf25b2498fc0702c9d412a9"
+      "resolvedSha": "264307feb11ad5a460500ff8d79024043c74d086"
     },
     {
       "name": "finance-cost-cash-forecast",
       "kind": "dir",
       "path": "finance-cost-cash-forecast",
       "repository": "https://github.com/iTechwu/helm.dofe.ai",
-      "resolvedSha": "34f035bb4068dc7afdf25b2498fc0702c9d412a9"
+      "resolvedSha": "264307feb11ad5a460500ff8d79024043c74d086"
     }
   ]
 }

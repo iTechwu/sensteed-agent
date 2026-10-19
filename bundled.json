@@ -102,7 +102,7 @@
       "source": "sibling",
       "siblingDir": "../docker-helm.dofe.ai/skills/finance-cash-pressure",
       "snapshotDir": "dsh-plugin-desktop/bundled/skills/finance-cash-pressure",
-      "resolvedSha": "34f035bb4068dc7afdf25b2498fc0702c9d412a9"
+      "resolvedSha": "264307feb11ad5a460500ff8d79024043c74d086"
     },
     {
       "name": "finance-budget-review",
@@ -138,7 +138,7 @@
       "source": "sibling",
       "siblingDir": "../docker-helm.dofe.ai/skills/finance-cost-cash-forecast",
       "snapshotDir": "dsh-plugin-desktop/bundled/skills/finance-cost-cash-forecast",
-      "resolvedSha": "34f035bb4068dc7afdf25b2498fc0702c9d412a9"
+      "resolvedSha": "264307feb11ad5a460500ff8d79024043c74d086"
     },
     {
       "name": "finance-budget-version-health",
