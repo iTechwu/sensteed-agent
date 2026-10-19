@@ -38,10 +38,10 @@ test('exposes full Knowledge, Memory, Ontology, and graph management surfaces in
   assert.match(source, /style\.textContent = css \+ stateCss \+ themeCss \+ themeRefinementCss \+ contentLayoutCss \+ managementCss/u)
 })
 
-async function loadClientTestApi() {
+async function loadClientTestApi(hookOverrides = {}) {
   const source = await readFile(new URL('src/client.js', root), 'utf8')
   const module = { exports: {} }
-  const react = { createElement(type, props, ...children) { return { type, props: props || {}, children } }, useEffect() {}, useMemo(factory) { return factory() }, useState(initial) { return [initial, () => {}] }, useSyncExternalStore() {}, Fragment: Symbol('Fragment') }
+  const react = { createElement(type, props, ...children) { return { type, props: props || {}, children } }, useEffect() {}, useMemo(factory) { return factory() }, useState(initial) { return [initial, () => {}] }, useSyncExternalStore() {}, Fragment: Symbol('Fragment'), ...hookOverrides }
   vm.runInNewContext(source, { module, exports: module.exports, require(id) { return id === 'react' ? react : { Tooltip() {} } }, Intl, Map, Set, Date, JSON, Number, Array, Object, String, Math })
   return module.exports.__test
 }
@@ -581,4 +581,24 @@ test('governance JSON validation rejects malformed or wrong-shaped configuration
   assert.equal(field.children[1].props['aria-invalid'], true)
   assert.equal(field.children[1].props['aria-describedby'], field.children[2].props.id)
   assert.equal(field.children[2].props.role, 'alert')
+})
+
+
+test('independent governance tasks never inherit each other draft inputs', async () => {
+  const states = []; let cursor = 0
+  const api = await loadClientTestApi({ useState(initial) { const i = cursor++; if (!(i in states)) states[i] = initial; return [states[i], value => { states[i] = value }] } })
+  const walk = node => !node || typeof node !== 'object' ? [] : [node, ...(node.children || []).flat(Infinity).flatMap(walk)]
+  const render = tab => { cursor = 0; return api.Management({ tab, data: {}, t: key => key, busy: false, result: null, onLoad() {}, onWrite() {} }) }
+  const field = (tab, name, index = 0) => walk(render(tab)).filter(node => node.type === api.ManagementField && node.props.placeholder === name)[index]
+  field('console', 'sourceName').props.onInput({ currentTarget: { value: 'source-draft' } })
+  assert.equal(field('console', 'titleField').props.value, '')
+  assert.equal(field('console', 'sourceName').props.value, 'source-draft')
+  field('knowledge', 'titleField', 0).props.onInput({ currentTarget: { value: 'ingest-title' } })
+  assert.equal(field('knowledge', 'titleField', 1).props.value, '')
+  field('knowledge', 'content').props.onInput({ currentTarget: { value: 'ingest-content' } })
+  assert.equal(field('memoryManage', 'content').props.value, '')
+  field('memoryManage', 'reason').props.onInput({ currentTarget: { value: 'memory-reason' } })
+  assert.equal(field('knowledge', 'reason').props.value, '')
+  field('console', 'principalId', 0).props.onInput({ currentTarget: { value: 'resource-principal' } })
+  assert.equal(field('console', 'principalId', 1).props.value, '')
 })
