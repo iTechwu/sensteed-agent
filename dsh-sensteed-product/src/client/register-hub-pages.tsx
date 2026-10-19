@@ -3,6 +3,10 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
+declare module '@deepseek-ai/dsh-api-session-controller/client' {
+  interface SessionReferenceSourceMap { sensteedHubCatalog: unknown }
+}
+
 import { createHubNavigation, nativeHubNavigation, HubContext } from './HubNavigation.tsx'
 import { HubSetupSection } from './HubSetupSection.tsx'
 import { Blocks, Sparkles } from 'lucide-react'
@@ -22,9 +26,15 @@ export function registerHubPages(ctx: Context, props: {
     const sessions = ctx.sessions.list.getSnapshot()
     const latest = sessions.ids.map(id => sessions.byId[id]).filter(value => value !== undefined).sort((a, b) => b.updatedAt - a.updatedAt)[0]
     if (!latest) return []
-    const result = await ctx.remote.skills.list({ sessionId: latest.id }, signal)
-    if (!result.ok) throw new Error(result.error.message)
-    return result.value.skills
+    return ctx.sessions.using(latest.id, { source: 'sensteedHubCatalog', signal }, async reference => {
+      signal.throwIfAborted()
+      const session = reference.binding.session.getSnapshot()
+      if (session.openState !== 'open') throw session.openError ?? new Error('Session unavailable')
+      const result = await ctx.remote.skills.list({ sessionId: latest.id }, signal)
+      signal.throwIfAborted()
+      if (!result.ok) throw new Error(result.error.message)
+      return result.value.skills
+    })
   }
   // The legacy page remains the default when its Host services are present.
   ctx.slots.inject('plugins.tab', () => ctx.slots.register({

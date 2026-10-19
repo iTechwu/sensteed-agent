@@ -58,7 +58,8 @@ it('renders the summary one-liner and the detail page with its MCP servers', asy
     expect(container.querySelector('.dshDofePluginStateOn')?.textContent).toBe('已启用')
     expect(container.textContent).toContain('商业调研与热点工具集')
     await act(async () => root.render(createElement(DofePluginCard, { ...props, view: 'page' } as never)))
-    expect(container.textContent).toContain('MCP 数据源')
+    expect(container.querySelector('details')?.open).toBe(false)
+    expect(container.querySelector('summary')?.textContent).toBe('查看连接详情')
     expect(container.querySelectorAll('.dshDofePluginServer')).toHaveLength(plugin.servers.length)
     expect(container.textContent).toContain('在 设置 → 内置能力 中调整这些能力的开关。')
   } finally {

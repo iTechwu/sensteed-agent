@@ -22,7 +22,7 @@ function ScheduleCatalogContext({ hooks, onNewTask, onOpenSession, onRetry }: Sc
   return <nav className="sensteedBusinessNavigation" aria-label="自动化任务导航">
     <button type="button" onClick={onNewTask}><Plus size={16} /> 新建任务</button>
     <label className="sensteedContextSearch"><Search size={15} /><input type="search" aria-label="搜索自动化任务" placeholder="搜索任务" value={query} onChange={event => setQuery(event.target.value)} /></label>
-    <h3>任务与会话</h3>
+    <p className="sensteedContextGroup">任务与会话</p>
     {catalog.status === 'error' ? <><p role="alert">任务加载失败</p><button type="button" onClick={() => { void onRetry(catalog.readRequest) }}>重新加载</button></>
       : !catalog.settled ? <p role="status">正在加载任务…</p>
       : records.length === 0 ? <p role="status">{query ? '没有匹配的任务' : '暂无自动化任务'}</p>

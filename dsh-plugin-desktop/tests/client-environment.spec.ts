@@ -207,8 +207,7 @@ describe('advanced desktop layout', () => {
 
     try {
       const dispose = installDesktopOwnedStyles()
-      expect(css).toMatch(/\.sensteedAgentFrame \{[^}]*transition: grid-template-columns var\(--ds-transition-duration-slow\) var\(--ds-ease-in-out\);/)
-      expect(css).toMatch(/\.sensteedAgentFrame\[data-dragging\] \{ transition: none; \}/)
+      expect(css).not.toContain('transition: grid-template-columns')
       expect(css).toContain('min-height: 0; overflow: visible;')
       expect(css).toMatch(/\.sensteedAgentResizeHandle \{[^}]*transition: left var\(--ds-transition-duration-slow\) var\(--ds-ease-in-out\);/)
       expect(css).toMatch(/\.sensteedAgentFrame\[data-dragging\] \.sensteedAgentResizeHandle \{ transition: none; \}/)

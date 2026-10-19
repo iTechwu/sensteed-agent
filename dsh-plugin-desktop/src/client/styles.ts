@@ -11,7 +11,10 @@ import {
 const DESKTOP_OWNED_STYLES = `
 html, body, #root { width: 100%; height: 100%; }
 body:is([data-sensteed-agent-mode="extended"], [data-sensteed-agent-mode="advanced"]) { margin: 0; background: transparent !important; }
-.sensteedAgentFrame { position: relative; display: grid; grid-template-rows: 100%; width: 100%; height: 100%; overflow: hidden; background: transparent; transition: grid-template-columns var(--ds-transition-duration-slow) var(--ds-ease-in-out); }
+.sensteedAgentFrame { position: relative; display: grid; grid-template-rows: 100%; width: 100%; height: 100%; overflow: hidden; background: transparent; }
+.sensteedSkipLink { position:absolute; z-index:1000; top:8px; left:8px; transform:translateY(-160%); padding:8px 12px; border-radius:6px; background:var(--dsw-alias-button-primary-fill); color:var(--dsw-alias-label-primary-foreground); }
+.sensteedSkipLink:focus { transform:translateY(0); }
+.sensteedAgentRightbarSurface[hidden] { display:none; }
 .sensteedAgentSidebarSurface { --dsw-specific-sidebar-fill: transparent; position: relative; grid-column: 1; grid-row: 1; min-width: 0; overflow: hidden; background: transparent; border-right: 1px solid var(--dsw-alias-border-l1); }
 body:is([data-sensteed-agent-mode="extended"], [data-sensteed-agent-mode="advanced"])[data-sensteed-agent-material="off"] .sensteedAgentSidebarSurface { --dsw-specific-sidebar-fill: var(--dsw-alias-bg-layer-1); background: var(--dsw-alias-bg-layer-1); }
 .sensteedAgentFrame[data-sidebar-collapsed] .sensteedAgentSidebarSurface { border-right:0; }

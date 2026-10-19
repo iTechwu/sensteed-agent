@@ -29,7 +29,7 @@ function DataCenterView({ ctx, t }) {
       const [configsResult, runsResult, metricsResult, qualityResult] = results
       setConfigs(configsResult.status === 'fulfilled' ? (configsResult.value.data ?? { list: [] }) : null)
       setRuns(runsResult.status === 'fulfilled' ? (runsResult.value.data ?? { list: [] }) : null)
-      setMetrics(metricsResult.status === 'fulfilled' ? (metricsResult.value.data ?? []) : null)
+      setMetrics(metricsResult.status === 'fulfilled' ? financeRows(metricsResult.value.data) : null)
       setQuality(qualityResult.status === 'fulfilled' ? qualityResult.value : null)
       const failed = results.filter(result => result.status === 'rejected').length
       setLoadState(failed === results.length ? 'error' : failed ? 'partial' : 'ready')

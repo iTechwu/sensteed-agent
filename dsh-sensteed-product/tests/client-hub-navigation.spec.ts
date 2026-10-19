@@ -39,3 +39,17 @@ it('reads a real method-bound settings scope when mounting the context', async (
     expect(container.textContent).toContain('发现与安装')
   } finally { await act(async () => root.unmount()); vi.unstubAllGlobals() }
 })
+
+it('selects a specific built-in capability rather than opening the whole installed list', () => {
+  const navigation = createHubNavigation()
+  navigation.openPlugin('finance')
+  expect(navigation.getSnapshot()).toBe('installed')
+  expect(navigation.selectedPlugin.getSnapshot()).toBe('finance')
+  navigation.select('installed')
+  expect(navigation.selectedPlugin.getSnapshot()).toBeNull()
+  const setView = vi.fn(), setTab = vi.fn()
+  const native = nativeHubNavigation({ getSnapshot: () => ({ tab: 'installed', view: { kind: 'item', id: 'dofe-finance' } }), subscribe: () => () => {}, actions: { setTab, setView } })
+  expect(native.selectedPlugin.getSnapshot()).toBe('finance')
+  native.openPlugin('knowledge')
+  expect(setView).toHaveBeenCalledWith({ kind: 'item', id: 'dofe-knowledge' })
+})
