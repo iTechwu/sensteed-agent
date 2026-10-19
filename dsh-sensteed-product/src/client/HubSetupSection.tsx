@@ -20,7 +20,7 @@ function HubSetupEditor({t,kind}:Pick<Props,'t'|'kind'>){
  const titleId=useId()
  const [check,setCheck]=useState<HubCheck>(),[selection,setSelection]=useState<HubSelection[]>([]),[preview,setPreview]=useState<HubPreview>(),[operation,setOperation]=useState<HubOperation>(),[busy,setBusy]=useState(false),[error,setError]=useState<string>(),[recovering,setRecovering]=useState(false),[clock,setClock]=useState(Date.now())
  const lock=useRef(false),intent=useRef<HubPreview>(),mounted=useRef(true),sequence=useRef(0)
- const message=(e:unknown)=>e instanceof Error&&e.message==='BASE_VERSION_NOT_ENABLED'?t('hubUnavailable'):t('hubRequestFailed')
+ const message=(e:unknown)=>!(e instanceof Error)?t('hubRequestFailed'):e.message==='BASE_VERSION_NOT_ENABLED'?t('hubUnavailable'):e.message==='HUB_UNAVAILABLE'?t('hubServiceUnreachable'):e.message==='HUB_SSO_REQUIRED'?t('settingsLoginRequired'):t('hubRequestFailed')
  const refresh=useCallback(async(signal?:AbortSignal)=>{
   const epoch=++sequence.current
   const value=await hubCheckRequest(signal)

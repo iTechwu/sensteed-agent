@@ -64,6 +64,20 @@ it.each([
 })
 it('clearly reports an unavailable base service',async()=>{vi.stubGlobal('fetch',vi.fn(async()=>Response.json({available:false,reason:'BASE_VERSION_NOT_ENABLED'})));await mount();expect(container.textContent).toContain(DOFE_ACCESS_COPY.zh.hubUnavailable)})
 
+it('names an unreachable Hub service instead of a lost confirmation',async()=>{
+ vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({error:'HUB_UNAVAILABLE'}),{status:409,headers:{'content-type':'application/json'}})))
+ await mount();expect(container.textContent).toContain(DOFE_ACCESS_COPY.zh.hubServiceUnreachable)
+ expect(container.textContent).not.toContain(DOFE_ACCESS_COPY.zh.hubRequestFailed)
+})
+it('points a Hub SSO fence back at the login flow',async()=>{
+ vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({error:'HUB_SSO_REQUIRED'}),{status:409,headers:{'content-type':'application/json'}})))
+ await mount();expect(container.textContent).toContain(DOFE_ACCESS_COPY.zh.settingsLoginRequired)
+})
+it('keeps unknown Host failures on the recover-status message',async()=>{
+ vi.stubGlobal('fetch',vi.fn(async()=>new Response('gateway exploded',{status:500})))
+ await mount();expect(container.textContent).toContain(DOFE_ACCESS_COPY.zh.hubRequestFailed)
+})
+
 it('blocks confirmation when a new install lacks signed access declarations',async()=>{vi.stubGlobal('fetch',vi.fn(async(path:string)=>Response.json(path.endsWith('/check')?check:{...plan,items:[{...item,action:'install'}]})));await mount();await click(DOFE_ACCESS_COPY.zh.hubPreview);expect(container.textContent).toContain(DOFE_ACCESS_COPY.zh.hubPermissionUnknown);expect([...container.querySelectorAll('button')].find(b=>b.textContent===DOFE_ACCESS_COPY.zh.hubExecute)?.disabled).toBe(true)})
 
 it('uses the verified Profile beta channel without guessing from version or channelRevision',async()=>{
