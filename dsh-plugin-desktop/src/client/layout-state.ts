@@ -38,14 +38,12 @@ export const RIGHTBAR_MIN = 300
 export const RIGHTBAR_MAX_RATIO = 0.7
 export const CENTER_MIN = 400
 
-/** Keep the wider macOS rail private to enhanced mode; extended uses upstream geometry. */
+/** The persistent module rail lives outside this frame; collapsed context reserves no space. */
 export function collapsedSidebarWidth(
-  mode: 'extended' | 'advanced',
-  platform: 'darwin' | 'win32' | 'linux',
+  _mode: 'extended' | 'advanced',
+  _platform: 'darwin' | 'win32' | 'linux',
 ): number {
-  return mode === 'advanced' && platform === 'darwin'
-    ? MACOS_SIDEBAR_COLLAPSED
-    : SIDEBAR_COLLAPSED
+  return 0
 }
 
 /**

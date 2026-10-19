@@ -194,8 +194,8 @@ function Dashboard({ t, embedded = false, onClose = closeOverlay }) {
 
 function Button({ wide, t, onOpen = openOverlay }) {
   const allowed = useFinanceWorkspaceAccess()
-  if (allowed !== true) return null
-  return h(Tooltip, { label: t('open'), disabled: wide }, h('button', { type: 'button', className: `sf-button${wide ? ' sf-wide' : ''}`, 'aria-label': t('open'), onClick: onOpen }, h(IconGaugeOutlineRegular, { size: wide ? 14 : 18 }), wide ? h('span', null, t('open')) : null))
+  if (allowed === false) return null
+  return h(Tooltip, { label: t('open'), disabled: wide }, h('button', { type: 'button', className: `sf-button${wide ? ' sf-wide' : ''}`, 'aria-label': t('open'), 'aria-busy': allowed === null, onClick: onOpen }, h(IconGaugeOutlineRegular, { size: wide ? 14 : 18 }), wide ? h('span', null, t('open')) : null))
 }
 
 function apply(ctx) {

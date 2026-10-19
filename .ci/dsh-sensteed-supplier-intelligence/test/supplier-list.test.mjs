@@ -11,7 +11,7 @@ function load(extra = {}) {
     React: { Fragment: 'fragment' },
     h: (type, props, ...children) => ({ type, props, children }),
     useState: value => [value, () => {}],
-    useEffect() {}, IconSearchOutlineRegular: 'icon',
+    useEffect() {}, useRef: () => ({ current: null }), IconSearchOutlineRegular: 'icon',
     useRemembered: (_key, value) => [value, () => {}],
     testUseLoad: extra.useLoad,
     ...extra,
@@ -60,14 +60,14 @@ test('supplier option failure keeps weekly history visible and existing plan sco
   let loads = 0
   const { Weekly } = load({
     useLoad: () => ++loads === 1
-      ? { loading: false, data: [{ plan: {} }, { items: [], unreadCount: 0 }, null] }
-      : { loading: false, data: null },
+      ? { loading: false, data: { plan: {} } }
+      : loads === 2 ? { loading: false, data: { items: [], unreadCount: 0 } } : { loading: false, data: null },
     useRemembered: (key, initial) => [key === 'weekly-plan-draft' ? { supplierIds: ['saved-supplier'], version: 4 } : initial, () => {}],
   })
   const tree = Weekly({ revision: 0, setError() {}, onUnread() {}, onScopeReady: true })
   const nodes = node => node && typeof node === 'object' ? [node, ...(node.children || []).flat(Infinity).flatMap(nodes)] : []
   const all = nodes(tree)
-  assert.ok(all.some(node => node.children?.includes('暂无已生成周报。')))
+  assert.match(textOf(tree), /暂无已生成周报/)
   const picker = all.find(node => node.type === 'fieldset')
   assert.equal(picker.props.disabled, true)
   assert.match(textOf(tree), /原选择仍保留/)

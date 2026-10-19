@@ -44,9 +44,13 @@ window.__fixtureReady=true;
   const page = await browser.newPage({ viewport: { width: 1440, height: 960 } })
   const errors = [], requests = []
   let denyKnowledge = false
+  let holdAccess = true
+  let releaseAccess
+  const accessReady = new Promise(resolve => { releaseAccess = resolve })
   page.on('pageerror', error => { errors.push(error.message); console.error('Fixture page error:', error.stack) })
   await page.route('**/api/**', async route => {
     const request = route.request(), url = new URL(request.url()); requests.push(url.pathname)
+    if (holdAccess && (url.pathname.endsWith('/access') || url.searchParams.has('access'))) await accessReady
     let body = { ok: true, data: { list: [], total: 0 }, scopeId: 'fixture-scope' }
     if (url.pathname.endsWith('/access') || url.searchParams.has('access')) body = { ok: true, allowed: !(denyKnowledge && url.pathname.endsWith('/knowledge')), scopeId: 'fixture-scope' }
     else if (url.pathname.endsWith('/permissions/me')) body = { ok: true, data: { permissions: ['cash.plan.read','budget.execution.read','budget.activity.read','finance.source.review','budget.activity.manage','budget.submission.verify','budget.submission.edit'] } }
@@ -58,6 +62,12 @@ window.__fixtureReady=true;
   page.on('console', m => { if (m.type() === 'error') console.error('Fixture console:', m.text()) });
   await page.goto(server.resolvedUrls.local[0])
   await page.waitForFunction(() => window.__fixtureReady === true)
+  for (const name of ['供应链管理', '财务管理', '企业知识']) {
+    const launcher = page.getByRole('button', { name, exact: true })
+    await launcher.waitFor({ state: 'visible' })
+    assert.equal(await launcher.getAttribute('aria-busy'), 'true')
+  }
+  holdAccess = false; releaseAccess()
   await page.getByRole('button', { name: '供应链管理', exact: true }).click()
   const context = page.locator('.sensteedBusinessNavigation')
   await context.getByRole('button', { name: '供应商台账', exact: true }).click()

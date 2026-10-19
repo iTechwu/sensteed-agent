@@ -99,13 +99,13 @@ export function DesktopNavigationSidebar({ collapsed, startSession, toggleSideba
         {extensions.includes('dofe-sensteed-knowledge') && <div className="sensteedKnowledgeModule" data-active={active === 'sensteed-knowledge' || undefined}>
           <PluginRailSeat beforeNavigate={action => { if (leaveGuard.current) leaveGuard.current(action); else action() }}>{renderSlot('sidebar.footer.action', { wide: false }, { only: 'dofe-sensteed-knowledge' })}</PluginRailSeat>
         </div>}
-        {ordered.map(({ id, label }) => <RailButton key={id} label={label} active={active === id} onClick={() => selectPanel(id)}>
+        {ordered.map(({ id, label }) => <RailButton key={id} label={label} active={active === id} onClick={() => navigate(id)}>
           {renderSlot('sidebar.panellist', { size: 20, active: active === id }, { only: id })}
         </RailButton>)}
       </nav>
       <div className="sensteedModuleExtensions" aria-label={zh ? '业务与扩展' : 'Business and extensions'}>
         {extensions.filter(id => id !== 'dofe-sensteed-knowledge').map(id => <div key={id} className="sensteedExtensionModule">
-          <PluginRailSeat>{renderSlot('sidebar.footer.action', { wide: false }, { only: id })}</PluginRailSeat>
+          <PluginRailSeat beforeNavigate={action => { if (leaveGuard.current) leaveGuard.current(action); else action() }}>{renderSlot('sidebar.footer.action', { wide: false }, { only: id })}</PluginRailSeat>
         </div>)}
       </div>
     </div>
