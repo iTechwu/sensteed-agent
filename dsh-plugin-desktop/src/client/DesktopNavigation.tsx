@@ -30,10 +30,10 @@ export function DesktopNavigationFrame({ Frame, frameProps, platform }: {
 function RailButton({ label, active, onClick, children }: {
   label: string; active?: boolean; onClick: () => void; children: ReactNode
 }) {
-  return <Tooltip label={label} delayMs={250} focusDelayMs={250} portal>
+  return <PluginRailSeat>
     <button type="button" className="sensteedModuleButton" aria-label={label}
       aria-current={active ? 'page' : undefined} onClick={onClick}>{children}</button>
-  </Tooltip>
+  </PluginRailSeat>
 }
 
 /** Retain plugin permission checks while portalling help outside the scroll rail. */
@@ -72,6 +72,16 @@ function PluginRailSeat({ children, beforeNavigate }: { children: ReactNode; bef
 export function DesktopNavigationSidebar({ collapsed, startSession, toggleSidebar, selectPanel,
   usePanels, usePanelInfo, useExtensions, renderSlot, t }: Omit<SidebarRootComponentProps, 'selectPanel' | 'renderSlot'> & PropsRenderSlots<'sidebar.brand.mark' | 'sidebar.brand.name' | 'sidebar.toggle.badge' | 'sidebar.panellist' | 'sidebar.workspaces' | 'sidebar.settings' | 'sidebar.footer.action' | 'desktop.navigation.context'> & { selectPanel: (id: MainPanelId | null) => void; useExtensions: SnapshotSelectorHook<readonly string[]> }) {
   const target = useContext(RailTarget)
+  const [preview, setPreview] = useState(false)
+  const previewTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const openPreview = () => { clearTimeout(previewTimer.current); if (collapsed) setPreview(true) }
+  const closePreview = () => { clearTimeout(previewTimer.current); previewTimer.current = setTimeout(() => setPreview(false), 180) }
+  useEffect(() => {
+    const dismiss = (event: KeyboardEvent) => { if (event.key === 'Escape') setPreview(false) }
+    window.addEventListener('keydown', dismiss)
+    return () => { clearTimeout(previewTimer.current); window.removeEventListener('keydown', dismiss) }
+  }, [])
+  useEffect(() => { setPreview(false) }, [collapsed])
   const leaveGuard = useRef<((action: () => void) => void) | undefined>(undefined)
   const registerLeaveGuard = useCallback((guard: (action: () => void) => void) => {
     leaveGuard.current = guard
@@ -102,7 +112,9 @@ export function DesktopNavigationSidebar({ collapsed, startSession, toggleSideba
     <div className="sensteedModuleBrand"><img src={sidebarBrandMarkDataUrl} alt="" /></div>
     <div className="sensteedModuleScroll">
       <nav aria-label={zh ? '功能模块' : 'Modules'}>
-        <RailButton label={homeLabel} active={home} onClick={() => navigate(null)}><Home size={20} /></RailButton>
+        <div onPointerEnter={openPreview} onPointerLeave={closePreview} onFocus={openPreview}>
+          <RailButton label={homeLabel} active={home} onClick={() => navigate(null)}><Home size={20} /></RailButton>
+        </div>
         {extensions.includes('dofe-sensteed-knowledge') && <div className="sensteedKnowledgeModule" data-active={active === 'sensteed-knowledge' || undefined}>
           <PluginRailSeat beforeNavigate={action => { if (leaveGuard.current) leaveGuard.current(action); else action() }}>{renderSlot('sidebar.footer.action', { wide: false }, { only: 'dofe-sensteed-knowledge' })}</PluginRailSeat>
         </div>}
@@ -123,11 +135,11 @@ export function DesktopNavigationSidebar({ collapsed, startSession, toggleSideba
   </>
   return <>
     {target !== null && createPortal(rail, target)}
-    <section className="sensteedContextSidebar" aria-label={contextLabel} hidden={collapsed}>
-      <header className="sensteedContextHeader"><strong>{contextLabel}</strong>
+    <section className="sensteedContextSidebar" data-preview={collapsed && preview || undefined} onPointerEnter={openPreview} onPointerLeave={closePreview} aria-label={preview ? homeLabel : contextLabel} hidden={collapsed && !preview}>
+      <header className="sensteedContextHeader"><strong>{preview ? homeLabel : contextLabel}</strong>
         <RailButton label={toggleLabel} onClick={toggleSidebar}><PanelLeft size={18} /></RailButton>
       </header>
-      <div data-context="home" className="sensteedContextHome" hidden={!home || collapsed}>
+      <div data-context="home" className="sensteedContextHome" hidden={!preview && (!home || collapsed)}>
         <Tooltip label={t('session.new.label')} delayMs={250} portal>
           <button type="button" className="sensteedContextNew" onClick={() => startSession()}>
             <SquarePen size={17} /><span>{t('session.new')}</span>
@@ -135,10 +147,10 @@ export function DesktopNavigationSidebar({ collapsed, startSession, toggleSideba
         </Tooltip>
         {renderSlot('sidebar.workspaces', { wide: true, expandSidebar: () => { if (collapsed) toggleSidebar() } })}
       </div>
-      {!home && renderSlot('desktop.navigation.context', { onAccessDenied, registerLeaveGuard }, { entryKey: active, fallback: <div className="sensteedModuleContext">
+      {!home && <div hidden={preview} style={{ display: preview ? 'none' : 'contents' }}>{renderSlot('desktop.navigation.context', { onAccessDenied, registerLeaveGuard }, { entryKey: active, fallback: <div className="sensteedModuleContext">
         <p>{zh ? '当前模块的业务导航与操作在右侧工作区中。' : 'Module navigation and actions are available in the workspace.'}</p>
         <button type="button" onClick={() => selectPanel(null)}>{zh ? '返回项目与聊天' : 'Back to projects and chats'}</button>
-      </div> })}
+      </div> })}</div>}
     </section>
   </>
 }
