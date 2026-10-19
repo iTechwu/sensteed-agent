@@ -617,7 +617,9 @@ window.__ModuleLoader__.load({
         (col.key || `column-${index}`) === sort.id && col.sortable !== false && (col.sortKey || col.sortValue || col.key))
         ? sort
         : null
+      const invalidRows = rows != null && !Array.isArray(rows)
       const sortedRows = useMemo(() => {
+        if (!Array.isArray(rows)) return []
         if (!activeSort) return rows || []
         const column = columns.find((col, index) => (col.key || `column-${index}`) === activeSort.id)
         if (!column) return rows || []
@@ -689,7 +691,7 @@ window.__ModuleLoader__.load({
       })
       return h('div', { className: 'sf-table-wrap' },
         h('div', { className: 'sf-table-toolbar' }, fieldMenu, activeSort ? h('span', { className: 'sf-table-sort-note' }, `当前页已按${columns.find((col, index) => (col.key || `column-${index}`) === activeSort.id)?.label || ''}${activeSort.direction === 'asc' ? '升序' : '降序'}`) : h('span', { className: 'sf-table-sort-note' }, '点击表头可排序'), activeSort ? h('button', { type: 'button', className: 'sf-link-button', onClick: () => setSort(null) }, '清除排序') : null),
-        !rows?.length ? h('div', { className: 'sf-empty' }, empty) : h('div', { className: 'sf-table-scroll' }, h('table', { className: 'sf-table', style: minColumns ? { minWidth: minColumns } : undefined },
+        invalidRows ? h('div', { className: 'sf-fatal', role: 'alert' }, '列表数据格式异常，请刷新数据后重试。') : !rows?.length ? h('div', { className: 'sf-empty' }, empty) : h('div', { className: 'sf-table-scroll' }, h('table', { className: 'sf-table', style: minColumns ? { minWidth: minColumns } : undefined },
           h('thead', null, h('tr', null, ...headerCells)),
           h('tbody', null, ...bodyRows))))
     }
@@ -3925,7 +3927,7 @@ window.__ModuleLoader__.load({
           const [configsResult, runsResult, metricsResult, qualityResult] = results
           setConfigs(configsResult.status === 'fulfilled' ? (configsResult.value.data ?? { list: [] }) : null)
           setRuns(runsResult.status === 'fulfilled' ? (runsResult.value.data ?? { list: [] }) : null)
-          setMetrics(metricsResult.status === 'fulfilled' ? (metricsResult.value.data ?? []) : null)
+          setMetrics(metricsResult.status === 'fulfilled' ? financeRows(metricsResult.value.data) : null)
           setQuality(qualityResult.status === 'fulfilled' ? qualityResult.value : null)
           const failed = results.filter(result => result.status === 'rejected').length
           setLoadState(failed === results.length ? 'error' : failed ? 'partial' : 'ready')
