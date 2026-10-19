@@ -115,7 +115,7 @@ window.__ModuleLoader__.load({
         opTheme: '经营分析主题框架', theme: '主题', metric: '指标', dataSource: '数据源', readiness: '就绪度', ready: '就绪', pending: '待接入', costMix: '费用构成', share: '占比', netFlowTitle: '收支净额（按月）', netInflow: '净流入', netOutflow: '净流出',
         // 资金
         adjustmentDraftSaved: '草稿已保存；提交失败可重试同一草稿，或到调整审批查看。', paymentTransactions: '逐笔实付', paymentReadFailed: '逐笔实付读取失败，请重试。', paymentCoverageUnknown: '展示已发布来源记录；完整性待核对，不以空列表代表未付款。', paymentNone: '未找到可确认归属的逐笔实付，请核对来源。', paymentNumber: '支付单号', paymentProcess: '流程号', paymentCurrency: '币种', paymentConfirmed: '支付已确认', paymentReturned: '已退票', paymentPending: '待支付确认', paymentUnknown: '支付状态未知',
-        cashSummaryV: '资金汇总', cashPlans: '排款工作台', cashAdjustments: '调整审批', cashRevenue: '收入计划', cashMatrix: '资金矩阵（主体 × 月）', cashMonthlyExecution: '当月执行', cashBalance: '资金余额', cashSummaryTable: '主体与月份资金汇总', remainingUnpaid: '剩余未付款', cashMissingMetrics: '差额调整与剩余未到账金额待来源数据补齐；缺失金额显示 —。', prevEndBalance: '上月末余额', plannedIncome: '计划收入', plannedExpense: '计划支出', projectedBalance: '预计余额', actualIncome: '实际收入', actualExpense: '实际支出', actualBalance: '实际余额',
+        cashSummaryV: '资金汇总', cashPlans: '排款工作台', cashAdjustments: '调整审批', cashRevenue: '收入计划', cashMatrix: '资金矩阵（主体 × 月）', cashMonthlyExecution: '当月执行', cashBalance: '资金余额', cashSummaryTable: '主体与月份资金汇总', remainingUnpaid: '剩余未付款', incomeAdjustment: '收入调整差额', expenseAdjustment: '支出调整差额', cashMissingMetrics: '仅计已过账调整，调减为正、调增为负；未到账和未支付逐笔计算。旧快照缺少调整账本口径时显示 —。', prevEndBalance: '上月末余额', plannedIncome: '计划收入', plannedExpense: '计划支出', projectedBalance: '预计余额', actualIncome: '实际收入', actualExpense: '实际支出', actualBalance: '实际余额',
         actualPaidDate: '实付日期', closeRemaining: '剩余不再执行', closeRemainingConfirm: '确认不再执行', closeRemainingReason: '不再执行原因（必填）', closeRemainingHint: '待支付余额将归零，状态标记为“剩余不再执行”。原计划、实付金额和日期保留，原因记录在审计日志中。',
         schedule: '排款', scheduleDate: '排款日期', priority: '优先级', priHigh: '高', priMid: '中', priLow: '低', acceptAcceptance: '接受承兑', cashAmount: '现汇金额（元）', acceptanceAmount: '承兑金额（元）', planDetail: '计划详情', increase: '申请调整', newAmount: '调整后金额（元）', increaseReason: '调整理由（必填）', increaseHint: '调增、调减均需审批；调减不得低于已知实付金额', payee: '收款方', planMonth: '排款月份', planMonthRequired: '排款月份必填', statusCol: '状态',
         revenueVs: '计划与实际到账',
@@ -194,7 +194,7 @@ window.__ModuleLoader__.load({
         carryoverRules: 'Carryover rules', carryoverMode: 'Mode', modeFull: 'Full carry', modePercent: 'Percent', modeExpire: 'Expire', percent: 'Percent (%)', expireMonth: 'Expire month', ruleEnabled: 'Enabled', ruleDisabled: 'Disabled', ruleAdd: 'Add rule', ruleToggle: 'Toggle', ruleRemove: 'Remove',
         opTheme: 'Operations topic framework', theme: 'Topic', metric: 'Metric', dataSource: 'Source', readiness: 'Readiness', ready: 'Ready', pending: 'Pending', costMix: 'Cost mix', share: 'Share', netFlowTitle: 'Net flow (monthly)', netInflow: 'Inflow', netOutflow: 'Outflow',
         adjustmentDraftSaved: 'Draft saved. Retry submission of this draft or find it in Plan adjustments.', paymentTransactions: 'Payment transactions', paymentReadFailed: 'Could not load payments. Please retry.', paymentCoverageUnknown: 'Published source records. Completeness is unverified; an empty list does not mean unpaid.', paymentNone: 'No attributable payment records. Check the source.', paymentNumber: 'Payment number', paymentProcess: 'Process number', paymentCurrency: 'Currency', paymentConfirmed: 'Payment confirmed', paymentReturned: 'Returned', paymentPending: 'Awaiting payment confirmation', paymentUnknown: 'Unknown payment status',
-        cashSummaryV: 'Cash summary', cashPlans: 'Payment plans', cashAdjustments: 'Plan adjustments', cashRevenue: 'Revenue plans', cashMatrix: 'Cash matrix (org × month)', cashMonthlyExecution: 'Current month execution', cashBalance: 'Cash balance', cashSummaryTable: 'Cash summary by org and month', remainingUnpaid: 'Remaining unpaid', cashMissingMetrics: 'Approved adjustments and outstanding receipts await source data. Missing amounts display —.', prevEndBalance: 'Prev end balance', plannedIncome: 'Planned income', plannedExpense: 'Planned expense', projectedBalance: 'Projected balance', actualIncome: 'Actual income', actualExpense: 'Actual expense', actualBalance: 'Actual balance',
+        cashSummaryV: 'Cash summary', cashPlans: 'Payment plans', cashAdjustments: 'Plan adjustments', cashRevenue: 'Revenue plans', cashMatrix: 'Cash matrix (org × month)', cashMonthlyExecution: 'Current month execution', cashBalance: 'Cash balance', cashSummaryTable: 'Cash summary by org and month', remainingUnpaid: 'Remaining unpaid', incomeAdjustment: 'Income adjustment', expenseAdjustment: 'Expense adjustment', cashMissingMetrics: 'Only posted adjustments count: decreases are positive, increases negative. Outstanding amounts are summed per plan. Unknown snapshot metrics display —.', prevEndBalance: 'Prev end balance', plannedIncome: 'Planned income', plannedExpense: 'Planned expense', projectedBalance: 'Projected balance', actualIncome: 'Actual income', actualExpense: 'Actual expense', actualBalance: 'Actual balance',
         actualPaidDate: 'Actual payment date', closeRemaining: 'Stop remaining execution', closeRemainingConfirm: 'Confirm stop', closeRemainingReason: 'Reason (required)', closeRemainingHint: 'The outstanding amount becomes zero with a stopped status. The original plan, actual amount and payment date are preserved; the reason is recorded in the audit log.',
         schedule: 'Schedule', scheduleDate: 'Schedule date', priority: 'Priority', priHigh: 'High', priMid: 'Mid', priLow: 'Low', acceptAcceptance: 'Accept acceptance', cashAmount: 'Cash amount (CNY)', acceptanceAmount: 'Acceptance amount (CNY)', planDetail: 'Plan detail', increase: 'Request adjustment', newAmount: 'New amount (CNY)', increaseReason: 'Reason (required)', increaseHint: 'Both directions require approval. A decrease requires known actual payments and cannot fall below them.', payee: 'Payee', planMonth: 'Plan month', planMonthRequired: 'Plan month is required', statusCol: 'Status',
         revenueVs: 'Planned vs actual',
@@ -1370,23 +1370,59 @@ window.__ModuleLoader__.load({
             message ? h('span', { id: errorId, className: 'sf-neg sf-field-error' }, message) : null))
       })
     }
+    let financeNavigationGlobal = null
+    function financeNavigationContext() {
+      return financeNavigationContext.value ||= React.createContext(null)
+    }
+    function useFinanceNavigationEntry(dirty, busy, discard) {
+      const navigation = React.useContext(financeNavigationContext()) || financeNavigationGlobal, latest = useRef(null)
+      latest.current = { dirty, busy, discard }
+      const read = key => typeof latest.current[key] === 'function' ? latest.current[key]() : latest.current[key]
+      useEffect(() => navigation?.register({ dirty: () => read('dirty'), busy: () => read('busy'), discard: () => latest.current.discard?.() }), [navigation])
+      useEffect(() => {
+        const prevent = event => { if (read('dirty') || read('busy')) { event.preventDefault(); event.returnValue = '' } }
+        window.addEventListener('beforeunload', prevent)
+        return () => window.removeEventListener('beforeunload', prevent)
+      }, [])
+      return navigation
+    }
+    function useFinanceNavigationGuard() {
+      const entries = useRef(new Set()), [pending, setPending] = useState(null), [blocked, setBlocked] = useState(false)
+      const busy = () => [...entries.current].some(entry => entry.busy())
+      const navigation = useMemo(() => ({
+        register: entry => { entries.current.add(entry); return () => entries.current.delete(entry) },
+        leave: action => {
+          if (busy()) { setBlocked(true); return }
+          setBlocked(false)
+          if ([...entries.current].some(entry => entry.dirty())) setPending(() => action)
+          else action()
+        },
+      }), [])
+      const dismiss = () => { setPending(null); setBlocked(false) }
+      const prompt = pending || blocked ? h(Dialog, { title: blocked ? '正在处理，请稍候' : '放弃未保存的录入？', width: 'sm', onClose: dismiss },
+        h('p', null, blocked ? '当前请求尚未完成，暂时不能切换。处理结果返回后可继续操作。' : '当前内容尚未保存。继续将清空本次填写或导入预览；也可以返回继续填写。'),
+        h('div', { className: 'sf-row' }, h(GhostButton, { onClick: dismiss }, blocked ? '返回当前页面' : '继续填写'),
+          !blocked ? h(PrimaryButton, { onClick: () => {
+            if (busy()) { setBlocked(true); return }
+            const action = pending; setPending(null)
+            for (const entry of entries.current) entry.discard()
+            action?.()
+          } }, '放弃并继续') : null)) : null
+      return { navigation, prompt }
+    }
     function useFinanceFormExit(initial, values, busy, onClose) {
       const baseline = useRef(JSON.stringify(initial)), [leaving, setLeaving] = useState(false)
       const promptRef = useRef(null), previousFocus = useRef(null), pendingAction = useRef(onClose)
       const [discardLabel, setDiscardLabel] = useState('放弃修改并关闭')
       const dirty = JSON.stringify(values) !== baseline.current
-      useEffect(() => {
-        if (!dirty) return undefined
-        const prevent = event => { event.preventDefault(); event.returnValue = '' }
-        window.addEventListener('beforeunload', prevent)
-        return () => window.removeEventListener('beforeunload', prevent)
-      }, [dirty])
+      useFinanceNavigationEntry(dirty, busy, () => { baseline.current = JSON.stringify(values) })
+      const isBusy = () => typeof busy === 'function' ? busy() : busy
       useEffect(() => { if (leaving) requestAnimationFrame(() => promptRef.current?.querySelector('button')?.focus()) }, [leaving])
-      const leave = (action, label = '放弃修改并继续') => { if (!busy) { if (dirty) { pendingAction.current = action; setDiscardLabel(label); previousFocus.current = document.activeElement; setLeaving(true) } else action() } }
+      const leave = (action, label = '放弃修改并继续') => { if (!isBusy()) { if (dirty) { pendingAction.current = action; setDiscardLabel(label); previousFocus.current = document.activeElement; setLeaving(true) } else action() } }
       const close = () => leave(onClose, '放弃修改并关闭')
       const prompt = leaving ? h('div', { ref: promptRef, className: 'sf-form-exit sf-stack', role: 'alert' },
         h('p', null, '有尚未保存的修改。离开后这些内容将丢失。'),
-        h('div', { className: 'sf-row' }, h(GhostButton, { disabled: busy, onClick: () => { setLeaving(false); requestAnimationFrame(() => previousFocus.current?.focus()) } }, '继续编辑'), h(GhostButton, { disabled: busy, onClick: () => { setLeaving(false); pendingAction.current() } }, discardLabel))) : null
+        h('div', { className: 'sf-row' }, h(GhostButton, { disabled: isBusy(), onClick: () => { setLeaving(false); requestAnimationFrame(() => previousFocus.current?.focus()) } }, '继续编辑'), h(GhostButton, { disabled: isBusy(), onClick: () => { if (!isBusy()) { setLeaving(false); pendingAction.current() } } }, discardLabel))) : null
       return { close, prompt, leave, reset: values => { baseline.current = JSON.stringify(values) } }
     }
     function FinanceFormDialog({ title, description, fields, initial = {}, onSubmit, onClose }) {
@@ -2750,6 +2786,9 @@ window.__ModuleLoader__.load({
       return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString('sv-SE', { timeZone: 'Asia/Shanghai' })
     }
 
+    const CASH_DELAY_OPTIONS = [['UNKNOWN', '未确认延期'], ['DELAYED', '已延期'], ['NOT_DELAYED', '未延期']]
+    const cashDelayLabel = value => CASH_DELAY_OPTIONS.find(([key]) => key === value)?.[1] ?? '未确认延期'
+
     const PRIORITIES = [['HIGH', 'priHigh'], ['MEDIUM', 'priMid'], ['LOW', 'priLow']]
 
     function normalizePaymentPriority(value) {
@@ -2766,7 +2805,7 @@ window.__ModuleLoader__.load({
       const [cash, setCash] = useState(null)
       const [plans, setPlans] = useState(null)
       const [revenues, setRevenues] = useState(null)
-      const [filters, setFilters] = useFinanceViewState(ctx, 'filters', { planType: ctx.drillParams?.planType || '', departmentId: ctx.drillParams?.departmentId || '', months: ctx.drillParams?.months || financePlanMonths(null, ctx.drillParams?.month), expenseType: ctx.drillParams?.expenseType || '', keyword: ctx.drillParams?.keyword || '', unassigned: ctx.drillParams?.unassigned === true })
+      const [filters, setFilters] = useFinanceViewState(ctx, 'filters', { planType: ctx.drillParams?.planType || '', delayStatus: ctx.drillParams?.delayStatus || '', departmentId: ctx.drillParams?.departmentId || '', months: ctx.drillParams?.months || financePlanMonths(null, ctx.drillParams?.month), expenseType: ctx.drillParams?.expenseType || '', keyword: ctx.drillParams?.keyword || '', unassigned: ctx.drillParams?.unassigned === true })
       const [page, setPage] = useFinanceViewState(ctx, 'page', ctx.drillParams?.page || 1)
       const [revenuePage, setRevenuePage] = useFinanceViewState(ctx, 'revenuePage', ctx.drillParams?.page || 1)
       const [keywordDraft, setKeywordDraft] = useFinanceViewState(ctx, 'keywordDraft', ctx.drillParams?.keyword || '')
@@ -2781,6 +2820,7 @@ window.__ModuleLoader__.load({
         const params = new URLSearchParams({ year })
         if (orgId && !filters.unassigned) params.set('orgId', orgId)
         if (filters.planType) params.set('planType', filters.planType)
+        if (filters.delayStatus) params.set('delayStatus', filters.delayStatus)
         if (filters.departmentId) params.set('departmentId', filters.departmentId)
         if (filters.months.length) params.set('months', filters.months.join(','))
         if (filters.expenseType) params.set('expenseType', filters.expenseType)
@@ -2829,6 +2869,7 @@ window.__ModuleLoader__.load({
         tab === 'plans' ? [
           h(Select, { key: 'type', 'aria-label': t('planType'), value: filters.planType, onChange: value => updateFilters({ planType: value }), options: PLAN_TYPES.map(([id, label]) => [id, t(label)]), placeholder: t('planType') }),
           h(Select, { key: 'expense', 'aria-label': t('expenseType'), value: filters.expenseType, onChange: value => updateFilters({ expenseType: value }), options: EXPENSE_TYPES.map(([id, label]) => [id, t(label)]), placeholder: t('expenseType') }),
+          h(Select, { key: 'delay', 'aria-label': '延期状态', value: filters.delayStatus || '', onChange: value => updateFilters({ delayStatus: value }), options: [['', '全部延期状态'], ...CASH_DELAY_OPTIONS], placeholder: '全部延期状态' }),
           h(SearchSelect, { key: 'department', value: filters.departmentId, onChange: value => updateFilters({ departmentId: value }), options: (departments || []).map(d => [d.id, d.name]), placeholder: t('department') }),
         ] : h('form', { className: 'sf-row', 'aria-label': '筛选收入类型', onSubmit: event => { event.preventDefault(); setIncomeTypeName(incomeTypeDraft.trim()); setRevenuePage(1) } },
           h(Field, { 'aria-label': '收入类型（精确匹配）', value: incomeTypeDraft, onChange: setIncomeTypeDraft, placeholder: '收入类型（精确匹配）', maxLength: 100 }),
@@ -2851,11 +2892,12 @@ window.__ModuleLoader__.load({
 
         tab === 'summary' ? h(SummaryTab, { cash, t, year, onDrill }) : null,
         tab === 'plans' ? !currentPlans ? h('p', { role: 'status' }, t('loading')) : currentPlans.error ? h(CashPlanListError, { onRetry: retryList }) : h(PlansTab, { rows: planRows, total: currentPlans.value?.data?.total ?? currentPlans.value?.total, page, onPage: setPage, t, busy, act, canWrite, onDialog: setDialog }) : null,
-        tab === 'revenue' ? !currentRevenues ? h('p', { role: 'status' }, t('loading')) : currentRevenues.error ? h(CashPlanListError, { onRetry: retryList }) : h(RevenueTab, { revenues: currentRevenues.value, page: revenuePage, onPage: setRevenuePage, t, canWrite, onBackfill: row => setDialog({ kind: 'backfill', row }), onLedger: row => setDialog({ kind: 'receiptLedger', row }) }) : null,
+        tab === 'revenue' ? !currentRevenues ? h('p', { role: 'status' }, t('loading')) : currentRevenues.error ? h(CashPlanListError, { onRetry: retryList }) : h(RevenueTab, { revenues: currentRevenues.value, page: revenuePage, onPage: setRevenuePage, t, canWrite, onBackfill: row => setDialog({ kind: 'backfill', row }), onLedger: row => setDialog({ kind: 'receiptLedger', row }), onAdjust: row => setDialog({ kind: 'revenueAdjustment', plan: row }) }) : null,
         tab === 'accuracy' ? h(CashAccuracyView, { ctx, t }) : null,
 
         dialog?.kind === 'closeRemaining' && canWrite ? h(CloseRemainingDialog, { plan: dialog.plan, t, busy, onClose: () => setDialog(null), act }) : null,
         dialog?.kind === 'schedule' ? h(ScheduleDialog, { plan: dialog.plan, t, onClose: () => setDialog(null), act }) : null,
+        dialog?.kind === 'revenueAdjustment' && canWrite ? h(RevenueAdjustmentDialog, { plan: dialog.plan, t, onClose: () => setDialog(null), act }) : null,
         dialog?.kind === 'increase' ? h(IncreaseDialog, { plan: dialog.plan, t, onClose: () => setDialog(null), act }) : null,
         dialog?.kind === 'planDetail' ? h(PlanDetailDialog, { plan: dialog.plan, ctx, t, onClose: () => setDialog(null) }) : null,
         dialog?.kind === 'receiptLedger' ? h(Dialog, { title: `${t('settlementSectionReceipt')} · ${dialog.row.itemName ?? ''}`, onClose: () => setDialog(null) }, h(CashSettlementsSection, { planId: dialog.row.id, direction: 'RECEIPT', ctx, t })) : null,
@@ -2875,7 +2917,7 @@ window.__ModuleLoader__.load({
       const month = Number(parts.find(part => part.type === 'month').value)
       const isCurrentYear = Number(selectedYear) === year
       const current = isCurrentYear ? rows.filter(row => row.year === year && row.month === month) : []
-      const totals = Object.fromEntries(['actualBalance', 'plannedIncome', 'plannedExpense', 'actualIncome', 'actualExpense', 'remainingPayment'].map(key => {
+      const totals = Object.fromEntries(['actualBalance', 'plannedIncome', 'plannedExpense', 'actualIncome', 'actualExpense', 'remainingPayment', 'remainingReceipt', 'incomeAdjustment', 'expenseAdjustment'].map(key => {
         const values = current.map(row => finite(row[key]))
         return [key, values.length && values.every(value => value !== null) ? values.reduce((sum, value) => sum + value, 0) : null]
       }))
@@ -2888,12 +2930,12 @@ window.__ModuleLoader__.load({
       const model = cashSummaryModel(rows, year, now)
       const caliber = cash?.data?.caliber || cash?.caliber
       return h('div', { className: 'sf-stack' },
-        h('p', { className: 'sf-note' }, caliber === 'PUBLISHED_FACTS' ? '按已生效财务代录及已审核发布的付款/收入计划汇总，仅含年度、月份齐全的行；未知金额保留为空，余额及来源剩余金额暂不可用。' : caliber === 'IMPORTED' ? '每行是主体×月份导入快照，未经拆分；余额不跨月累加。' : '来源口径暂未返回，请核对服务版本与导入发布状态；未知金额不按零处理。'),
+        h('p', { className: 'sf-note' }, caliber === 'PUBLISHED_FACTS' ? '按已生效财务代录及已审核发布的付款/收入计划汇总，仅含年度、月份齐全的行；未知金额保留为空；余额不可推导，未到账/未付款逐笔求和，调整差额只计已过账单。' : caliber === 'IMPORTED' ? '每行是主体×月份导入快照，未经拆分；余额不跨月累加。' : '来源口径暂未返回，请核对服务版本与导入发布状态；未知金额不按零处理。'),
         !rows.length ? h('p', { role: 'status' }, '当前年度与主体暂无资金汇总记录，可切换范围或到数据中心核查导入与发布状态。') : null,
         model.isCurrentYear ? h(Card, { title: `${model.year}-${String(model.month).padStart(2, '0')} · ${t('cashMonthlyExecution')}`, unit: t('unitNote') },
           h('div', { className: 'sf-kpis' },
-            ...[['actualBalance', 'cashBalance'], ['plannedIncome', 'plannedIncome'], ['plannedExpense', 'plannedExpense'], ['actualIncome', 'actualIncome'], ['actualExpense', 'actualExpense'], ['remainingPayment', 'remainingUnpaid']].map(([key, label]) =>
-              h(KpiCard, { key, icon: 'data', label: t(label), value: yuan(model.totals[key]) ?? '—', negative: model.totals[key] !== null && model.totals[key] < 0, onClick: onDrill && key !== 'actualBalance' ? () => onDrill('cash', { view: /Income$/.test(key) ? 'revenue' : 'plans', year: String(model.year), month: String(model.month) }) : undefined }))),
+            ...[['actualBalance', 'cashBalance'], ['plannedIncome', 'plannedIncome'], ['plannedExpense', 'plannedExpense'], ['actualIncome', 'actualIncome'], ['actualExpense', 'actualExpense'], ['remainingPayment', 'remainingUnpaid'], ['remainingReceipt', 'remainingReceipt'], ['incomeAdjustment', 'incomeAdjustment'], ['expenseAdjustment', 'expenseAdjustment']].map(([key, label]) =>
+              h(KpiCard, { key, icon: 'data', label: t(label), value: yuan(model.totals[key]) ?? '—', negative: model.totals[key] !== null && model.totals[key] < 0, onClick: onDrill && key !== 'actualBalance' ? () => onDrill('cash', { view: ['plannedIncome', 'actualIncome', 'incomeAdjustment', 'remainingReceipt'].includes(key) ? 'revenue' : 'plans', year: String(model.year), month: String(model.month) }) : undefined }))),
           h('p', { className: 'sf-note' }, t('cashMissingMetrics'))) : null,
         h(Card, { title: t('cashSummaryTable'), unit: t('unitNote') }, h(CashSummaryTable, { rows, t })))
     }
@@ -2904,7 +2946,7 @@ window.__ModuleLoader__.load({
           { label: t('org'), key: 'orgName', stickyLeft: true },
           { label: t('year'), key: 'year', num: true },
           { label: t('monthCol'), key: 'month', num: true },
-          ...[['prevMonthEndBalance', 'prevEndBalance'], ['plannedIncome', 'plannedIncome'], ['plannedExpense', 'plannedExpense'], ['projectedBalance', 'projectedBalance'], ['actualIncome', 'actualIncome'], ['actualExpense', 'actualExpense'], ['actualBalance', 'actualBalance'], ['remainingPayment', 'remainingUnpaid']].map(([key, label]) => ({
+          ...[['prevMonthEndBalance', 'prevEndBalance'], ['plannedIncome', 'plannedIncome'], ['plannedExpense', 'plannedExpense'], ['projectedBalance', 'projectedBalance'], ['actualIncome', 'actualIncome'], ['actualExpense', 'actualExpense'], ['actualBalance', 'actualBalance'], ['remainingPayment', 'remainingUnpaid'], ['remainingReceipt', 'remainingReceipt'], ['incomeAdjustment', 'incomeAdjustment'], ['expenseAdjustment', 'expenseAdjustment']].map(([key, label]) => ({
             label: t(label), key, sortValue: row => finite(row[key]), num: true, render: row => wan(row[key]) ?? '—',
           })),
         ], rows, rowKey: 'id', empty: t('empty'),
@@ -2927,6 +2969,7 @@ window.__ModuleLoader__.load({
             { label: t('actualPaidDate'), key: 'actualPaidAt', render: row => actualPaymentDate(row.actualPaidAt) ?? '—', num: true },
             { label: t('statusCol'), key: 'status', render: row => financeDisplayValue(row.status, 'status') },
             { label: t('scheduleDate'), key: 'scheduleDate', render: row => actualPaymentDate(row.scheduleDate) ?? '—', num: true },
+            { label: '延期状态', key: 'delayStatus', render: row => cashDelayLabel(row.delayStatus) },
             { label: t('priority'), key: 'priority', render: row => { const priority = normalizePaymentPriority(row.priority); return priority ? h(Pill, { tone: priority === 'HIGH' ? 'rose' : priority === 'MEDIUM' ? 'amber' : 'muted' }, financeEnumLabel(priority, t, Object.fromEntries(PRIORITIES))) : '—' } },
             {
               label: t('actions'), key: 'actions', sortable: false,
@@ -2966,6 +3009,11 @@ window.__ModuleLoader__.load({
       const [cashAmount, setCashAmount] = useState(plan.plannedCashAmount != null ? String(plan.plannedCashAmount) : '')
       const [acceptanceAmount, setAcceptanceAmount] = useState(plan.plannedAcceptanceAmount != null ? String(plan.plannedAcceptanceAmount) : '')
       const [planMonth, setPlanMonth] = useState('')
+      const [delayStatus, setDelayStatus] = useState(plan.delayStatus ?? 'UNKNOWN')
+      const [delayTouched, setDelayTouched] = useState(false)
+      const [originalDate, setOriginalDate] = useState(actualPaymentDate(plan.originalScheduleDate) ?? '')
+      const [deferredDate, setDeferredDate] = useState(actualPaymentDate(plan.deferredUntil) ?? '')
+      const [delayReason, setDelayReason] = useState(plan.delayReason ?? '')
       const [splitTouched, setSplitTouched] = useState(false)
       const [formError, setFormError] = useState(null)
       const [pending, setPending] = useState(false)
@@ -3015,10 +3063,12 @@ window.__ModuleLoader__.load({
           if (Math.round(Number(cashAmount) * 100) + Math.round(Number(acceptanceAmount) * 100) !== totalCents) { setFormError(t('scheduleSumBad')); return }
           if (accepts === 'no' && Number(acceptanceAmount) > 0) { setFormError(t('scheduleNoAcceptance')); return }
         }
+        if (delayTouched && delayStatus === 'DELAYED' && (!originalDate || !deferredDate || deferredDate <= originalDate || !delayReason.trim())) { setFormError('延期须填写原计划日期、较晚的延期日期及原因。'); return }
         setFormError(null)
         lock.current = true; setPending(true)
         try {
           const saved = await act(`/payment-plans/${plan.id}/schedule`, {
+            ...(delayTouched ? { delayStatus, ...(delayStatus === 'DELAYED' ? { originalScheduleDate: new Date(`${originalDate}T00:00:00+08:00`).toISOString(), deferredUntil: new Date(`${deferredDate}T00:00:00+08:00`).toISOString(), delayReason: delayReason.trim() } : {}) } : {}),
             ...(scheduleDate ? { scheduleDate: new Date(`${scheduleDate}T00:00:00+08:00`).toISOString() } : {}),
             ...(priority ? { priority } : {}),
             ...(accepts ? { acceptsAcceptance: accepts === 'yes' } : {}),
@@ -3041,8 +3091,14 @@ window.__ModuleLoader__.load({
           h('p', { className: 'sf-note' }, `${plan.description ?? '—'} · 计划 ${yuan(plan.plannedAmount) ?? '—'} · ${plan.planMonth ? plan.planMonth + '月' : '待排'}`),
           formError ? h('p', { role: 'alert', className: 'sf-neg' }, formError) : null,
           plan.planMonth == null ? h(FormRow, { label: `${t('scheduleMonthBackfill')} *` }, h(Select, { value: planMonth, onChange: setPlanMonth, options: Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1} ${t('monthCol')}`]), placeholder: t('monthCol') })) : null,
+          h(FormRow, { label: '延期状态' }, h(Select, { value: delayStatus, onChange: value => { setDelayStatus(value); setDelayTouched(true) }, options: CASH_DELAY_OPTIONS })),
+          delayStatus === 'DELAYED' ? h('div', { className: 'sf-stack' },
+            h(FormRow, { label: '原计划日期' }, h(Field, { type: 'date', value: originalDate, onChange: value => { setOriginalDate(value); setDelayTouched(true) } })),
+            h(FormRow, { label: '延期至' }, h(Field, { type: 'date', value: deferredDate, onChange: value => { setDeferredDate(value); setDelayTouched(true) } })),
+            h(FormRow, { label: '延期原因' }, h(Textarea, { value: delayReason, maxLength: 500, onChange: value => { setDelayReason(value); setDelayTouched(true) } }))) : null,
+          h('p', { className: 'sf-note' }, '延期以财务确认的日期和原因为准；到期未付不自动标记延期，保存不改变归属月份。'),
           h(FormRow, { label: t('scheduleDate') }, h(Field, { type: 'date', value: scheduleDate, onChange: setScheduleDate })),
-          h(FormRow, { label: '排款优先级' }, h(Select, { value: priority, onChange: setPriority, options: priorityOptions, placeholder: '未设置' })),
+          h(FormRow, { label: '排款优先级' }, h(Select, { 'aria-label': t('priority'), value: priority, onChange: setPriority, options: priorityOptions, placeholder: '未设置' })),
           h(FormRow, { label: '是否接受承兑' }, h(Select, { value: accepts, onChange: value => { setAccepts(value); if (value === 'no' && totalCents !== null) updateSplit('acceptance', '0') }, options: [['yes', '接受'], ['no', '不接受']], placeholder: '未设置' })),
           h(FormRow, { label: t('cashAmount') }, h(Field, { inputMode: 'decimal', value: cashAmount, onChange: value => updateSplit('cash', value) })),
           h(FormRow, { label: t('acceptanceAmount') }, h(Field, { inputMode: 'decimal', value: acceptanceAmount, onChange: value => updateSplit('acceptance', value) })),
@@ -3125,6 +3181,7 @@ window.__ModuleLoader__.load({
     function PlanDetailDialog({ plan, ctx, t, onClose }) {
       const fields = [
         [t('org'), plan.orgName], [t('planType'), financeEnumLabel(plan.planType, t, PLAN_LABELS)], [t('description'), plan.description],
+        ['延期状态', cashDelayLabel(plan.delayStatus)], ['原计划日期', actualPaymentDate(plan.originalScheduleDate)], ['延期至', actualPaymentDate(plan.deferredUntil)], ['延期原因', plan.delayReason],
         [t('department'), plan.departmentName], [t('costItem'), plan.costItemName], [t('planMonth'), plan.planMonth ? `${plan.planMonth} 月` : '—'],
         [t('planned'), wan(plan.plannedAmount)], [t('actual'), wan(plan.actualAmount)], [t('variance'), wan(plan.varianceAmount)],
         [t('remaining'), wan(plan.remainingAmount)], [t('actualPaidDate'), actualPaymentDate(plan.actualPaidAt)], [t('scheduleDate'), actualPaymentDate(plan.scheduleDate)], [t('priority'), plan.priority ? financeEnumLabel(normalizePaymentPriority(plan.priority), t, Object.fromEntries(PRIORITIES)) : '—'],
@@ -3140,7 +3197,7 @@ window.__ModuleLoader__.load({
 
     // ---- 收入计划 ----
 
-    function RevenueTab({ revenues, page, onPage, t, canWrite = true, onBackfill, onLedger }) {
+    function RevenueTab({ revenues, page, onPage, t, canWrite = true, onBackfill, onLedger, onAdjust }) {
       const rows = revenues?.data?.list || revenues?.list || []
       return h(Card, { title: t('revenueVs'), unit: t('unitNote') },
         h('p', { className: 'sf-note' }, t('remainingReceiptHint')),
@@ -3162,6 +3219,7 @@ window.__ModuleLoader__.load({
             },
             { label: t('remainingReceipt'), key: 'remainingReceipt', num: true, sortValue: revenueRemaining, render: row => wan(revenueRemaining(row)) ?? '—' },
             { label: t('actions'), key: 'actions', sortable: false, render: row => h('div', { className: 'sf-row', style: { flexWrap: 'nowrap', justifyContent: 'flex-end' } },
+            canWrite && onAdjust ? h(LinkButton, { onClick: () => onAdjust(row) }, '调增/调减') : null,
             canWrite ? h(LinkButton, { onClick: () => onBackfill(row) }, t('backfill')) : null,
             canWrite ? h(LinkButton, { onClick: () => onLedger(row) }, t('settlementSectionReceipt')) : null) },
           ],
@@ -3497,6 +3555,119 @@ window.__ModuleLoader__.load({
         h('label', { className: 'sf-row' },
           h('input', { type: 'checkbox', checked: rule.confirmed, onChange: event => setRuleField('confirmed', event.target.checked) }), t('ruleConfirm')),
         h(PrimaryButton, { disabled: lock.current || !rule.confirmed, onClick: () => void confirmRule() }, t('ruleConfirmAction')))
+    }
+
+    // 收入计划调整独立审批链；金额生效只由服务端过账执行。
+    function validRevenueAdjustment(plan, value, reason) {
+      const text = String(value ?? '').trim(), before = finite(plan.plannedAmount), after = finite(text), actual = finite(plan.actualAmount)
+      return /^\d+(\.\d{1,2})?$/.test(text)
+        && before !== null && after !== null && after <= 99999999999999.99 && after !== before
+        && (actual === null ? after > before : after >= actual)
+        && Boolean(reason.trim()) && reason.trim().length <= 500
+    }
+
+    function RevenueAdjustmentDialog({ plan, t, onClose, act }) {
+      const [newAmount, setNewAmount] = useState(''), [reason, setReason] = useState('')
+      const [draftId, setDraftId] = useState(null), [pending, setPending] = useState(false), [error, setError] = useState(null)
+      const lock = useRef(false), draftRef = useRef(null)
+      const invalid = !draftId && !validRevenueAdjustment(plan, newAmount, reason)
+      const close = () => { if (!lock.current) onClose() }
+      const submit = async () => {
+        if (invalid || lock.current) return
+        lock.current = true; setPending(true); setError(null)
+        try {
+          if (!draftRef.current) {
+            const result = await post(`/rest/finance/revenue-plans/${encodeURIComponent(plan.id)}/adjustments`, { newAmount: Number(newAmount), reason: reason.trim() })
+            const id = result.data?.id
+            if (!id) throw new Error('未取得收入调整草稿编号，请核对后重试')
+            draftRef.current = id; setDraftId(id)
+          }
+          const saved = await act(`/rest/finance/revenue-plan-adjustments/${encodeURIComponent(draftRef.current)}/submit`, {})
+          if (saved === false || saved === null) { setError('草稿已保存，提交未成功。重试只提交此草稿。'); return }
+          onClose()
+        } catch (failure) { setError(failure.message) }
+        finally { lock.current = false; setPending(false) }
+      }
+      return h(Dialog, { title: `收入计划调增/调减 · ${plan.description || plan.incomeTypeName || ''}`, onClose: close, dismissDisabled: pending, footer: [
+        h(GhostButton, { key: 'cancel', disabled: pending, onClick: close }, t('cancel')),
+        h(PrimaryButton, { key: 'ok', disabled: invalid || pending, onClick: submit }, draftId ? '重试提交此草稿' : '创建并提交审批'),
+      ] }, h('div', { className: 'sf-stack' },
+        h('p', { className: 'sf-note' }, `当前计划金额 ${formatNumber(plan.plannedAmount) ?? '—'} 元。审批通过后仍须过账，过账前计划金额不变。调减不得低于已知实收；实收未知时请先核对。`),
+        draftId ? h('p', { role: 'status', className: 'sf-note' }, `已保存草稿 ${draftId}。金额和原因已锁定；提交失败重试不会重复建单。`) : null,
+        error ? h('p', { role: 'alert', className: 'sf-neg' }, error) : null,
+        h(FormRow, { label: '调整后收入计划金额（元）' }, h(Field, { inputMode: 'decimal', value: newAmount, disabled: pending || Boolean(draftId), onChange: setNewAmount })),
+        h(FormRow, { label: '调增/调减原因', wide: true }, h(Textarea, { value: reason, maxLength: 500, disabled: pending || Boolean(draftId), onChange: setReason }))))
+    }
+
+    function revenueAdjustmentActions(ctx, status) {
+      if (!ctx.financeWriter) return []
+      const permissions = ctx.permissions || [], actions = []
+      const canWrite = permissions.includes('cash.plan.write'), canVerify = permissions.includes('cash.plan.verify')
+      if (status === 'DRAFT' && canWrite) actions.push(['submit', '提交审批'])
+      if (status === 'SUBMITTED' && canVerify && permissions.includes('cash.plan.adjustment.approve')) actions.push(['approve', '审批通过'], ['reject', '驳回'])
+      if (status === 'APPROVED' && canVerify) actions.push(['post', '过账'])
+      if (['DRAFT', 'SUBMITTED', 'APPROVED'].includes(status) && canWrite) actions.push(['cancel', '撤销'])
+      return actions
+    }
+
+    function RevenueAdjustmentActionDialog({ row, kind, label, onClose, act }) {
+      const [note, setNote] = useState(''), [pending, setPending] = useState(false), [error, setError] = useState(null)
+      const lock = useRef(false)
+      const required = ['reject', 'cancel'].includes(kind)
+      const close = () => { if (!lock.current) onClose() }
+      const submit = async () => {
+        if (lock.current || required && !note.trim() || note.trim().length > 500) return
+        lock.current = true; setPending(true); setError(null)
+        try {
+          const saved = await act(`/finance/revenue-plan-adjustments/${encodeURIComponent(row.id)}/${kind}`, ['submit', 'post'].includes(kind) ? {} : { note: note.trim() })
+          if (saved === false || saved === null) { setError('操作未完成，请核对后重试'); return }
+          onClose()
+        } catch (failure) { setError(failure.message) }
+        finally { lock.current = false; setPending(false) }
+      }
+      return h(Dialog, { title: `${label}收入调整 · ${row.code || row.id}`, onClose: close, dismissDisabled: pending, footer: [
+        h(GhostButton, { key: 'cancel', disabled: pending, onClick: close }, '返回'),
+        h(PrimaryButton, { key: 'ok', disabled: pending || required && !note.trim() || note.trim().length > 500, onClick: submit }, `确认${label}`),
+      ] }, h('div', { className: 'sf-stack' },
+        h('p', null, `计划金额 ${formatNumber(row.oldAmount) ?? '—'} → ${formatNumber(row.newAmount) ?? '—'} 元。原因：${row.reason || '未提供'}`),
+        h('p', { className: 'sf-note' }, kind === 'post' ? '过账将按服务端校验更新收入计划并追加审计流水；重复过账由服务端幂等保护。' : kind === 'approve' ? '批准后仍待过账，此操作不会直接修改收入计划金额。' : kind === 'cancel' ? '撤销此调整单后不可继续审批或过账；收入计划金额保留原值。' : '请核对调整详情、实收底线及当前状态。'),
+        !['submit', 'post'].includes(kind) ? h(FormRow, { label: `${label}说明${required ? '（必填）' : '（可选）'}` }, h(Textarea, { value: note, maxLength: 500, disabled: pending, onChange: setNote })) : null,
+        error ? h('p', { role: 'alert', className: 'sf-neg' }, error) : null))
+    }
+
+    function RevenueAdjustmentsQueue({ ctx, t }) {
+      const [status, setStatus] = useState('SUBMITTED'), [page, setPage] = useState(1), [dialog, setDialog] = useState(null)
+      const action = useFinanceAction()
+      const params = new URLSearchParams({ page: String(page), limit: '20' })
+      if (ctx.year) params.set('year', String(ctx.year))
+      if (ctx.orgId) params.set('orgId', ctx.orgId)
+      if (status) params.set('status', status)
+      const revision = `${ctx.revision}-${action.revision}`
+      const list = useFinanceResource(`/finance/revenue-plan-adjustments?${params}`, revision)
+      const detail = useFinanceResource(dialog?.kind === 'detail' ? `/finance/revenue-plan-adjustments/${encodeURIComponent(dialog.row.id)}` : null, revision)
+      const scopeKey = `${ctx.year}-${ctx.orgId || ''}`
+      useEffect(() => { setPage(1); setDialog(null) }, [scopeKey])
+      const rows = financeRows(list.data)
+      return h('div', { className: 'sf-stack' },
+        h('p', { className: 'sf-note' }, '收入调整独立审批：提交后由有专用审批资格的资金负责人审批，批准后仍须过账才更新计划。数据范围由服务端校验。'),
+        h(Select, { 'aria-label': '收入调整状态', value: status, options: [['', '全部状态'], ['DRAFT', '草稿'], ['SUBMITTED', '待审批'], ['APPROVED', '已批准待过账'], ['POSTED', '已过账'], ['REJECTED', '已驳回'], ['CANCELLED', '已撤销']], onChange: value => { setStatus(value); setPage(1); setDialog(null) } }),
+        h(Notice, null, action.notice),
+        h(FinanceResource, { resource: list }, h(Table, { tableId: 'finance-revenue-adjustments', rows, empty: '暂无收入调整单', columns: [
+          { key: 'kind', label: '事项类型', render: () => '收入计划调整' },
+          ...financeColumns([['code', '调整单号'], ['oldAmount', '调整前金额（元）'], ['newAmount', '调整后金额（元）'], ['reason', '原因']]),
+          { key: 'status', label: '状态', render: row => ({ DRAFT: '草稿', SUBMITTED: '待审批', APPROVED: '已批准待过账', POSTED: '已过账', REJECTED: '已驳回', CANCELLED: '已撤销' })[row.status] || row.status },
+          ...financeColumns([['submittedAt', '提交时间']]),
+          { key: 'actions', label: '操作', sortable: false, render: row => h('div', { className: 'sf-row' },
+            h(GhostButton, { onClick: () => setDialog({ kind: 'detail', row }) }, '查看明细'),
+            ...revenueAdjustmentActions(ctx, row.status).map(([kind, label]) => h(GhostButton, { key: kind, disabled: action.busy, onClick: () => setDialog({ kind, label, row }) }, label))) },
+        ] })),
+        h(Pager, { page, total: list.data?.total, limit: 20, onPage: setPage }),
+        dialog?.kind === 'detail' ? h(Dialog, { title: '收入调整详情与审计流水', onClose: () => setDialog(null) }, h(FinanceResource, { resource: detail }, detail.data ? h('div', { className: 'sf-stack' },
+          h('p', null, `${detail.data.code || dialog.row.id} · ${detail.data.status === 'APPROVED' ? '已批准待过账' : financeDisplayValue(detail.data.status, 'status')}`),
+          h('p', null, `计划金额 ${formatNumber(detail.data.oldAmount) ?? '—'} → ${formatNumber(detail.data.newAmount) ?? '—'} 元。原因：${detail.data.reason || '未提供'}`),
+          h(Table, { tableId: 'finance-revenue-adjustment-history', rows: detail.data.logs || [], empty: '暂无操作流水', columns: financeColumns([['action', '操作'], ['fromStatus', '原状态'], ['toStatus', '新状态'], ['actorName', '操作者'], ['note', '说明'], ['createdAt', '时间']]) }),
+          h('details', null, h('summary', null, '查看原始业务证据与追溯编号'), h(FinanceEvidence, { value: detail.data }))) : null)) : null,
+        dialog && dialog.kind !== 'detail' ? h(RevenueAdjustmentActionDialog, { key: `${dialog.row.id}-${dialog.kind}`, ...dialog, act: action.run, onClose: () => setDialog(null) }) : null)
     }
 
     // 片段 5/7 视图：预警（4 统计卡 + 规则集确认横幅 + 明细筛选分页 + 证据快照 Dialog + 按类型下钻）
@@ -4405,6 +4576,7 @@ window.__ModuleLoader__.load({
       const [costError, setCostError] = useState(false)
       const [retry, setRetry] = useState(0)
       const savingRef = useRef(false)
+      useFinanceNavigationEntry(() => dirtyRef.current, () => savingRef.current, () => { dirtyRef.current = false })
       const [formRevision, setFormRevision] = useState(0)
       useEffect(() => {
         if (entryMountedRef.current) requestAnimationFrame(() => entryRootRef.current?.querySelector?.('[role="tab"][aria-selected="true"]')?.focus?.())
@@ -5311,6 +5483,9 @@ window.__ModuleLoader__.load({
         notice ? h('p', { role: 'status' }, notice) : null,
         preview ? h('div', { className: 'sf-stack' },
           h('p', null, `预览 ${preview.rowCount} 条 · 预计新增 ${preview.newCount ?? '待核对'} 条 · 已有位置 ${preview.existingCount ?? preview.duplicateCount} 条`),
+          preview.errors?.length ? h('div', { role: 'alert', className: 'sf-banner sf-banner-rose' },
+            h('strong', null, `发现 ${preview.errors.length} 行错误，修复源文件后重新上传。`),
+            h('ul', { className: 'sf-stack' }, ...preview.errors.map(error => h('li', { key: `${error.row}-${error.field || ''}-${error.message}` }, `第 ${error.row} 行${error.field ? ` · ${error.field}` : ''}：${error.message}`)))) : null,
           ...preview.warnings.map((warning, key) => h('p', { key, className: 'sf-note' }, warning)),
           h(FormRow, { label: '搜索预览零件' }, h(Field, { value: keyword, onChange: value => { setKeyword(value); setPage(1) }, 'aria-label': '搜索预览零件', placeholder: '按零件号或名称核对预览' })),
           h(Table, { tableId: 'finance-ebom-preview', rows: filtered.slice((page - 1) * 20, page * 20), columns: [
@@ -5320,7 +5495,7 @@ window.__ModuleLoader__.load({
           ], empty: '无匹配零件' }), h(Pager, { page, total: filtered.length, limit: 20, onPage: setPage }),
           preview.warnings.length ? h('label', null, h('input', { type: 'checkbox', checked: acknowledged, disabled: busy, onChange: event => setAcknowledged(event.target.checked) }), '我已核对重复记录及装配位置') : null,
           h('div', { className: 'sf-row' },
-            h(PrimaryButton, { busy, disabled: preview.newCount === 0 || (preview.warnings.length > 0 && !acknowledged) || !preview.nodes.length, onClick: () => run(async () => { const result = await financeRest(`/ce/packages/${packageId}/nodes`, 'POST', { nodes: preview.nodes }); setPreview(null); setNotice(`导入完成：新增 ${result.data.created}，已有装配位置跳过 ${result.data.skipped}`); onChanged() }) }, `确认导入 ${preview.rowCount} 条`),
+            h(PrimaryButton, { busy, disabled: preview.errors?.length > 0 || preview.newCount === 0 || (preview.warnings.length > 0 && !acknowledged) || !preview.nodes.length, onClick: () => run(async () => { const result = await financeRest(`/ce/packages/${packageId}/nodes`, 'POST', { nodes: preview.nodes }); setPreview(null); setNotice(`导入完成：新增 ${result.data.created}，已有装配位置跳过 ${result.data.skipped}`); onChanged() }) }, `确认导入 ${preview.rowCount} 条`),
             h(GhostButton, { disabled: busy, onClick: () => { setPreview(null); setError(''); setAcknowledged(false) } }, '取消预览')),
           preview.newCount === 0 ? h('p', { className: 'sf-note' }, '本文件所有装配位置均已存在，无需重复导入。结构发生变化请新建成本版本。') : null) : null)
     }
@@ -5728,8 +5903,8 @@ window.__ModuleLoader__.load({
         h('div', { className: 'sf-row' }, h(PrimaryButton, { type: 'submit', busy }, '确认分配'), h(GhostButton, { disabled: busy, onClick: onClose }, '取消'))))
     }
 
-    const FINANCE_REVIEW_SOURCES = [['filing', '填报复核'], ['facts', 'OA 批次核对'], ['budget', '预算调整'], ['plans', '付款计划调整']]
-    function ReviewView({ ctx }) {
+    const FINANCE_REVIEW_SOURCES = [['filing', '填报复核'], ['facts', 'OA 批次核对'], ['budget', '预算调整'], ['plans', '付款计划调整'], ['revenue', '收入计划调整']]
+    function ReviewView({ ctx, t }) {
       // 深链定位（如旧资金页 tab=adjustments 迁移链接）直接落到对应复核类别。
       const [section, setSection] = useFinanceViewState(ctx, 'reviewSection', () => FINANCE_REVIEW_SOURCES.some(([id]) => id === ctx.drillParams?.section) ? ctx.drillParams.section : 'filing')
       const [page, setPage] = useFinanceViewState(ctx, 'reviewPage', 1)
@@ -5740,7 +5915,7 @@ window.__ModuleLoader__.load({
       const revision = `${ctx.revision}-${action.revision}`
       const summary = useFinanceResource('/finance/review/summary', revision)
       const paths = { filing: '/finance/filing/assignments?status=SUBMITTED', facts: '/data-source/fact-batches?status=PENDING_REVIEW', budget: '/finance/budget/adjustments?status=SUBMITTED', plans: '/finance/payment-plan-adjustments?status=SUBMITTED' }
-      const list = useFinanceResource(`${paths[section]}&page=${page}&limit=20${section === 'filing' && ctx.drillParams?.taskId ? `&taskId=${encodeURIComponent(ctx.drillParams.taskId)}` : ''}`, revision)
+      const list = useFinanceResource(paths[section] ? `${paths[section]}&page=${page}&limit=20${section === 'filing' && ctx.drillParams?.taskId ? `&taskId=${encodeURIComponent(ctx.drillParams.taskId)}` : ''}` : null, revision)
       const detailPath = dialog?.kind === 'detail' ? section === 'filing' ? `/finance/filing/assignments/${dialog.row.id}` : section === 'budget' ? `/finance/budget/adjustments/${dialog.row.id}` : section === 'plans' ? `/finance/payment-plan-adjustments/${dialog.row.id}` : null : null
       const detail = useFinanceResource(detailPath, revision)
       const batch = useFinanceResource(ctx.drillParams?.sourcePath?.match(/batch=([\w-]+)/)?.[1] ? `/finance/filing/batches/${ctx.drillParams.sourcePath.match(/batch=([\w-]+)/)[1]}` : null, revision)
@@ -5754,7 +5929,7 @@ window.__ModuleLoader__.load({
         h(Card, { title: '复核队列汇总' }, h(FinanceResource, { resource: summary }, h('div', { className: 'sf-kpis' }, ...(summary.data?.sources || []).map(row => h(KpiCard, { key: row.source, label: ({ FILING: '填报', FACT_BATCH: '事实批次', BUDGET_ADJUSTMENT: '预算调整', PLAN_ADJUSTMENT: '计划调整' })[row.source], value: row.pending, onClick: () => { const next = ({ FILING: 'filing', FACT_BATCH: 'facts', BUDGET_ADJUSTMENT: 'budget', PLAN_ADJUSTMENT: 'plans' })[row.source]; if (next) { setSection(next); setPage(1); setDialog(null) } } }))))),
         h(Select, { 'aria-label': '复核类别', value: section, options: FINANCE_REVIEW_SOURCES, onChange: value => { setSection(value); setPage(1); setDialog(null) } }), h(Notice, null, action.notice),
         section === 'filing' && canVerify ? h(GhostButton, { disabled: !selected.length || mixedTasks || action.busy, onClick: () => setDialog({ kind: 'batch', title: `批量定稿（${selected.length} 条）` }) }, `批量定稿（已选 ${selected.length}${mixedTasks ? ' · 跨任务不可批量定稿' : ''}）`) : null,
-        h(Card, { title: FINANCE_REVIEW_SOURCES.find(([id]) => id === section)[1], unit: '元' }, h(FinanceResource, { resource: list }, h(Table, { tableId: `finance-review-${section}`, rows, empty: '暂无待复核事项', columns: [
+        section === 'revenue' ? h(Card, { title: '收入计划调整', unit: '元' }, h(RevenueAdjustmentsQueue, { ctx, t })) : h(Card, { title: FINANCE_REVIEW_SOURCES.find(([id]) => id === section)[1], unit: '元' }, h(FinanceResource, { resource: list }, h(Table, { tableId: `finance-review-${section}`, rows, empty: '暂无待复核事项', columns: [
           ...(section === 'filing' && canVerify ? [{ key: 'select', label: '选择', sortable: false, render: row => h('input', { type: 'checkbox', 'aria-label': `选择 ${row.departmentName || row.id}`, checked: selected.includes(row.id), onChange: event => setSelected(current => event.target.checked ? [...current, row.id] : current.filter(id => id !== row.id)) }) }] : []),
           ...financeColumns(section === 'filing' ? [['taskTitle', '活动'], ['departmentName', '部门'], ['status', '状态'], ['rowCount', '行数'], ['submittedAt', '提交时间']] : section === 'facts' ? [['batchKey', '批次'], ['scope', '范围'], ['headerRows', '主表行数'], ['detailRows', '明细行数'], ['amountTotal', '金额（来源币种）'], ['currency', '币种']] : [['code', '单号'], ['reason', '原因'], ['status', '状态'], ['submittedAt', '提交时间']]),
           { key: 'actions', label: '操作', sortable: false, render: row => h('div', { className: 'sf-row' },
@@ -6559,6 +6734,8 @@ window.__ModuleLoader__.load({
       const identity = { ...capabilities, financeWriter }
       const canOpen = section => financeSectionAllowed(section, identity)
       const navigation = useFinanceNavigation(String(new Date().getFullYear()))
+      const leaveGuard = useFinanceNavigationGuard()
+      financeNavigationGlobal = leaveGuard.navigation
       const { tab, params: drillParams, year, orgId } = navigation.current
       const setYear = value => navigation.update({ year: value, viewState: {} })
       const setOrgId = value => navigation.update({ orgId: value, viewState: {} })
@@ -6571,9 +6748,7 @@ window.__ModuleLoader__.load({
       const [briefState, setBriefState] = useState('loading')
       const [workQueue, setWorkQueue] = useState(null)
       const shellRef = useRef(null)
-      const entryLeaveRef = useRef(null)
-      const registerEntryLeave = useCallback(guard => { entryLeaveRef.current = guard }, [])
-      const closeSafely = () => { if (entryLeaveRef.current) entryLeaveRef.current(onClose); else onClose() }
+      const closeSafely = () => leaveGuard.navigation.leave(onClose)
       // 同步请求锁：brief 取数在途时丢弃重复刷新，避免 revision 连击叠加请求
       const loadingRef = useRef(false)
 
@@ -6621,12 +6796,13 @@ window.__ModuleLoader__.load({
       }, [active, tab, year, orgId, revision, financeWriter])
 
       const refresh = () => { if (loadingRef.current) return; setRevision(value => value + 1) }
+      const refreshSafely = () => leaveGuard.navigation.leave(refresh)
       useEffect(() => {
         if (!active) return undefined
-        window.addEventListener('sf:refresh', refresh)
+        window.addEventListener('sf:refresh', refreshSafely)
         const key = event => { if (event.key === 'Escape') closeSafely() }
         window.addEventListener('keydown', key)
-        return () => { window.removeEventListener('sf:refresh', refresh); window.removeEventListener('keydown', key) }
+        return () => { window.removeEventListener('sf:refresh', refreshSafely); window.removeEventListener('keydown', key) }
       }, [active])
 
       useEffect(() => { if (active) requestAnimationFrame(() => shellRef.current?.focus?.()) }, [active])
@@ -6640,8 +6816,7 @@ window.__ModuleLoader__.load({
           const next = { year, orgId, ...params }
           navigation.navigate(target, next, contentRef.current?.scrollTop || 0)
         }
-        if (entryLeaveRef.current) entryLeaveRef.current(navigate)
-        else navigate()
+        leaveGuard.navigation.leave(navigate)
       }
       const ctx = { year, orgId, orgs, departments, revision, drillParams, viewState: navigation.current.viewState, permissions: capabilities.permissions || [], financeWriter, role: capabilities.role, fullAccess: capabilities.fullAccess, onNavigate: onDrill }
       const activeItem = financeNavigationItem(tab, drillParams)
@@ -6651,8 +6826,7 @@ window.__ModuleLoader__.load({
       const canBack = previous && canOpen(previous.tab) && (!previousItem || financeNavigationAllowed(previousItem, identity))
       const goBack = () => {
         if (!canBack) return
-        if (entryLeaveRef.current) entryLeaveRef.current(navigation.back)
-        else navigation.back()
+        leaveGuard.navigation.leave(navigation.back)
       }
       useEffect(() => restoreFinanceScroll(contentRef.current, navigation.current.scrollTop), [navigation.current.id])
       const briefProps = { brief, t, onDrill, orgId }
@@ -6670,7 +6844,7 @@ window.__ModuleLoader__.load({
             tab === 'alerts' ? h(AlertsView, { ctx, t, onDrill }) : null,
             tab === 'costitems' ? h(FinanceCostItemsView, { ctx, t }) : null,
             tab === 'datacenter' ? h(DataCenterView, { ctx, t }) : null,
-            tab === 'entry' ? h(EntryPanel, { year, orgId, orgs, departments, role: ctx.role, t, onSaved: refresh, onYearChange: setYear, onNavigate: onDrill, onLeaveGuardChange: registerEntryLeave }) : null,
+            tab === 'entry' ? h(EntryPanel, { year, orgId, orgs, departments, role: ctx.role, t, onSaved: refresh, onYearChange: setYear, onNavigate: onDrill }) : null,
             tab === 'budget-filing' ? h(BudgetFilingView, { key: `budget-filing-${year}-${drillParams?.taskId || ''}`, ctx, t }) : null,
             tab === 'filing' ? h(FilingParityView, { key: `filing-${year}-${drillParams?.section || 'assignments'}-${drillParams?.taskId || ''}`, ctx, t }) : null,
             tab === 'identity' ? drillParams?.directorySection === 'members' ? h(FinanceMembersView, { ctx, t }) : drillParams?.directorySection === 'directory' ? h(FinanceDirectoryView, { ctx }) : h(FinanceEmploymentView, { ctx, t }) : null,
@@ -6696,10 +6870,10 @@ window.__ModuleLoader__.load({
               h('h1', { id: 'sf-title' }, activeItem?.[1] ?? t(SECTION_META[tab]?.[0] ?? 'title')),
               h('p', { className: 'sf-desc' }, [operator ? `${t('operatorAs')} ${operator}` : null, tab === 'budget-filing' ? '本人填报、两级审核与部门预算确认' : tab === 'filing' ? '完成部门填报并跟踪提交、退回与确认进度' : tab === 'identity' ? '维护成员职责、组织身份与部门归属' : t(SECTION_META[tab]?.[1] ?? 'subtitle')].filter(Boolean).join(' · '))),
             h('div', { className: 'sf-header-side' },
-              !['entry', 'identity', 'bom', 'sources', 'datacenter', 'costitems', 'review', 'notifications', 'permissions'].includes(tab) ? h('label', { className: 'sf-filter' }, h('span', null, t('year')), h(Select, { value: year, onChange: value => { setYear(value); setDrillParams(current => current ? { ...current, year: value, taskId: undefined, versionId: undefined, lineId: undefined } : null) }, options: yearOptions(year) })) : null,
-              ['overview', 'operations', 'cash', 'alerts', 'analyze'].includes(tab) ? h('label', { className: 'sf-filter' }, h('span', null, t('org')), h(SearchSelect, { value: orgId, onChange: value => { setOrgId(value); setDrillParams(null) }, options: orgs.filter(org => org.type !== 'GROUP').map(org => [org.id, org.name]), placeholder: t('allOrgs') })) : null,
+              !['entry', 'identity', 'bom', 'sources', 'datacenter', 'costitems', 'review', 'notifications', 'permissions'].includes(tab) ? h('label', { className: 'sf-filter' }, h('span', null, t('year')), h(Select, { value: year, onChange: value => { if (value !== year) leaveGuard.navigation.leave(() => { setYear(value); setDrillParams(current => current ? { ...current, year: value, taskId: undefined, versionId: undefined, lineId: undefined } : null) }) }, options: yearOptions(year) })) : null,
+              ['overview', 'operations', 'cash', 'alerts', 'analyze'].includes(tab) ? h('label', { className: 'sf-filter' }, h('span', null, t('org')), h(SearchSelect, { value: orgId, onChange: value => { if (value !== orgId) leaveGuard.navigation.leave(() => { setOrgId(value); setDrillParams(null) }) }, options: orgs.filter(org => org.type !== 'GROUP').map(org => [org.id, org.name]), placeholder: t('allOrgs') })) : null,
               h('div', { className: 'sf-header-buttons' },
-                h(Tooltip, { label: t('refresh') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('refresh'), onClick: refresh }, h(IconRefreshOutlineRegular, { size: 16 }))),
+                h(Tooltip, { label: t('refresh') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('refresh'), onClick: refreshSafely }, h(IconRefreshOutlineRegular, { size: 16 }))),
                 h(Tooltip, { label: t('close') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('close'), onClick: closeSafely }, h(IconCloseOutlineRegular, { size: 16 })))))),
           h('nav', { className: 'sf-tabs', 'aria-label': t('title') }, ...FINANCE_NAVIGATION.map(([label, items]) => {
             const visible = items.filter(item => financeNavigationAllowed(item, identity))
@@ -6714,7 +6888,7 @@ window.__ModuleLoader__.load({
               const visible = items.filter(item => financeNavigationAllowed(item, identity))
               return visible.length ? h('optgroup', { key: label, label }, ...visible.map(item => h('option', { key: item[0], value: item[0] }, item[1]))) : null
             }))),
-          h('div', { ref: contentRef, className: `sf-content${briefState === 'loading' && !brief ? ' sf-refreshing' : ''}`, 'aria-busy': briefState === 'loading' && !brief }, body)))
+          h('div', { ref: contentRef, className: `sf-content${briefState === 'loading' && !brief ? ' sf-refreshing' : ''}`, 'aria-busy': briefState === 'loading' && !brief }, body), leaveGuard.prompt))
     }
 
     function Button({ wide, t, onOpen = openOverlay }) {

@@ -1,5 +1,5 @@
-const FINANCE_REVIEW_SOURCES = [['filing', '填报复核'], ['facts', 'OA 批次核对'], ['budget', '预算调整'], ['plans', '付款计划调整']]
-function ReviewView({ ctx }) {
+const FINANCE_REVIEW_SOURCES = [['filing', '填报复核'], ['facts', 'OA 批次核对'], ['budget', '预算调整'], ['plans', '付款计划调整'], ['revenue', '收入计划调整']]
+function ReviewView({ ctx, t }) {
   // 深链定位（如旧资金页 tab=adjustments 迁移链接）直接落到对应复核类别。
   const [section, setSection] = useFinanceViewState(ctx, 'reviewSection', () => FINANCE_REVIEW_SOURCES.some(([id]) => id === ctx.drillParams?.section) ? ctx.drillParams.section : 'filing')
   const [page, setPage] = useFinanceViewState(ctx, 'reviewPage', 1)
@@ -10,7 +10,7 @@ function ReviewView({ ctx }) {
   const revision = `${ctx.revision}-${action.revision}`
   const summary = useFinanceResource('/finance/review/summary', revision)
   const paths = { filing: '/finance/filing/assignments?status=SUBMITTED', facts: '/data-source/fact-batches?status=PENDING_REVIEW', budget: '/finance/budget/adjustments?status=SUBMITTED', plans: '/finance/payment-plan-adjustments?status=SUBMITTED' }
-  const list = useFinanceResource(`${paths[section]}&page=${page}&limit=20${section === 'filing' && ctx.drillParams?.taskId ? `&taskId=${encodeURIComponent(ctx.drillParams.taskId)}` : ''}`, revision)
+  const list = useFinanceResource(paths[section] ? `${paths[section]}&page=${page}&limit=20${section === 'filing' && ctx.drillParams?.taskId ? `&taskId=${encodeURIComponent(ctx.drillParams.taskId)}` : ''}` : null, revision)
   const detailPath = dialog?.kind === 'detail' ? section === 'filing' ? `/finance/filing/assignments/${dialog.row.id}` : section === 'budget' ? `/finance/budget/adjustments/${dialog.row.id}` : section === 'plans' ? `/finance/payment-plan-adjustments/${dialog.row.id}` : null : null
   const detail = useFinanceResource(detailPath, revision)
   const batch = useFinanceResource(ctx.drillParams?.sourcePath?.match(/batch=([\w-]+)/)?.[1] ? `/finance/filing/batches/${ctx.drillParams.sourcePath.match(/batch=([\w-]+)/)[1]}` : null, revision)
@@ -24,7 +24,7 @@ function ReviewView({ ctx }) {
     h(Card, { title: '复核队列汇总' }, h(FinanceResource, { resource: summary }, h('div', { className: 'sf-kpis' }, ...(summary.data?.sources || []).map(row => h(KpiCard, { key: row.source, label: ({ FILING: '填报', FACT_BATCH: '事实批次', BUDGET_ADJUSTMENT: '预算调整', PLAN_ADJUSTMENT: '计划调整' })[row.source], value: row.pending, onClick: () => { const next = ({ FILING: 'filing', FACT_BATCH: 'facts', BUDGET_ADJUSTMENT: 'budget', PLAN_ADJUSTMENT: 'plans' })[row.source]; if (next) { setSection(next); setPage(1); setDialog(null) } } }))))),
     h(Select, { 'aria-label': '复核类别', value: section, options: FINANCE_REVIEW_SOURCES, onChange: value => { setSection(value); setPage(1); setDialog(null) } }), h(Notice, null, action.notice),
     section === 'filing' && canVerify ? h(GhostButton, { disabled: !selected.length || mixedTasks || action.busy, onClick: () => setDialog({ kind: 'batch', title: `批量定稿（${selected.length} 条）` }) }, `批量定稿（已选 ${selected.length}${mixedTasks ? ' · 跨任务不可批量定稿' : ''}）`) : null,
-    h(Card, { title: FINANCE_REVIEW_SOURCES.find(([id]) => id === section)[1], unit: '元' }, h(FinanceResource, { resource: list }, h(Table, { tableId: `finance-review-${section}`, rows, empty: '暂无待复核事项', columns: [
+    section === 'revenue' ? h(Card, { title: '收入计划调整', unit: '元' }, h(RevenueAdjustmentsQueue, { ctx, t })) : h(Card, { title: FINANCE_REVIEW_SOURCES.find(([id]) => id === section)[1], unit: '元' }, h(FinanceResource, { resource: list }, h(Table, { tableId: `finance-review-${section}`, rows, empty: '暂无待复核事项', columns: [
       ...(section === 'filing' && canVerify ? [{ key: 'select', label: '选择', sortable: false, render: row => h('input', { type: 'checkbox', 'aria-label': `选择 ${row.departmentName || row.id}`, checked: selected.includes(row.id), onChange: event => setSelected(current => event.target.checked ? [...current, row.id] : current.filter(id => id !== row.id)) }) }] : []),
       ...financeColumns(section === 'filing' ? [['taskTitle', '活动'], ['departmentName', '部门'], ['status', '状态'], ['rowCount', '行数'], ['submittedAt', '提交时间']] : section === 'facts' ? [['batchKey', '批次'], ['scope', '范围'], ['headerRows', '主表行数'], ['detailRows', '明细行数'], ['amountTotal', '金额（来源币种）'], ['currency', '币种']] : [['code', '单号'], ['reason', '原因'], ['status', '状态'], ['submittedAt', '提交时间']]),
       { key: 'actions', label: '操作', sortable: false, render: row => h('div', { className: 'sf-row' },

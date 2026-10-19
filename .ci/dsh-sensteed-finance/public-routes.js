@@ -1,6 +1,14 @@
 // Datasource 公开财务契约白名单；新增接口须对照 packages/contracts/src/api 验证。
 // 明确方法与路径，禁止透传任意 URL、内部接口或客户端身份。
 export const PUBLIC_FINANCE_ROUTES = [
+  ["POST", "/finance/revenue-plans/:id/adjustments"],
+  ["GET", "/finance/revenue-plan-adjustments"],
+  ["GET", "/finance/revenue-plan-adjustments/:id"],
+  ["POST", "/finance/revenue-plan-adjustments/:id/submit"],
+  ["POST", "/finance/revenue-plan-adjustments/:id/approve"],
+  ["POST", "/finance/revenue-plan-adjustments/:id/reject"],
+  ["POST", "/finance/revenue-plan-adjustments/:id/cancel"],
+  ["POST", "/finance/revenue-plan-adjustments/:id/post"],
   ["POST", "/ce/packages/:id/ebom/preview"],
   ["POST", "/ce/packages/:id/cost-excel"],
   ["PUT", "/ce/nodes/:nodeId/ac-target"],

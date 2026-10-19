@@ -23,6 +23,8 @@ function Dashboard({ t, embedded = false, onClose = closeOverlay }) {
   const identity = { ...capabilities, financeWriter }
   const canOpen = section => financeSectionAllowed(section, identity)
   const navigation = useFinanceNavigation(String(new Date().getFullYear()))
+  const leaveGuard = useFinanceNavigationGuard()
+  financeNavigationGlobal = leaveGuard.navigation
   const { tab, params: drillParams, year, orgId } = navigation.current
   const setYear = value => navigation.update({ year: value, viewState: {} })
   const setOrgId = value => navigation.update({ orgId: value, viewState: {} })
@@ -35,9 +37,7 @@ function Dashboard({ t, embedded = false, onClose = closeOverlay }) {
   const [briefState, setBriefState] = useState('loading')
   const [workQueue, setWorkQueue] = useState(null)
   const shellRef = useRef(null)
-  const entryLeaveRef = useRef(null)
-  const registerEntryLeave = useCallback(guard => { entryLeaveRef.current = guard }, [])
-  const closeSafely = () => { if (entryLeaveRef.current) entryLeaveRef.current(onClose); else onClose() }
+  const closeSafely = () => leaveGuard.navigation.leave(onClose)
   // 同步请求锁：brief 取数在途时丢弃重复刷新，避免 revision 连击叠加请求
   const loadingRef = useRef(false)
 
@@ -85,12 +85,13 @@ function Dashboard({ t, embedded = false, onClose = closeOverlay }) {
   }, [active, tab, year, orgId, revision, financeWriter])
 
   const refresh = () => { if (loadingRef.current) return; setRevision(value => value + 1) }
+  const refreshSafely = () => leaveGuard.navigation.leave(refresh)
   useEffect(() => {
     if (!active) return undefined
-    window.addEventListener('sf:refresh', refresh)
+    window.addEventListener('sf:refresh', refreshSafely)
     const key = event => { if (event.key === 'Escape') closeSafely() }
     window.addEventListener('keydown', key)
-    return () => { window.removeEventListener('sf:refresh', refresh); window.removeEventListener('keydown', key) }
+    return () => { window.removeEventListener('sf:refresh', refreshSafely); window.removeEventListener('keydown', key) }
   }, [active])
 
   useEffect(() => { if (active) requestAnimationFrame(() => shellRef.current?.focus?.()) }, [active])
@@ -104,8 +105,7 @@ function Dashboard({ t, embedded = false, onClose = closeOverlay }) {
       const next = { year, orgId, ...params }
       navigation.navigate(target, next, contentRef.current?.scrollTop || 0)
     }
-    if (entryLeaveRef.current) entryLeaveRef.current(navigate)
-    else navigate()
+    leaveGuard.navigation.leave(navigate)
   }
   const ctx = { year, orgId, orgs, departments, revision, drillParams, viewState: navigation.current.viewState, permissions: capabilities.permissions || [], financeWriter, role: capabilities.role, fullAccess: capabilities.fullAccess, onNavigate: onDrill }
   const activeItem = financeNavigationItem(tab, drillParams)
@@ -115,8 +115,7 @@ function Dashboard({ t, embedded = false, onClose = closeOverlay }) {
   const canBack = previous && canOpen(previous.tab) && (!previousItem || financeNavigationAllowed(previousItem, identity))
   const goBack = () => {
     if (!canBack) return
-    if (entryLeaveRef.current) entryLeaveRef.current(navigation.back)
-    else navigation.back()
+    leaveGuard.navigation.leave(navigation.back)
   }
   useEffect(() => restoreFinanceScroll(contentRef.current, navigation.current.scrollTop), [navigation.current.id])
   const briefProps = { brief, t, onDrill, orgId }
@@ -134,7 +133,7 @@ function Dashboard({ t, embedded = false, onClose = closeOverlay }) {
         tab === 'alerts' ? h(AlertsView, { ctx, t, onDrill }) : null,
         tab === 'costitems' ? h(FinanceCostItemsView, { ctx, t }) : null,
         tab === 'datacenter' ? h(DataCenterView, { ctx, t }) : null,
-        tab === 'entry' ? h(EntryPanel, { year, orgId, orgs, departments, role: ctx.role, t, onSaved: refresh, onYearChange: setYear, onNavigate: onDrill, onLeaveGuardChange: registerEntryLeave }) : null,
+        tab === 'entry' ? h(EntryPanel, { year, orgId, orgs, departments, role: ctx.role, t, onSaved: refresh, onYearChange: setYear, onNavigate: onDrill }) : null,
         tab === 'budget-filing' ? h(BudgetFilingView, { key: `budget-filing-${year}-${drillParams?.taskId || ''}`, ctx, t }) : null,
         tab === 'filing' ? h(FilingParityView, { key: `filing-${year}-${drillParams?.section || 'assignments'}-${drillParams?.taskId || ''}`, ctx, t }) : null,
         tab === 'identity' ? drillParams?.directorySection === 'members' ? h(FinanceMembersView, { ctx, t }) : drillParams?.directorySection === 'directory' ? h(FinanceDirectoryView, { ctx }) : h(FinanceEmploymentView, { ctx, t }) : null,
@@ -160,10 +159,10 @@ function Dashboard({ t, embedded = false, onClose = closeOverlay }) {
           h('h1', { id: 'sf-title' }, activeItem?.[1] ?? t(SECTION_META[tab]?.[0] ?? 'title')),
           h('p', { className: 'sf-desc' }, [operator ? `${t('operatorAs')} ${operator}` : null, tab === 'budget-filing' ? '本人填报、两级审核与部门预算确认' : tab === 'filing' ? '完成部门填报并跟踪提交、退回与确认进度' : tab === 'identity' ? '维护成员职责、组织身份与部门归属' : t(SECTION_META[tab]?.[1] ?? 'subtitle')].filter(Boolean).join(' · '))),
         h('div', { className: 'sf-header-side' },
-          !['entry', 'identity', 'bom', 'sources', 'datacenter', 'costitems', 'review', 'notifications', 'permissions'].includes(tab) ? h('label', { className: 'sf-filter' }, h('span', null, t('year')), h(Select, { value: year, onChange: value => { setYear(value); setDrillParams(current => current ? { ...current, year: value, taskId: undefined, versionId: undefined, lineId: undefined } : null) }, options: yearOptions(year) })) : null,
-          ['overview', 'operations', 'cash', 'alerts', 'analyze'].includes(tab) ? h('label', { className: 'sf-filter' }, h('span', null, t('org')), h(SearchSelect, { value: orgId, onChange: value => { setOrgId(value); setDrillParams(null) }, options: orgs.filter(org => org.type !== 'GROUP').map(org => [org.id, org.name]), placeholder: t('allOrgs') })) : null,
+          !['entry', 'identity', 'bom', 'sources', 'datacenter', 'costitems', 'review', 'notifications', 'permissions'].includes(tab) ? h('label', { className: 'sf-filter' }, h('span', null, t('year')), h(Select, { value: year, onChange: value => { if (value !== year) leaveGuard.navigation.leave(() => { setYear(value); setDrillParams(current => current ? { ...current, year: value, taskId: undefined, versionId: undefined, lineId: undefined } : null) }) }, options: yearOptions(year) })) : null,
+          ['overview', 'operations', 'cash', 'alerts', 'analyze'].includes(tab) ? h('label', { className: 'sf-filter' }, h('span', null, t('org')), h(SearchSelect, { value: orgId, onChange: value => { if (value !== orgId) leaveGuard.navigation.leave(() => { setOrgId(value); setDrillParams(null) }) }, options: orgs.filter(org => org.type !== 'GROUP').map(org => [org.id, org.name]), placeholder: t('allOrgs') })) : null,
           h('div', { className: 'sf-header-buttons' },
-            h(Tooltip, { label: t('refresh') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('refresh'), onClick: refresh }, h(IconRefreshOutlineRegular, { size: 16 }))),
+            h(Tooltip, { label: t('refresh') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('refresh'), onClick: refreshSafely }, h(IconRefreshOutlineRegular, { size: 16 }))),
             h(Tooltip, { label: t('close') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('close'), onClick: closeSafely }, h(IconCloseOutlineRegular, { size: 16 })))))),
       h('nav', { className: 'sf-tabs', 'aria-label': t('title') }, ...FINANCE_NAVIGATION.map(([label, items]) => {
         const visible = items.filter(item => financeNavigationAllowed(item, identity))
@@ -178,7 +177,7 @@ function Dashboard({ t, embedded = false, onClose = closeOverlay }) {
           const visible = items.filter(item => financeNavigationAllowed(item, identity))
           return visible.length ? h('optgroup', { key: label, label }, ...visible.map(item => h('option', { key: item[0], value: item[0] }, item[1]))) : null
         }))),
-      h('div', { ref: contentRef, className: `sf-content${briefState === 'loading' && !brief ? ' sf-refreshing' : ''}`, 'aria-busy': briefState === 'loading' && !brief }, body)))
+      h('div', { ref: contentRef, className: `sf-content${briefState === 'loading' && !brief ? ' sf-refreshing' : ''}`, 'aria-busy': briefState === 'loading' && !brief }, body), leaveGuard.prompt))
 }
 
 function Button({ wide, t, onOpen = openOverlay }) {

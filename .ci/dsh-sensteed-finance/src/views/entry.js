@@ -550,6 +550,7 @@ function EntryPanel({ year, orgId, orgs, departments, role, t, onSaved, onYearCh
   const [costError, setCostError] = useState(false)
   const [retry, setRetry] = useState(0)
   const savingRef = useRef(false)
+  useFinanceNavigationEntry(() => dirtyRef.current, () => savingRef.current, () => { dirtyRef.current = false })
   const [formRevision, setFormRevision] = useState(0)
   useEffect(() => {
     if (entryMountedRef.current) requestAnimationFrame(() => entryRootRef.current?.querySelector?.('[role="tab"][aria-selected="true"]')?.focus?.())

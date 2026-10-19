@@ -7,6 +7,9 @@ function actualPaymentDate(value) {
   return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString('sv-SE', { timeZone: 'Asia/Shanghai' })
 }
 
+const CASH_DELAY_OPTIONS = [['UNKNOWN', '未确认延期'], ['DELAYED', '已延期'], ['NOT_DELAYED', '未延期']]
+const cashDelayLabel = value => CASH_DELAY_OPTIONS.find(([key]) => key === value)?.[1] ?? '未确认延期'
+
 const PRIORITIES = [['HIGH', 'priHigh'], ['MEDIUM', 'priMid'], ['LOW', 'priLow']]
 
 function normalizePaymentPriority(value) {
@@ -23,7 +26,7 @@ function CashView({ ctx, t, onDrill }) {
   const [cash, setCash] = useState(null)
   const [plans, setPlans] = useState(null)
   const [revenues, setRevenues] = useState(null)
-  const [filters, setFilters] = useFinanceViewState(ctx, 'filters', { planType: ctx.drillParams?.planType || '', departmentId: ctx.drillParams?.departmentId || '', months: ctx.drillParams?.months || financePlanMonths(null, ctx.drillParams?.month), expenseType: ctx.drillParams?.expenseType || '', keyword: ctx.drillParams?.keyword || '', unassigned: ctx.drillParams?.unassigned === true })
+  const [filters, setFilters] = useFinanceViewState(ctx, 'filters', { planType: ctx.drillParams?.planType || '', delayStatus: ctx.drillParams?.delayStatus || '', departmentId: ctx.drillParams?.departmentId || '', months: ctx.drillParams?.months || financePlanMonths(null, ctx.drillParams?.month), expenseType: ctx.drillParams?.expenseType || '', keyword: ctx.drillParams?.keyword || '', unassigned: ctx.drillParams?.unassigned === true })
   const [page, setPage] = useFinanceViewState(ctx, 'page', ctx.drillParams?.page || 1)
   const [revenuePage, setRevenuePage] = useFinanceViewState(ctx, 'revenuePage', ctx.drillParams?.page || 1)
   const [keywordDraft, setKeywordDraft] = useFinanceViewState(ctx, 'keywordDraft', ctx.drillParams?.keyword || '')
@@ -38,6 +41,7 @@ function CashView({ ctx, t, onDrill }) {
     const params = new URLSearchParams({ year })
     if (orgId && !filters.unassigned) params.set('orgId', orgId)
     if (filters.planType) params.set('planType', filters.planType)
+    if (filters.delayStatus) params.set('delayStatus', filters.delayStatus)
     if (filters.departmentId) params.set('departmentId', filters.departmentId)
     if (filters.months.length) params.set('months', filters.months.join(','))
     if (filters.expenseType) params.set('expenseType', filters.expenseType)
@@ -86,6 +90,7 @@ function CashView({ ctx, t, onDrill }) {
     tab === 'plans' ? [
       h(Select, { key: 'type', 'aria-label': t('planType'), value: filters.planType, onChange: value => updateFilters({ planType: value }), options: PLAN_TYPES.map(([id, label]) => [id, t(label)]), placeholder: t('planType') }),
       h(Select, { key: 'expense', 'aria-label': t('expenseType'), value: filters.expenseType, onChange: value => updateFilters({ expenseType: value }), options: EXPENSE_TYPES.map(([id, label]) => [id, t(label)]), placeholder: t('expenseType') }),
+      h(Select, { key: 'delay', 'aria-label': '延期状态', value: filters.delayStatus || '', onChange: value => updateFilters({ delayStatus: value }), options: [['', '全部延期状态'], ...CASH_DELAY_OPTIONS], placeholder: '全部延期状态' }),
       h(SearchSelect, { key: 'department', value: filters.departmentId, onChange: value => updateFilters({ departmentId: value }), options: (departments || []).map(d => [d.id, d.name]), placeholder: t('department') }),
     ] : h('form', { className: 'sf-row', 'aria-label': '筛选收入类型', onSubmit: event => { event.preventDefault(); setIncomeTypeName(incomeTypeDraft.trim()); setRevenuePage(1) } },
       h(Field, { 'aria-label': '收入类型（精确匹配）', value: incomeTypeDraft, onChange: setIncomeTypeDraft, placeholder: '收入类型（精确匹配）', maxLength: 100 }),
@@ -108,11 +113,12 @@ function CashView({ ctx, t, onDrill }) {
 
     tab === 'summary' ? h(SummaryTab, { cash, t, year, onDrill }) : null,
     tab === 'plans' ? !currentPlans ? h('p', { role: 'status' }, t('loading')) : currentPlans.error ? h(CashPlanListError, { onRetry: retryList }) : h(PlansTab, { rows: planRows, total: currentPlans.value?.data?.total ?? currentPlans.value?.total, page, onPage: setPage, t, busy, act, canWrite, onDialog: setDialog }) : null,
-    tab === 'revenue' ? !currentRevenues ? h('p', { role: 'status' }, t('loading')) : currentRevenues.error ? h(CashPlanListError, { onRetry: retryList }) : h(RevenueTab, { revenues: currentRevenues.value, page: revenuePage, onPage: setRevenuePage, t, canWrite, onBackfill: row => setDialog({ kind: 'backfill', row }), onLedger: row => setDialog({ kind: 'receiptLedger', row }) }) : null,
+    tab === 'revenue' ? !currentRevenues ? h('p', { role: 'status' }, t('loading')) : currentRevenues.error ? h(CashPlanListError, { onRetry: retryList }) : h(RevenueTab, { revenues: currentRevenues.value, page: revenuePage, onPage: setRevenuePage, t, canWrite, onBackfill: row => setDialog({ kind: 'backfill', row }), onLedger: row => setDialog({ kind: 'receiptLedger', row }), onAdjust: row => setDialog({ kind: 'revenueAdjustment', plan: row }) }) : null,
     tab === 'accuracy' ? h(CashAccuracyView, { ctx, t }) : null,
 
     dialog?.kind === 'closeRemaining' && canWrite ? h(CloseRemainingDialog, { plan: dialog.plan, t, busy, onClose: () => setDialog(null), act }) : null,
     dialog?.kind === 'schedule' ? h(ScheduleDialog, { plan: dialog.plan, t, onClose: () => setDialog(null), act }) : null,
+    dialog?.kind === 'revenueAdjustment' && canWrite ? h(RevenueAdjustmentDialog, { plan: dialog.plan, t, onClose: () => setDialog(null), act }) : null,
     dialog?.kind === 'increase' ? h(IncreaseDialog, { plan: dialog.plan, t, onClose: () => setDialog(null), act }) : null,
     dialog?.kind === 'planDetail' ? h(PlanDetailDialog, { plan: dialog.plan, ctx, t, onClose: () => setDialog(null) }) : null,
     dialog?.kind === 'receiptLedger' ? h(Dialog, { title: `${t('settlementSectionReceipt')} · ${dialog.row.itemName ?? ''}`, onClose: () => setDialog(null) }, h(CashSettlementsSection, { planId: dialog.row.id, direction: 'RECEIPT', ctx, t })) : null,
@@ -132,7 +138,7 @@ function cashSummaryModel(rows, selectedYear, now = new Date()) {
   const month = Number(parts.find(part => part.type === 'month').value)
   const isCurrentYear = Number(selectedYear) === year
   const current = isCurrentYear ? rows.filter(row => row.year === year && row.month === month) : []
-  const totals = Object.fromEntries(['actualBalance', 'plannedIncome', 'plannedExpense', 'actualIncome', 'actualExpense', 'remainingPayment'].map(key => {
+  const totals = Object.fromEntries(['actualBalance', 'plannedIncome', 'plannedExpense', 'actualIncome', 'actualExpense', 'remainingPayment', 'remainingReceipt', 'incomeAdjustment', 'expenseAdjustment'].map(key => {
     const values = current.map(row => finite(row[key]))
     return [key, values.length && values.every(value => value !== null) ? values.reduce((sum, value) => sum + value, 0) : null]
   }))
@@ -145,12 +151,12 @@ function SummaryTab({ cash, t, year, now, onDrill }) {
   const model = cashSummaryModel(rows, year, now)
   const caliber = cash?.data?.caliber || cash?.caliber
   return h('div', { className: 'sf-stack' },
-    h('p', { className: 'sf-note' }, caliber === 'PUBLISHED_FACTS' ? '按已生效财务代录及已审核发布的付款/收入计划汇总，仅含年度、月份齐全的行；未知金额保留为空，余额及来源剩余金额暂不可用。' : caliber === 'IMPORTED' ? '每行是主体×月份导入快照，未经拆分；余额不跨月累加。' : '来源口径暂未返回，请核对服务版本与导入发布状态；未知金额不按零处理。'),
+    h('p', { className: 'sf-note' }, caliber === 'PUBLISHED_FACTS' ? '按已生效财务代录及已审核发布的付款/收入计划汇总，仅含年度、月份齐全的行；未知金额保留为空；余额不可推导，未到账/未付款逐笔求和，调整差额只计已过账单。' : caliber === 'IMPORTED' ? '每行是主体×月份导入快照，未经拆分；余额不跨月累加。' : '来源口径暂未返回，请核对服务版本与导入发布状态；未知金额不按零处理。'),
     !rows.length ? h('p', { role: 'status' }, '当前年度与主体暂无资金汇总记录，可切换范围或到数据中心核查导入与发布状态。') : null,
     model.isCurrentYear ? h(Card, { title: `${model.year}-${String(model.month).padStart(2, '0')} · ${t('cashMonthlyExecution')}`, unit: t('unitNote') },
       h('div', { className: 'sf-kpis' },
-        ...[['actualBalance', 'cashBalance'], ['plannedIncome', 'plannedIncome'], ['plannedExpense', 'plannedExpense'], ['actualIncome', 'actualIncome'], ['actualExpense', 'actualExpense'], ['remainingPayment', 'remainingUnpaid']].map(([key, label]) =>
-          h(KpiCard, { key, icon: 'data', label: t(label), value: yuan(model.totals[key]) ?? '—', negative: model.totals[key] !== null && model.totals[key] < 0, onClick: onDrill && key !== 'actualBalance' ? () => onDrill('cash', { view: /Income$/.test(key) ? 'revenue' : 'plans', year: String(model.year), month: String(model.month) }) : undefined }))),
+        ...[['actualBalance', 'cashBalance'], ['plannedIncome', 'plannedIncome'], ['plannedExpense', 'plannedExpense'], ['actualIncome', 'actualIncome'], ['actualExpense', 'actualExpense'], ['remainingPayment', 'remainingUnpaid'], ['remainingReceipt', 'remainingReceipt'], ['incomeAdjustment', 'incomeAdjustment'], ['expenseAdjustment', 'expenseAdjustment']].map(([key, label]) =>
+          h(KpiCard, { key, icon: 'data', label: t(label), value: yuan(model.totals[key]) ?? '—', negative: model.totals[key] !== null && model.totals[key] < 0, onClick: onDrill && key !== 'actualBalance' ? () => onDrill('cash', { view: ['plannedIncome', 'actualIncome', 'incomeAdjustment', 'remainingReceipt'].includes(key) ? 'revenue' : 'plans', year: String(model.year), month: String(model.month) }) : undefined }))),
       h('p', { className: 'sf-note' }, t('cashMissingMetrics'))) : null,
     h(Card, { title: t('cashSummaryTable'), unit: t('unitNote') }, h(CashSummaryTable, { rows, t })))
 }
@@ -161,7 +167,7 @@ function CashSummaryTable({ rows, t }) {
       { label: t('org'), key: 'orgName', stickyLeft: true },
       { label: t('year'), key: 'year', num: true },
       { label: t('monthCol'), key: 'month', num: true },
-      ...[['prevMonthEndBalance', 'prevEndBalance'], ['plannedIncome', 'plannedIncome'], ['plannedExpense', 'plannedExpense'], ['projectedBalance', 'projectedBalance'], ['actualIncome', 'actualIncome'], ['actualExpense', 'actualExpense'], ['actualBalance', 'actualBalance'], ['remainingPayment', 'remainingUnpaid']].map(([key, label]) => ({
+      ...[['prevMonthEndBalance', 'prevEndBalance'], ['plannedIncome', 'plannedIncome'], ['plannedExpense', 'plannedExpense'], ['projectedBalance', 'projectedBalance'], ['actualIncome', 'actualIncome'], ['actualExpense', 'actualExpense'], ['actualBalance', 'actualBalance'], ['remainingPayment', 'remainingUnpaid'], ['remainingReceipt', 'remainingReceipt'], ['incomeAdjustment', 'incomeAdjustment'], ['expenseAdjustment', 'expenseAdjustment']].map(([key, label]) => ({
         label: t(label), key, sortValue: row => finite(row[key]), num: true, render: row => wan(row[key]) ?? '—',
       })),
     ], rows, rowKey: 'id', empty: t('empty'),
@@ -184,6 +190,7 @@ function PlansTab({ rows, total, page, onPage, t, busy, act, canWrite = true, on
         { label: t('actualPaidDate'), key: 'actualPaidAt', render: row => actualPaymentDate(row.actualPaidAt) ?? '—', num: true },
         { label: t('statusCol'), key: 'status', render: row => financeDisplayValue(row.status, 'status') },
         { label: t('scheduleDate'), key: 'scheduleDate', render: row => actualPaymentDate(row.scheduleDate) ?? '—', num: true },
+        { label: '延期状态', key: 'delayStatus', render: row => cashDelayLabel(row.delayStatus) },
         { label: t('priority'), key: 'priority', render: row => { const priority = normalizePaymentPriority(row.priority); return priority ? h(Pill, { tone: priority === 'HIGH' ? 'rose' : priority === 'MEDIUM' ? 'amber' : 'muted' }, financeEnumLabel(priority, t, Object.fromEntries(PRIORITIES))) : '—' } },
         {
           label: t('actions'), key: 'actions', sortable: false,
@@ -223,6 +230,11 @@ function ScheduleDialog({ plan, t, onClose, act }) {
   const [cashAmount, setCashAmount] = useState(plan.plannedCashAmount != null ? String(plan.plannedCashAmount) : '')
   const [acceptanceAmount, setAcceptanceAmount] = useState(plan.plannedAcceptanceAmount != null ? String(plan.plannedAcceptanceAmount) : '')
   const [planMonth, setPlanMonth] = useState('')
+  const [delayStatus, setDelayStatus] = useState(plan.delayStatus ?? 'UNKNOWN')
+  const [delayTouched, setDelayTouched] = useState(false)
+  const [originalDate, setOriginalDate] = useState(actualPaymentDate(plan.originalScheduleDate) ?? '')
+  const [deferredDate, setDeferredDate] = useState(actualPaymentDate(plan.deferredUntil) ?? '')
+  const [delayReason, setDelayReason] = useState(plan.delayReason ?? '')
   const [splitTouched, setSplitTouched] = useState(false)
   const [formError, setFormError] = useState(null)
   const [pending, setPending] = useState(false)
@@ -272,10 +284,12 @@ function ScheduleDialog({ plan, t, onClose, act }) {
       if (Math.round(Number(cashAmount) * 100) + Math.round(Number(acceptanceAmount) * 100) !== totalCents) { setFormError(t('scheduleSumBad')); return }
       if (accepts === 'no' && Number(acceptanceAmount) > 0) { setFormError(t('scheduleNoAcceptance')); return }
     }
+    if (delayTouched && delayStatus === 'DELAYED' && (!originalDate || !deferredDate || deferredDate <= originalDate || !delayReason.trim())) { setFormError('延期须填写原计划日期、较晚的延期日期及原因。'); return }
     setFormError(null)
     lock.current = true; setPending(true)
     try {
       const saved = await act(`/payment-plans/${plan.id}/schedule`, {
+        ...(delayTouched ? { delayStatus, ...(delayStatus === 'DELAYED' ? { originalScheduleDate: new Date(`${originalDate}T00:00:00+08:00`).toISOString(), deferredUntil: new Date(`${deferredDate}T00:00:00+08:00`).toISOString(), delayReason: delayReason.trim() } : {}) } : {}),
         ...(scheduleDate ? { scheduleDate: new Date(`${scheduleDate}T00:00:00+08:00`).toISOString() } : {}),
         ...(priority ? { priority } : {}),
         ...(accepts ? { acceptsAcceptance: accepts === 'yes' } : {}),
@@ -298,8 +312,14 @@ function ScheduleDialog({ plan, t, onClose, act }) {
       h('p', { className: 'sf-note' }, `${plan.description ?? '—'} · 计划 ${yuan(plan.plannedAmount) ?? '—'} · ${plan.planMonth ? plan.planMonth + '月' : '待排'}`),
       formError ? h('p', { role: 'alert', className: 'sf-neg' }, formError) : null,
       plan.planMonth == null ? h(FormRow, { label: `${t('scheduleMonthBackfill')} *` }, h(Select, { value: planMonth, onChange: setPlanMonth, options: Array.from({ length: 12 }, (_, index) => [String(index + 1), `${index + 1} ${t('monthCol')}`]), placeholder: t('monthCol') })) : null,
+      h(FormRow, { label: '延期状态' }, h(Select, { value: delayStatus, onChange: value => { setDelayStatus(value); setDelayTouched(true) }, options: CASH_DELAY_OPTIONS })),
+      delayStatus === 'DELAYED' ? h('div', { className: 'sf-stack' },
+        h(FormRow, { label: '原计划日期' }, h(Field, { type: 'date', value: originalDate, onChange: value => { setOriginalDate(value); setDelayTouched(true) } })),
+        h(FormRow, { label: '延期至' }, h(Field, { type: 'date', value: deferredDate, onChange: value => { setDeferredDate(value); setDelayTouched(true) } })),
+        h(FormRow, { label: '延期原因' }, h(Textarea, { value: delayReason, maxLength: 500, onChange: value => { setDelayReason(value); setDelayTouched(true) } }))) : null,
+      h('p', { className: 'sf-note' }, '延期以财务确认的日期和原因为准；到期未付不自动标记延期，保存不改变归属月份。'),
       h(FormRow, { label: t('scheduleDate') }, h(Field, { type: 'date', value: scheduleDate, onChange: setScheduleDate })),
-      h(FormRow, { label: '排款优先级' }, h(Select, { value: priority, onChange: setPriority, options: priorityOptions, placeholder: '未设置' })),
+      h(FormRow, { label: '排款优先级' }, h(Select, { 'aria-label': t('priority'), value: priority, onChange: setPriority, options: priorityOptions, placeholder: '未设置' })),
       h(FormRow, { label: '是否接受承兑' }, h(Select, { value: accepts, onChange: value => { setAccepts(value); if (value === 'no' && totalCents !== null) updateSplit('acceptance', '0') }, options: [['yes', '接受'], ['no', '不接受']], placeholder: '未设置' })),
       h(FormRow, { label: t('cashAmount') }, h(Field, { inputMode: 'decimal', value: cashAmount, onChange: value => updateSplit('cash', value) })),
       h(FormRow, { label: t('acceptanceAmount') }, h(Field, { inputMode: 'decimal', value: acceptanceAmount, onChange: value => updateSplit('acceptance', value) })),
@@ -382,6 +402,7 @@ function PlanPayments({ planId, t }) {
 function PlanDetailDialog({ plan, ctx, t, onClose }) {
   const fields = [
     [t('org'), plan.orgName], [t('planType'), financeEnumLabel(plan.planType, t, PLAN_LABELS)], [t('description'), plan.description],
+    ['延期状态', cashDelayLabel(plan.delayStatus)], ['原计划日期', actualPaymentDate(plan.originalScheduleDate)], ['延期至', actualPaymentDate(plan.deferredUntil)], ['延期原因', plan.delayReason],
     [t('department'), plan.departmentName], [t('costItem'), plan.costItemName], [t('planMonth'), plan.planMonth ? `${plan.planMonth} 月` : '—'],
     [t('planned'), wan(plan.plannedAmount)], [t('actual'), wan(plan.actualAmount)], [t('variance'), wan(plan.varianceAmount)],
     [t('remaining'), wan(plan.remainingAmount)], [t('actualPaidDate'), actualPaymentDate(plan.actualPaidAt)], [t('scheduleDate'), actualPaymentDate(plan.scheduleDate)], [t('priority'), plan.priority ? financeEnumLabel(normalizePaymentPriority(plan.priority), t, Object.fromEntries(PRIORITIES)) : '—'],
@@ -397,7 +418,7 @@ function PlanDetailDialog({ plan, ctx, t, onClose }) {
 
 // ---- 收入计划 ----
 
-function RevenueTab({ revenues, page, onPage, t, canWrite = true, onBackfill, onLedger }) {
+function RevenueTab({ revenues, page, onPage, t, canWrite = true, onBackfill, onLedger, onAdjust }) {
   const rows = revenues?.data?.list || revenues?.list || []
   return h(Card, { title: t('revenueVs'), unit: t('unitNote') },
     h('p', { className: 'sf-note' }, t('remainingReceiptHint')),
@@ -419,6 +440,7 @@ function RevenueTab({ revenues, page, onPage, t, canWrite = true, onBackfill, on
         },
         { label: t('remainingReceipt'), key: 'remainingReceipt', num: true, sortValue: revenueRemaining, render: row => wan(revenueRemaining(row)) ?? '—' },
         { label: t('actions'), key: 'actions', sortable: false, render: row => h('div', { className: 'sf-row', style: { flexWrap: 'nowrap', justifyContent: 'flex-end' } },
+        canWrite && onAdjust ? h(LinkButton, { onClick: () => onAdjust(row) }, '调增/调减') : null,
         canWrite ? h(LinkButton, { onClick: () => onBackfill(row) }, t('backfill')) : null,
         canWrite ? h(LinkButton, { onClick: () => onLedger(row) }, t('settlementSectionReceipt')) : null) },
       ],

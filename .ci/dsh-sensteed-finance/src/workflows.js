@@ -242,23 +242,59 @@ function financeFormFields(fields, values, onChange, errors, busy, prefix, rowNu
         message ? h('span', { id: errorId, className: 'sf-neg sf-field-error' }, message) : null))
   })
 }
+let financeNavigationGlobal = null
+function financeNavigationContext() {
+  return financeNavigationContext.value ||= React.createContext(null)
+}
+function useFinanceNavigationEntry(dirty, busy, discard) {
+  const navigation = React.useContext(financeNavigationContext()) || financeNavigationGlobal, latest = useRef(null)
+  latest.current = { dirty, busy, discard }
+  const read = key => typeof latest.current[key] === 'function' ? latest.current[key]() : latest.current[key]
+  useEffect(() => navigation?.register({ dirty: () => read('dirty'), busy: () => read('busy'), discard: () => latest.current.discard?.() }), [navigation])
+  useEffect(() => {
+    const prevent = event => { if (read('dirty') || read('busy')) { event.preventDefault(); event.returnValue = '' } }
+    window.addEventListener('beforeunload', prevent)
+    return () => window.removeEventListener('beforeunload', prevent)
+  }, [])
+  return navigation
+}
+function useFinanceNavigationGuard() {
+  const entries = useRef(new Set()), [pending, setPending] = useState(null), [blocked, setBlocked] = useState(false)
+  const busy = () => [...entries.current].some(entry => entry.busy())
+  const navigation = useMemo(() => ({
+    register: entry => { entries.current.add(entry); return () => entries.current.delete(entry) },
+    leave: action => {
+      if (busy()) { setBlocked(true); return }
+      setBlocked(false)
+      if ([...entries.current].some(entry => entry.dirty())) setPending(() => action)
+      else action()
+    },
+  }), [])
+  const dismiss = () => { setPending(null); setBlocked(false) }
+  const prompt = pending || blocked ? h(Dialog, { title: blocked ? '正在处理，请稍候' : '放弃未保存的录入？', width: 'sm', onClose: dismiss },
+    h('p', null, blocked ? '当前请求尚未完成，暂时不能切换。处理结果返回后可继续操作。' : '当前内容尚未保存。继续将清空本次填写或导入预览；也可以返回继续填写。'),
+    h('div', { className: 'sf-row' }, h(GhostButton, { onClick: dismiss }, blocked ? '返回当前页面' : '继续填写'),
+      !blocked ? h(PrimaryButton, { onClick: () => {
+        if (busy()) { setBlocked(true); return }
+        const action = pending; setPending(null)
+        for (const entry of entries.current) entry.discard()
+        action?.()
+      } }, '放弃并继续') : null)) : null
+  return { navigation, prompt }
+}
 function useFinanceFormExit(initial, values, busy, onClose) {
   const baseline = useRef(JSON.stringify(initial)), [leaving, setLeaving] = useState(false)
   const promptRef = useRef(null), previousFocus = useRef(null), pendingAction = useRef(onClose)
   const [discardLabel, setDiscardLabel] = useState('放弃修改并关闭')
   const dirty = JSON.stringify(values) !== baseline.current
-  useEffect(() => {
-    if (!dirty) return undefined
-    const prevent = event => { event.preventDefault(); event.returnValue = '' }
-    window.addEventListener('beforeunload', prevent)
-    return () => window.removeEventListener('beforeunload', prevent)
-  }, [dirty])
+  useFinanceNavigationEntry(dirty, busy, () => { baseline.current = JSON.stringify(values) })
+  const isBusy = () => typeof busy === 'function' ? busy() : busy
   useEffect(() => { if (leaving) requestAnimationFrame(() => promptRef.current?.querySelector('button')?.focus()) }, [leaving])
-  const leave = (action, label = '放弃修改并继续') => { if (!busy) { if (dirty) { pendingAction.current = action; setDiscardLabel(label); previousFocus.current = document.activeElement; setLeaving(true) } else action() } }
+  const leave = (action, label = '放弃修改并继续') => { if (!isBusy()) { if (dirty) { pendingAction.current = action; setDiscardLabel(label); previousFocus.current = document.activeElement; setLeaving(true) } else action() } }
   const close = () => leave(onClose, '放弃修改并关闭')
   const prompt = leaving ? h('div', { ref: promptRef, className: 'sf-form-exit sf-stack', role: 'alert' },
     h('p', null, '有尚未保存的修改。离开后这些内容将丢失。'),
-    h('div', { className: 'sf-row' }, h(GhostButton, { disabled: busy, onClick: () => { setLeaving(false); requestAnimationFrame(() => previousFocus.current?.focus()) } }, '继续编辑'), h(GhostButton, { disabled: busy, onClick: () => { setLeaving(false); pendingAction.current() } }, discardLabel))) : null
+    h('div', { className: 'sf-row' }, h(GhostButton, { disabled: isBusy(), onClick: () => { setLeaving(false); requestAnimationFrame(() => previousFocus.current?.focus()) } }, '继续编辑'), h(GhostButton, { disabled: isBusy(), onClick: () => { if (!isBusy()) { setLeaving(false); pendingAction.current() } } }, discardLabel))) : null
   return { close, prompt, leave, reset: values => { baseline.current = JSON.stringify(values) } }
 }
 function FinanceFormDialog({ title, description, fields, initial = {}, onSubmit, onClose }) {

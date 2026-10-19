@@ -233,6 +233,9 @@ function FinanceEbomExcel({ packageId, onChanged }) {
     notice ? h('p', { role: 'status' }, notice) : null,
     preview ? h('div', { className: 'sf-stack' },
       h('p', null, `预览 ${preview.rowCount} 条 · 预计新增 ${preview.newCount ?? '待核对'} 条 · 已有位置 ${preview.existingCount ?? preview.duplicateCount} 条`),
+      preview.errors?.length ? h('div', { role: 'alert', className: 'sf-banner sf-banner-rose' },
+        h('strong', null, `发现 ${preview.errors.length} 行错误，修复源文件后重新上传。`),
+        h('ul', { className: 'sf-stack' }, ...preview.errors.map(error => h('li', { key: `${error.row}-${error.field || ''}-${error.message}` }, `第 ${error.row} 行${error.field ? ` · ${error.field}` : ''}：${error.message}`)))) : null,
       ...preview.warnings.map((warning, key) => h('p', { key, className: 'sf-note' }, warning)),
       h(FormRow, { label: '搜索预览零件' }, h(Field, { value: keyword, onChange: value => { setKeyword(value); setPage(1) }, 'aria-label': '搜索预览零件', placeholder: '按零件号或名称核对预览' })),
       h(Table, { tableId: 'finance-ebom-preview', rows: filtered.slice((page - 1) * 20, page * 20), columns: [
@@ -242,7 +245,7 @@ function FinanceEbomExcel({ packageId, onChanged }) {
       ], empty: '无匹配零件' }), h(Pager, { page, total: filtered.length, limit: 20, onPage: setPage }),
       preview.warnings.length ? h('label', null, h('input', { type: 'checkbox', checked: acknowledged, disabled: busy, onChange: event => setAcknowledged(event.target.checked) }), '我已核对重复记录及装配位置') : null,
       h('div', { className: 'sf-row' },
-        h(PrimaryButton, { busy, disabled: preview.newCount === 0 || (preview.warnings.length > 0 && !acknowledged) || !preview.nodes.length, onClick: () => run(async () => { const result = await financeRest(`/ce/packages/${packageId}/nodes`, 'POST', { nodes: preview.nodes }); setPreview(null); setNotice(`导入完成：新增 ${result.data.created}，已有装配位置跳过 ${result.data.skipped}`); onChanged() }) }, `确认导入 ${preview.rowCount} 条`),
+        h(PrimaryButton, { busy, disabled: preview.errors?.length > 0 || preview.newCount === 0 || (preview.warnings.length > 0 && !acknowledged) || !preview.nodes.length, onClick: () => run(async () => { const result = await financeRest(`/ce/packages/${packageId}/nodes`, 'POST', { nodes: preview.nodes }); setPreview(null); setNotice(`导入完成：新增 ${result.data.created}，已有装配位置跳过 ${result.data.skipped}`); onChanged() }) }, `确认导入 ${preview.rowCount} 条`),
         h(GhostButton, { disabled: busy, onClick: () => { setPreview(null); setError(''); setAcknowledged(false) } }, '取消预览')),
       preview.newCount === 0 ? h('p', { className: 'sf-note' }, '本文件所有装配位置均已存在，无需重复导入。结构发生变化请新建成本版本。') : null) : null)
 }
