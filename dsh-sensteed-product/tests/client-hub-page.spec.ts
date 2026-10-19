@@ -2,7 +2,7 @@
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, expect, it, vi } from 'vitest'
-import { HubPage } from '../src/client/HubPage.tsx'
+import { HubPage, SkillLibrary } from '../src/client/HubPage.tsx'
 import { DOFE_ACCESS_COPY } from '../src/client/dofe-access.ts'
 let root: Root | undefined, node: HTMLDivElement
 const plugin = { kind: 'plugin', itemId: 'plugin', displayName: 'Finance', version: '1.0', required: false, initialInstall: true, enabled: true, disposition: 'INSTALL', reason: null, bytes: 1 }
@@ -45,4 +45,21 @@ it('opens the real skill catalog and creation callback and clears account-owned 
   await act(async () => h.logout())
   expect(node.textContent).toBe(DOFE_ACCESS_COPY.zh.settingsLoginRequired)
   expect(node.textContent).not.toContain('my-skill')
+})
+
+it('keeps skill descriptions readable and exposes filter count and clear recovery', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+  const description = '完整说明'.repeat(80)
+  node = document.createElement('div'); document.body.append(node); root = createRoot(node)
+  await act(async () => root!.render(createElement(SkillLibrary, { t: key => DOFE_ACCESS_COPY.zh[key], loadSkills: async () => [{ name: 'finance', description }, { name: 'office', description: '办公' }] })))
+  expect(node.querySelector('details')?.open).toBe(false)
+  expect(node.querySelector('details p')?.textContent).toBe(description)
+  expect(node.textContent).toContain('显示技能: 2 / 2')
+  const input = node.querySelector<HTMLInputElement>('input[type=search]')!
+  await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'no-match'); input.dispatchEvent(new Event('input', { bubbles: true })) })
+  expect(node.textContent).toContain('显示技能: 0 / 2')
+  expect(node.textContent).toContain(DOFE_ACCESS_COPY.zh.catalogNoMatches)
+  await click('清除搜索')
+  expect(input.value).toBe('')
+  expect(node.textContent).toContain('显示技能: 2 / 2')
 })

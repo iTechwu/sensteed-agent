@@ -141,7 +141,7 @@ function DesktopOwnedFrameBody({
         </div>
       </aside>
       <main id="sensteed-main-workspace" tabIndex={-1} className="sensteedAgentConversationSurface"><MainPanel usePanelInfo={usePanelInfo} renderSlot={renderSlot} /></main>
-      <aside className="sensteedAgentRightbarSurface" data-rightbar-col hidden={!conversationContext}>
+      <aside className="sensteedAgentRightbarSurface" data-rightbar-col hidden={!conversationContext || (columns.rightbar === 0 && !panels.rightbarFullscreen)}>
         {renderSlot('rightbar', { width: normal.rightbar, viewportWidth: viewport, canShow: conversationContext && normal.rightbar > 0 })}
       </aside>
       {/* Electron resolves app regions in DOM order; Desktop overlays must remain later. */}

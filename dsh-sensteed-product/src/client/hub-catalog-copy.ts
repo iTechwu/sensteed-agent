@@ -1,6 +1,7 @@
 /** Copy shared by the sidebar catalogs and their installation review. */
 export const HUB_CATALOG_COPY = {
   zh: {
+    catalogClearSearch: '清除搜索', catalogResults: '显示技能', catalogSkillDescription: '查看完整说明',
     catalogBackToAll: '查看全部内置能力',
     pluginsNav: '插件', skillsNav: '技能', pluginsIntro: '发现、创建和管理工作所需的插件。', skillsIntro: '发现、创建和管理 Agent 技能。',
     catalogTab: '企业目录', builtInTab: '内置插件', localSkillsTab: '可用技能', catalogSearch: '搜索名称', catalogAll: '全部', catalogInstalled: '已安装', catalogAvailable: '可安装', catalogFilter: '筛选安装状态',
@@ -12,6 +13,7 @@ export const HUB_CATALOG_COPY = {
     localSkillsIntro: '以下技能可在最近的会话中通过 /名称 调用。', localSkillsEmpty: '开始一个会话后，即可查看该会话可用的技能。', localSkillsFailed: '无法读取技能，请重试。', catalogRetry: '重试',
   },
   en: {
+    catalogClearSearch: 'Clear search', catalogResults: 'Skills shown', catalogSkillDescription: 'Read full description',
     catalogBackToAll: 'All built-in capabilities',
     pluginsNav: 'Plugins', skillsNav: 'Skills', pluginsIntro: 'Discover, create, and manage plugins for your work.', skillsIntro: 'Discover, create, and manage Agent skills.',
     catalogTab: 'Company catalog', builtInTab: 'Built-in plugins', localSkillsTab: 'Available skills', catalogSearch: 'Search names', catalogAll: 'All', catalogInstalled: 'Installed', catalogAvailable: 'Available', catalogFilter: 'Filter installation status',

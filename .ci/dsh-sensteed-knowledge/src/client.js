@@ -131,6 +131,7 @@ const copy = {
     consoleHint: "能力与数据均受当前企业身份 ACL 约束",
     reloadData: "读取",
     rebuildGraph: "重建知识图谱",
+    graphMaintenance: "图谱维护", graphMaintenanceHint: "重建会更新图谱投影；日常查询无需执行。", jsonObjectError: "请输入有效的 JSON 对象，例如 {}。", jsonArrayError: "请输入有效的 JSON 数组，例如 []。", jsonDocumentError: "请输入有效的 JSON-LD 对象或数组。",
     createSpace: "创建知识空间",
     createSource: "创建接入源",
     createOntology: "创建 Ontology 草稿",
@@ -263,6 +264,7 @@ const copy = {
     consoleHint: "Capabilities and data are constrained by the current enterprise ACL",
     reloadData: "Load",
     rebuildGraph: "Rebuild graph",
+    graphMaintenance: "Graph maintenance", graphMaintenanceHint: "Rebuild updates the graph projection. It is not needed for everyday reads.", jsonObjectError: "Enter a valid JSON object, for example {}.", jsonArrayError: "Enter a valid JSON array, for example [].", jsonDocumentError: "Enter a valid JSON-LD object or array.",
     createSpace: "Create space",
     createSource: "Create source",
     createOntology: "Create ontology draft",
@@ -1145,8 +1147,13 @@ function parseJsonArray(value) {
     return [];
   }
 }
-function ManagementField({ control = "input", placeholder, ...props }) {
-  return h("label", { className: "yk-management-field" }, h("span", null, placeholder), h(control, { ...props, "aria-label": placeholder }));
+function validManagementJson(value, shape) {
+  if (!value.trim()) return shape !== 'document';
+  try { const parsed = JSON.parse(value); return shape === 'array' ? Array.isArray(parsed) : shape === 'object' ? parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed) : parsed !== null && typeof parsed === 'object'; } catch { return false; }
+}
+function ManagementField({ control = "input", placeholder, error, ...props }) {
+  const errorId = `yk-validation-${String(placeholder).replace(/\s+/g, '-')}`;
+  return h("label", { className: "yk-management-field" }, h("span", null, placeholder), h(control, { ...props, "aria-label": placeholder, "aria-invalid": error ? true : undefined, "aria-describedby": error ? errorId : undefined }), error ? h("small", { id: errorId, role: "alert" }, error) : null);
 }
 function ManagementRecords({ records, result, busy, t }) {
   if (busy) return h("p", { role: "status", className: "yk-muted" }, t("loadingCapability"));
@@ -1180,6 +1187,10 @@ function Management({ data, t, tab, busy, result, onLoad, onWrite }) {
   const [resourceId, setResourceId] = useState("");
   const [aclActions, setAclActions] = useState("");
   const [documentId, setDocumentId] = useState("");
+  const validSourceConfig = validManagementJson(sourceConfig, 'object');
+  const validConstraints = validManagementJson(ontologyConstraints, 'array');
+  const validAlignments = validManagementJson(ontologyAlignments, 'array');
+  const validJsonLd = validManagementJson(ontologyJsonLd, 'document');
   const capabilities = data?.capabilities || {};
   const rows = Array.isArray(capabilities.tools) ? capabilities.tools : [];
   const write = (tool, input) => onWrite?.(tool, input);
@@ -1203,7 +1214,7 @@ function Management({ data, t, tab, busy, result, onLoad, onWrite }) {
         ["capability_catalog", "能力目录"], ["environment_facts", "环境事实"], ["skills", "技能"],
         ["acl_grants", "资源授权"], ["principals", "主体"], ["ontologies", "Ontology"],
       ].map(([tool, label]) => h("button", { type: "button", className: "yk-management-card", key: tool, disabled: busy || !capabilityAllowed(data, `knowledge.${tool}`, "read"), onClick: () => onLoad(tool) }, h("strong", null, label), h("span", null, capabilityAllowed(data, `knowledge.${tool}`, "read") ? t("reloadData") : t("capabilityUnavailable"))))),
-      h("button", { type: "button", className: "yk-primary", disabled: busy || !capabilityAllowed(data, "knowledge.rebuild_graph", "write"), onClick: () => onWrite("rebuild_graph", { reason: "desktop-console" }) }, busy ? t("loadingCapability") : t("rebuildGraph")),
+      h("details", { className: "yk-management-form" }, h("summary", null, t("graphMaintenance")), h("p", { className: "yk-muted" }, t("graphMaintenanceHint")), h("button", { type: "button", className: "yk-quiet", disabled: busy || !capabilityAllowed(data, "knowledge.rebuild_graph", "write"), onClick: () => onWrite("rebuild_graph", { reason: "desktop-console" }) }, busy ? t("loadingCapability") : t("rebuildGraph"))),
       h("details", { className: "yk-management-form" },
         h("summary", null, t("createSpace")),
         h(ManagementField, { control: "input", className: "yk-management-input", value: title, placeholder: t("titleField"), onInput: event => setTitle(event.currentTarget.value) }),
@@ -1214,17 +1225,17 @@ function Management({ data, t, tab, busy, result, onLoad, onWrite }) {
         h("summary", null, t("createSource")),
         h(ManagementField, { control: "input", className: "yk-management-input", value: title, placeholder: t("sourceName"), onInput: event => setTitle(event.currentTarget.value) }),
         h(ManagementField, { control: "input", className: "yk-management-input", value: sourceType, placeholder: t("sourceKind"), onInput: event => setSourceType(event.currentTarget.value) }),
-        h(ManagementField, { control: "textarea", className: "yk-management-input", value: sourceConfig, placeholder: t("sourceConfig"), onInput: event => setSourceConfig(event.currentTarget.value), rows: 3 }),
-        h("button", { type: "button", className: "yk-primary", disabled: busy || !title.trim() || !sourceType.trim() || !capabilityAllowed(data, "knowledge.create_source", "write"), onClick: () => onWrite("create_source", { name: title.trim(), type: sourceType.trim(), config: parseJsonObject(sourceConfig) }) }, t("createSource")),
+        h(ManagementField, { control: "textarea", className: "yk-management-input", value: sourceConfig, placeholder: t("sourceConfig"), error: validSourceConfig ? undefined : t("jsonObjectError"), onInput: event => setSourceConfig(event.currentTarget.value), rows: 3 }),
+        h("button", { type: "button", className: "yk-primary", disabled: busy || !validSourceConfig || !title.trim() || !sourceType.trim() || !capabilityAllowed(data, "knowledge.create_source", "write"), onClick: () => onWrite("create_source", { name: title.trim(), type: sourceType.trim(), config: parseJsonObject(sourceConfig) }) }, t("createSource")),
       ),
       h("details", { className: "yk-management-form" },
         h("summary", null, t("createOntology")),
         h(ManagementField, { control: "input", className: "yk-management-input", value: ontologyVersion, placeholder: t("ontologyVersion"), onInput: event => setOntologyVersion(event.currentTarget.value) }),
         h(ManagementField, { control: "input", className: "yk-management-input", value: ontologyClasses, placeholder: t("ontologyClasses"), onInput: event => setOntologyClasses(event.currentTarget.value) }),
         h(ManagementField, { control: "input", className: "yk-management-input", value: ontologyPredicates, placeholder: t("ontologyPredicates"), onInput: event => setOntologyPredicates(event.currentTarget.value) }),
-        h(ManagementField, { control: "textarea", className: "yk-management-input", value: ontologyConstraints, placeholder: "Constraints JSON array", onInput: event => setOntologyConstraints(event.currentTarget.value), rows: 2 }),
-        h(ManagementField, { control: "textarea", className: "yk-management-input", value: ontologyAlignments, placeholder: "Alignments JSON array", onInput: event => setOntologyAlignments(event.currentTarget.value), rows: 2 }),
-        h("button", { type: "button", className: "yk-primary", disabled: busy || !ontologyVersion.trim() || !ontologyClasses.trim() || !ontologyPredicates.trim() || !capabilityAllowed(data, "knowledge.create_ontology_version", "write"), onClick: () => onWrite("create_ontology_version", { version: ontologyVersion.trim(), classes: ontologyClasses.split(",").map(value => value.trim()).filter(Boolean), predicates: ontologyPredicates.split(",").map(value => value.trim()).filter(Boolean), constraints: parseJsonArray(ontologyConstraints), alignments: parseJsonArray(ontologyAlignments) }) }, t("createOntology")),
+        h(ManagementField, { control: "textarea", className: "yk-management-input", value: ontologyConstraints, placeholder: "Constraints JSON array", error: validConstraints ? undefined : t("jsonArrayError"), onInput: event => setOntologyConstraints(event.currentTarget.value), rows: 2 }),
+        h(ManagementField, { control: "textarea", className: "yk-management-input", value: ontologyAlignments, placeholder: "Alignments JSON array", error: validAlignments ? undefined : t("jsonArrayError"), onInput: event => setOntologyAlignments(event.currentTarget.value), rows: 2 }),
+        h("button", { type: "button", className: "yk-primary", disabled: busy || !validConstraints || !validAlignments || !ontologyVersion.trim() || !ontologyClasses.trim() || !ontologyPredicates.trim() || !capabilityAllowed(data, "knowledge.create_ontology_version", "write"), onClick: () => onWrite("create_ontology_version", { version: ontologyVersion.trim(), classes: ontologyClasses.split(",").map(value => value.trim()).filter(Boolean), predicates: ontologyPredicates.split(",").map(value => value.trim()).filter(Boolean), constraints: parseJsonArray(ontologyConstraints), alignments: parseJsonArray(ontologyAlignments) }) }, t("createOntology")),
       ),
       h("details", { className: "yk-management-form" },
         h("summary", null, t("publishOntology")),
@@ -1235,8 +1246,8 @@ function Management({ data, t, tab, busy, result, onLoad, onWrite }) {
       ),
       h("details", { className: "yk-management-form" },
         h("summary", null, t("importOntology")),
-        h(ManagementField, { control: "textarea", className: "yk-management-input", value: ontologyJsonLd, placeholder: t("ontologyJsonLd"), onInput: event => setOntologyJsonLd(event.currentTarget.value), rows: 4 }),
-        h("button", { type: "button", className: "yk-primary", disabled: busy || !ontologyJsonLd.trim() || !capabilityAllowed(data, "knowledge.import_ontology", "write"), onClick: () => onWrite("import_ontology", { jsonLd: ontologyJsonLd.trim() }) }, t("importOntology")),
+        h(ManagementField, { control: "textarea", className: "yk-management-input", value: ontologyJsonLd, placeholder: t("ontologyJsonLd"), error: ontologyJsonLd.trim() && !validJsonLd ? t("jsonDocumentError") : undefined, onInput: event => setOntologyJsonLd(event.currentTarget.value), rows: 4 }),
+        h("button", { type: "button", className: "yk-primary", disabled: busy || !validJsonLd || !ontologyJsonLd.trim() || !capabilityAllowed(data, "knowledge.import_ontology", "write"), onClick: () => onWrite("import_ontology", { jsonLd: ontologyJsonLd.trim() }) }, t("importOntology")),
       ),
       h("details", { className: "yk-management-form" },
         h("summary", null, t("grantAcl")),
@@ -1774,6 +1785,7 @@ module.exports = {
   __test: {
     Management,
     ManagementField,
+    validManagementJson,
     ManagementRecords,
     actionErrorLabel,
     count,

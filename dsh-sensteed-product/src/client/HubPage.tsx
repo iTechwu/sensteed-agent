@@ -21,7 +21,7 @@ export interface HubPageProps {
   loadSkills: (signal: AbortSignal) => Promise<readonly CatalogSkill[]>
 }
 
-function SkillLibrary({ loadSkills, t }: Pick<HubPageProps, 'loadSkills' | 't'>) {
+export function SkillLibrary({ loadSkills, t }: Pick<HubPageProps, 'loadSkills' | 't'>) {
   const [skills, setSkills] = useState<readonly CatalogSkill[]>(), [failed, setFailed] = useState(false), [retry, setRetry] = useState(0), [query, setQuery] = useState('')
   useEffect(() => {
     const controller = new AbortController()
@@ -32,12 +32,14 @@ function SkillLibrary({ loadSkills, t }: Pick<HubPageProps, 'loadSkills' | 't'>)
   const visible = skills?.filter(skill => `${skill.name} ${skill.description}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
   return <section aria-label={t('localSkillsTab')}>
     <p className="dshHubHint">{t('localSkillsIntro')}</p>
-    <button type="button" className="dshHubSecondary" onClick={() => setRetry(value => value + 1)}>{t('hubCheck')}</button>
+    <button type="button" className="dshHubSecondary" disabled={skills === undefined && !failed} onClick={() => setRetry(value => value + 1)}>{t('hubCheck')}</button>
     <input className="dshHubSkillSearch" type="search" aria-label={t('catalogSearch')} placeholder={t('catalogSearch')} value={query} onChange={event => setQuery(event.target.value)} />
+    {query && <button type="button" className="dshHubSecondary" onClick={() => setQuery('')}>{t('catalogClearSearch')}</button>}
+    {skills && <p role="status" className="dshHubHint">{t('catalogResults')}: {visible?.length} / {skills.length}</p>}
     {failed ? <div role="alert"><p>{t('localSkillsFailed')}</p><button type="button" className="dshHubSecondary" onClick={() => setRetry(value => value + 1)}>{t('catalogRetry')}</button></div>
       : skills === undefined ? <p role="status">{t('catalogLoading')}</p>
       : visible?.length === 0 ? <p role="status" className="dshHubEmpty">{t(skills.length ? 'catalogNoMatches' : 'localSkillsEmpty')}</p>
-      : <ul className="dshHubCatalog">{visible?.map(skill => <li className="dshHubCard" key={skill.name}><div className="dshHubCardHeading"><span className="dshHubGlyph"><Sparkles size={20} aria-hidden="true" /></span><h3>{skill.name}</h3></div><p className="dshHubHint">{skill.description}</p><code>/{skill.name}</code></li>)}</ul>}
+      : <ul className="dshHubCatalog">{visible?.map(skill => <li className="dshHubCard" key={skill.name}><div className="dshHubCardHeading"><span className="dshHubGlyph"><Sparkles size={20} aria-hidden="true" /></span><h3>{skill.name}</h3></div><p className="dshHubHint">{skill.description.length > 180 ? `${skill.description.slice(0, 180)}…` : skill.description}</p>{skill.description.length > 180 && <details className="dshHubDetails"><summary>{t('catalogSkillDescription')}</summary><p>{skill.description}</p></details>}<code>/{skill.name}</code></li>)}</ul>}
   </section>
 }
 

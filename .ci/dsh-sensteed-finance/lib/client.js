@@ -6174,7 +6174,7 @@ window.__ModuleLoader__.load({
       const comparison = useFinanceResource(path, revision)
       const versionLabel = row => mode === 'monthly' ? `${row.label} · 已冻结${row.frozenThroughMonth}个月 / 剩余预测${12 - row.frozenThroughMonth}个月` : `${row.name} · ${financeDisplayValue(row.status, 'status')}${row.isPrimary ? ' · 主版本' : ''}`
       const selectedVersions = [baseRows.find(row => row.id === validA), targetRows.find(row => row.id === validB)]
-      const trial = mode !== 'monthly' && selectedVersions.some(row => row?.status === 'DRAFT' || row?.status === 'CONFIRMED')
+      const trial = Boolean(path) && mode !== 'monthly' && selectedVersions.some(row => row?.status === 'DRAFT' || row?.status === 'CONFIRMED')
       const rows = financeRows(comparison.data)
       const comparable = mode === 'yearly' ? rows.filter(row => (row.basePresent ?? row.baseBudget !== 0) && (row.targetPresent ?? row.targetBudget !== 0)) : rows
       const oneSided = mode === 'yearly' ? rows.filter(row => !(row.basePresent ?? row.baseBudget !== 0) || !(row.targetPresent ?? row.targetBudget !== 0)) : []
@@ -6187,8 +6187,8 @@ window.__ModuleLoader__.load({
         validA && validB && validA === validB ? h('p', { role: 'status' }, '请选择不同的快照或预算版本') : null,
         mode === 'yearly' ? h(FormRow, { label: '对比年度' }, h(Select, { 'aria-label': '对比年度', value: targetYear, onChange: value => { setTargetYear(value); setB('') }, options: yearOptions(targetYear) })) : null,
         h('div', { className: 'sf-row' },
-          h(Select, { 'aria-label': '基准快照或版本', value: validA, onChange: setA, options: baseRows.map(row => [row.id, versionLabel(row)]), placeholder: '选择基准' }),
-          h(Select, { 'aria-label': '对比快照或版本', value: validB, onChange: setB, options: targetRows.map(row => [row.id, versionLabel(row)]), placeholder: '选择对比' })),
+          h(FormRow, { label: '基准快照或版本' }, h(Select, { 'aria-label': '基准快照或版本', value: validA, onChange: setA, options: baseRows.map(row => [row.id, versionLabel(row)]), placeholder: '选择基准' })),
+          h(FormRow, { label: '对比快照或版本' }, h(Select, { 'aria-label': '对比快照或版本', value: validB, onChange: setB, options: targetRows.map(row => [row.id, versionLabel(row)]), placeholder: '选择对比' }))),
         [versions, targetVersions, snapshots].filter(resource => resource.error).map((resource, i) => h(FinanceResource, { key: i, resource })),
         mode === 'yearly' && comparison.data ? h('div', { className: 'sf-kpis' }, h(KpiCard, { label: '可比预算变化', value: formatNumber(targetTotal - baseTotal) }), h(KpiCard, { label: '可比预算变化率', value: baseTotal ? `${formatNumber((targetTotal - baseTotal) / Math.abs(baseTotal) * 100)}%` : '—' }), h(KpiCard, { label: '主体覆盖率', value: targetOrgs.size ? `${formatNumber(covered / targetOrgs.size * 100)}%` : '—' })) : null,
         trial ? h('p', { className: 'sf-banner sf-banner-amber' }, '试算比较：含未正式发布的预算版本，不能作为正式同比结论。') : null,

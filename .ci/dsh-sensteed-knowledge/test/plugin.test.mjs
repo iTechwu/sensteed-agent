@@ -567,3 +567,18 @@ test('governance reads the correct domains and labels fields persistently', asyn
   assert.ok(forms.length >= 7)
   assert.ok(forms.every(node => !node.props.open && node.children[0].type === 'summary'))
 })
+
+
+test('governance JSON validation rejects malformed or wrong-shaped configuration', async () => {
+  const { validManagementJson, ManagementField } = await loadClientTestApi()
+  for (const input of ['{broken', '[]', 'null', '1', '"text"']) assert.equal(validManagementJson(input, 'object'), false)
+  assert.equal(validManagementJson('{"enabled":true}', 'object'), true)
+  assert.equal(validManagementJson('[{"name":"rule"}]', 'array'), true)
+  assert.equal(validManagementJson('{}', 'array'), false)
+  assert.equal(validManagementJson('', 'document'), false)
+  assert.equal(validManagementJson('{"@context":{}}', 'document'), true)
+  const field = ManagementField({ control: 'textarea', placeholder: '接入配置 JSON', error: '请输入 JSON 对象' })
+  assert.equal(field.children[1].props['aria-invalid'], true)
+  assert.equal(field.children[1].props['aria-describedby'], field.children[2].props.id)
+  assert.equal(field.children[2].props.role, 'alert')
+})
