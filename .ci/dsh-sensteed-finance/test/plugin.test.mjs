@@ -3586,3 +3586,13 @@ test('monthly outflow edits create the next parameter batch and preserve prior t
   assert.deepEqual(writes[0][1].params.tax, parameter.params.tax)
   assert.equal(parameter.params.monthlyOutflows.length, 0)
 })
+
+
+test('comparison selectors have visible labels and do not claim a trial before a pair exists', async () => {
+  const source = (await Promise.all(['src/components.js', 'src/format.js', 'src/views/comparisons.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
+  const harness = clientHarness(source, 'ComparisonsView', { useFinanceAction: () => ({ revision: 0 }), useFinanceResource: () => ({ data: { list: [{ id: 'draft', name: '草稿', status: 'DRAFT' }] } }), financeRows: data => data?.list || [], financeColumns: () => [], financeDisplayValue: value => value, FinanceResource() {}, Notice() {} })
+  const nodes = clientNodes(harness.render({ ctx: { year: '2026', drillParams: { mode: 'versions' }, permissions: [], revision: 0 } }))
+  assert.ok(nodes.some(node => node.props.label === '基准快照或版本'))
+  assert.ok(nodes.some(node => node.props.label === '对比快照或版本'))
+  assert.ok(!nodes.some(node => node.children?.some(value => typeof value === 'string' && value.startsWith('试算比较'))))
+})

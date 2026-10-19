@@ -75,6 +75,21 @@ describe('desktop sidebar DOM anchor', () => {
     expect(document.querySelector('.sensteedSkipLink')?.getAttribute('href')).toBe('#sensteed-main-workspace')
   })
 
+  it('removes closed resource controls from navigation without hiding fullscreen resources', () => {
+    const layout = new DesktopLayoutState()
+    const props = { layout, platform: 'win32', renderSlot: (name: string) => createElement('button', null, name),
+      usePanelInfo: (select: (info: PanelInfo) => unknown) => select(layout.getPanelInfo()),
+    } as unknown as AdvancedFrameProps
+    const hidden = () => { document.body.innerHTML = renderToStaticMarkup(createElement(AdvancedFrame, props)); return document.querySelector('.sensteedAgentRightbarSurface')?.hasAttribute('hidden') }
+    expect(hidden()).toBe(true)
+    layout.openRightbar(true, false)
+    expect(hidden()).toBe(false)
+    layout.closeRightbar()
+    expect(hidden()).toBe(true)
+    layout.openRightbar(false, true)
+    expect(hidden()).toBe(false)
+  })
+
   it('keeps the compatibility class spelled the way attribute selectors match', () => {
     // `class` attribute matching is case-sensitive in standards mode, so the
     // upstream substring has to survive verbatim.
