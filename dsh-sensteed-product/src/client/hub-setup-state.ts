@@ -22,7 +22,13 @@ export function hubInitialSelections(check:HubCheck):HubSelection[]{
 }
 export async function hubSetupRequest<T>(action:'check'|'preview'|'execute'|'status'|'restart',body:unknown,signal?:AbortSignal):Promise<T>{
  const response=await fetch(`/api/desktop/hub/generations/${action}`,{method:'POST',credentials:'same-origin',redirect:'error',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify(body),signal:signal?AbortSignal.any([signal,AbortSignal.timeout(action==='execute'?120000:30000)]):AbortSignal.timeout(action==='execute'?120000:30000)})
- if(!response.ok)throw Error(response.status===503?'BASE_VERSION_NOT_ENABLED':`HUB_REQUEST_${response.status}`)
+ if(!response.ok){
+  if(response.status===503)throw Error('BASE_VERSION_NOT_ENABLED')
+  // The Host answers stable intent failures with {error:'HUB_*'}; keep that code
+  // so the page can name an unreachable service instead of a lost confirmation.
+  let code='';try{const text=await response.text();if(text.length<=256)code=JSON.parse(text)?.error??''}catch{}
+  throw Error(typeof code==='string'&&/^HUB_[A-Z0-9_]{1,80}$/.test(code)?code:`HUB_REQUEST_${response.status}`)
+ }
  const value=await response.json() as T|{available:boolean;result?:T;reason?:string}
  if(value&&typeof value==='object'&&'available'in value){if(!value.available||!('result'in value))throw Error(value.reason??'BASE_VERSION_NOT_ENABLED');return value.result as T}
  return value as T
