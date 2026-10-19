@@ -1,6 +1,6 @@
 // 完整策略是替换关系；最终权限始终由服务器解析，不在客户端叠加旧授权。
 function financePolicyPeople(directory, purpose = 'permission') {
-  return (directory?.members || []).filter(person => person.userId && (purpose === 'role' ? (person.identityEnabled ?? person.enabled) : person.enabled !== false && person.identityEnabled !== false) && person.source !== 'LOCAL_MIRROR')
+  return (directory?.members || []).filter(person => person.userId && (purpose === 'role' ? (person.identityEnabled ?? person.enabled) : person.enabled) && person.source !== 'LOCAL_MIRROR')
 }
 function financePolicyDepartmentPeople(directory, ids, purpose = 'permission') {
   const selected = new Set(ids)
@@ -18,26 +18,80 @@ function FinanceOrganizationNotice({ directory, onRefresh }) {
     directory.syncError ? h('p', null, financeErrorText(directory.syncError)) : null,
     onRefresh ? h(GhostButton, { onClick: onRefresh }, '刷新目录') : null)
 }
-function financePolicyRequest(value, people, roles, orgs, departments) {
-  const reason = String(value.reason || '').trim()
-  if (!reason || reason.length > 500) throw new Error('请填写 1 至 500 字的变更原因')
-  if (value.subjectType === 'USER') {
-    if (!value.userIds.length || value.userIds.length > 500 || value.userIds.some(id => !people.some(person => person.userId === id))) throw new Error('请从当前组织选择 1 至 500 名可用成员')
-  } else if (value.subjectType !== 'ROLE' || !roles.some(role => role.id === value.subjectId && role.enabled)) throw new Error('请选择可用岗位角色')
-  if (value.permissions.length > 100 || value.permissions.some(code => !FINANCE_PERMISSION_NAMES[code])) throw new Error('存在不可识别的功能，请刷新后核对')
-  const scopes = value.permissions.length ? value.scopes.map(scope => {
-    if (!['SELF', 'GLOBAL', 'ORG', 'DEPARTMENT'].includes(scope.scopeType)) throw new Error('请选择数据范围')
-    if (scope.scopeType === 'ORG' && !orgs.some(row => row.id === scope.orgId)) throw new Error('请选择有效主体')
-    if (scope.scopeType === 'DEPARTMENT' && !departments.some(row => row.id === scope.departmentId)) throw new Error('请选择有效部门')
-    const result = { scopeType: scope.scopeType, ...(scope.scopeType === 'ORG' ? { orgId: scope.orgId } : {}), ...(scope.scopeType === 'DEPARTMENT' ? { departmentId: scope.departmentId } : {}) }
-    for (const key of ['yearFrom', 'yearTo']) if (scope[key] !== '' && scope[key] != null) {
-      const year = Number(scope[key]); if (!Number.isSafeInteger(year)) throw new Error('年度必须是整数'); result[key] = year
+function financePolicyErrors(value, people, roles, orgs, departments, confirmed = true) {
+    const errors = {};
+    if (value.subjectType === 'USER') {
+        if (!value.userIds.length ||
+            value.userIds.length > 500 ||
+            value.userIds.some((id) => !id || id.length > 64 || !people.some((person) => person.userId === id)))
+            errors.subject = '请从当前组织选择 1 至 500 名可用成员';
     }
-    if (result.yearFrom != null && result.yearTo != null && result.yearFrom > result.yearTo) throw new Error('起始年度不能晚于截止年度')
-    return result
-  }) : []
-  if (value.permissions.length && !scopes.length || scopes.length > 100) throw new Error('请选择 1 至 100 个数据范围')
-  const common = { permissions: [...new Set(value.permissions)], scopes, reason }
+    else if (value.subjectType !== 'ROLE' ||
+        !roles.some((role) => role.id === value.subjectId && role.enabled))
+        errors.subject = '请选择可用岗位角色';
+    if (value.permissions.length > 100 ||
+        value.permissions.some((code) => !Object.hasOwn(FINANCE_PERMISSION_NAMES, code)))
+        errors.permissions = '存在不可识别的功能，请刷新后核对';
+    if (value.permissions.length) {
+        if (!value.scopes.length || value.scopes.length > 100)
+            errors.scopes = '请选择 1 至 100 个数据范围';
+        value.scopes.forEach((scope, index) => {
+            const key = `scope-${index}`;
+            if (!['SELF', 'GLOBAL', 'ORG', 'DEPARTMENT'].includes(scope.scopeType))
+                errors[`${key}-scopeType`] = '请选择数据范围';
+            if ((scope.scopeType === 'ORG' || scope.orgId) && !orgs.some((row) => row.id === scope.orgId))
+                errors[`${key}-orgId`] = '请选择有效主体';
+            if ((scope.scopeType === 'DEPARTMENT' || scope.departmentId) &&
+                !departments.some((row) => row.id === scope.departmentId))
+                errors[`${key}-departmentId`] = '请选择有效部门';
+            for (const field of ['yearFrom', 'yearTo'])
+                if (scope[field] !== '' &&
+                    scope[field] != null &&
+                    (!String(scope[field]).trim() || !Number.isSafeInteger(Number(scope[field]))))
+                    errors[`${key}-${field}`] = '年度必须是整数';
+            if (!errors[`${key}-yearFrom`] &&
+                !errors[`${key}-yearTo`] &&
+                scope.yearFrom !== '' &&
+                scope.yearFrom != null &&
+                scope.yearTo !== '' &&
+                scope.yearTo != null &&
+                Number(scope.yearFrom) > Number(scope.yearTo))
+                errors[`${key}-yearTo`] = '起始年度不能晚于截止年度';
+        });
+    }
+    if (!value.reason.trim() || value.reason.trim().length > 500)
+        errors.reason = '请填写 1 至 500 字的变更原因';
+    if (!confirmed)
+        errors.confirmation = '请核对并确认完整替换后的权限范围';
+    return errors;
+}
+
+function financePolicyScopes(value) {
+    return value.permissions.length
+        ? value.scopes.map((scope) => ({
+            scopeType: scope.scopeType,
+            ...(scope.orgId ? { orgId: scope.orgId } : {}),
+            ...(scope.departmentId ? { departmentId: scope.departmentId } : {}),
+            ...(scope.yearFrom !== '' && scope.yearFrom != null
+                ? { yearFrom: Number(scope.yearFrom) }
+                : {}),
+            ...(scope.yearTo !== '' && scope.yearTo != null ? { yearTo: Number(scope.yearTo) } : {}),
+        }))
+        : [];
+}
+
+function financePolicyScopeSummary(value, orgs, departments) {
+    if (!value.permissions.length)
+        return '收回全部功能，不保留数据范围';
+    return (value.scopes
+        .map((scope, index) => `${index + 1}. ${{ SELF: '仅本人', GLOBAL: '全组织', ORG: '指定主体', DEPARTMENT: '指定部门' }[scope.scopeType] || '待选择范围'}${scope.orgId ? ` · 主体：${orgs.find((row) => row.id === scope.orgId)?.name || '待核对'}` : ''}${scope.departmentId ? ` · 部门：${departments.find((row) => row.id === scope.departmentId)?.name || '待核对'}` : ''} · 年度 ${scope.yearFrom ?? ''}—${scope.yearTo ?? ''}（空端不限）`)
+        .join('；') || '待添加数据范围');
+}
+
+function financePolicyRequest(value, people, roles, orgs, departments) {
+  const errors = financePolicyErrors(value, people, roles, orgs, departments)
+  if (Object.keys(errors).length) throw new Error(Object.values(errors)[0])
+  const common = { permissions: [...new Set(value.permissions)], scopes: financePolicyScopes(value), reason: value.reason.trim() }
   return value.subjectType === 'USER' ? { path: '/finance/permission-policies/batch', body: { userIds: [...new Set(value.userIds)], ...common } }
     : { path: '/finance/permission-policies', body: { subjectType: 'ROLE', subjectId: value.subjectId, ...common } }
 }
@@ -74,52 +128,74 @@ function PermissionsView({ ctx }) {
       ] }),
       ctx.role === 'FINANCE_OWNER' ? h(GhostButton, { onClick: () => ctx.onNavigate('identity', { directorySection: 'members' }) }, '前往成员与角色管理岗位') : null) : null,
     manage ? h(FinancePermissionHistory, { ctx, directory: directory.data }) : null,
-    dialog?.kind === 'policy' ? h(FinancePolicyDialog, { key: dialog.policy?.id || dialog.policy?.subjectId || 'new', policy: dialog.policy, initialTab: tab, people, roles: roleRows.map(role => ({ ...role, policy: policyRows.find(policy => policy.subjectType === 'ROLE' && policy.subjectId === role.id) })), directory: directory.data, onDirectoryRefresh: directory.retry, orgs: ctx.orgs, departments: ctx.departments, onClose: () => setDialog(null), onSave: async request => { await action.run(request.path, request.body, 'PUT'); setDialog(null) } }) : null,
+    dialog?.kind === 'policy' ? h(FinancePolicyDialog, { key: dialog.policy?.id || dialog.policy?.subjectId || 'new', policy: dialog.policy, initialTab: tab, people, roles: roleRows.map(role => ({ ...role, policy: policyRows.find(policy => policy.subjectType === 'ROLE' && policy.subjectId === role.id) })), directory: directory.data, directoryBlocked: !ready, onDirectoryRefresh: () => { directory.retry(); roles.retry(); policies.retry() }, orgs: ctx.orgs, departments: ctx.departments, onClose: () => setDialog(null), onSave: async request => { await action.run(request.path, request.body, 'PUT'); setDialog(null) } }) : null,
     dialog?.kind === 'restore' ? h(FinanceFormDialog, { title: dialog.policy.subjectType === 'USER' ? '恢复继承岗位' : '恢复内置模板', onClose: () => setDialog(null), fields: [{ key: 'reason', label: '恢复原因', required: true, maxLength: 500, type: 'textarea' }], onSubmit: async body => { await action.run(`/finance/permission-policies/${dialog.policy.id}/remove`, body); setDialog(null) } }) : null)
 }
-function FinancePolicyDialog({ policy, initialTab, people, roles, directory, onDirectoryRefresh, orgs, departments, onClose, onSave }) {
-  const roleId = policy?.subjectType === 'ROLE' ? policy.subjectId : ''
-  const [value, setValue] = useState(() => ({ subjectType: policy?.subjectType || initialTab || 'USER', subjectId: roleId, userIds: policy?.subjectType === 'USER' ? [policy.subjectId] : [], permissions: [...(policy?.permissions || FINANCE_ROLE_PERMISSION_BASELINE[roleId] || [])], scopes: (policy?.scopes || [{ scopeType: roleId && !['DEPT_FILLER', 'DEPT_LEADER', 'DEPT_COLLABORATOR'].includes(roleId) ? 'GLOBAL' : 'SELF' }]).map(scope => ({ ...scope })), reason: '' }))
-  const [confirmation, setConfirmation] = useState(''), [error, setError] = useState(''), [busy, setBusy] = useState(false), lock = useRef(false)
-  const fingerprint = JSON.stringify([value.subjectType, value.subjectId, value.userIds, value.permissions, value.scopes])
-  const update = patch => { setValue(current => ({ ...current, ...patch })); setError('') }
-  const changeScope = (index, patch) => update({ scopes: value.scopes.map((scope, i) => i === index ? { ...scope, ...patch } : scope) })
-  const save = async event => {
-    event.preventDefault(); if (lock.current) return
-    try {
-      const request = financePolicyRequest(value, people, roles, orgs, departments)
-      if (confirmation !== fingerprint) throw new Error('请核对并确认完整替换后的权限范围')
-      lock.current = true; setBusy(true); setError(''); await onSave(request)
-    } catch (cause) { setError(cause.message || '保存失败，整批未保存，填写内容已保留') }
-    finally { lock.current = false; setBusy(false) }
+function FinancePolicyDialog({ policy, initialTab, people, roles, directory, directoryBlocked = false, onDirectoryRefresh, orgs, departments, onClose, onSave }) {
+  const empty = { subjectType: initialTab || 'USER', subjectId: '', userIds: [], permissions: [], scopes: [{scopeType:'SELF'}], reason: '' }
+  const roleDraft = id => {
+    const current = roles.find(role => role.id === id)?.policy
+    return {...empty, subjectType:'ROLE', subjectId:id, permissions:[...(current?.permissions || FINANCE_ROLE_PERMISSION_BASELINE[id] || [])], scopes:(current?.scopes || [{scopeType:['DEPT_FILLER','DEPT_LEADER','DEPT_COLLABORATOR'].includes(id) ? 'SELF' : 'GLOBAL'}]).map(scope=>({...scope})), reason:''}
   }
-  const memberOptions = people.map(person => [person.userId, `${person.name || person.userId} · ${(person.departmentIds || []).map(id => directory?.departments?.find(d => d.id === id)?.name).filter(Boolean).join('、') || '未分配部门'}`])
-  return h(Dialog, { title: '配置完整权限', width: 'lg', onClose, dismissDisabled: busy }, h('form', { onSubmit: save, className: 'sf-stack' },
-    h('p', { className: 'sf-note' }, '本次保存完整替换所选成员或岗位的功能与数据范围。成员独立配置不会与角色权限叠加；关闭全部功能后，该成员将无财务权限。'),
-    h(FinanceOrganizationNotice, { directory, onRefresh: busy ? undefined : onDirectoryRefresh }),
-    h('fieldset', { disabled: busy, className: 'sf-fieldset sf-stack' },
-      !policy ? h(FormRow, { label: '配置对象' }, h(Select, { 'aria-label': '配置对象', value: value.subjectType, options: [['USER', '成员'], ['ROLE', '岗位角色']], onChange: subjectType => update({ subjectType, subjectId: '', userIds: [], permissions: [], scopes: [{ scopeType: 'SELF' }] }) })) : null,
-      value.subjectType === 'USER' ? h('div', { className: 'sf-stack' },
-        h(FormRow, { label: '选择成员' }, h(MultiSearchSelect, { value: value.userIds, options: memberOptions, placeholder: '选择成员', onChange: userIds => update({ userIds }) })),
-        h(FormRow, { label: '按部门追加当前成员（含下级）' }, h(SearchSelect, { buttonTrigger: true, value: '', options: (directory?.departments || []).map(row => [row.id, row.name]), placeholder: '选择部门追加成员', onChange: id => update({ userIds: [...new Set([...value.userIds, ...financePolicyDepartmentPeople(directory, [id])])] }) })),
-        h('p', { className: 'sf-note' }, '已选：' + (value.userIds.map(id => people.find(person => person.userId === id)?.name || id).join('、') || '尚未选择')))
-        : h(FormRow, { label: '岗位角色' }, h(SearchSelect, { buttonTrigger: true, value: value.subjectId, options: roles.filter(role => role.enabled).map(role => [role.id, role.name]), placeholder: '选择岗位角色', disabled: Boolean(policy), onChange: subjectId => { const existing = roles.find(role => role.id === subjectId); update({ subjectId, permissions: [...(existing?.policy?.permissions || FINANCE_ROLE_PERMISSION_BASELINE[subjectId] || [])], scopes: existing?.policy?.scopes?.map(scope => ({ ...scope })) || [{ scopeType: ['DEPT_FILLER', 'DEPT_LEADER', 'DEPT_COLLABORATOR'].includes(subjectId) ? 'SELF' : 'GLOBAL' }] }) } })),
-      h(FormRow, { label: '完整功能清单' }, h(MultiSearchSelect, { value: value.permissions, options: FINANCE_PERMISSION_GROUPS.flatMap(group => group.permissions.map(code => [code, group.domain + ' · ' + FINANCE_PERMISSION_NAMES[code]])), placeholder: '选择功能权限', onChange: permissions => update({ permissions }) })),
-      h('p', { className: 'sf-note' }, value.permissions.length ? `已选 ${value.permissions.length} 项功能：${value.permissions.map(code => FINANCE_PERMISSION_NAMES[code] || code).join('、')}` : '全部功能关闭；保存后不保留岗位自带权限'),
-      value.permissions.some(code => FINANCE_HIGH_RISK_PERMISSIONS.includes(code)) ? h('p', { role: 'status' }, '包含重开活动、发布正式预算或管理权限等重要功能，请核对数据范围。') : null,
-      ...value.scopes.map((scope, index) => h('div', { key: index, className: 'sf-inline-form sf-stack' },
-        h(FormRow, { label: '数据范围 ' + (index + 1) }, h(Select, { 'aria-label': '数据范围 ' + (index + 1), value: scope.scopeType, options: [['SELF', '本人'], ['DEPARTMENT', '指定部门'], ['ORG', '指定主体'], ['GLOBAL', '全域']], onChange: scopeType => changeScope(index, { scopeType, orgId: undefined, departmentId: undefined }) })),
-        scope.scopeType === 'ORG' ? h(FormRow, { label: '主体' }, h(SearchSelect, { buttonTrigger: true, value: scope.orgId || '', options: orgs.map(row => [row.id, row.name]), placeholder: '选择主体', onChange: orgId => changeScope(index, { orgId }) })) : null,
-        scope.scopeType === 'DEPARTMENT' ? h(FormRow, { label: '部门' }, h(SearchSelect, { buttonTrigger: true, value: scope.departmentId || '', options: departments.map(row => [row.id, row.name]), placeholder: '选择数据部门', onChange: departmentId => changeScope(index, { departmentId }) })) : null,
-        h('div', { className: 'sf-form-grid' }, ...[['yearFrom', '起始年度'], ['yearTo', '截止年度']].map(([key, label]) => h(FormRow, { key, label }, h(Field, { 'aria-label': label + ' ' + (index + 1), type: 'number', step: '1', value: scope[key] ?? '', onChange: year => changeScope(index, { [key]: year }) })))),
-        h(GhostButton, { onClick: () => update({ scopes: value.scopes.filter((_, i) => i !== index) }) }, '移除此范围'))),
-      h(GhostButton, { disabled: value.scopes.length >= 100, onClick: () => update({ scopes: [...value.scopes, { scopeType: 'SELF' }] }) }, '添加数据范围'),
-      h('p', { className: 'sf-note' }, '多个数据范围取并集；年度留空表示不限制该端年度。'),
-      h(FormRow, { label: '变更原因' }, h(Textarea, { 'aria-label': '变更原因', value: value.reason, onChange: reason => update({ reason }), required: true, maxLength: 500 })),
-      h('label', null, h('input', { type: 'checkbox', checked: confirmation === fingerprint, onChange: event => setConfirmation(event.target.checked ? fingerprint : '') }), '我已核对对象、完整功能及数据范围，并确认完整替换')),
-    error ? h('p', { role: 'alert', className: 'sf-neg' }, error) : null,
-    h('div', { className: 'sf-row' }, h(GhostButton, { disabled: busy, onClick: onClose }, '取消'), h(PrimaryButton, { type: 'submit', busy }, '保存完整权限'))))
+  const [value, setValue] = useState(() => policy ? {...(policy.subjectType === 'ROLE' ? roleDraft(policy.subjectId) : empty),...policy,userIds:policy.subjectType === 'USER' ? [policy.subjectId] : [],reason:''} : empty)
+  const [confirmation,setConfirmation] = useState(''), [error,setError] = useState(''), [busy,setBusy] = useState(false), [attempted,setAttempted] = useState(false), [search,setSearch] = useState('')
+  const lock=useRef(false), formRef=useRef(null), initial=useRef(value), prefix=useId(), exit=useFinanceFormExit(initial.current,value,busy,onClose)
+  const close=()=>{if(!lock.current)exit.close()}
+  const fingerprint=JSON.stringify([value.subjectType,value.subjectId,value.userIds,value.permissions,value.scopes])
+  const errors=financePolicyErrors(value,people,roles,orgs,departments,confirmation===fingerprint)
+  const attrs=key=>({'aria-invalid':attempted&&errors[key]?true:undefined,'aria-describedby':attempted&&errors[key]?`${prefix}-${key}-error`:undefined})
+  const message=key=>attempted&&errors[key]?h('p',{id:`${prefix}-${key}-error`,className:'sf-neg sf-field-error'},errors[key]):null
+  const update=patch=>{setValue(current=>({...current,...patch}));setError('')}
+  const load=next=>{exit.reset(next);setValue(next);setConfirmation('');setAttempted(false);setError('');setSearch('')}
+  const switchTo=next=>{if(!lock.current)exit.leave(()=>load(next))}
+  const changeScope=(index,patch)=>update({scopes:value.scopes.map((scope,i)=>i===index?{...scope,...patch}:scope)})
+  const save=async event=>{
+    event.preventDefault();if(lock.current || directoryBlocked)return
+    setAttempted(true);setError('')
+    if(Object.keys(errors).length){financeFocusFormError(formRef.current);return}
+    lock.current=true;setBusy(true)
+    try{const result=await onSave(financePolicyRequest(value,people,roles,orgs,departments));if(result===false)setError('保存失败，填写内容已保留，请核对后重试')}
+    catch(cause){setError(cause.message||'保存失败，填写内容已保留，请核对后重试')}
+    finally{lock.current=false;setBusy(false)}
+  }
+  const fields=(items,values,change)=>financeFormFields(items,values,change,attempted?errors:{},busy,prefix)
+  const memberOptions=people.map(person=>[person.userId,`${person.name||person.userId} · ${(person.departmentIds||[]).map(id=>directory?.departments?.find(d=>d.id===id)?.name).filter(Boolean).join('、')||'未分配部门'}`])
+  const groups=FINANCE_PERMISSION_GROUPS.map(group=>({...group,permissions:group.permissions.filter(code=>`${FINANCE_PERMISSION_NAMES[code]} ${code}`.toLowerCase().includes(search.trim().toLowerCase()))})).filter(group=>group.permissions.length)
+  return h(Dialog,{title:'配置完整权限',width:'lg',onClose:close,dismissDisabled:busy},h('form',{ref:formRef,noValidate:true,onSubmit:save,className:'sf-stack'},
+    h('p',{className:'sf-note'},'选择成员或角色，设置可用功能及可访问数据。保存完整替换原配置，未选功能将被收回。成员独立配置不会与角色权限叠加。'),
+    h(FinanceOrganizationNotice,{directory,onRefresh:busy?undefined:onDirectoryRefresh}),
+    h('fieldset',{disabled:busy,className:'sf-fieldset sf-stack'},
+      h('legend',null,'1. 选择配置对象'),
+      h(FormRow,{label:'配置对象'},h(Select,{'aria-label':'配置对象',value:value.subjectType,options:[['USER','成员'],['ROLE','岗位角色']],onChange:subjectType=>{if(subjectType!==value.subjectType)switchTo({...empty,subjectType})}})),
+      value.subjectType==='USER'?h('div',{className:'sf-stack'},
+        ...fields([{key:'subject',label:'选择成员',required:true,multi:true,searchable:true,options:memberOptions}],{subject:value.userIds},(_,userIds)=>update({userIds})),
+        h(FormRow,{label:'按部门追加当前成员（含下级）'},h(SearchSelect,{buttonTrigger:true,value:'',options:(directory?.departments||[]).map(row=>[row.id,row.name]),placeholder:'选择部门追加成员',onChange:id=>update({userIds:[...new Set([...value.userIds,...financePolicyDepartmentPeople(directory,[id])])]})})),
+        h('p',{className:'sf-note'},'选择部门仅追加当前可用成员，未来加入部门的人不会自动获得此次配置。成员无需先登录。'))
+        :h(FormRow,{label:'岗位角色（必填）'},h(SearchSelect,{buttonTrigger:true,'aria-label':'岗位角色',...attrs('subject'),value:value.subjectId,options:roles.filter(role=>role.enabled).map(role=>[role.id,role.name]),placeholder:'选择岗位角色',onChange:id=>{if(id!==value.subjectId)switchTo(roleDraft(id))}}),message('subject')),
+      h('h3',null,`2. 选择功能 · 已选 ${value.permissions.length} 项`),
+      h(FormRow,{label:'搜索功能权限'},h(Field,{'aria-label':'搜索功能权限',value:search,onChange:setSearch,placeholder:'搜索功能名称或权限码'})),
+      h(FormRow,{label:'填入角色默认功能'},h(Select,{'aria-label':'填入角色默认功能',value:'',options:[['','选择模板'],...Object.entries(FINANCE_POLICY_ROLE_NAMES)],onChange:id=>update({permissions:[...(FINANCE_ROLE_PERMISSION_BASELINE[id]||[])]})})),
+      h('div',{tabIndex:-1,'aria-label':'完整功能清单',...attrs('permissions'),className:'sf-stack'},
+        ...groups.map(group=>h('div',{key:group.domain,className:'sf-stack'},
+          h('label',null,h('input',{type:'checkbox','aria-label':group.domain,'aria-checked':group.permissions.every(code=>value.permissions.includes(code))?true:group.permissions.some(code=>value.permissions.includes(code))?'mixed':false,ref:node=>{if(node)node.indeterminate=group.permissions.some(code=>value.permissions.includes(code))&&!group.permissions.every(code=>value.permissions.includes(code))},checked:group.permissions.every(code=>value.permissions.includes(code)),onChange:event=>update({permissions:event.target.checked?[...new Set([...value.permissions,...group.permissions])]:value.permissions.filter(code=>!group.permissions.includes(code))})}),group.domain),
+          ...group.permissions.map(code=>h('label',{key:code},h('input',{type:'checkbox','aria-label':FINANCE_PERMISSION_NAMES[code],checked:value.permissions.includes(code),onChange:event=>update({permissions:event.target.checked?[...new Set([...value.permissions,code])]:value.permissions.filter(item=>item!==code)})}),FINANCE_PERMISSION_NAMES[code],FINANCE_HIGH_RISK_PERMISSIONS.includes(code)?'（高风险）':'')))),
+        !groups.length?h('p',null,'没有匹配的功能'):null,message('permissions')),
+      h('h3',null,'3. 数据范围（多个范围取并集）'),
+      ...(!value.permissions.length?[h('p',{role:'status'},'全部功能关闭；保存时不保留数据范围。')]:[
+        ...value.scopes.map((scope,index)=>h('div',{key:index,className:'sf-inline-form sf-stack'},
+          ...fields([{key:`scope-${index}-scopeType`,label:`数据范围 ${index+1}`,required:true,options:[['SELF','仅本人'],['DEPARTMENT','指定部门'],['ORG','指定主体'],['GLOBAL','全组织']]},{key:`scope-${index}-orgId`,label:`主体 ${index+1}`,required:scope.scopeType==='ORG',searchable:true,options:orgs.map(row=>[row.id,row.name])},{key:`scope-${index}-departmentId`,label:`部门 ${index+1}`,required:scope.scopeType==='DEPARTMENT',searchable:true,options:departments.map(row=>[row.id,row.name])},...['yearFrom','yearTo'].map(key=>({key:`scope-${index}-${key}`,label:`${key==='yearFrom'?'起始年度':'截止年度'} ${index+1}`,type:'number',step:'1'}))],Object.fromEntries(['scopeType','orgId','departmentId','yearFrom','yearTo'].map(key=>[`scope-${index}-${key}`,scope[key]??''])),(key,next)=>changeScope(index,{[key.replace(`scope-${index}-`,'')]:next})),
+          h(GhostButton,{'aria-label':`移除数据范围 ${index+1}`,onClick:()=>update({scopes:value.scopes.filter((_,i)=>i!==index)})},'移除此范围'))),
+        h(GhostButton,{...attrs('scopes'),disabled:value.scopes.length>=100,onClick:()=>update({scopes:[...value.scopes,{scopeType:'SELF'}]})},'添加数据范围'),message('scopes')]),
+      h('p',{className:'sf-note'},'同一范围的主体、部门及年度共同限制数据；不同范围取并集。年度留空表示不限制该端年度。'),
+      ...fields([{key:'reason',label:'变更原因',required:true,maxLength:500,type:'textarea'}],{reason:value.reason},(_,reason)=>update({reason})),
+      h('p',{'aria-label':'保存摘要',className:'sf-note'},`${value.subjectType==='USER'?`完整替换 ${value.userIds.length} 名成员：${value.userIds.map(id=>people.find(person=>person.userId===id)?.name||id).join('、')||'待选择'}`:`完整替换角色：${roles.find(role=>role.id===value.subjectId)?.name||'待选择'}`}；仅保留 ${value.permissions.length} 项功能。${financePolicyScopeSummary(value,orgs,departments)}`),
+      h('label',null,h('input',{'aria-label':'确认完整替换',type:'checkbox',...attrs('confirmation'),checked:confirmation===fingerprint,onChange:event=>setConfirmation(event.target.checked?fingerprint:'')}),'我已核对对象、完整功能及数据范围，并确认完整替换'),message('confirmation')),
+    attempted&&Object.keys(errors).length?h('p',{role:'alert',className:'sf-neg'},'请检查输入，已定位到首个错误。'):null,
+    directoryBlocked?h('p',{role:'status'},'所需目录尚未就绪，请刷新目录后重试。',h(GhostButton,{disabled:busy,onClick:onDirectoryRefresh},'刷新目录')):null,
+    error?h('p',{role:'alert',className:'sf-neg'},error):null,exit.prompt,
+    h('div',{className:'sf-row'},h(GhostButton,{disabled:busy,onClick:close},'取消'),h(PrimaryButton,{type:'submit',busy,disabled:directoryBlocked},busy?'保存中…':'保存完整配置'))))
 }
+
 function FinanceRoleManager({ roles, ready, action }) {
   const [dialog, setDialog] = useState(null)
   const run = async body => {

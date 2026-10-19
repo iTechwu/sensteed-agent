@@ -222,3 +222,67 @@ for (const patch of [{}, { partNo: '' }, { partNo: '  ' }, { currency: 'USD' }, 
   assert.equal(pluginQuotePresentation.amount(quote), quotePresentationModule.exports.ceQuoteAmount(quote), `报价精度或币种展示漂移 ${JSON.stringify(patch)}`)
 }
 console.log('OK: supplier quote eligibility, expiry boundary and four-decimal currency display')
+
+// 归属登记与预览使用同一日历规则和本地零点，避免 JS 将 2 月 30 日自动进位。
+const employmentModule = { exports: {} }
+new Function('exports', ts.transpileModule(await readFile(resolve(datasource, 'apps/web/components/finance/employment-entry.ts'), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(employmentModule.exports)
+const employmentStart = new Function(pluginSource + '\nreturn financeEmploymentStartISOString')()
+for (const value of ['', 'invalid', '2026-02-29', '2026-02-30', '2026-04-31', '2026-13-01', '2026-01-00', '2026-1-1', '2028-02-29', '2026-10-19', '2026-03-08', '2026-11-01']) {
+  assert.equal(employmentStart(value), employmentModule.exports.financeEmploymentStartISOString(value), `归属生效日期规则漂移 ${value}`)
+}
+console.log('OK: employment calendar validation and local-midnight effective dates')
+
+// 预算条目：同一份输入在两端应标记同样字段，不只检查最终是否能保存。
+const rowValidationModule = { exports: {} }
+new Function('exports', ts.transpileModule(await readFile(resolve(datasource, 'apps/web/components/finance/budget-filing-row-validation.ts'), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(rowValidationModule.exports)
+const pluginRowErrors = new Function(await readFile(resolve(root, 'src/views/budget-filing.js'), 'utf8') + '\nreturn financeBudgetRowErrors')()
+const errorCases = [{}, { costItemId: 'gone' }, { month: '' }, { month: 13 }, { month: 1.5 }, { plannedAmount: '' }, { plannedAmount: '0' }, { plannedAmount: '-1' }, { plannedAmount: '0.291' }, { plannedAmount: '0.29' }, { plannedAmount: '1250.50' }, { plannedAmount: '999999999999.99' }, { plannedAmount: '1000000000000' }, { plannedAmount: 'Infinity' }, { description: '  ' }, { description: '字'.repeat(501) }]
+const mappingCard = { configurationRequired: true, configurationImported: true, expenseMappings: [{ code: 'A', costItemId: 'c1', level1Name: '研发' }, { code: 'B', costItemId: 'c2', level1Name: '管理' }] }
+for (const patch of errorCases) {
+  const value = { costItemId: 'c1', expenseMappingCode: 'A', month: '1', plannedAmount: '1250.50', description: '材料测算', ...patch }
+  for (const [card, level1] of [[undefined, undefined], [mappingCard, '研发'], [mappingCard, '管理'], [{ ...mappingCard, configurationImported: false }, '研发']]) {
+    assert.deepEqual(pluginRowErrors(value, [{ id: 'c1' }], card, level1), rowValidationModule.exports.financeBudgetRowErrors(value, [{ id: 'c1' }], card, level1), `预算条目字段校验漂移 ${JSON.stringify(patch)} ${level1}`)
+  }
+}
+console.log('OK: 64 budget draft field-validation cases including mapping scope and monetary precision')
+
+// 预算退回、轮次复制与历史归属：错误位置和当地日期转换结果都必须一致。
+const budgetDialogs = new Function(await readFile(resolve(root, 'src/views/budget-filing.js'), 'utf8') + '\nreturn {financeBudgetReasonError,financeBudgetDeadline,financeBudgetRoundErrors}')()
+const webDialogs = rowValidationModule.exports
+for (const reason of ['', ' ', '补充测算', '字'.repeat(500), '字'.repeat(501)]) assert.equal(budgetDialogs.financeBudgetReasonError(reason), webDialogs.financeBudgetReasonError(reason))
+const invalidDeadlines = ['', 'invalid', '2027-02-29T18:30', '2028-02-30T18:30', '2027-04-31T18:30', '2027-13-01T10:00', '2027-01-01T24:00', '2027-01-01T10:60', '0000-01-01T10:00', '2027-01-01T10:00Z']
+for (const value of [...invalidDeadlines, '2028-02-29T18:30', '2027-01-01T00:00', '2026-03-08T02:30', '2026-11-01T01:30']) {
+  const actual = budgetDialogs.financeBudgetDeadline(value)
+  assert.equal(actual, webDialogs.financeBudgetDeadline(value), `预算截止时间漂移 ${value}`)
+  if (invalidDeadlines.includes(value)) assert.equal(actual, null, `预算截止时间发生进位 ${value}`)
+}
+assert.equal(budgetDialogs.financeBudgetDeadline('2028-02-29T18:30'), new Date('2028-02-29T18:30:00').toISOString())
+if (process.env.TZ === 'America/New_York') assert.equal(budgetDialogs.financeBudgetDeadline('2026-03-08T02:30'), null, '拒绝夏令时缺失时刻')
+for (const patch of [{}, {owners:{}}, {owners:{r1:'gone'}}, {owners:{r1:'x'.repeat(65)}}, {title:' '}, {title:'字'.repeat(150)}, {title:'字'.repeat(151)}, {dueAt:'2027-02-30T12:00'}, {reason:' '}, {reason:'字'.repeat(500)}, {reason:'字'.repeat(501)}]) {
+  const value={owners:{r1:'user-1'},title:'调整轮次',dueAt:'2028-02-29T18:30',reason:'复核测算',...patch}
+  for (const ownerOnly of [false,true]) assert.deepEqual(budgetDialogs.financeBudgetRoundErrors(value,[{id:'r1'}],['user-1'],ownerOnly), webDialogs.financeBudgetRoundErrors(value,[{id:'r1'}],['user-1'],ownerOnly))
+}
+const copyStatement=ast.statements.find(node=>ts.isVariableStatement(node)&&node.declarationList.declarations.some(declaration=>declaration.name.getText(ast)==='CopyBudgetRoundSchema'))
+assert.ok(copyStatement)
+const copyExports={}
+new Function('exports','z',ts.transpileModule(copyStatement.getText(ast),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(copyExports,require('zod').z)
+for (const [key,max] of [['title',150],['reason',500]]) {
+  assert.ok(copyExports.CopyBudgetRoundSchema.shape[key].safeParse('字'.repeat(max)).success)
+  assert.equal(copyExports.CopyBudgetRoundSchema.shape[key].safeParse('字'.repeat(max+1)).success,false)
+}
+console.log('OK: 5 rejection reasons, 14 local deadlines and 22 budget round/owner validation cases; copy text limits match Zod')
+
+// 完整策略保留同一范围中的交叉限制，错误位置和摘要也必须一致。
+const policyModule={exports:{}}
+new Function('exports','require',ts.transpileModule(await readFile(resolve(datasource,'apps/web/components/finance/permission-policy-validation.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(policyModule.exports,()=>permissionModule.exports)
+const policyPlugin=new Function(await readFile(resolve(root,'src/permission-catalog.js'),'utf8')+'\n'+await readFile(resolve(root,'src/views/permissions.js'),'utf8')+'\nreturn {financePolicyErrors,financePolicyScopes,financePolicyScopeSummary,financePolicyRequest}')()
+const policyPeople=[{userId:'u1'}],policyRoles=[{id:'custom',enabled:true},{id:'off',enabled:false}],policyOrgs=[{id:'11111111-1111-4111-8111-111111111111',name:'虚构主体'}],policyDepartments=[{id:'22222222-2222-4222-8222-222222222222',name:'研发部'}]
+const policyBase={subjectType:'USER',subjectId:'',userIds:['u1'],permissions:['cash.plan.read'],scopes:[{scopeType:'ORG',orgId:policyOrgs[0].id,departmentId:policyDepartments[0].id,yearFrom:'2027',yearTo:'2028'}],reason:'  复核职责  '}
+const policyCases=[{}, {userIds:[]},{userIds:['gone']},{userIds:['x'.repeat(65)]},{userIds:Array(501).fill('u1')},{subjectType:'ROLE',subjectId:'custom'},{subjectType:'ROLE',subjectId:'off'},{subjectType:'ROLE',subjectId:'gone'},{subjectType:'TEAM'},{permissions:['unknown']},{permissions:Array(101).fill('cash.plan.read')},{permissions:[],scopes:[{scopeType:'ORG'}]},{scopes:[]},{scopes:Array(101).fill({scopeType:'SELF'})},{reason:''},{reason:' '},{reason:'字'.repeat(500)},{reason:'字'.repeat(501)},...['SELF','GLOBAL','ORG','DEPARTMENT','bad'].map(scopeType=>({scopes:[{scopeType}]})),...['',' ',2027,2027.5,'bad','2028','9007199254740992'].map(yearFrom=>({scopes:[{...policyBase.scopes[0],yearFrom,yearTo:'2027'}]})),{scopes:[{scopeType:'SELF',orgId:'gone'}]},{scopes:[{scopeType:'GLOBAL',departmentId:'gone'}]},{scopes:[{scopeType:'SELF',yearFrom:null,yearTo:null}]},{scopes:[{scopeType:'GLOBAL',yearFrom:'1900',yearTo:'2200'}]}]
+for(const patch of policyCases){const value={...policyBase,...patch};for(const confirmed of [false,true])assert.deepEqual(policyPlugin.financePolicyErrors(value,policyPeople,policyRoles,policyOrgs,policyDepartments,confirmed),policyModule.exports.financePolicyErrors(value,policyPeople,policyRoles,policyOrgs,policyDepartments,confirmed));assert.deepEqual(policyPlugin.financePolicyScopes(value),policyModule.exports.financePolicyScopes(value));assert.equal(policyPlugin.financePolicyScopeSummary(value,policyOrgs,policyDepartments),policyModule.exports.financePolicyScopeSummary(value,policyOrgs,policyDepartments))}
+assert.deepEqual(policyPlugin.financePolicyRequest(policyBase,policyPeople,policyRoles,policyOrgs,policyDepartments).body.scopes,[{scopeType:'ORG',orgId:policyOrgs[0].id,departmentId:policyDepartments[0].id,yearFrom:2027,yearTo:2028}])
+const scopeStatement=ast.statements.find(node=>ts.isVariableStatement(node)&&node.declarationList.declarations.some(declaration=>declaration.name.getText(ast)==='PermissionPolicyScopeSchema'))
+const scopeExports={};new Function('exports','z',ts.transpileModule(scopeStatement.getText(ast),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(scopeExports,require('zod').z)
+assert.ok(scopeExports.PermissionPolicyScopeSchema.safeParse(policyPlugin.financePolicyScopes(policyBase)[0]).success)
+for(const member of memberCases)assert.equal(pluginPeople({members:[member]},'permission').length>0,memberModule.exports.canSelectOrganizationMember(member,'permission'),`完整策略成员资格漂移 ${member.userId}`)
+console.log(`OK: ${policyCases.length} complete-policy drafts: field errors with/without confirmation, intersecting scopes, summaries and member eligibility match`)

@@ -417,41 +417,69 @@ function EmploymentCard({ employments, busy, t, onDialog, onRetry, page = 1, onP
   onPage ? h(Pager, { page, total: employments?.total, limit: 20, onPage }) : employments?.total > rows.length ? h('p', { className: 'sf-note' }, `仅展示前 ${rows.length} 条记录，排序仅作用于已加载记录。`) : null)
 }
 
+function financeEmploymentStartISOString(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null
+  const date = new Date(`${value}T00:00:00`)
+  const [year, month, day] = value.split('-').map(Number)
+  if (!Number.isFinite(date.getTime()) || date.getFullYear() !== year || date.getMonth() + 1 !== month || date.getDate() !== day) return null
+  return date.toISOString()
+}
 function EmploymentDialog({ contacts, contactsLoading, contactsError, departments, busy, t, onClose, onRetry, act, initialUserId = '' }) {
   const [systemUserId, setSystemUserId] = useState(initialUserId)
   const [departmentId, setDepartmentId] = useState('')
   const [startDate, setStartDate] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const submitting = useRef(false)
+  const [attempted, setAttempted] = useState(false)
+  const submitting = useRef(false), formRef = useRef(null), prefix = useId()
   const locked = busy || saving
+  const exit = useFinanceFormExit({ departmentId: '', startDate: '' }, { departmentId, startDate }, locked, onClose)
   const userOptions = [...new Map(contacts.filter(contact => contact.systemUserId).map(contact => [contact.systemUserId, contact.name || contact.systemUserId])).entries()]
-  const canSubmit = !contactsLoading && !contactsError && Boolean(startDate) && userOptions.some(([id]) => id === systemUserId) && (departments || []).some(department => department.id === departmentId)
-  const submit = async () => {
+  const fields = [
+    { key: 'systemUserId', label: '选择人员', required: true, searchable: true, options: userOptions, disabled: Boolean(initialUserId) || contactsLoading || contactsError },
+    { key: 'departmentId', label: '归属部门', required: true, searchable: true, options: (departments || []).map(department => [department.id, department.name]) },
+    { key: 'startDate', label: '起始日期', required: true, type: 'date' },
+  ]
+  const errors = financeFormErrors(fields, { systemUserId, departmentId, startDate })
+  if (!financeEmploymentStartISOString(startDate)) errors.startDate = '请输入有效的起始日期'
+  if (!userOptions.some(([id]) => id === systemUserId)) errors.systemUserId = '请选择已绑定的人员'
+  if (!(departments || []).some(department => department.id === departmentId)) errors.departmentId = '请选择可用的归属部门'
+  const canSubmit = !contactsLoading && !contactsError && userOptions.length && (departments || []).length
+  const change = (key, value) => {
+    setError('')
+    if (key === 'systemUserId') {
+      if (value === systemUserId || initialUserId) return
+      exit.leave(() => { setSystemUserId(value); setDepartmentId(''); setStartDate(''); setAttempted(false) })
+    } else if (key === 'departmentId') setDepartmentId(value)
+    else setStartDate(value)
+  }
+  const submit = async event => {
+    event?.preventDefault()
     if (!canSubmit || locked || submitting.current) return
-    const start = new Date(`${startDate}T00:00:00`)
-    if (!Number.isFinite(start.getTime())) return
+    setAttempted(true); setError('')
+    if (Object.keys(errors).length) { financeFocusFormError(formRef.current); return }
     submitting.current = true
     setSaving(true)
-    setError('')
     try {
-      if (await act('/employment-records', { systemUserId, departmentId, startDate: start.toISOString(), sourceRef: 'manual' }, '归属已登记（部门变化时旧记录自动闭合）')) onClose()
+      if (await act('/employment-records', { systemUserId, departmentId, startDate: financeEmploymentStartISOString(startDate), sourceRef: 'manual' }, '归属已登记（部门变化时旧记录自动闭合）')) onClose()
       else setError('登记失败，请检查字段或稍后重试。已保留输入。')
     } catch { setError('登记失败，请检查字段或稍后重试。已保留输入。') }
     finally { submitting.current = false; setSaving(false) }
   }
-  return h(Dialog, { title: t('empCreate'), onClose: () => { if (!locked) onClose() }, footer: [
-    h(GhostButton, { key: 'cancel', disabled: locked, onClick: onClose }, t('cancel')),
-    h(PrimaryButton, { key: 'ok', busy: locked, disabled: !canSubmit || locked, onClick: submit }, t('submit')),
+  const rows = financeFormFields(fields, { systemUserId, departmentId, startDate }, change, attempted ? errors : {}, locked, prefix)
+  return h(Dialog, { title: t('empCreate'), onClose: exit.close, dismissDisabled: locked, footer: [
+    h(GhostButton, { key: 'cancel', disabled: locked, onClick: exit.close }, t('cancel')),
+    h(PrimaryButton, { key: 'ok', busy: locked, disabled: !canSubmit || locked, onClick: submit }, locked ? '登记中…' : '登记'),
   ] },
-    error ? h('p', { role: 'alert', className: 'sf-neg' }, error) : null,
     contactsError ? h('div', { role: 'alert' }, h('p', { className: 'sf-neg' }, '读取人员目录暂时不可用，请稍后重试。'), h(LinkButton, { onClick: onRetry }, '重试加载')) : null,
     !contactsLoading && !contactsError && !userOptions.length ? h('p', { className: 'sf-note' }, '暂无已绑定人员，请先同步或绑定通讯录。') : null,
     !(departments || []).length ? h('p', { className: 'sf-note' }, '暂无可用部门，请先同步组织目录。') : null,
-    h('fieldset', { className: 'sf-stack sf-fieldset sf-employment-form', disabled: locked },
-      h(FormRow, { label: t('empUser') }, h(SearchSelect, { value: systemUserId, disabled: locked || contactsLoading || contactsError, onChange: value => { setSystemUserId(value); setDepartmentId(''); setStartDate('') }, options: userOptions, placeholder: contactsLoading ? '人员加载中…' : t('empUser'), 'aria-label': '选择人员' })),
-      h(FormRow, { label: t('empDept') }, h(SearchSelect, { value: departmentId, disabled: locked, onChange: setDepartmentId, options: (departments || []).map(department => [department.id, department.name]), placeholder: t('empDept'), title: (departments || []).find(department => department.id === departmentId)?.name, 'aria-label': '归属部门' })),
-      h(FormRow, { label: t('empStart') }, h(Field, { type: 'date', disabled: locked, value: startDate, onChange: setStartDate, 'aria-label': '起始日期' }))))
+    h('form', { ref: formRef, noValidate: true, onSubmit: submit, className: 'sf-stack' },
+      h('fieldset', { className: 'sf-stack sf-fieldset sf-employment-form', disabled: locked }, ...rows),
+      h('p', { className: 'sf-note', 'aria-label': '登记摘要' }, `${userOptions.find(([id]) => id === systemUserId)?.[1] || '待选择人员'} → ${(departments || []).find(department => department.id === departmentId)?.name || '待选择部门'}；${startDate || '待填写日期'} 当地时间 00:00 生效。部门变化时旧记录自动闭合。`),
+      attempted && Object.keys(errors).length ? h('p', { role: 'alert', className: 'sf-neg' }, '请检查输入，已定位到首个错误。') : null,
+      error ? h('p', { role: 'alert', className: 'sf-neg' }, error) : null,
+      exit.prompt))
 }
 
 
@@ -835,5 +863,20 @@ function FinanceEmploymentView({ ctx, t }) {
     h(FinanceResource, { resource: contacts }, h(SearchSelect, { 'aria-label': '选择人员', value: selected?.id || '', selectedLabel: selected?.name, options: options.map(person => [person.id, `${person.name}${person.systemUserId ? '' : '（未绑定）'}`]), onChange: id => { setSelected(options.find(person => person.id === id) || null); setPage(1) }, placeholder: '选择人员' }), h(Pager, { page: contactPage, total: contacts.data?.total, limit: 20, onPage: setContactPage })),
     h(Notice, null, action.notice),
     !selected ? h('p', null, '请先选择人员') : !selected.systemUserId ? h('p', null, '该人员尚未绑定系统身份，请先核对组织通讯录。') : h(FinanceResource, { resource: records }, h(EmploymentCard, { employments: records.data, page, onPage: setPage, userName: selected.name, busy: contacts.loading || Boolean(contacts.error), t, onDialog: () => setOpen(true), onRetry: records.retry })),
+    selected?.systemUserId ? h(FinanceEmploymentPreview, { key: selected.systemUserId, systemUserId: selected.systemUserId, revision: `${ctx.revision}-${tick}` }) : null,
     open ? h(EmploymentDialog, { contacts: [selected], initialUserId: selected.systemUserId, departments: ctx.departments, busy: action.busy, t, act, onClose: () => setOpen(false) }) : null)
+}
+
+/** 仅查询已登记归属；不从当前通讯录推断历史，也不在客户端重算归属。 */
+function FinanceEmploymentPreview({ systemUserId, revision }) {
+  const [date, setDate] = useState('')
+  const at = financeEmploymentStartISOString(date)
+  const result = useFinanceResource(at ? `/finance/employment/resolve?${new URLSearchParams({ systemUserId, at })}` : null, revision)
+  const prefix = useId()
+  return h('section', { className: 'sf-stack', 'aria-label': '归属解析预览' },
+    h('h4', null, '归属解析预览（输入日期查当日归属部门）'),
+    h(FormRow, { label: '归属解析日期' }, h(Field, { type: 'date', value: date, onChange: setDate, 'aria-label': '归属解析日期', 'aria-invalid': date && !at ? true : undefined, 'aria-describedby': `${prefix}-date-hint` })),
+    h('p', { id: `${prefix}-date-hint`, className: date && !at ? 'sf-neg' : 'sf-note' }, date && !at ? '请输入有效的解析日期' : '按所选日期当地时间 00:00 解析归属。'),
+    !at ? h('p', { className: 'sf-note' }, '选择日期后解析') : h(FinanceResource, { resource: result },
+      result.data ? h('p', { role: 'status' }, `${date} 归属：${result.data.departmentName ?? result.data.departmentId ?? '未匹配（无该日期的归属记录）'}`) : null))
 }

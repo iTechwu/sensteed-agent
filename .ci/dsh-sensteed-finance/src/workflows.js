@@ -233,18 +233,19 @@ function financeFocusFormError(form) {
 function financeFormFields(fields, values, onChange, errors, busy, prefix, rowNumber) {
   return fields.filter(field => !field.when || field.when(values)).map(field => {
     const message = errors[field.key], errorId = `${prefix}-${field.key}-error`
-    const props = { 'aria-label': `${field.label}${rowNumber ? ` ${rowNumber}` : ''}`, 'aria-invalid': message ? true : undefined, 'aria-describedby': message ? errorId : undefined, value: financeFieldValue(values, field.key) ?? '', onChange: value => onChange(field.key, value), required: field.required, disabled: busy }
+    const props = { 'aria-label': `${field.label}${rowNumber ? ` ${rowNumber}` : ''}`, 'aria-invalid': message ? true : undefined, 'aria-describedby': message ? errorId : undefined, value: financeFieldValue(values, field.key) ?? '', onChange: value => onChange(field.key, value), required: field.required, disabled: busy || Boolean(field.disabled) }
     return h(FormRow, { key: field.key, label: `${field.label}${field.required ? '（必填）' : ''}` },
       h('div', { className: 'sf-field-control' },
         field.multi ? h(MultiSearchSelect, { ...props, value: props.value || [], options: field.options || [], placeholder: field.label })
-          : field.options ? h(field.searchable ? SearchSelect : Select, { ...props, ...(field.searchable ? { buttonTrigger: true } : {}), options: field.options, placeholder: '请选择' })
+          : field.options ? h(field.searchable ? SearchSelect : Select, { ...props, ...(field.searchable ? { buttonTrigger: true } : {}), options: field.options, placeholder: field.searchable ? field.label : '请选择' })
           : h(field.type === 'textarea' ? Textarea : Field, { ...props, type: field.type || 'text', min: field.min, max: field.max, maxLength: field.maxLength || 500, step: field.type === 'number' ? 'any' : undefined }),
         message ? h('span', { id: errorId, className: 'sf-neg sf-field-error' }, message) : null))
   })
 }
 function useFinanceFormExit(initial, values, busy, onClose) {
   const baseline = useRef(JSON.stringify(initial)), [leaving, setLeaving] = useState(false)
-  const promptRef = useRef(null), previousFocus = useRef(null)
+  const promptRef = useRef(null), previousFocus = useRef(null), pendingAction = useRef(onClose)
+  const [discardLabel, setDiscardLabel] = useState('放弃修改并关闭')
   const dirty = JSON.stringify(values) !== baseline.current
   useEffect(() => {
     if (!dirty) return undefined
@@ -253,11 +254,12 @@ function useFinanceFormExit(initial, values, busy, onClose) {
     return () => window.removeEventListener('beforeunload', prevent)
   }, [dirty])
   useEffect(() => { if (leaving) requestAnimationFrame(() => promptRef.current?.querySelector('button')?.focus()) }, [leaving])
-  const close = () => { if (!busy) { if (dirty) { previousFocus.current = document.activeElement; setLeaving(true) } else onClose() } }
+  const leave = (action, label = '放弃修改并继续') => { if (!busy) { if (dirty) { pendingAction.current = action; setDiscardLabel(label); previousFocus.current = document.activeElement; setLeaving(true) } else action() } }
+  const close = () => leave(onClose, '放弃修改并关闭')
   const prompt = leaving ? h('div', { ref: promptRef, className: 'sf-form-exit sf-stack', role: 'alert' },
     h('p', null, '有尚未保存的修改。离开后这些内容将丢失。'),
-    h('div', { className: 'sf-row' }, h(GhostButton, { disabled: busy, onClick: () => { setLeaving(false); requestAnimationFrame(() => previousFocus.current?.focus()) } }, '继续编辑'), h(GhostButton, { disabled: busy, onClick: onClose }, '放弃修改并关闭'))) : null
-  return { close, prompt }
+    h('div', { className: 'sf-row' }, h(GhostButton, { disabled: busy, onClick: () => { setLeaving(false); requestAnimationFrame(() => previousFocus.current?.focus()) } }, '继续编辑'), h(GhostButton, { disabled: busy, onClick: () => { setLeaving(false); pendingAction.current() } }, discardLabel))) : null
+  return { close, prompt, leave, reset: values => { baseline.current = JSON.stringify(values) } }
 }
 function FinanceFormDialog({ title, description, fields, initial = {}, onSubmit, onClose }) {
   const [values, setValues] = useState(initial), [busy, setBusy] = useState(false)

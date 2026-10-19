@@ -1,3 +1,4 @@
-# The desktop owns finance MCP activation and renewal after Feishu login.
-# This plugin itself is mounted by the desktop profile; do not register it twice.
-[]
+# The sealed product owns authenticated MCP transport; this bundle activates only itself.
+- insert:
+    - id: dofe-sensteed-finance
+      name: '@dofe/dsh-sensteed-finance'

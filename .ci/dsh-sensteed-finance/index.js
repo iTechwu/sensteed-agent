@@ -15,7 +15,7 @@ const FINANCE_WORKSPACE_ACCESS_PATH = '/finance/permissions/workspace-access'
 const REQUEST_TIMEOUT_MS = 30000
 const MAX_BODY_BYTES = 256 * 1024
 
-export const inject = ['webServer', 'credentials', 'tools', 'systemPrompt', 'dofeAuth', 'dofeAccess']
+export const inject = ['webServer', 'credentials', 'tools', 'systemPrompt', 'dofeAuth', 'dofeAccess', 'hubMcp']
 export const capabilities = Object.freeze([
   {
     "id": "finance-management",
@@ -63,6 +63,9 @@ export function apply(ctx, overrides = {}) {
   }
 
   const disposers = []
+  if (!ctx.hubMcp?.register) throw new Error('HUB_MCP_SERVICE_REQUIRED')
+  const registration = ctx.hubMcp.register({ capability: 'finance', serverName: 'finance', path: 'finance', timeoutMs: 60000 })
+  disposers.push(() => registration.dispose())
 
   const canUseFinance = scope => {
     const gate = typeof ctx.dofeAccess === 'function' ? ctx.dofeAccess() : undefined
