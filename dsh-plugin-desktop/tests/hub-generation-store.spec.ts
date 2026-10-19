@@ -120,11 +120,11 @@ describe('Hub generation local transaction', () => {
     const { store } = fixture(); const value = stage(store, 'g1')
     mkdirSync(join(store.generationDirectory('g1'), 'skills/example'), { mode: 0o700 })
     writeFileSync(join(store.generationDirectory('g1'), 'skills/example/SKILL.md'), '# example', { mode: 0o600 })
-    const v2: HubGenerationDescriptor = { ...value, schemaVersion: 2, files: { ...value.files, 'skills/example/SKILL.md': digest('# example') }, verifiedComposition: {
+    const v2: HubGenerationDescriptor = { ...value, schemaVersion: 2, suppressedPackages: ['removed-plugin'], suppressedSkills: ['removed-skill'], files: { ...value.files, 'skills/example/SKILL.md': digest('# example') }, verifiedComposition: {
       entries: [{ id: 'example', packageName: 'extension', config: {} }], skills: [{ name: 'example', path: 'skills/example/SKILL.md', sha256: digest('# example') }] } }
     await expect(store.prepare({ ...v2, verifiedComposition: { ...v2.verifiedComposition!, entries: [{ id: 'example', packageName: 'untracked', config: {} }] } })).rejects.toThrow('outside managed')
     await expect(store.prepare({ ...v2, verifiedComposition: { ...v2.verifiedComposition!, skills: [{ name: 'example', path: 'skills/example/SKILL.md', sha256: 'a'.repeat(64) }] } })).rejects.toThrow('verified file set')
-    await store.prepare(v2); await store.activate(); expect(store.activeDescriptor()?.verifiedComposition?.entries).toHaveLength(1)
+    await store.prepare(v2); await store.activate(); expect(store.activeDescriptor()?.verifiedComposition?.entries).toHaveLength(1); expect(store.activeDescriptor()).toMatchObject({suppressedPackages:['removed-plugin'],suppressedSkills:['removed-skill']})
   })
   it('does not reuse another profile scope and detects state scope tampering', async () => {
     const { store, root } = fixture(); await store.prepare(stage(store, 'g1'))
