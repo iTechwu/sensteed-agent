@@ -77,6 +77,7 @@ describe('dofe-product-routes', () => {
       '/api/desktop/auth/feishu/status',
       '/api/desktop/dofe/models',
       '/api/desktop/dofe/validate',
+      '/api/desktop/hub/updates',
       '/api/desktop/yootun/audit',
     ].sort())
   })

@@ -10,6 +10,7 @@ import { registerDofePluginItems } from './DofePluginItems.tsx'
 import { DOFE_ACCESS_COPY } from './dofe-access.ts'
 import { DOFE_ACCESS_SETTINGS_NAMESPACE, type DofeAccessSettings } from '../dofe-plugins.ts'
 import { CreatePluginMenuItem, startCreatorConversation } from './CreatePluginMenuItem.tsx'
+import { installHubUpdateNotice } from './HubUpdateNotice.tsx'
 
 export function applyDofeAccess(ctx: Context): void {
   const inject = (ctx as Context & { inject?: Context['inject'] }).inject
@@ -26,12 +27,14 @@ export function applyDofeAccess(ctx: Context): void {
   ctx.effect(() => installDofeAccessStyles(), 'desktop: access styles')
   const settingsScope = ctx.configForms.get<DofeAccessSettings>(DOFE_ACCESS_SETTINGS_NAMESPACE)
   const t = ctx.locale.bind('dofe.access')
+  const subscribeReconnect = (listener: () => void) => ctx.on('connection/reset', listener)
   const props = { credentials: ctx.remote.credentials, settingsApi: ctx.remote.settings, settingsScope, t }
   ctx.effect(() => installDofeAccessGate(props), 'desktop: mandatory access gate')
   // The Plugins page lists every brand-eligible DoFe datasource as a read-only
   // card; the activation switches live on the Built-in capabilities page.
   registerDofePluginItems(ctx, settingsScope, t)
   if (BRAND_VARIANT === 'sensteed') {
+    ctx.effect(() => installHubUpdateNotice({ settingsScope, t, subscribeReconnect }), 'desktop: read-only Hub update notice')
     ctx.slots.inject('settings.trigger', () => ctx.slots.register({
       name: 'settings.trigger', priority: -100, inject: () => ({ settingsScope }),
     }, SensteedUserSettingsTrigger))

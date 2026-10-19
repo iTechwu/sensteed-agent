@@ -19,6 +19,7 @@ import { handleYootunAuditRequest, YOOTUN_AUDIT_PATH } from './yootun-audit-rout
 import { YootunAuditService } from './yootun-audit-service.ts'
 import { YootunAuditStore } from './yootun-audit-store.ts'
 import type { DofeLauncherRuntime } from './dofe-managed.ts'
+import { handleHubUpdatesRequest, HUB_UPDATES_PATH } from './hub-update-route.ts'
 
 export const name = 'dofe-product-routes'
 export const inject = ['webServer', 'connection', 'credentials', 'dofeAuth']
@@ -118,4 +119,15 @@ export async function apply(ctx: Context, config: { auditSyncEnabled: boolean })
       '@dofe/dsh-sensteed-product: private DoFe access route',
     )
   }
+  ctx.effect(
+    () => ctx.webServer.register({
+      kind: 'exact',
+      path: HUB_UPDATES_PATH,
+      handler: (req, res) => {
+        if (rejectDesktopRequest(ctx, req, res)) return
+        return handleHubUpdatesRequest(req, res, rendererOrigin, dofeAuth)
+      },
+    }),
+    '@dofe/dsh-sensteed-product: read-only Hub update route',
+  )
 }
