@@ -88,6 +88,26 @@ assert.ok(cashEvidenceRoutes.length >= 7, '资金证据契约路由解析不足'
 for (const [, method, path] of cashEvidenceRoutes) {
   assert.ok(PUBLIC_FINANCE_ROUTES.some(([actualMethod, actualPath]) => actualMethod === method && actualPath === '/finance/cash-evidence' + path), `插件未覆盖资金证据契约 ${method} ${path}`)
 }
+// 收入调整八条公开路由必须全部可达，且不可添加契约外方法。
+const revenueAdjustmentContract = await readFile(resolve(datasource, 'packages/contracts/src/api/revenue-plan-adjustment.contract.ts'), 'utf8')
+const revenueAdjustmentRoutes = [...revenueAdjustmentContract.matchAll(/method: '(GET|POST|PUT|PATCH|DELETE)',\s+path: '(\/[^']*)'/g)].map(([, method, path]) => [method, '/finance' + path])
+assert.equal(revenueAdjustmentRoutes.length, 8, '收入调整契约路由解析不足或发生变化')
+const pluginRevenueRoutes = PUBLIC_FINANCE_ROUTES.filter(([, path]) => /^\/finance\/(revenue-plan-adjustments(?:\/|$)|revenue-plans\/:id\/adjustments$)/.test(path))
+assert.deepEqual(pluginRevenueRoutes.map(route => route.join(' ')).sort(), revenueAdjustmentRoutes.map(route => route.join(' ')).sort(), '插件收入调整公开路由与权威契约不一致')
+const revenueAdjustmentSchema = await readFile(resolve(datasource, 'packages/contracts/src/schemas/revenue-plan-adjustment.schema.ts'), 'utf8')
+const revenueAdjustmentAst = ts.createSourceFile('revenue-plan-adjustment.schema.ts', revenueAdjustmentSchema, ts.ScriptTarget.Latest, true)
+const revenueCreateStatement = revenueAdjustmentAst.statements.find(node => ts.isVariableStatement(node) && node.declarationList.declarations.some(declaration => declaration.name.getText(revenueAdjustmentAst) === 'CreateRevenuePlanAdjustmentSchema'))
+assert.ok(revenueCreateStatement, '未找到收入调整权威金额与原因校验')
+const revenueCreateExports = {}
+new Function('exports', 'z', ts.transpileModule(revenueCreateStatement.getText(revenueAdjustmentAst), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(revenueCreateExports, require('zod').z)
+const revenueAdjustmentValidator = new Function('finite', await readFile(resolve(root, 'src/views/revenue-adjustment.js'), 'utf8') + '\nreturn validRevenueAdjustment')(value => value == null || value === '' || !Number.isFinite(Number(value)) ? null : Number(value))
+const revenueCreateCases = [{ newAmount: '90', reason: '调整' }, { newAmount: '60', reason: '调整' }, { newAmount: '150', reason: '调整' }, { newAmount: '0.29', reason: '调整' }, { newAmount: '99999999999999.99', reason: '调整' }, { newAmount: '100000000000000', reason: '调整' }, { newAmount: '90.001', reason: '调整' }, { newAmount: '-1', reason: '调整' }, { newAmount: 'NaN', reason: '调整' }, { newAmount: '90', reason: ' ' }, { newAmount: '90', reason: '字'.repeat(500) }, { newAmount: '90', reason: '字'.repeat(501) }]
+for (const input of revenueCreateCases) {
+  const plan = { plannedAmount: 100, actualAmount: 0 }
+  const expected = revenueCreateExports.CreateRevenuePlanAdjustmentSchema.safeParse(input)
+  assert.equal(Boolean(revenueAdjustmentValidator(plan, input.newAmount, input.reason)), expected.success, `收入调整金额或原因漂移 ${JSON.stringify(input)}`)
+}
+console.log(`PASS: ${revenueAdjustmentRoutes.length} 条收入调整公开路由、${revenueCreateCases.length} 组金额及原因边界与权威契约一致`)
 const cashSection = await readFile(resolve(datasource, 'apps/web/components/finance/cash-section.tsx'), 'utf8')
 const webCashTabs = JSON.parse(cashSection.match(/const CASH_TABS = (\[[^\]]+\]) as const/)[1].replace(/'/g, '"'))
 const cashView = await readFile(resolve(root, 'src/views/cash.js'), 'utf8')

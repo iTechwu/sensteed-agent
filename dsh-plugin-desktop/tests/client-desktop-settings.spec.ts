@@ -727,6 +727,7 @@ describe('Desktop settings Slot registration', () => {
     expect(options).toMatchObject({
       name: 'settings.section',
       id: 'desktop',
+      priority: -100,
       order: 100,
       locale: DESKTOP_SETTINGS_LOCALE_NAMESPACE,
     })

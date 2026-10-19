@@ -1,21 +1,23 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { HubCatalog } from './HubCatalog.tsx'
 import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { DofeAccessLocaleKey } from './dofe-access.ts'
 import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { DofeAccessSettings } from '../dofe-plugins.ts'
-import { hubCheckRequest, hubBlocked, hubInitialSelections, hubKey, hubSetupRequest, hubTerminal, type HubCheck, type HubOperation, type HubPreview, type HubSelection } from './hub-setup-state.ts'
-type Props={t:(key:DofeAccessLocaleKey)=>string;settingsScope?:ConfigForm<DofeAccessSettings>;subscribeReconnect?:(listener:()=>void)=>()=>void}
+import { hubCheckRequest, hubBlocked, hubInitialSelections, hubKey, hubSetupRequest, hubTerminal, type HubKind, type HubCheck, type HubOperation, type HubPreview, type HubSelection } from './hub-setup-state.ts'
+type Props={kind?:HubKind;t:(key:DofeAccessLocaleKey)=>string;settingsScope?:ConfigForm<DofeAccessSettings>;subscribeReconnect?:(listener:()=>void)=>()=>void}
 const noSubscribe=()=>()=>{}
 const standaloneAccount=()=>'standalone'
 /** Key the entire editor to the account so no previous account's plan/nonce remains visible. */
-export function HubSetupSection({t,settingsScope,subscribeReconnect}:Props){
+export function HubSetupSection({t,settingsScope,subscribeReconnect,kind}:Props){
  const [connectionEpoch,setConnectionEpoch]=useState(0)
  useEffect(()=>subscribeReconnect?.(()=>setConnectionEpoch(value=>value+1)),[subscribeReconnect])
  const store=useMemo(()=>settingsScope?{subscribe:(fn:()=>void)=>settingsScope.subscribe(fn),getSnapshot:()=>{const value=settingsScope.getSnapshot().value;return value?.authMode==='feishu'?value.identity?.ssoSub:undefined}}:undefined,[settingsScope])
  const account=useSyncExternalStore(store?.subscribe??noSubscribe,store?.getSnapshot??standaloneAccount,store?.getSnapshot??standaloneAccount)
- return account?<HubSetupEditor key={`${account}:${connectionEpoch}`} t={t}/>:<p role="status">{t('settingsLoginRequired')}</p>
+ return account?<HubSetupEditor key={`${account}:${connectionEpoch}`} t={t} {...(kind?{kind}:{})}/>:<p role="status">{t('settingsLoginRequired')}</p>
 }
-function HubSetupEditor({t}:Pick<Props,'t'>){
+function HubSetupEditor({t,kind}:Pick<Props,'t'|'kind'>){
+ const titleId=useId()
  const [check,setCheck]=useState<HubCheck>(),[selection,setSelection]=useState<HubSelection[]>([]),[preview,setPreview]=useState<HubPreview>(),[operation,setOperation]=useState<HubOperation>(),[busy,setBusy]=useState(false),[error,setError]=useState<string>(),[recovering,setRecovering]=useState(false),[clock,setClock]=useState(Date.now())
  const lock=useRef(false),intent=useRef<HubPreview>(),mounted=useRef(true),sequence=useRef(0)
  const message=(e:unknown)=>e instanceof Error&&e.message==='BASE_VERSION_NOT_ENABLED'?t('hubUnavailable'):t('hubRequestFailed')
@@ -42,36 +44,27 @@ function HubSetupEditor({t}:Pick<Props,'t'>){
  const run=async(action:()=>Promise<void>)=>{if(lock.current)return;lock.current=true;setBusy(true);setError(undefined);try{await action()}catch(e){if(mounted.current)setError(message(e))}finally{lock.current=false;if(mounted.current)setBusy(false)}}
  const change=(item:HubSelection|{kind:'skill'|'plugin';itemId:string},action:string)=>{intent.current=undefined;setPreview(undefined);setSelection(current=>[...current.filter(i=>hubKey(i)!==hubKey(item)),...(action==='skip'?[]:[{kind:item.kind,itemId:item.itemId,action:action as HubSelection['action'],enabled:check?.activeItems.find(i=>hubKey(i)===hubKey(item))?.enabled??true}])])}
  const blocked=check?.entries.some(e=>e.required&&hubBlocked(e))??false,pending=!hubTerminal(operation),expired=preview?Date.parse(preview.expiresAt)<=clock:true,missingAccess=preview?.items.some(i=>(i.action==='install'||i.action==='update')&&!i.accessDeclaration)??false
- return <section className="dshDofeAccess" aria-labelledby="hub-setup-title">
-  <h2 id="hub-setup-title">{t('hubTitle')}</h2><p>{t('hubIntro')}</p><p>{t('hubPersonalSkills')}</p>
+ return <section className="dshHubSetup" aria-labelledby={titleId}>
+  <h2 id={titleId} className="dshHubSectionTitle">{t('catalogTab')}</h2><p className="dshHubHint">{t('catalogReviewHint')}</p>
   {error&&<p role="alert">{error}</p>}
-  <div><Button disabled={busy||recovering} onClick={()=>void run(()=>refresh())}>{busy?t('hubWorking'):t('hubCheck')}</Button></div>
-  {check&&<><p>{t('hubProfile')}: <code>{check.profileId}</code> · <code>{check.channel}</code> · {check.activeGenerationDigest?t('hubActive'):t('hubInitial')}</p>
-   <ul style={{listStyle:'none',padding:0,display:'grid',gap:12}}>{check.entries.map(entry=>{const active=check.activeItems.some(i=>hubKey(i)===hubKey(entry)),chosen=selection.find(i=>hubKey(i)===hubKey(entry)),unavailable=hubBlocked(entry)
-    return <li key={hubKey(entry)} style={{border:'1px solid var(--dsw-alias-border-l1, #ddd)',borderRadius:8,padding:12}}>
-     <strong>{entry.displayName}</strong> <small>{entry.kind} · {entry.version??t('hubUnpublished')} {entry.required?`· ${t('hubRequired')}`:''}</small>
-     <p>{entry.disposition}{entry.reason?` · ${entry.reason}`:''}</p>
-     <label>{t('hubAction')} <select aria-label={`${entry.displayName} ${t('hubAction')}`} disabled={busy||recovering||pending||unavailable&&!active} value={chosen?.action??'skip'} onChange={event=>change(entry,event.target.value)}>
-      {!entry.required&&!active&&<option value="skip">{t('hubSkip')}</option>}
-      {active&&<option value="retain">{t('hubRetain')}</option>}
-      {!unavailable&&<option value={active?'update':'install'}>{active?t('hubUpdate'):t('hubInstall')}</option>}
-      {unavailable&&!active&&entry.required&&<option value="install">{t('hubBlocked')}</option>}
-      {active&&!entry.required&&<option value="uninstall">{t('hubRemove')}</option>}
-     </select></label>
-    </li>})}</ul>
+  <div className="dshHubRefresh"><Button className="dshHubSecondary" disabled={busy||recovering} onClick={()=>void run(()=>refresh())}>{busy?t('hubWorking'):t('hubCheck')}</Button></div>
+  {!check&&!error&&<p role="status">{t('catalogLoading')}</p>}
+  {check&&<><details className="dshHubDetails"><summary>{t('hubProfile')}</summary><p>{t('hubProfile')}: <code>{check.profileId}</code> · <code>{check.channel}</code> · {check.activeGenerationDigest?t('hubActive'):t('hubInitial')}</p></details>
+   <HubCatalog check={check} kind={kind} selection={selection} disabled={busy||recovering||pending} change={change} t={t}/>
    {blocked&&<p role="status">{t('hubRequiredBlocked')}</p>}
-   <Button disabled={busy||recovering||pending||blocked||selection.length===0} onClick={()=>void run(async()=>{intent.current=undefined;setPreview(undefined);const value=await hubSetupRequest<HubPreview>('preview',{channel:check.channel,requested:selection});if(!value.intentId||!value.confirmationNonce||!value.items?.length||!Number.isFinite(Date.parse(value.expiresAt)))throw Error('INVALID_PREVIEW');intent.current=value;setPreview(value)})}>{t('hubPreview')}</Button>
+   <p className="dshHubHint">{t('catalogFullPlan')}</p>
+   <Button className="dshHubPrimary" disabled={busy||recovering||pending||blocked||selection.length===0} onClick={()=>void run(async()=>{intent.current=undefined;setPreview(undefined);const value=await hubSetupRequest<HubPreview>('preview',{channel:check.channel,requested:selection});if(!value.intentId||!value.confirmationNonce||!value.items?.length||!Number.isFinite(Date.parse(value.expiresAt)))throw Error('INVALID_PREVIEW');intent.current=value;setPreview(value)})}>{t('hubPreview')}</Button>
   </>}
-  {preview&&<div aria-label={t('hubPlan')}><h3>{t('hubPlan')}</h3><p>{t('hubBytes')}: {preview.totalBytes.toLocaleString()} bytes · {t('hubExpires')}: {new Date(preview.expiresAt).toLocaleString()}</p>
-   <code>{preview.planDigest}</code><ul>{preview.items.map(item=><li key={hubKey(item)}><strong>{item.displayName??item.itemId}</strong> · {item.kind} · {item.action} · {item.version??t('hubUnknown')} · {item.enabled?t('hubEnabled'):t('hubDisabled')}
+  {preview&&<div className="dshHubPlan" aria-label={t('hubPlan')}><h3>{t('hubPlan')}</h3><p>{t('hubBytes')}: {preview.totalBytes.toLocaleString()} bytes · {t('hubExpires')}: {new Date(preview.expiresAt).toLocaleString()}</p>
+   <details className="dshHubDetails"><summary>{t('catalogDetails')}</summary><code>{preview.planDigest}</code></details><ul>{preview.items.map(item=><li key={hubKey(item)}><strong>{item.displayName??item.itemId}</strong> · {item.kind} · {item.action} · {item.version??t('hubUnknown')} · {item.enabled?t('hubEnabled'):t('hubDisabled')}
     {item.releaseId&&<div>{t('hubRelease')}: <code>{item.releaseId}</code></div>}
     {item.compatibility&&<p>{item.compatibility}{item.evidence?` · ${item.evidence}`:''}</p>}
     <p>{t('hubPermissions')}: {item.accessDeclaration?`${t('hubScripts')}: ${String(item.accessDeclaration.containsScripts)}; ${t('hubFiles')}: ${item.accessDeclaration.fileAccess}; ${t('hubNetwork')}: ${item.accessDeclaration.networkHosts.join(', ')||t('hubNone')}${item.accessDeclaration.localPreview?`; ${t('hubPreviewScope')}: ${item.accessDeclaration.localPreview.scope} (${item.accessDeclaration.localPreview.protocols.join(', ')})`:''}`:t('hubPermissionUnknown')}</p>
    </li>)}</ul><p>{t('hubConfirmHint')}</p>
    {missingAccess&&<p role="alert">{t('hubAccessRequired')}</p>}
-   <Button disabled={busy||recovering||pending||expired||missingAccess||!intent.current} onClick={()=>{const value=intent.current;if(!value||Date.parse(value.expiresAt)<=Date.now()||value.items.some(i=>(i.action==='install'||i.action==='update')&&!i.accessDeclaration))return;intent.current=undefined;setPreview(undefined);void run(async()=>{try{setOperation(await hubSetupRequest<HubOperation>('execute',{intentId:value.intentId,confirmationNonce:value.confirmationNonce}))}catch(e){setRecovering(true);throw e}})}}>{expired?t('hubExpired'):t('hubExecute')}</Button>
+   <Button className="dshHubPrimary" disabled={busy||recovering||pending||expired||missingAccess||!intent.current} onClick={()=>{const value=intent.current;if(!value||Date.parse(value.expiresAt)<=Date.now()||value.items.some(i=>(i.action==='install'||i.action==='update')&&!i.accessDeclaration))return;intent.current=undefined;setPreview(undefined);void run(async()=>{try{setOperation(await hubSetupRequest<HubOperation>('execute',{intentId:value.intentId,confirmationNonce:value.confirmationNonce}))}catch(e){setRecovering(true);throw e}})}}>{expired?t('hubExpired'):t('hubExecute')}</Button>
   </div>}
-  {operation&&<div role="status"><h3>{t('hubOperation')}</h3><p>{operation.state}{operation.phase&&operation.phase!==operation.state?` · ${operation.phase}`:''}{operation.errorCode?` · ${operation.errorCode}`:''}</p>
+  {operation&&<div className="dshHubPlan" role="status"><h3>{t('hubOperation')}</h3><p>{operation.state}{operation.phase&&operation.phase!==operation.state?` · ${operation.phase}`:''}{operation.errorCode?` · ${operation.errorCode}`:''}</p>
    <p><code>{operation.operationId}</code></p>{operation.outboxState==='pending'?<p>{t('hubReceiptPending')}</p>:operation.receiptSeq!==undefined&&<p>{t('hubReceiptSynced')} · {operation.receiptSeq}</p>}{operation.restartRequired&&<p>{t('hubRestartRequired')}</p>}
    {operation.restartReady&&<Button disabled={busy||recovering} onClick={()=>void run(async()=>{setRecovering(true);try{setOperation(await hubSetupRequest<HubOperation>('restart',{operationId:operation.operationId}))}catch{setError(t('hubConnectionRecovering'))}})}>{t('hubRestart')}</Button>}
   </div>}

@@ -31,7 +31,7 @@ test('carryover and scheduling selectors show localized options while retaining 
       [ui.CarryoverDialog, {}, locale === 'zh' ? [['FULL', '全额结转'], ['PERCENT', '比例结转'], ['EXPIRE', '过期清零']] : [['FULL', 'Full carry'], ['PERCENT', 'Percent'], ['EXPIRE', 'Expire']]],
       [ui.ScheduleDialog, { plan: { priority: 'HIGH', planMonth: 10 } }, locale === 'zh' ? [['HIGH', '高'], ['MEDIUM', '中'], ['LOW', '低']] : [['HIGH', 'High'], ['MEDIUM', 'Mid'], ['LOW', 'Low']]],
     ]) {
-      const select = nodes(component({ ...props, t })).find(node => node.type === ui.Select)
+      const select = nodes(component({ ...props, t })).find(node => node.type === ui.Select && (component !== ui.ScheduleDialog || node.props['aria-label'] === t('priority')))
       const options = ui.Select(select.props).props.children.filter(node => node?.props?.value).map(node => [node.props.value, node.props.children[0]])
       assert.deepEqual(options, expected)
     }

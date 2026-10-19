@@ -2,7 +2,7 @@
 import { useMemo, useSyncExternalStore } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
-import type { InjectFace, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { dofePluginsForBrand, DOFE_ACCESS_VALIDATION_VERSION, type DofeAccessSettings, type DofePluginId } from '../dofe-plugins.ts'
 import type { DofeAccessLocaleKey } from './dofe-access.ts'
@@ -20,7 +20,7 @@ interface DofePluginCardInjected {
   readonly t: Copy
 }
 
-type DofePluginCardProps = PropsRuntime<'plugins.item'> & InjectFace<DofePluginCardInjected>
+type DofePluginCardProps = Pick<PropsRuntime<'plugins.item'>, 'view'> & DofePluginCardInjected
 
 /** Derive the reported state from the same gate the settings section writes. */
 export function dofePluginCardState(plugin: { id: DofePluginId; access?: 'basic' | 'business'; builtIn: boolean }, settings: DofeAccessSettings | undefined): DofePluginCardState {

@@ -32,3 +32,10 @@ it('releases the session reference when prompt admission fails', async () => {
   await expect(startCreatorConversation(ctx as never)).rejects.toThrow('admission refused')
   expect(release).toHaveBeenCalledOnce()
 })
+
+it('starts skill creation through the existing cordis preset with an explicit skill invocation', async () => {
+  const { ctx, session, release } = fixture({ ok: true, value: { accepted: true } })
+  await startCreatorConversation(ctx as never, 'skill')
+  expect(session.prompt).toHaveBeenCalledWith([{ type: 'text', text: expect.stringMatching(/^\/skill-creator\n/) }], 'queue')
+  expect(release).toHaveBeenCalledOnce()
+})

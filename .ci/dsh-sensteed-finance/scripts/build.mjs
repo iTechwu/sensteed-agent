@@ -15,7 +15,7 @@ const FILES = [
   'src/views/overview.js',
   'src/views/budget.js',
   'src/views/operations.js',
-  'src/views/cash.js', 'src/views/cash-evidence.js',
+  'src/views/cash.js', 'src/views/cash-evidence.js', 'src/views/revenue-adjustment.js',
   'src/views/alerts.js',
   'src/views/datacenter.js',
   'src/views/entry.js', 'src/views/configured-entry.js',

@@ -19,7 +19,7 @@ async function mount(h:ReturnType<typeof harness>){vi.stubGlobal('IS_REACT_ACT_E
 it('checks without opening Settings, opens the actual setup editor, and clears it on logout',async()=>{
  const fetcher=vi.fn(async(_path:string)=>Response.json(snapshot));vi.stubGlobal('fetch',fetcher);const h=harness();await mount(h)
  expect(fetcher).toHaveBeenCalledTimes(1);expect(node.querySelector('[role="status"]')).not.toBeNull();expect(node.querySelector('dialog')).toBeNull()
- await act(async()=>node.querySelector('button')!.click());expect(node.querySelector('dialog')).not.toBeNull();expect(node.textContent).toContain(DOFE_ACCESS_COPY.zh.hubTitle)
+ await act(async()=>node.querySelector('button')!.click());expect(node.querySelector('dialog')).not.toBeNull();expect(node.textContent).toContain(DOFE_ACCESS_COPY.zh.catalogTab)
  expect(fetcher.mock.calls.every(call=>String(call[0]).endsWith('/check'))).toBe(true)
  await act(async()=>h.account(undefined));expect(node.textContent).toBe('')
 })

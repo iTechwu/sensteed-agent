@@ -19,6 +19,7 @@ function clientHarness(source, componentName, overrides = {}) {
   const h = (type, props, ...children) => ({ type, props: props || {}, children: children.flat(Infinity).filter(Boolean) })
   const dependencies = {
     h, useState, useCallback: callback => callback,
+    React: { createContext: () => ({ Provider: props => props.children?.[0] }), useContext: () => null },
     useRef: initial => useState(() => ({ current: initial }))[0],
     useId: () => useState(() => 'selector-' + Math.random())[0],
     useMemo: compute => compute(),
@@ -711,7 +712,7 @@ test('department multi-select adds filtered results without losing previous choi
 })
 
 async function budgetEntryHarness(overrides = {}) {
-  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/members.js', root), 'utf8')
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/workflows.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/members.js', root), 'utf8')
   const values = { orgId: 'org-1', year: '2026', expenseType: 'FIXED_OPERATION', departmentId: 'dept-1', costItemId: 'travel', budgetAmount: '1250.50', ...overrides.values }
   const writes = [], reads = []
   let resetCount = 0
@@ -1449,10 +1450,13 @@ test('clicking the sidebar button renders the dashboard without render-time refe
   const reactStub = {
     createElement,
     useCallback: callback => callback,
+    useMemo: compute => compute(),
+    useContext: () => null,
     Fragment: 'Fragment',
     useState: initial => [initial === null ? true : (typeof initial === 'function' ? initial() : initial), () => {}],
     useRef: initial => ({ current: initial }),
     useEffect: () => {},
+    createContext: () => ({ Provider: props => props.children?.[0] }),
     useSyncExternalStore: (_subscribe, getSnapshot) => getSnapshot(),
   }
   const primitivesStub = new Proxy({}, { get: (_target, key) => key === 'Tooltip' ? props => props.children : () => null })
@@ -1758,7 +1762,7 @@ test('direct-entry amounts render business labels rather than unresolved transla
   const head = await readFile(new URL('src/head.js', root), 'utf8')
   const dictionary = head.slice(head.indexOf('const copy ='), head.indexOf('\n// ---- 打开/关闭状态'))
   const copy = new Function(dictionary + '\nreturn copy')()
-  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/members.js', root), 'utf8')
+  const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/workflows.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/members.js', root), 'utf8')
   for (const [locale, expected] of [['zh', '计划金额（元） *'], ['en', 'Planned amount（CNY） *']]) {
     const harness = clientHarness(source, 'EntryPanel')
     const props = { year: 2026, orgs: [], departments: [], t: key => copy[locale][key] ?? key }

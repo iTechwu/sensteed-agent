@@ -43,6 +43,9 @@ overrides:
   # 纯满足解析器。
   '@deepseek-ai/dsh-invariants': 0.1.7-alpha.2
   app-builder-lib>@electron/get: 5.1.0
+  # yauzl 2's legacy stream destroy hook can leave extract-zip's pipeline
+  # pending forever on large deflated entries with current Node streams.
+  extract-zip>yauzl: 3.4.0
 
 supportedArchitectures:
   os:

@@ -7,6 +7,7 @@ settings:
 overrides:
   '@deepseek-ai/dsh-invariants': 0.1.7-alpha.2
   app-builder-lib>@electron/get: 5.1.0
+  extract-zip>yauzl: 3.4.0
 
 patchedDependencies:
   '@electron/universal@2.0.3': cdaf19c117b3d1a6c9cb7fcd18341d46202a452d4ed59792d901cb9957b24736
@@ -7635,7 +7636,7 @@ importers:
         version: link:../../../vendor/schemastery
       '@puppeteer/browsers':
         specifier: 3.2.2
-        version: 3.2.2(yauzl@2.10.0)
+        version: 3.2.2(yauzl@3.4.0)
       zod:
         specifier: 4.4.3
         version: 4.4.3
@@ -17995,7 +17996,7 @@ importers:
         version: 0.0.80
       '@puppeteer/browsers':
         specifier: 3.2.2
-        version: 3.2.2(yauzl@2.10.0)
+        version: 3.2.2(yauzl@3.4.0)
       '@standard-schema/spec':
         specifier: ^1.1.0
         version: 1.1.0
@@ -18362,6 +18363,9 @@ importers:
       '@deepseek-ai/dsh-client-ui-settings':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/client/ui-settings
+      '@deepseek-ai/dsh-client-ui-sidebar':
+        specifier: workspace:*
+        version: link:../deepseek-harness/packages/client/ui-sidebar
       '@deepseek-ai/dsh-client-ui-slots':
         specifier: workspace:*
         version: link:../deepseek-harness/packages/client/ui-slots
@@ -26169,9 +26173,6 @@ packages:
   fastq@1.20.1:
     resolution: {integrity: sha512-GGToxJ/w1x32s/D2EKND7kTil4n8OVk/9mycTc4VDza13lOvpUZTGX3mFSCtV9ksdGBVzvsyAVLM6mHFThxXxw==}
 
-  fd-slicer@1.1.0:
-    resolution: {integrity: sha512-cE1qsB/VwyQozZ+q1dGxR8LBYNZeofhEdUNGSMbQD3Gw2lAzX9Zb3uIU6Ebc/Fmyjo9AWWfnn0AUCHqtevs/8g==}
-
   fdir@6.5.0:
     resolution: {integrity: sha512-tIbYtZbucOs0BRGqPJkshJUYdL+SDH7dVM8gjy+ERp3WAUjLEFJE+02kanyHtwjWOnwrKYBiwAmM0p4kLJAnXg==}
     engines: {node: '>=12.0.0'}
@@ -29680,8 +29681,9 @@ packages:
     resolution: {integrity: sha512-9OpKOLeaoNFecEp7P6iYbzze/5CqWoH7N3SMs/6y1XF4nMvFMspEGZzJ6uFi9MmQwXhyzqYoSEKO3tvA3Z/o2w==}
     engines: {node: ^20.19.0 || ^22.12.0 || >=23}
 
-  yauzl@2.10.0:
-    resolution: {integrity: sha512-p4a9I6X6nu6IhoGmBqAcbJy1mlC4j27vEPZX9F4L4/vZT3Lyq1VkFHw/V/PUcB9Buo+DG3iHkT0x3Qya58zc3g==}
+  yauzl@3.4.0:
+    resolution: {integrity: sha512-jIH9yLR9wqr0wOS0TpBvo/g/2UgZH5qePVbjgRliiF0BYvOZyaBknKsF+x9Iht0O6sqgnB93rCICdOZFecJuDw==}
+    engines: {node: '>=12'}
 
   yocto-queue@0.1.0:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
@@ -36900,12 +36902,12 @@ snapshots:
 
   '@protobufjs/utf8@1.1.2': {}
 
-  '@puppeteer/browsers@3.2.2(yauzl@2.10.0)':
+  '@puppeteer/browsers@3.2.2(yauzl@3.4.0)':
     dependencies:
       modern-tar: 0.8.5
       yargs: 18.2.0
     optionalDependencies:
-      yauzl: 2.10.0
+      yauzl: 3.4.0
 
   '@quansync/fs@1.0.0':
     dependencies:
@@ -39623,7 +39625,7 @@ snapshots:
     dependencies:
       debug: 4.4.3(supports-color@9.4.0)
       get-stream: 5.2.0
-      yauzl: 2.10.0
+      yauzl: 3.4.0
     optionalDependencies:
       '@types/yauzl': 2.10.3
     transitivePeerDependencies:
@@ -39671,10 +39673,6 @@ snapshots:
   fastq@1.20.1:
     dependencies:
       reusify: 1.1.0
-
-  fd-slicer@1.1.0:
-    dependencies:
-      pend: 1.2.0
 
   fdir@6.5.0(picomatch@4.0.5):
     optionalDependencies:
@@ -43558,10 +43556,9 @@ snapshots:
       y18n: 5.0.8
       yargs-parser: 22.0.0
 
-  yauzl@2.10.0:
+  yauzl@3.4.0:
     dependencies:
-      buffer-crc32: 0.2.13
-      fd-slicer: 1.1.0
+      pend: 1.2.0
 
   yocto-queue@0.1.0: {}
 

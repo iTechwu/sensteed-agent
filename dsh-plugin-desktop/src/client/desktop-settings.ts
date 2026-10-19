@@ -86,6 +86,7 @@ export function applyDesktopSettings(
   ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section',
     id: 'desktop',
+    priority: -100,
     order: 100,
     label: () => t('nav'),
     locale: DESKTOP_SETTINGS_LOCALE_NAMESPACE,
