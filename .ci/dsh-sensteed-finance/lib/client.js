@@ -1155,6 +1155,7 @@ window.__ModuleLoader__.load({
     .sf-root{--sf-rose:var(--dsw-alias-state-error-primary);--sf-amber:var(--dsw-alias-state-warn-primary);--sf-green:var(--dsw-alias-state-success-primary);--sf-blue:var(--dsw-alias-state-business-primary);--sf-sky:var(--dsw-alias-state-business-primary);--sf-line:var(--dsw-alias-border-l1);--sf-line2:var(--dsw-alias-border-l2);--sf-bg:color-mix(in srgb,var(--dsw-alias-bg-layer-2) 45%,var(--dsw-alias-bg-base));--sf-card:var(--dsw-alias-bg-base);--sf-hover:var(--dsw-alias-bg-layer-2);--sf-ink:var(--dsw-alias-label-primary);--sf-ink2:var(--dsw-alias-label-secondary);--sf-ink3:var(--dsw-alias-label-tertiary);--sf-on-brand:var(--dsw-alias-label-primary-foreground)}
     /* 品牌轴对齐 datasource 网页端浅绿工作台（agentspace 系）；暗色皮肤提亮保持对比度 */
     .sf-root{--sf-brand:oklch(0.55 0.14 162)}[data-ds-dark-theme] .sf-root{--sf-brand:oklch(0.74 0.11 162)}
+    .sf-connection-page{box-sizing:border-box;min-height:100%;padding:32px;color:var(--sf-ink);background:var(--sf-bg);font-size:14px;line-height:1.6}.sf-connection-page h1{font-size:24px;margin:0 0 24px}.sf-connection-card{max-width:640px;padding:24px;border:1px solid var(--sf-line);border-radius:8px;background:var(--sf-card)}.sf-connection-card h2{font-size:18px;margin:0 0 8px}.sf-connection-card p{color:var(--sf-ink2);margin:0 0 20px}
     .sf-button{display:flex;width:36px;height:36px;align-items:center;justify-content:center;gap:8px;border:0;border-radius:6px;background:transparent;color:var(--sf-ink2);cursor:pointer}.sf-button:hover{background:var(--sf-hover);color:var(--sf-ink)}.sf-wide{width:100%;height:34px;justify-content:flex-start;padding:0 10px}.sf-wide span{font-size:13px}
     .sf-overlay{position:fixed;inset:0;z-index:510;background:var(--sf-bg);color:var(--sf-ink);font-size:13px}.sf-overlay.sf-page{position:relative;inset:auto;z-index:auto;width:100%;height:100%;min-height:0}.sf-shell{display:grid;grid-template-rows:auto auto 1fr;width:100%;height:100%;overflow:hidden}
     .sf-header{display:flex;min-height:72px;align-items:flex-end;justify-content:space-between;gap:18px;padding:14px 28px 16px;border-bottom:1px solid var(--sf-line);flex-wrap:wrap}.sf-header-main{min-width:0}.sf-eyebrow{margin:0 0 2px;color:var(--sf-ink3);font-size:11px;font-weight:650;letter-spacing:.06em;text-transform:uppercase}.sf-header h1{margin:0;font-size:20px;line-height:1.35;font-weight:650}.sf-desc{margin:2px 0 0;color:var(--sf-ink2);font-size:12.5px}.sf-header-side{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap}.sf-filter{display:grid;gap:4px}.sf-filter>span{color:var(--sf-ink3);font-size:11px}.sf-filter select{min-width:130px;height:30px;padding:4px 10px;border:1px solid var(--sf-line2);border-radius:6px;background:var(--sf-card);color:inherit;font:inherit;font-size:12.5px;cursor:pointer}.sf-header-buttons{display:flex;gap:6px}
@@ -7159,12 +7160,12 @@ window.__ModuleLoader__.load({
     function FinancePage(props) {
       const allowed = useFinanceWorkspaceAccess()
       const state = useSyncExternalStore(financeDesktopNavigation().subscribe, financeDesktopNavigation().getSnapshot, financeDesktopNavigation().getSnapshot)
-      return allowed === true ? h(Dashboard, { ...props, key: state.epoch }) : h('main', { className: 'sf-page' },
+      return allowed === true ? h(Dashboard, { ...props, key: state.epoch }) : h('main', { className: 'sf-root sf-connection-page' },
         h('h1', null, '财务管理'),
-        h('section', { className: 'sf-card', role: 'status', 'aria-live': 'polite' },
+        h('section', { className: 'sf-connection-card', role: 'status', 'aria-live': 'polite' },
           h('h2', null, state.status === 'unavailable' ? '暂时无法连接财务工作台' : '正在连接财务工作台'),
           h('p', null, allowed === false ? '当前账号无法访问财务工作台，请核对登录身份和授权。' : state.status === 'unavailable' ? '连接检查尚未成功。请确认网络后重试，已有数据不会因此被清除。' : '正在核对当前账号的访问权限…'),
-          h('button', { type: 'button', className: 'sf-button', onClick: () => window.dispatchEvent(new Event('sensteed:finance-retry')) }, '重新连接')))
+          h('button', { type: 'button', className: 'sf-btn', onClick: () => window.dispatchEvent(new Event('sensteed:finance-retry')) }, '重新连接')))
     }
 
     function Overlay({ t }) {
