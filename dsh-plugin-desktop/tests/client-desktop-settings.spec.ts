@@ -188,8 +188,8 @@ describe('Desktop settings API', () => {
   })
 
   it('names the section Desktop settings and describes browser opening as permission', () => {
-    expect(zh.nav).toBe('桌面设置')
-    expect(en.nav).toBe('Desktop settings')
+    expect(zh.nav).toBe('桌面')
+    expect(en.nav).toBe('Desktop')
     expect(Object.values(zh)).not.toContain('将在启动时创建')
     expect(Object.values(en)).not.toContain('Created when first started')
     expect(zh.openBrowser).toBe('允许在浏览器中打开')

@@ -9,6 +9,8 @@ export function installDesktopNavigationStyles(): () => void {
 .sensteedModuleRail { box-sizing:border-box; width:52px; flex:none; display:flex; flex-direction:column; align-items:center; padding:12px 6px 10px; border-right:1px solid var(--dsw-alias-border-l1); }
 .sensteedNavigationFrame[data-navigation-platform="darwin"] > .sensteedModuleRail { padding-top:52px; }
 .sensteedNavigationFrame[data-navigation-platform="win32"] > .sensteedModuleRail { padding-top:40px; }
+.sensteedModuleRail [role="tooltip"] { display:none !important; }
+.sensteedRailTooltip { position:fixed; z-index:10000; transform:translateY(-50%); pointer-events:none; max-width:min(280px,calc(100vw - 68px)); overflow-wrap:anywhere; padding:6px 10px; border-radius:7px; border:1px solid var(--dsw-alias-border-l1); background:var(--dsw-alias-bg-layer-2); color:var(--dsw-alias-label-primary); font-size:12px; }
 .sensteedModuleBrand { height:40px; display:grid; place-items:center; margin-bottom:10px; }
 .sensteedModuleBrand img { width:24px; height:24px; object-fit:contain; }
 .sensteedModuleScroll { width:40px; flex:1; min-height:0; overflow-y:auto; scrollbar-width:none; }
@@ -18,13 +20,17 @@ export function installDesktopNavigationStyles(): () => void {
 .sensteedModuleButton[aria-current="page"] { background:var(--dsw-alias-bg-layer-3,var(--dsw-alias-bg-layer-2)); color:var(--dsw-alias-label-primary); }
 .sensteedNavigationFrame button:focus-visible { outline:2px solid var(--dsw-alias-brand-primary); outline-offset:-2px; }
 .sensteedModuleFoot { width:40px; display:flex; flex-direction:column; align-items:center; gap:8px; padding-top:8px; }
+.sensteedKnowledgeModule { margin-bottom:8px; }
+.sensteedKnowledgeModule[data-active] button { background:var(--dsw-alias-bg-layer-2); color:var(--dsw-alias-label-primary); }
+.sensteedModuleExtensions:not(:has(button)) { display:none; }
 .sensteedModuleExtensions { margin-top:16px; padding-top:12px; border-top:1px solid var(--dsw-alias-border-l1); }
 .sensteedModuleRail [data-slot="sidebar.footer.action"] { max-height:none; overflow:visible; width:40px; margin:0; padding:0; gap:8px; }
 .sensteedModuleRail [data-slot="sidebar.footer.action"] button { box-sizing:border-box; width:40px; min-width:0; height:40px; margin:0; padding:0; border-radius:8px; }
 .sensteedModuleRail [data-slot="sidebar.settings"] { width:40px; }
 .sensteedModuleRail [data-slot="sidebar.settings"] > div:first-child { width:40px; }
 .sensteedModuleRail [data-slot="sidebar.settings"] button { max-width:40px; }
-.sensteedContextSidebar { box-sizing:border-box; height:100%; min-height:0; display:flex; flex-direction:column; padding:12px; background:var(--dsw-alias-bg-layer-1); }
+.sensteedModuleRail .dshSensteedUserSettingsTrigger .dshDofeAccessAvatar { width:26px; height:26px; }
+.sensteedContextSidebar { --dsh-sidebar-inline-padding:12px; box-sizing:border-box; height:100%; min-height:0; display:flex; flex-direction:column; padding:12px; background:var(--dsw-alias-bg-layer-1); }
 .sensteedContextSidebar[hidden],.sensteedContextHome[hidden] { display:none; }
 .sensteedContextHeader { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:0 0 12px 8px; }
 .sensteedContextHeader strong { font-size:16px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }

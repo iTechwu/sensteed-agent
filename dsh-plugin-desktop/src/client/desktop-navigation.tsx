@@ -17,7 +17,9 @@ export function applyDesktopNavigation(ctx: Context): void {
   if (ctx.slots.entries('sidebar').length > 0) return
   ctx.effect(installDesktopNavigationStyles, 'desktop: navigation styles')
   const panels = createSnapshotStore<readonly SidebarPanelMetadata[]>([])
+  const extensions = createSnapshotStore<readonly string[]>([])
   const refresh = (): void => {
+    extensions.set(ctx.slots.entriesOfSlot('sidebar.footer.action').flatMap(entry => entry.options.id ? [entry.options.id] : []))
     panels.set(ctx.slots.entriesOfSlot('sidebar.panellist').map(({ options }) => ({
       id: options.id as MainPanelId, label: resolveSlotLabel(options.label) ?? options.id ?? '', order: options.order ?? 0,
     })).sort((a, b) => a.order - b.order))
@@ -41,10 +43,43 @@ export function applyDesktopNavigation(ctx: Context): void {
         const zh = ctx.locale.getSnapshot().active.startsWith('zh')
         return key === 'session.new' || key === 'session.new.label' ? (zh ? '新聊天' : 'New chat') : key
       },
-      hooks: { panels, shortcuts: ctx.shortcuts.catalog },
+      hooks: { panels, extensions, shortcuts: ctx.shortcuts.catalog },
     }),
   }, DesktopNavigationSidebar as never))
   ctx.effect(() => ctx.slots.subscribe('sidebar.panellist', refresh), 'desktop: module registrations')
+  ctx.effect(() => ctx.slots.subscribe('sidebar.footer.action', refresh), 'desktop: extension registrations')
+  ctx.effect(() => ctx.slots.subscribe('main', () => {
+    const id = ctx.layout.panelInfo.getSnapshot().activePanelId
+    if (id !== null && !ctx.slots.entries('main').some(entry => entry.options.key === id)) ctx.layout.selectPanel(null)
+  }), 'desktop: unloaded module fallback')
   ctx.effect(() => ctx.locale.subscribe(refresh), 'desktop: module labels')
+  ctx.effect(() => {
+    let source: import('@deepseek-ai/dsh-client-ui-slots').StoredEntry | undefined
+    let remove: (() => void) | undefined
+    let updating = false
+    const sync = (): void => {
+      if (updating) return
+      const entry = ctx.slots.entries('sidebar.footer.action').find(row => row.options.id === 'dofe-sensteed-knowledge' && row.registrant !== 'desktop-knowledge-label')
+      if (entry === source) return
+      updating = true
+      try {
+        remove?.(); remove = undefined; source = entry
+        if (!entry) return
+        remove = ctx.slots.register({ name: 'sidebar.footer.action', id: 'dofe-sensteed-knowledge', priority: -100,
+          registrant: 'desktop-knowledge-label', order: entry.options.order ?? 45,
+          inject: () => {
+            const props = entry.inject?.() ?? {}
+            const original = props.t
+            return { ...props, t: (key: string) => key === 'open'
+              ? (ctx.locale.getSnapshot().active.startsWith('zh') ? '知识与记忆' : 'Knowledge & memory')
+              : typeof original === 'function' ? original(key) : key }
+          },
+        }, entry.component as never)
+      } finally { updating = false }
+    }
+    const off = ctx.slots.subscribe('sidebar.footer.action', sync)
+    sync()
+    return () => { off(); remove?.() }
+  }, 'desktop: knowledge navigation label')
   refresh()
 }

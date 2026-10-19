@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 
-export async function verifyProfileRenderer({ url, cookie, rendererHeader }) {
+export async function verifyProfileRenderer({ url, cookie, rendererHeader, twoLevelNavigation = false }) {
   const require = createRequire(new URL('../../deepseek-harness/apps/web/package.json', import.meta.url))
   const { chromium } = require('playwright')
   const browser = await chromium.launch({
@@ -39,6 +39,15 @@ export async function verifyProfileRenderer({ url, cookie, rendererHeader }) {
     ])
     await page.locator('[data-slot="main"]').first().waitFor({ state: 'attached', timeout: 5_000 })
     await page.locator('[data-slot="sidebar.workspaces"]').first().waitFor({ state: 'attached', timeout: 5_000 })
+    if (twoLevelNavigation) {
+      const rail = page.locator('.sensteedModuleRail')
+      await rail.waitFor({ state: 'visible' })
+      assert.equal(await rail.evaluate(element => element.getBoundingClientRect().width), 52)
+      assert.equal(await rail.locator('[data-slot="sidebar.settings"]').count(), 1)
+      assert.equal(await rail.locator('[data-slot="sidebar.workspaces"]').count(), 0)
+    } else {
+      assert.equal(await page.locator('.sensteedNavigationFrame').count(), 0)
+    }
   } catch (cause) {
     throw new Error(`Desktop renderer smoke failed: ${String(cause)}\n${errors.join('\n')}`, { cause })
   } finally {
