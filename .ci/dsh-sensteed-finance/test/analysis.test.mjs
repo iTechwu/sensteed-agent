@@ -36,11 +36,11 @@ function analysis(globals, navigator = {}, context = {}, translate = key => key)
   }
   const h = (type, props, ...children) => ({ type, props: props || {}, children: children.flat(Infinity).filter(Boolean) })
   function PrimaryButton() {}
-  const component = new Function('globalThis', 'navigator', 'h', 'useState', 'useRef', 'ANALYSIS_ENTRIES', 'PrimaryButton', 'Glyph', 'Notice', 'financeErrorText', `${view}\nreturn AnalyzeView`)(
+  const component = new Function('globalThis', 'navigator', 'h', 'useState', 'useRef', 'useSyncExternalStore', 'ANALYSIS_ENTRIES', 'PrimaryButton', 'Glyph', 'Notice', 'financeErrorText', `${view}\nreturn AnalyzeView`)(
     globals, navigator, h, useState, initial => {
       const [ref] = useState({ current: initial })
       return ref
-    }, entries, PrimaryButton, () => {}, () => {}, message => message,
+    }, (_subscribe, getSnapshot) => getSnapshot(), entries, PrimaryButton, () => {}, () => {}, message => message,
   )
   const props = { ctx: { year: '2026', orgId: 'org-a', orgs: [{ id: 'org-a', name: '主体甲' }], ...context }, t: translate }
   const nodes = node => node && typeof node === 'object' ? [node, ...node.children.flatMap(nodes)] : []
@@ -349,4 +349,48 @@ test('the operation keeps session ownership until asynchronous navigation has co
   })
   await analysis(globals).render()[0].props.onClick()
   assert.deepEqual(order, ['send', 'open', 'release'])
+})
+
+
+test('leaving and returning to analysis retains the accepted session and clears it after opening', async () => {
+  let created = 0, sends = 0, fail = true
+  const destinations = []
+  const { globals } = bridge({
+    create: async () => `persisted-${++created}`,
+    scope: () => ({ get: () => ({ send: async () => { sends++ } }) }),
+  }, {}, undefined, undefined, async id => { destinations.push(id); if (fail) throw new Error('offline') })
+  await analysis(globals).render()[0].props.onClick()
+  const returned = analysis(globals)
+  const buttons = returned.render()
+  const reopen = buttons.find(button => button.props['aria-label'] === 'analysisOpenSession')
+  assert.ok(reopen, 'a freshly mounted view offers the existing session')
+  assert.ok(buttons.filter(button => button !== reopen).every(button => button.props.disabled))
+  assert.ok(returned.tree().some(node => node.props.role === 'alert' && node.children.includes('analysisSentNotOpened')))
+  assert.equal(returned.tree().some(node => node.type === 'textarea'), false)
+  fail = false
+  await reopen.props.onClick()
+  assert.equal(created, 1)
+  assert.equal(sends, 1)
+  assert.deepEqual(destinations, ['persisted-1', 'persisted-1'])
+  assert.ok(analysis(globals).render().every(button => !button.props.disabled))
+})
+
+test('remounting during submission stays locked and bridge calls share the in-flight operation', async () => {
+  let finish, created = 0, sends = 0
+  const { globals } = bridge({
+    create: async () => `pending-${++created}`,
+    scope: () => ({ get: () => ({ send: async () => { sends++; await new Promise(resolve => { finish = resolve }) } }) }),
+  })
+  const first = analysis(globals).render()[0].props.onClick()
+  while (!finish) await new Promise(resolve => setImmediate(resolve))
+  const returned = analysis(globals)
+  assert.ok(returned.render().every(button => button.props.disabled))
+  await returned.render()[1].props.onClick()
+  const service = globals.__sensteed_finance_conversation()
+  const concurrent = service.send('/finance-cost-structure\nother request')
+  finish()
+  await Promise.all([first, concurrent])
+  assert.equal(created, 1)
+  assert.equal(sends, 1)
+  assert.ok(returned.render().every(button => !button.props.disabled))
 })

@@ -194,7 +194,28 @@ function apply(ctx) {
   // 深度分析入口走宿主 conversation 服务（由 desktop 宿主在浏览器侧注册）；
   // 通过惰性 getter 注入，避免插件客户端与宿主模块产生编译期耦合。
   ctx.effect(() => {
-    globalThis.__sensteed_finance_conversation = () => ({ async send(prompt) {
+    // Keep only operation state and a session receipt for this plugin lifetime.
+    // View navigation must not lose accepted work or create another in-flight request.
+    let state = { starting: false, submitted: null }
+    let operation = null
+    const listeners = new Set()
+    const publish = patch => { state = { ...state, ...patch }; for (const listener of listeners) listener() }
+    const conversationBridge = {
+      getSnapshot: () => state,
+      subscribe: listener => { listeners.add(listener); return () => listeners.delete(listener) },
+      send(prompt) {
+        if (operation) return operation
+        if (state.submitted) return Promise.resolve(state.submitted)
+        publish({ starting: true })
+        operation = Promise.resolve().then(() => submit(prompt)).finally(() => {
+          operation = null
+          publish({ starting: false })
+        })
+        return operation
+      },
+    }
+    globalThis.__sensteed_finance_conversation = () => conversationBridge
+    async function submit(prompt) {
       const sessions = ctx.get?.('sessions')
       const navigation = ctx.get?.('uiWorkspace')
       if (!sessions || !navigation) throw new Error('conversation_unavailable')
@@ -214,7 +235,11 @@ function apply(ctx) {
       const id = await sessions.create()
       // Retain until ready, catalog check and submission finish; an unknown /skill is plain prose to the Host.
       let accepted = false
-      let opened = false
+      const receipt = { sessionId: id, opened: false, open: async () => {
+        await navigation.openSession(id)
+        receipt.opened = true
+        publish({ submitted: null })
+      } }
       try { await sessions.using(id, { source: 'controllerOperation' }, async reference => {
         await reference.ready
         const scoped = sessions.scope(id)
@@ -228,16 +253,17 @@ function apply(ctx) {
         if (!conversation) throw new Error('conversation_service_unavailable')
         await conversation.send(prompt)
         accepted = true
+        publish({ submitted: receipt })
         // Transfer ownership to the visible session before releasing the operation reference.
-        try { await navigation.openSession(id); opened = true } catch {}
+        try { await receipt.open() } catch {}
       }) } catch (error) {
         // Once accepted, a reference cleanup failure must not offer to resend the same request.
         if (!accepted) throw error
       }
-      return { sessionId: id, opened, open: () => navigation.openSession(id) }
-    } })
+      return receipt
+    }
     globalThis.__sensteed_finance_close = closeOverlay
-    return () => { delete globalThis.__sensteed_finance_conversation; delete globalThis.__sensteed_finance_close }
+    return () => { listeners.clear(); delete globalThis.__sensteed_finance_conversation; delete globalThis.__sensteed_finance_close }
   }, 'dofe-sensteed-finance: scoped conversation')
   const t = ctx.locale.bind(NS)
   ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({ name: 'sidebar.footer.action', id: 'dofe-sensteed-finance', order: 56, inject: () => ({ t, onOpen: () => ctx.layout.selectPanel('sensteed-finance') }) }, Button))

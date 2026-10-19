@@ -93,19 +93,28 @@ function FinanceInlineAssistant({ ctx }) {
       answer.sources.length ? h('small', null, `来源：${answer.sources.join('、')}`) : null) : h('p', null, errors.length === 3 ? '财务数据暂时无法读取，请重试后再提问。' : '从已治理的财务数据开始提问，支持预算、收支、资金和数据质量问题。'))
 }
 
+const idleAnalysisOperation = { starting: false, submitted: null }
+const subscribeIdleAnalysis = () => () => {}
+const getIdleAnalysis = () => idleAnalysisOperation
+
 function AnalyzeView({ ctx, t }) {
   const { year, orgId, orgs } = ctx
   const [notice, setNotice] = useState(null)
   const [starting, setStarting] = useState(null)
   const [recovery, setRecovery] = useState(null)
-  const [submitted, setSubmitted] = useState(null)
+  const [localSubmitted, setSubmitted] = useState(null)
+  const bridge = globalThis.__sensteed_finance_conversation?.()
+  const operation = useSyncExternalStore(bridge?.subscribe || subscribeIdleAnalysis, bridge?.getSnapshot || getIdleAnalysis, getIdleAnalysis)
+  const submitted = localSubmitted || operation.submitted
+  const busy = starting !== null || operation.starting
   const startingRef = useRef(false)
-  const submittedRef = useRef(null)
+  const submittedRef = useRef(submitted)
+  submittedRef.current = submitted
   const recordSubmitted = receipt => { submittedRef.current = receipt; setSubmitted(receipt) }
   const orgName = (orgs || []).find(org => org.id === orgId)?.name
   const scopeName = orgId ? `${orgName || t('analysisOrgPending')} (${orgId})` : t('analysisAllAuthorized')
   const startAnalysis = async entry => {
-    if (startingRef.current || submittedRef.current) return
+    if (startingRef.current || bridge?.getSnapshot?.().starting || submittedRef.current) return
     startingRef.current = true
     setStarting(entry.id)
     setNotice(null)
@@ -125,12 +134,12 @@ function AnalyzeView({ ctx, t }) {
     h(FinanceInlineAssistant, { key: `${year}-${orgId}`, ctx }),
     h('h2', null, '新会话深度分析'),
     h('p', { className: 'sf-note' }, t('analyzeHint')),
-    notice ? h('p', { className: 'sf-notice', role: recovery || submitted ? 'alert' : 'status' }, notice) : null,
-    submitted ? h('div', null, h(PrimaryButton, { onClick: reopenSubmitted, disabled: starting !== null, busy: starting === 'reopen', 'aria-label': t('analysisOpenSession') }, t('analysisOpenSession'))) : null,
+    notice || submitted || operation.starting ? h('p', { className: 'sf-notice', role: recovery || submitted ? 'alert' : 'status' }, notice || t(submitted ? 'analysisSentNotOpened' : 'analysisStarting')) : null,
+    submitted ? h('div', null, h(PrimaryButton, { onClick: reopenSubmitted, disabled: busy, busy: starting === 'reopen', 'aria-label': t('analysisOpenSession') }, t('analysisOpenSession'))) : null,
     recovery ? h('label', { className: 'sf-form-row' }, h('span', null, t('analysisPromptLabel')), h('textarea', { readOnly: true, rows: 6, value: recovery, 'aria-label': t('analysisPromptLabel') })) : null,
     h('div', { className: 'sf-analysis-grid' }, ...ANALYSIS_ENTRIES.map(entry => h('article', { className: 'sf-card sf-analysis-card', key: entry.id },
       h('div', { className: 'sf-analysis-head' }, h(Glyph, { name: entry.icon, size: 15 }), h('h2', null, t(`analysis_${entry.id}`))),
       h('p', null, t(`analysis_${entry.id}_desc`)),
-      h('div', null, h(PrimaryButton, { busy: starting === entry.id, disabled: starting !== null || Boolean(submitted), onClick: () => startAnalysis(entry), 'aria-label': `${t(`analysis_${entry.id}`)}：${t('send')}` }, h(Glyph, { name: 'send', size: 12 }), t(starting === entry.id ? 'analysisStarting' : 'send')))))),
+      h('div', null, h(PrimaryButton, { busy: starting === entry.id, disabled: busy || Boolean(submitted), onClick: () => startAnalysis(entry), 'aria-label': `${t(`analysis_${entry.id}`)}：${t('send')}` }, h(Glyph, { name: 'send', size: 12 }), t(starting === entry.id ? 'analysisStarting' : 'send')))))),
     h('p', { className: 'sf-note' }, t('analyzingNote')))
 }

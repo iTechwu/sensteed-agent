@@ -20,6 +20,7 @@ const sessions = {
   scope: id => ({ get: name => name === 'conversation' ? { send: async prompt => {
     if (fixture.sendMode === 'rejected') throw new Error('synthetic transport rejection')
     fixture.sent.push({ id, prompt })
+    if (fixture.sendMode === 'pending') await new Promise(resolve => { fixture.finishSend = resolve })
   } } : undefined }),
 }
 const skills = { list: async ({ sessionId }) => {
