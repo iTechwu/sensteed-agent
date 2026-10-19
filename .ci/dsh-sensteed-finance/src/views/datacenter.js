@@ -92,7 +92,7 @@ function DataCenterView({ ctx, t }) {
 
   return h('div', { className: 'sf-view' },
     h(FinanceDataAssets, { ctx }),
-    h(Card, { title: '数据流转与追溯' }, h('p', { className: 'sf-note' }, '数据资产 → 采集来源 → 暂存记录 → 核对发布 → 正式事实。来源采集成功不代表已发布，正式预算事实从预算执行查看。'), h('div', { className: 'sf-row' }, h(GhostButton, { onClick: () => ctx.onNavigate('sources', { year: String(new Date().getFullYear()) }) }, '查看来源暂存'), h(GhostButton, { onClick: () => ctx.onNavigate('facts', { year: String(new Date().getFullYear()) }) }, '核对发布与正式事实'))),
+    h(Card, { title: '数据流转与追溯' }, h('p', { className: 'sf-note' }, '数据资产 → 采集来源 → 暂存记录 → 核对发布 → 正式事实。来源采集成功不代表已发布，正式预算事实从预算执行查看。'), h('div', { className: 'sf-row' }, h(GhostButton, { onClick: () => ctx.onNavigate('sources', { year: String(ctx.year) }) }, '查看来源暂存'), h(GhostButton, { onClick: () => ctx.onNavigate('facts', { year: String(ctx.year) }) }, '核对发布与正式事实'))),
     notice ? h(Notice, null, notice) : null,
     loadState === 'loading' ? h('div', { className: 'sf-loading', role: 'status' }, h(Glyph, { name: 'loading' }), t('dataCenterLoading')) : null,
     loadState === 'error' ? h('div', { className: 'sf-fatal', role: 'alert' }, h('strong', null, t('dataCenterFailed')), h('p', { className: 'sf-note' }, t('loadPartial')), h(GhostButton, { onClick: load }, t('dataCenterRetry'))) : null,

@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
-const source = (await Promise.all(['src/format.js', 'src/views/cash-evidence.js'].map(file => readFile(new URL('../' + file, import.meta.url), 'utf8')))).join('\n')
+const guardSource = 'let financeNavigationGlobal = null' + (await readFile(new URL('../src/workflows.js', import.meta.url), 'utf8')).split('let financeNavigationGlobal = null')[1].split('function FinanceFormDialog')[0]
+const source = guardSource + '\n' + (await Promise.all(['src/format.js', 'src/views/cash-evidence.js'].map(file => readFile(new URL('../' + file, import.meta.url), 'utf8')))).join('\n')
 
 function harness({ api = async () => ({ data: { list: [], total: 0, limit: 20 } }), post = async () => ({ data: {} }) } = {}) {
   const values = [], refs = [], effects = []
@@ -12,7 +13,7 @@ function harness({ api = async () => ({ data: { list: [], total: 0, limit: 20 } 
   const useEffect = (effect, deps) => { const i = effectCursor++, key = JSON.stringify(deps); if (effects[i]?.key !== key) { effects[i]?.cleanup?.(); effects[i] = { key, cleanup: effect() } } }
   const h = (type, props, ...children) => ({ type, props: props || {}, children: children.flat(Infinity) })
   const components = Object.fromEntries(['Dialog', 'GhostButton', 'PrimaryButton', 'FormRow', 'Field', 'Textarea', 'LinkButton', 'Table', 'Pager', 'Card', 'Select', 'SearchSelect', 'Notice'].map(name => [name, name]))
-  const ui = new Function('h', 'useState', 'useRef', 'useEffect', 'api', 'post', ...Object.keys(components), source + '\nreturn { CashSettlementsSection, CashAccuracyView, CashAccuracyPeriod, CashAccuracySourceForms, financeSettlementBody, financeEvidenceAmount, financeBeijingInstant }')(h, useState, useRef, useEffect, api, post, ...Object.values(components))
+  const ui = new Function('React', 'window', 'document', 'requestAnimationFrame', 'useMemo', 'h', 'useState', 'useRef', 'useEffect', 'api', 'post', ...Object.keys(components), source + '\nreturn { CashSettlementsSection, CashAccuracyView, CashAccuracyPeriod, CashAccuracySourceForms, financeSettlementBody, financeEvidenceAmount, financeBeijingInstant }')({ createContext: () => ({}), useContext: () => null }, { addEventListener() {}, removeEventListener() {} }, { activeElement: null }, cb => cb(), cb => cb(), h, useState, useRef, useEffect, api, post, ...Object.values(components))
   return { ui, render: (name, props) => { cursor = refCursor = effectCursor = 0; return ui[name]({ t: key => key, ...props }) }, settle: () => new Promise(resolve => setImmediate(resolve)) }
 }
 const nodes = tree => tree && typeof tree === 'object' ? [tree, ...(tree.children || []).flatMap(nodes)] : []
@@ -83,7 +84,7 @@ test('settlement registration requires the attestation, converts time, resets on
   assert.equal(writes[1].body.occurredAt, '2026-10-17T04:00:00.000Z')
   tree = h.render('CashSettlementsSection', props)
   assert.equal(fields(tree)[0].props.value, '', 'success resets the transaction id')
-  assert.equal(fields(tree)[8].props.value, '回单已核对', 'success keeps the note like the web')
+  assert.equal(fields(tree)[8].props.value, '', 'success clears the previous transaction evidence like the web')
 })
 
 test('settlement JSON import enforces size, plan/direction match and success notice', async () => {
@@ -175,4 +176,31 @@ test('accuracy source forms gate capture, snapshot upload and rule confirmation'
   assert.equal(ruleWrite.body.excludeCancelled, true)
   assert.equal(ruleWrite.body.excludeDeferred, false)
   assert.equal(ruleWrite.body.tolerance, '0.01')
+})
+
+test('settlement file preserves the public voucher source and amount split instead of form aliases', () => {
+  const { ui } = harness()
+  const parsed = ui.financeSettlementBody(key => key, { direction: 'PAYMENT', planId: 'p', sourceSystem: 'BANK', sourceId: 'b1', sourceRef: '回单', occurredAt: '2026-10-19T00:00:00Z', currency: 'CNY', amount: '100', cashAmount: '60', acceptanceAmount: '40', processNo: 'FLOW-9', note: '已核对' })
+  assert.equal(parsed.body.sourceSystem, 'BANK')
+  assert.equal(parsed.body.cashAmount, '60')
+  assert.equal(parsed.body.acceptanceAmount, '40')
+  assert.equal(parsed.body.processNo, 'FLOW-9')
+})
+
+test('settlement pending state visibly locks the form and prevents duplicate registration', async () => {
+  let finish, writes = 0
+  const h = harness({ post: async () => { writes++; await new Promise(resolve => { finish = resolve }); return {} } })
+  const props = { planId: 'p', direction: 'PAYMENT', ctx }
+  let tree = h.render('CashSettlementsSection', props)
+  const values = ['TX-1', '2026-10-19T12:00', '100', 'CNY', '60', '40', 'FLOW-1', '回单', '已核对']
+  fields(tree).forEach((field, i) => field.props.onChange(values[i]))
+  tree = h.render('CashSettlementsSection', props); check(tree, 0); tree = h.render('CashSettlementsSection', props)
+  const submit = primaryButtons(tree).find(node => String(node.children).includes('settlementRegister'))
+  const pending = submit.props.onClick(); submit.props.onClick()
+  tree = h.render('CashSettlementsSection', props)
+  assert.equal(writes, 1)
+  assert.equal(nodes(tree).find(node => node.type === 'fieldset').props.disabled, true)
+  finish(); await pending
+  tree = h.render('CashSettlementsSection', props)
+  assert.equal(nodes(tree).find(node => node.type === 'fieldset').props.disabled, false)
 })

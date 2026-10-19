@@ -6,7 +6,7 @@ const FINANCE_NAVIGATION = [
   ['资金管理', [['cash', '资金分析', 'cash']]],
   ['经营分析', [['operations', '经营分析', 'operations']]],
   ['数据与异常', [['datacenter', '数据中心', 'datacenter'], ['costitems', '费用类别', 'costitems'], ['sources', '来源记录', 'sources'], ['facts', '已发布事实', 'facts'], ['alerts', '预警中心', 'alerts']]],
-  ['财务处理', [['review', '审核队列', 'review'], ['entry', '财务代录', 'entry'], ['filing-activities', '填报活动', 'filing', { section: 'tasks' }]]],
+  ['财务处理', [['filing-activities', '填报活动', 'filing', { section: 'tasks' }], ['review', '审核队列', 'review'], ['entry', '财务代录', 'entry']]],
   ['身份与权限', [['identity-members', '成员与角色', 'identity', { directorySection: 'members' }], ['identity-directory', '组织通讯录', 'identity', { directorySection: 'directory' }], ['identity-employment', '部门归属', 'identity', { directorySection: 'employment' }], ['permissions', '功能与数据授权', 'permissions']]],
   ['更多工具', [['bom', '成本工程', 'bom'], ['analyze', 'AI 财务助手', 'analyze'], ['notifications', '通知中心', 'notifications']]],
 ]
@@ -77,6 +77,7 @@ function financeBusinessDestination(path) {
     if (legacy) route = ['comparisons', { mode: legacy }]
   }
   if (!route) return null
+  if (route[0] === 'filing' && url.searchParams.has('task') && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(url.searchParams.get('task')?.trim() || '')) return null
   const params = { ...route[1] }
   if (pathname === '/budget' && route[0] === 'budget') {
     for (const [query, key] of [['orgs', 'orgIds'], ['depts', 'departmentIds'], ['expenses', 'expenseTypes'], ['months', 'months']]) {
@@ -133,7 +134,7 @@ function financeBusinessDestination(path) {
   const year = url.searchParams.get('year')
   if (year && /^\d{4}$/.test(year) && Number(year) >= 2000 && Number(year) <= 2100) params.year = year
   for (const [query, key] of [['org', 'orgId'], ['task', 'taskId']]) {
-    const value = url.searchParams.get(query)
+    const value = url.searchParams.get(query)?.trim()
     if (value && /^[a-zA-Z0-9_-]{1,100}$/.test(value) && value !== 'primary') params[key] = value
   }
   if (params.orgId === 'all') params.orgId = ''

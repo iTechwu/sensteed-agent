@@ -19,6 +19,7 @@ function BudgetFilingExcel({ card, costItems, onRefresh }) {
   const [file, setFile] = useState(null), [preview, setPreview] = useState(null)
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [message, setMessage] = useState('')
   const lock = useRef(false)
+  useFinanceNavigationEntry(Boolean(preview), () => lock.current, () => { setPreview(null); setFile(null) })
   const ready = !card.configurationRequired || (card.configurationImported && card.expenseMappings?.length > 0)
   const run = async action => {
     if (lock.current) return
@@ -63,10 +64,16 @@ function BudgetFilingExcel({ card, costItems, onRefresh }) {
           h(GhostButton, { disabled: busy, onClick: () => { setPreview(null); setFile(null) } }, '取消预览'))) : null)
 }
 
-function FilingExcelDraft({ assignmentId, disabled, onBusyChange, onApply }) {
+function FilingExcelDraft({ assignmentId, disabled, onBusyChange, onApply, hasExistingRows = false }) {
   const [preview, setPreview] = useState(null)
   const [busy, setBusy] = useState(false), [error, setError] = useState('')
   const lock = useRef(false)
+  const [replacing, setReplacing] = useState(false)
+  useFinanceNavigationEntry(Boolean(preview), () => lock.current, () => { setPreview(null); setReplacing(false) })
+  const apply = () => {
+    if (disabled || lock.current || !preview || !preview.rows.length || preview.errors.length) return
+    onApply(preview.rows); setPreview(null); setReplacing(false)
+  }
   const run = async operation => {
     if (lock.current || disabled) return
     lock.current = true; setBusy(true); onBusyChange?.(true); setError('')
@@ -77,12 +84,14 @@ function FilingExcelDraft({ assignmentId, disabled, onBusyChange, onApply }) {
     h('p', { className: 'sf-note' }, 'Excel 先预览，再替换当前编辑内容；暂存或提交后才会保存，不直接写入正式数据。'),
     h('div', { className: 'sf-row' },
       h(GhostButton, { disabled: disabled || busy, onClick: () => run(async () => { const result = await financeRest(`/finance/filing/assignments/${assignmentId}/excel-template`, 'POST', {}); financeDownloadBudgetTemplate(result.data) }) }, '下载填报 Excel 模板'),
-      h(FormRow, { label: '选择填报 Excel 并预览' }, h('input', { type: 'file', accept: '.xlsx', 'aria-label': '选择填报 Excel 并预览', disabled: disabled || busy, onChange: event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void run(async () => { setPreview(null); const body = await financeBudgetExcelFile(file); const result = await financeRest(`/finance/filing/assignments/${assignmentId}/excel-preview`, 'POST', body); setPreview(result.data) }) } }))),
+      h(FormRow, { label: '选择填报 Excel 并预览' }, h('input', { type: 'file', accept: '.xlsx', 'aria-label': '选择填报 Excel 并预览', disabled: disabled || busy, onChange: event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void run(async () => { setPreview(null); setReplacing(false); const body = await financeBudgetExcelFile(file); const result = await financeRest(`/finance/filing/assignments/${assignmentId}/excel-preview`, 'POST', body); setPreview(result.data) }) } }))),
     error ? h('p', { role: 'alert' }, error) : null,
     preview ? h('div', { className: 'sf-stack' },
       h('p', null, `预览 ${preview.rows.length} 条 · 合计 ${formatNumber(preview.totalAmount)} 元`),
       ...(preview.errors || []).map(item => h('p', { key: item.row, role: 'alert' }, `第 ${item.row} 行：${item.message}`)),
       h(Table, { tableId: 'filing-excel-preview', rows: preview.rows.slice(0, 20), columns: financeColumns([['month', '月份'], ['plannedAmount', '金额（元）'], ['description', '编制说明']]), empty: '暂无可导入内容' }),
       preview.rows.length > 20 ? h('p', { className: 'sf-note' }, `当前预览前 20 条，确认后载入全部 ${preview.rows.length} 条。`) : null,
-      h(PrimaryButton, { disabled: disabled || busy || !preview.rows.length || preview.errors.length > 0, onClick: () => { onApply(preview.rows); setPreview(null) } }, '确认替换当前编辑内容')) : null)
+      h(PrimaryButton, { disabled: disabled || busy || !preview.rows.length || preview.errors.length > 0, onClick: () => { if (hasExistingRows) setReplacing(true); else apply() } }, `替换当前编辑行（${preview.rows.length} 行）`),
+      replacing ? h('div', { role: 'alert', className: 'sf-inline-form sf-stack' }, h('p', null, `替换会清空当前编辑行，改用 Excel 的 ${preview.rows.length} 行。尚未保存到服务器。`), h(GhostButton, { disabled: disabled || busy, onClick: () => setReplacing(false) }, '保留当前编辑行'), h(PrimaryButton, { disabled: disabled || busy, onClick: apply }, '确认替换当前编辑行')) : null,
+      h(GhostButton, { disabled: disabled || busy, onClick: () => { setPreview(null); setReplacing(false) } }, '取消预览')) : null)
 }
