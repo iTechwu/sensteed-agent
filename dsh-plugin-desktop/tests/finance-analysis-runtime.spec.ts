@@ -68,11 +68,13 @@ describe('default finance skills at the Host step boundary', () => {
       if (decision.kind !== 'enter') return
       const injections = decision.messages.filter(message => message.source.kind === 'skill-invocation')
       expect(injections).toHaveLength(1)
-      expect(injections[0].source).toMatchObject({ kind: 'skill-invocation', name: entry.skill })
+      const injection = injections[0], original = decision.messages[0]
+      if (!injection || !original) throw new Error('Expected the skill injection and original user message')
+      expect(injection.source).toMatchObject({ kind: 'skill-invocation', name: entry.skill })
       const expected = (await readFile(join(skillsRoot, entry.skill, 'SKILL.md'), 'utf8')).replace(/^---[\s\S]*?\n---\s*/, '').trim()
-      expect(injections[0].content[0]).toMatchObject({ type: 'text', text: expect.stringContaining(expected) })
-      expect(decision.messages[0].content[0]).toMatchObject({ type: 'text', text: prompt })
-      expect(decision.messages.at(-1)).toBe(injections[0])
+      expect(injection.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining(expected) })
+      expect(original.content[0]).toMatchObject({ type: 'text', text: prompt })
+      expect(decision.messages.at(-1)).toBe(injection)
     })
   })
 
