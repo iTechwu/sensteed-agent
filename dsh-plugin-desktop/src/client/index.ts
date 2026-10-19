@@ -1,3 +1,4 @@
+import { applyDesktopNavigation } from './desktop-navigation.tsx'
 import { installUiDiagnostics } from './ui-diagnostics.ts'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -173,6 +174,9 @@ export function apply(ctx: ClientContext): void {
   }
   if (environment.mode === 'advanced') applyAdvancedShell(ctx, environment)
   if (environment.mode === 'extended') applyExtendedShell(ctx, environment, desktopSettings)
+  if (environment.mode !== 'compatibility') ctx.inject(['layout', 'uiWorkspace', 'shortcuts'], scope => {
+    applyDesktopNavigation(scope)
+  })
   // Scoped rather than module-level on purpose: the shells above provide
   // `layout`, and upstream's `uiWorkspace` injects it. Naming `uiWorkspace` in
   // the module-level inject list would deadlock the two against each other.
