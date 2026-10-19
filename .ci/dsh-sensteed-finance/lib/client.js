@@ -309,6 +309,7 @@ window.__ModuleLoader__.load({
           emit({ status: 'ready', items: items.map(({ id, label, group }) => ({ id, label, ...(group ? { group } : {}) })), activeId })
         },
         clearSource() { select = null; leave = null; emit({ status: state.status === 'denied' ? 'denied' : 'loading', items: [], activeId: null }) },
+        unavailable() { if (state.status !== 'ready' && state.status !== 'denied') emit({ status: 'unavailable' }) },
         resume() { if (state.status === 'denied') emit({ status: 'loading' }) },
         select(id) { if (state.status !== 'ready' || !state.items.some(item => item.id === id) || !select) return false; select(id); return true },
         leave(action) { if (leave) leave(action); else action() },
@@ -332,7 +333,7 @@ window.__ModuleLoader__.load({
                 if (!response.ok || body.allowed !== true) throw new Error('access_unavailable')
                 if (onScope) onScope(body.scopeId); else bridge.adoptScope(body.scopeId)
                 bridge.resume(); setAllowed(true)
-              } catch { /* Transient outages retain the last confirmed same-identity permission. */ }
+              } catch { if (!disposed && generation === epoch) bridge.unavailable() }
               finally { pending = false; if (!disposed) timer = setTimeout(check, generation !== epoch ? 0 : 15000) }
             }
             const reset = () => { setAllowed(null); void check() }
@@ -356,11 +357,12 @@ window.__ModuleLoader__.load({
           const current = React.useSyncExternalStore(bridge.subscribe, bridge.getSnapshot, bridge.getSnapshot)
           const menu = React.useRef(null)
           React.useEffect(() => bridge.attach(), [])
+          React.useEffect(() => { if (current.status !== 'loading') return; const timer = setTimeout(() => bridge.unavailable(), 10000); return () => clearTimeout(timer) }, [current.status])
           React.useEffect(() => { if (menu.current) menu.current.scrollTop = menuScroll }, [current.status])
           React.useEffect(() => registerLeaveGuard(action => bridge.leave(action)), [registerLeaveGuard])
           React.useEffect(() => { if (current.status === 'denied') onAccessDenied() }, [current.status, onAccessDenied])
           const h = React.createElement
-          if (current.status !== 'ready') return h('p', { role: 'status', className: 'sensteedBusinessNavigationStatus' }, current.status === 'denied' ? '当前模块不可访问' : '正在加载导航…')
+          if (current.status !== 'ready') return h('p', { role: 'status', className: 'sensteedBusinessNavigationStatus' }, current.status === 'denied' ? '当前模块不可访问' : current.status === 'unavailable' ? '暂时无法加载导航，请在工作区重新连接。' : '正在加载导航…')
           let group
           return h('nav', { ref: menu, onScroll: event => { menuScroll = event.currentTarget.scrollTop }, className: 'sensteedBusinessNavigation', 'aria-label': '业务导航' }, ...current.items.flatMap(item => {
             const heading = item.group && item.group !== group ? h('h3', { key: `group-${item.group}` }, item.group) : null
@@ -7157,7 +7159,12 @@ window.__ModuleLoader__.load({
     function FinancePage(props) {
       const allowed = useFinanceWorkspaceAccess()
       const state = useSyncExternalStore(financeDesktopNavigation().subscribe, financeDesktopNavigation().getSnapshot, financeDesktopNavigation().getSnapshot)
-      return allowed === true ? h(Dashboard, { ...props, key: state.epoch }) : null
+      return allowed === true ? h(Dashboard, { ...props, key: state.epoch }) : h('main', { className: 'sf-page' },
+        h('h1', null, '财务管理'),
+        h('section', { className: 'sf-card', role: 'status', 'aria-live': 'polite' },
+          h('h2', null, state.status === 'unavailable' ? '暂时无法连接财务工作台' : '正在连接财务工作台'),
+          h('p', null, allowed === false ? '当前账号无法访问财务工作台，请核对登录身份和授权。' : state.status === 'unavailable' ? '连接检查尚未成功。请确认网络后重试，已有数据不会因此被清除。' : '正在核对当前账号的访问权限…'),
+          h('button', { type: 'button', className: 'sf-button', onClick: () => window.dispatchEvent(new Event('sensteed:finance-retry')) }, '重新连接')))
     }
 
     function Overlay({ t }) {
@@ -7201,7 +7208,7 @@ window.__ModuleLoader__.load({
               if (body.allowed) financeDesktopNavigation().resume()
               if (body.allowed) nextCheckMs = 60000
             }
-          } catch { if (generation !== financeDesktopNavigation().epoch) setAllowed(null) }
+          } catch { if (generation !== financeDesktopNavigation().epoch) setAllowed(null); else if (!cancelled) financeDesktopNavigation().unavailable() }
           finally {
             checking = false
             if (!cancelled) timer = setTimeout(() => { void check() }, generation !== financeDesktopNavigation().epoch ? 0 : nextCheckMs)
@@ -7212,6 +7219,7 @@ window.__ModuleLoader__.load({
         refresh()
         window.addEventListener('focus', refresh)
         window.addEventListener('online', refresh)
+        window.addEventListener('sensteed:finance-retry', refresh)
         window.addEventListener('sensteed:identity-changed', refresh)
         document.addEventListener('visibilitychange', onVisible)
         return () => {
@@ -7220,6 +7228,7 @@ window.__ModuleLoader__.load({
           controller.abort()
           window.removeEventListener('focus', refresh)
           window.removeEventListener('online', refresh)
+          window.removeEventListener('sensteed:finance-retry', refresh)
           window.removeEventListener('sensteed:identity-changed', refresh)
           document.removeEventListener('visibilitychange', onVisible)
         }
