@@ -5,7 +5,7 @@ import vm from 'node:vm'
 
 const shell = await readFile(new URL('../src/shell.js', import.meta.url), 'utf8')
 function load(extra = {}) {
-  return vm.runInNewContext(`${shell}; if (testUseLoad) useLoad = testUseLoad; ({ loadSupplierOptions: typeof loadSupplierOptions === 'function' ? loadSupplierOptions : undefined, Suppliers, Weekly, Loading })`, {
+  return vm.runInNewContext(`${shell}; if (testUseLoad) useLoad = testUseLoad; ({ loadSupplierOptions: typeof loadSupplierOptions === 'function' ? loadSupplierOptions : undefined, Suppliers, Weekly, Loading, Business, Status, setSelected })`, {
     exports: {},
     fmt: value => value || '时间未记录',
     React: { Fragment: 'fragment' },
@@ -68,9 +68,9 @@ test('supplier option failure keeps weekly history visible and existing plan sco
   const nodes = node => node && typeof node === 'object' ? [node, ...(node.children || []).flat(Infinity).flatMap(nodes)] : []
   const all = nodes(tree)
   assert.ok(all.some(node => node.children?.includes('暂无已生成周报。')))
-  const select = all.find(node => node.type === 'select')
-  assert.equal(select.props.disabled, true)
-  assert.deepEqual(Array.from(select.props.value), ['saved-supplier'])
+  const picker = all.find(node => node.type === 'fieldset')
+  assert.equal(picker.props.disabled, true)
+  assert.match(textOf(tree), /原选择仍保留/)
 })
 
 test('failed reads render an error instead of an empty-data message', () => {
@@ -78,4 +78,41 @@ test('failed reads render an error instead of an empty-data message', () => {
   const node = Loading({ state: { loading: false, data: null, error: '供应链服务暂不可用。' } })
   assert.equal(node.props.role, 'alert')
   assert.equal(node.children[0], '供应链服务暂不可用。')
+})
+
+const textOf = node => typeof node === 'string' ? node : Array.isArray(node) ? node.map(textOf).join(' ') : node?.children?.map(textOf).join(' ') || ''
+
+test('supplier selection retains its human name and clears evidence from another supplier', () => {
+  const globals = { selectedSupplier: '', selectedSupplierName: '', selectedEvidence: 'old', selectedEvidenceKind: 'media', selectedEvidenceEventId: 'event' }
+  const context = vm.createContext({ ...globals, exports: {} })
+  vm.runInContext(`${shell}; setSelected('new', '供应商甲')`, context)
+  assert.equal(context.selectedSupplierName, '供应商甲')
+  assert.equal(context.selectedEvidence, '')
+})
+
+test('review and execution states use understandable Chinese labels', () => {
+  const { Status } = load()
+  for (const [value, label] of [['REJECTED', '已排除'], ['STALE', '需重新评估'], ['running', '处理中'], ['failed', '失败']]) {
+    assert.equal(textOf(Status({ value })), label)
+  }
+})
+
+
+test('background save keeps the draft base version after a refresh and strips client metadata', async () => {
+  let sent
+  const { Business } = load({
+    selectedSupplier: 's1', selectedSupplierName: '供应商甲', selectedEvidence: '', selectedEvidenceKind: '',
+    useLoad: () => ({ loading: false, data: [{ version: 5, context: { fields: {} } }, { total: 0, items: [] }, []] }),
+    useRemembered: (key, initial) => [key === 'business-form:s1' ? { _baseVersion: 2, criticalMaterials: '物料甲，物料乙', inventoryDays: '' } : initial, () => {}],
+    api: async (_action, args) => { sent = args; return { version: 3 } },
+    crypto: { randomUUID: () => 'fixture-idempotency' },
+    window: { dispatchEvent() {} }, CustomEvent: class {},
+  })
+  const tree = Business({ revision: 1, setError() {}, onScopeReady: true })
+  const find = node => node?.type === 'form' ? node : (node?.children || []).flat(Infinity).map(find).find(Boolean)
+  await find(tree).props.onSubmit({ preventDefault() {} })
+  assert.equal(sent.expectedVersion, 2)
+  assert.ok(!Object.hasOwn(sent.fields, '_baseVersion'))
+  assert.deepEqual(Array.from(sent.fields.criticalMaterials), ['物料甲', '物料乙'])
+  assert.equal(sent.fields.inventoryDays, null)
 })

@@ -38,6 +38,7 @@ function clientHarness(source, componentName, overrides = {}) {
     window: { innerWidth: 1024, innerHeight: 768, addEventListener() {}, removeEventListener() {} },
     requestAnimationFrame: callback => callback(),
     financePlanMonths: planMonths,
+    financeDesktopNavigation: () => ({ recall: () => null }),
     yearOptions: () => [['2026', '2026']],
     budgetVersionLabel: version => version.name,
     PLAN_TYPES: [], EXPENSE_TYPES: [], ConfiguredBudgetEntry() {}, BudgetSaveReceipt() {}, FilingExcelDraft() {},
@@ -227,7 +228,7 @@ test('matrix and detail tables expose sortable raw values for formatted finance 
 })
 
 test('finance enum codes are translated at every user-facing selector and data-center table', async () => {
-  const files = ['src/head.js', 'src/workflows.js', 'src/views/budget.js', 'src/views/cash.js', 'src/views/datacenter.js']
+  const files = ['src/head.js', 'src/desktop-navigation.js', 'src/workflows.js', 'src/views/budget.js', 'src/views/cash.js', 'src/views/datacenter.js']
   const source = (await Promise.all(files.map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
   assert.match(source, /bizSystem:\s*'业务系统'/)
   assert.match(source, /docType:\s*'单据类型'/)
@@ -626,15 +627,15 @@ test('entry lists distinguish loading, empty, and failed requests with retry act
 })
 
 test('client preserves HTTP status so member permission failures are distinguished from network errors', async () => {
-  const head = await readFile(new URL('src/head.js', root), 'utf8')
+  const head = ((await readFile(new URL('src/desktop-navigation.js', root), 'utf8')) + '\n' + (await readFile(new URL('src/head.js', root), 'utf8')))
   const requestSource = head.slice(head.indexOf('async function api('), head.indexOf('// One idempotency key'))
   const workflows = await readFile(new URL('src/workflows.js', root), 'utf8')
   const financeErrorText = new Function(workflows + '\nreturn financeErrorText')()
-  const read = new Function('fetch', 'AbortSignal', 'BASE', 'REQUEST_TIMEOUT_MS', 'financeErrorText', requestSource + '\nreturn api')
+  const read = new Function('fetch', 'AbortSignal', 'BASE', 'REQUEST_TIMEOUT_MS', 'financeErrorText', 'financeDesktopNavigation', requestSource + '\nreturn api')
   const response = status => ({ ok: status === 200, status, json: async () => status === 200 ? { data: { list: [] } } : { error: 'permission_denied' } })
-  const denied = read(async () => response(403), { timeout: () => undefined }, '/finance', 30000, financeErrorText)
+  const denied = read(async () => response(403), { timeout: () => undefined, any: () => undefined }, '/finance', 30000, financeErrorText, () => ({ epoch: 0, signal: undefined }))
   await assert.rejects(denied('/members'), error => error.status === 403 && error.message.includes('权限'))
-  const unavailable = read(async () => response(503), { timeout: () => undefined }, '/finance', 30000, financeErrorText)
+  const unavailable = read(async () => response(503), { timeout: () => undefined, any: () => undefined }, '/finance', 30000, financeErrorText, () => ({ epoch: 0, signal: undefined }))
   await assert.rejects(unavailable('/members'), error => error.status === 503)
 
   const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/members.js', root), 'utf8')
@@ -836,7 +837,7 @@ async function invokeRoute(route, method, url, body, headers = {}) {
 
 // 客户端片段清单（与 scripts/build.mjs 的 FILES 保持一致；顺序即依赖顺序）
 const CLIENT_FILES = [
-  'src/head.js', 'src/format.js', 'src/components.js', 'src/styles.js', 'src/workflows.js', 'src/navigation.js', 'src/permission-catalog.js',
+  'src/head.js', 'src/desktop-navigation.js', 'src/format.js', 'src/components.js', 'src/styles.js', 'src/workflows.js', 'src/navigation.js', 'src/permission-catalog.js',
   'src/views/overview.js', 'src/views/budget.js', 'src/views/operations.js', 'src/views/cash.js',
   'src/views/alerts.js', 'src/views/datacenter.js', 'src/views/entry.js', 'src/views/configured-entry.js', 'src/views/analyze.js',
   'src/views/bom.js', 'src/views/notifications.js', 'src/views/permissions.js', 'src/views/members.js', 'src/views/review.js', 'src/views/sources.js', 'src/views/comparisons.js', 'src/views/facts.js', 'src/views/engine.js', 'src/views/filing.js',
@@ -1633,7 +1634,7 @@ test('cash viewers cannot schedule, increase or backfill plans', async () => {
 
 
 test('expense and payment type options have translated labels in both locales', async () => {
-  const head = await readFile(new URL('src/head.js', root), 'utf8')
+  const head = ((await readFile(new URL('src/desktop-navigation.js', root), 'utf8')) + '\n' + (await readFile(new URL('src/head.js', root), 'utf8')))
   const constants = head.slice(head.indexOf('const EXPENSE_TYPES'), head.indexOf('const LEDGER_LIMIT'))
   const dictionary = head.slice(head.indexOf('const copy ='), head.indexOf('\n// ---- 打开/关闭状态'))
   const { expenses, plans, copy } = new Function(constants + '\n' + dictionary + '\nreturn { expenses: EXPENSE_TYPES, plans: PLAN_TYPES, copy }')()
@@ -1761,7 +1762,7 @@ test('empty backfill offers creation for the selected plan type', async () => {
 })
 
 test('direct-entry amounts render business labels rather than unresolved translation keys', async () => {
-  const head = await readFile(new URL('src/head.js', root), 'utf8')
+  const head = ((await readFile(new URL('src/desktop-navigation.js', root), 'utf8')) + '\n' + (await readFile(new URL('src/head.js', root), 'utf8')))
   const dictionary = head.slice(head.indexOf('const copy ='), head.indexOf('\n// ---- 打开/关闭状态'))
   const copy = new Function(dictionary + '\nreturn copy')()
   const source = await readFile(new URL('src/components.js', root), 'utf8') + '\n' + await readFile(new URL('src/workflows.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/entry.js', root), 'utf8') + '\n' + await readFile(new URL('src/views/members.js', root), 'utf8')
@@ -1776,7 +1777,7 @@ test('direct-entry amounts render business labels rather than unresolved transla
 })
 
 test('cash plan columns translate actual, remaining and variance amounts', async () => {
-  const head = await readFile(new URL('src/head.js', root), 'utf8')
+  const head = ((await readFile(new URL('src/desktop-navigation.js', root), 'utf8')) + '\n' + (await readFile(new URL('src/head.js', root), 'utf8')))
   const copy = new Function(head.slice(head.indexOf('const copy ='), head.indexOf('\n// ---- 打开/关闭状态')) + '\nreturn copy')()
   const source = (await Promise.all(['src/components.js', 'src/format.js', 'src/views/cash.js'].map(file => readFile(new URL(file, root), 'utf8')))).join('\n')
   for (const [component, props, expected] of [

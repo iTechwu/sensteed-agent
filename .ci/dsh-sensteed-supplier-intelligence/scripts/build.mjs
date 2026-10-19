@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const chunks = []
-for (const file of ['src/head.js', 'src/styles.js', 'src/shell.js']) chunks.push(await readFile(resolve(root, file), 'utf8'))
+for (const file of ['src/head.js', 'src/desktop-navigation.js', 'src/styles.js', 'src/shell.js']) chunks.push(await readFile(resolve(root, file), 'utf8'))
 const source = chunks.join('\n')
 await mkdir(resolve(root, 'lib'), { recursive: true })
 const indented = source.split('\n').map(line => line ? `    ${line}` : '').join('\n')

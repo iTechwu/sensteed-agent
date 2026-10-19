@@ -2,7 +2,7 @@ import { brandClientSource } from '../../brand/build.mjs'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 
 const root = new URL('../', import.meta.url)
-const source = brandClientSource(await readFile(new URL('src/client.js', root), 'utf8'))
+const source = brandClientSource((await readFile(new URL('src/desktop-navigation.js', root), 'utf8')) + '\n' + (await readFile(new URL('src/client.js', root), 'utf8')))
 await mkdir(new URL('lib/', root), { recursive: true })
 await writeFile(new URL('lib/client.js', root), [
   'window.__ModuleLoader__.load({',

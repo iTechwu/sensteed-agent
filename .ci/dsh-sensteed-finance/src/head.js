@@ -237,11 +237,13 @@ const subscribe = listener => { listeners.add(listener); return () => listeners.
 const snapshot = () => opened
 
 async function api(path, options) {
+  const bridge = financeDesktopNavigation(), epoch = bridge.epoch
   let response
   try {
-    response = await fetch(`${BASE}${path}`, { credentials: 'same-origin', redirect: 'error', headers: { Accept: 'application/json', ...(options?.body ? { 'Content-Type': 'application/json' } : {}) }, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS), ...options })
+    response = await fetch(`${BASE}${path}`, { credentials: 'same-origin', redirect: 'error', headers: { Accept: 'application/json', ...(options?.body ? { 'Content-Type': 'application/json' } : {}) }, ...options, signal: AbortSignal.any([AbortSignal.timeout(REQUEST_TIMEOUT_MS), bridge.signal, ...(options?.signal ? [options.signal] : [])]) })
   } catch (error) { throw new Error(financeErrorText(error?.name === 'TimeoutError' ? 'upstream_timeout' : error?.message)) }
   const body = await response.json().catch(() => null)
+  if (epoch !== bridge.epoch) throw new DOMException('Stale identity response', 'AbortError')
   if (!response.ok || !body || (body.ok === false && !Object.keys(body).some(key => !['ok', 'error'].includes(key) && body[key] && !body[key].error))) {
     const error = new Error(financeErrorText(body?.error, response.status))
     error.status = response.status
@@ -260,3 +262,6 @@ function post(path, payload) {
   pendingWrites.set(key, operation)
   return operation
 }
+
+let financeDesktopNavigationBridge
+function financeDesktopNavigation() { return financeDesktopNavigationBridge ||= createDesktopNavigationBridge(React) }

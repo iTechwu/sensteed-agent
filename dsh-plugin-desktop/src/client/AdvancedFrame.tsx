@@ -1,3 +1,4 @@
+import { DesktopNavigationFrame } from './DesktopNavigation.tsx'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
@@ -27,7 +28,15 @@ export function AdvancedFrame(props: AdvancedFrameProps) {
 }
 
 /** Shared panel mechanics below the two mode-specific root boundaries. */
-export function DesktopOwnedFrame({
+export function DesktopOwnedFrame(props: AdvancedFrameProps & { readonly mode: 'extended' | 'advanced' }) {
+  return <DesktopNavigationFrame platform={props.platform} Frame={DesktopOwnedFrameAdapter} frameProps={{ ...props }} />
+}
+
+function DesktopOwnedFrameAdapter(props: Record<string, unknown>) {
+  return <DesktopOwnedFrameBody {...props as unknown as AdvancedFrameProps & { readonly mode: 'extended' | 'advanced' }} />
+}
+
+function DesktopOwnedFrameBody({
   layout,
   mode,
   platform,
