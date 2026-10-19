@@ -4,17 +4,13 @@ function OverviewView({ brief, t, onDrill, orgId, workQueue }) {
   if (!brief) return h(EmptyState, null, t('empty'))
   const data = brief.data || brief
   const overview = data.overview || {}
-  const m = overview.metrics || {}
-  const trend = overview.trend || []
+  const m = data.budget?.totals || {}
+  const trend = financeBudgetTrend(data.budget?.list || [])
   const alertsSummary = data.alertsSummary || {}
   const cashList = data.cash?.list || []
-  const cashTotals = cashList.reduce((acc, row) => {
-    acc.plannedIncome += finite(row.plannedIncome) ?? 0
-    acc.actualIncome += finite(row.actualIncome) ?? 0
-    acc.plannedExpense += finite(row.plannedExpense) ?? 0
-    acc.actualExpense += finite(row.actualExpense) ?? 0
-    return acc
-  }, { plannedIncome: 0, actualIncome: 0, plannedExpense: 0, actualExpense: 0 })
+  const cashTotals = Object.fromEntries(['plannedIncome', 'actualIncome', 'plannedExpense', 'actualExpense'].map(key => [key,
+    cashList.length && cashList.every(row => finite(row[key]) !== null) ? cashList.reduce((sum, row) => sum + finite(row[key]), 0) : null,
+  ]))
   const exec = execRateOf(m.prSubmittedAmount, m.prEstimatedAmount, m.budgetAmount)
   const trendData = trend.map(point => ({
     label: String(point.month).padStart(2, '0'),
@@ -22,16 +18,14 @@ function OverviewView({ brief, t, onDrill, orgId, workQueue }) {
     paid: finite(point.paidAmount),
   }))
   const openAlerts = (data.openAlerts || alertsSummary.top || []).slice(0, 5)
-  const workItems = workQueue?.state === 'loading' ? null : [
-    {
-      id: 'filing', icon: 'plan', tone: 'blue', label: t('pendingFiling'), hint: t('pendingFilingHint'), value: (workQueue?.tasks?.list || []).filter(item => item.status !== 'CLOSED').length, target: 'filing',
-    },
-    {
-      id: 'quality', icon: 'database', tone: 'amber', label: t('pendingQuality'), hint: t('pendingQualityHint'), value: (workQueue?.quality?.issues || []).reduce((sum, item) => sum + (finite(item.count) ?? 0), 0), target: 'datacenter',
-    },
-    {
-      id: 'alerts', icon: 'warning', tone: 'rose', label: t('pendingAlerts'), hint: t('pendingAlertsHint'), value: workQueue?.alerts?.total ?? alertsSummary.total ?? 0, target: 'alerts',
-    },
+  const workItems = workQueue?.state === 'loading' ? null : workQueue?.financeWriter ? [
+    { id: 'review', icon: 'plan', tone: 'blue', label: '待财务验证', hint: '填报、批次与调整单等待复核', value: workQueue.review?.total ?? '—', target: 'review' },
+    { id: 'quality', icon: 'database', tone: 'amber', label: '数据质量待处理', hint: '未分配主体、缺失金额等', value: workQueue.quality ? (workQueue.quality.issues || []).reduce((sum, item) => sum + (finite(item.count) ?? 0), 0) : '—', target: 'datacenter' },
+    { id: 'alerts', icon: 'warning', tone: 'rose', label: '待处理预警', hint: '当前年度规则引擎结果', value: workQueue.alerts?.total ?? '—', target: 'alerts', params: { status: 'OPEN' } },
+  ] : [
+    { id: 'filing', icon: 'plan', tone: 'blue', label: '待填报', hint: '截止时间前完成并提交', value: workQueue?.assignments ? workQueue.assignments.fillablePending + workQueue.assignments.fillableDraft : '—', target: 'filing', params: { section: 'assignments' } },
+    { id: 'submitted', icon: 'clock', tone: 'amber', label: '待财务验证', hint: '确认前不计入正式数据', value: workQueue?.assignments?.submitted ?? '—', target: 'filing', params: { section: 'mine' } },
+    { id: 'rejected', icon: 'warning', tone: 'rose', label: '已退回', hint: '按退回原因修改后重提', value: workQueue?.assignments?.fillableRejected ?? '—', target: 'filing', params: { section: 'assignments' } },
   ]
   const workbench = h('section', { className: 'sf-workbench', 'aria-labelledby': 'sf-workbench-title' },
     h('div', { className: 'sf-workbench-head' },
@@ -41,7 +35,7 @@ function OverviewView({ brief, t, onDrill, orgId, workQueue }) {
       workQueue?.state === 'partial' ? h('span', { className: 'sf-workbench-status' }, t('loadPartial')) : null),
     workItems
       ? h('div', { className: 'sf-work-items' }, ...workItems.map(item => h('button', {
-        type: 'button', key: item.id, className: `sf-work-item is-${item.tone}`, onClick: () => onDrill(item.target),
+        type: 'button', key: item.id, className: `sf-work-item is-${item.tone}`, onClick: () => onDrill(item.target, item.params),
       },
         h('span', { className: 'sf-work-icon' }, h(Glyph, { name: item.icon, size: 15 })),
         h('span', { className: 'sf-work-copy' }, h('strong', null, item.label), h('small', null, item.hint)),
@@ -52,16 +46,18 @@ function OverviewView({ brief, t, onDrill, orgId, workQueue }) {
       h('span', null, `${orgId ? t('scopeOrg') : t('scopeAll')} · ${data.year ?? ''} ${t('scopeYear')} · ${t('unitNote')}`),
       h('span', null, `${t('kpiExecRate')} = ${t('kpiPrSubmitted')} ÷ ${t('kpiBudget')}`)),
     workbench,
+    data.budget?.budgetVersionId == null ? h('p', { role: 'status', className: 'sf-banner sf-banner-amber' }, '当前年度尚未发布预算，空汇总不代表已批准零预算。') : null,
     h('div', { className: 'sf-kpis' },
       h(KpiCard, { icon: 'data', label: t('kpiBudget'), value: yuan(m.budgetAmount), onClick: () => onDrill('budget') }),
       h(KpiCard, { icon: 'plan', label: t('kpiPrSubmitted'), value: yuan(m.prSubmittedAmount), hint: `${t('kpiExecRate')} ${ratio(exec, 1) ?? '—'}`, onClick: () => onDrill('budget', { view: 'ledger', recordType: 'SUBMITTED' }) }),
       h(KpiCard, { icon: 'clock', label: t('kpiPrEstimated'), value: yuan(m.prEstimatedAmount), onClick: () => onDrill('budget', { view: 'ledger', recordType: 'ESTIMATED' }) }),
       h(KpiCard, { icon: 'goal', label: t('kpiPaid'), value: yuan(m.paidAmount), hint: `${t('kpiPaid')}/${t('kpiPrSubmitted')} ${ratio(m.paidAmount, m.prSubmittedAmount) ?? '—'}`, onClick: () => onDrill('budget', { view: 'lines' }) }),
       h(KpiCard, {
-        icon: 'warning', label: t('kpiAlerts'), value: alertsSummary.total ?? 0,
-        hint: `${t('sevCritical')} ${alertsSummary.critical ?? 0} · ${t('sevWarn')} ${alertsSummary.warn ?? 0}`,
-        hintTone: alertsSummary.critical > 0 ? 'down' : alertsSummary.warn > 0 ? 'warn' : 'up',
-        negative: alertsSummary.critical > 0, onClick: () => onDrill('alerts'),
+        icon: orgId ? 'goal' : 'plan', label: orgId ? '预算健康度' : 'PR台账',
+        value: orgId ? data.budget?.budgetVersionId == null || exec == null ? '待核对' : exec > 1 ? '已超支' : exec >= 0.8 ? '需关注' : '正常' : yuan(overview.prLedger?.submittedAmount) ?? '—',
+        hint: orgId ? exec == null ? '正式预算不足以判断' : `预算剩余比例 ${ratio(Math.max(0, 1 - exec), 1)}` : `独立台账口径，不计入预算执行 · ${overview.prLedger?.submittedCount ?? '—'}笔`,
+        hintTone: orgId && exec > 1 ? 'down' : undefined,
+        negative: orgId && exec > 1, onClick: () => onDrill('budget', { view: orgId ? 'variance' : 'ledger', ...(orgId ? {} : { recordType: 'SUBMITTED' }) }),
       })),
     h('div', { className: 'sf-overview-grid' },
       h(Card, { title: t('trendTitle'), unit: t('unitNote') },
@@ -97,7 +93,7 @@ function OverviewView({ brief, t, onDrill, orgId, workQueue }) {
             },
           },
         ],
-        rows: overview.byOrg || [], empty: t('empty'),
+        rows: [...(data.budget?.list || []).reduce((map, row) => { const key = row.orgId || ''; const value = map.get(key) || { orgId: row.orgId, orgName: row.orgName || t('unassigned'), budgetAmount: 0, prSubmittedAmount: 0, prEstimatedAmount: 0, paidAmount: 0 }; for (const field of ['budgetAmount', 'prSubmittedAmount', 'prEstimatedAmount', 'paidAmount']) value[field] += finite(row[field]) ?? 0; map.set(key, value); return map }, new Map()).values()], empty: t('empty'), onRowClick: row => onDrill('budget', { view: 'lines', orgId: row.orgId || '', unassigned: !row.orgId }),
       })),
       h('div', { className: 'sf-two-col' },
         h(Card, { title: t('incomeAch'), unit: t('unitNote') },

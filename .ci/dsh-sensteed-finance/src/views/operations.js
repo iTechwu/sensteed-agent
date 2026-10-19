@@ -1,88 +1,57 @@
-// 片段 5/7 视图：经营（对齐前端 operations-section：3 KPI + 主题框架表 + 费用构成 + 三系列趋势 + 收支净额）
-
-/** 经营分析主题框架（与前端 operations-section 同源的静态规划表） */
-const OP_TOPICS = [
-  ['预算执行', '预算执行率 / 支付率', '预算汇总 + 付款台账', true],
-  ['资金链', '月度余额 / 缺口月份', '资金汇总', true],
-  ['收入达成', '计划与实际到账', '收入计划', true],
-  ['成本结构', '三类费用占比与漂移', '预算汇总（三类费用）', true],
-  ['数据质量', '未分配主体 / 缺失金额', '数据质量清单', true],
-  ['项目毛利', '项目维度收入-成本', '项目台账（待导入）', false],
-  ['人效', '人均产出 / 部门人力成本', '归属记录 + 薪酬（待导入）', false],
-]
-
+// 与网页经营分析统一：预算使用正式预算汇总，计划和实际收支分别展示。
+function financeBudgetTrend(rows) {
+  const months = new Map()
+  for (const row of rows || []) {
+    if (!row.month) continue
+    const point = months.get(row.month) || { month: row.month, prSubmittedAmount: 0, prEstimatedAmount: 0, paidAmount: 0 }
+    for (const key of ['prSubmittedAmount', 'prEstimatedAmount', 'paidAmount']) point[key] += finite(row[key]) ?? 0
+    months.set(row.month, point)
+  }
+  return [...months.values()].sort((a, b) => a.month - b.month)
+}
+function financeCashNet(rows) {
+  const months = new Map()
+  for (const row of rows) {
+    const key = `${row.year}-${String(row.month).padStart(2, '0')}`
+    const point = months.get(key) || { label: key, month: row.month, planned: 0, actual: 0, plannedComplete: true, actualComplete: true }
+    for (const kind of ['planned', 'actual']) {
+      const income = finite(row[`${kind}Income`]), expense = finite(row[`${kind}Expense`])
+      point[`${kind}Complete`] &&= income !== null && expense !== null
+      point[kind] += (income ?? 0) - (expense ?? 0)
+    }
+    months.set(key, point)
+  }
+  const list = [...months.values()].sort((a, b) => a.label.localeCompare(b.label))
+  return { list, actual: list.length && list.every(row => row.actualComplete) ? list.reduce((sum, row) => sum + row.actual, 0) : null }
+}
 function OperationsView({ brief, t, onDrill }) {
   if (!brief) return h(EmptyState, null, t('empty'))
   const data = brief.data || brief
-  const overview = data.overview || {}
-  const m = overview.metrics || {}
-  const trend = overview.trend || []
-  const cashList = data.cash?.list || []
-  const budgetSummary = data.budget?.list || []
-  const budgetTotals = data.budget?.totals
-
+  const budget = data.budget || {}
+  const m = budget.totals || {}
+  const net = financeCashNet(data.cash?.list || [])
   const exec = execRateOf(m.prSubmittedAmount, m.prEstimatedAmount, m.budgetAmount)
-  const payRate = ratio(m.paidAmount, m.prSubmittedAmount)
-  const totals = cashList.reduce((acc, row) => {
-    acc.actualIncome += finite(row.actualIncome) ?? 0
-    acc.actualExpense += finite(row.actualExpense) ?? 0
-    return acc
-  }, { actualIncome: 0, actualExpense: 0 })
-  const netTotal = totals.actualIncome - totals.actualExpense
-
-  // 费用构成：年度合计行按三类费用聚合（无合计行时逐行累加）
-  const byType = {}
-  for (const row of budgetSummary) {
-    const key = row.expenseType || 'OTHER'
-    byType[key] = (byType[key] ?? 0) + (finite(row.budgetAmount) ?? 0)
-  }
-  if (budgetTotals && !budgetSummary.length) {
-    for (const key of Object.keys(EXPENSE_LABELS)) byType[key] = finite(budgetTotals[key]) ?? 0
-  }
-  const shareTones = ['a', 'b', 'c', 'd']
-  const shareSegments = Object.entries(byType).map(([key, value], index) => ({
-    label: financeEnumLabel(key, t, EXPENSE_LABELS), value, tone: shareTones[index % shareTones.length],
-  }))
-
-  const netByMonth = new Map()
-  for (const row of cashList) {
-    const label = `${row.year}-${String(row.month).padStart(2, '0')}`
-    const income = finite(row.actualIncome) ?? finite(row.plannedIncome) ?? 0
-    const expense = finite(row.actualExpense) ?? finite(row.plannedExpense) ?? 0
-    netByMonth.set(label, (netByMonth.get(label) ?? 0) + income - expense)
-  }
-  const netData = [...netByMonth.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([label, value]) => ({ label: label.slice(5), value }))
-
-  const trendData = trend.map(point => ({
-    label: String(point.month).padStart(2, '0'),
-    prSubmitted: finite(point.prSubmittedAmount),
-    prEstimated: finite(point.prEstimatedAmount),
-    paid: finite(point.paidAmount),
-  }))
-
+  const composition = new Map()
+  for (const row of budget.list || []) composition.set(row.expenseType, (composition.get(row.expenseType) || 0) + (finite(row.budgetAmount) ?? 0))
+  const segments = [...composition].map(([expenseType, value], index) => ({ expenseType, value, label: expenseType ? financeEnumLabel(expenseType, t, EXPENSE_LABELS) : '未分类', tone: ['a', 'b', 'c', 'd'][index % 4] }))
+  const trend = financeBudgetTrend(budget.list).map(row => ({ label: mm(row.month), prSubmitted: row.prSubmittedAmount, prEstimated: row.prEstimatedAmount, paid: row.paidAmount }))
   return h('div', { className: 'sf-view' },
+    budget.budgetVersionId == null ? h('p', { role: 'status', className: 'sf-banner sf-banner-amber' }, '当前年度尚未发布预算，不能将空汇总视为已批准零预算。') : null,
     h('div', { className: 'sf-kpis' },
-      h(KpiCard, { icon: 'data', label: t('kpiExecRate'), value: ratio(exec, 1) ?? '—', hint: `${t('kpiBudget')} ${wan(m.budgetAmount) ?? '—'}`, onClick: () => onDrill('budget') }),
-      h(KpiCard, { icon: 'plan', label: t('kpiPayRate'), value: payRate ?? '—', hint: `${t('kpiPrSubmitted')} ${wan(m.prSubmittedAmount) ?? '—'}`, onClick: () => onDrill('budget', { view: 'ledger' }) }),
-      h(KpiCard, { icon: 'goal', label: t('kpiNetInflow'), value: wan(netTotal), hint: `↑${wan(totals.actualIncome) ?? '—'} / ↓${wan(totals.actualExpense) ?? '—'}`, hintTone: netTotal >= 0 ? 'up' : 'down', negative: netTotal < 0, onClick: () => onDrill('cash') })),
-    h(Card, { title: t('opTheme') }, h(Table, { tableId: 'finance-OperationsView-1',
-      columns: [
-        { label: t('theme'), key: '0' },
-        { label: t('metric'), key: '1' },
-        { label: t('dataSource'), key: '2' },
-        { label: t('readiness'), key: '3', render: row => row[3] ? h(Pill, { tone: 'green' }, t('ready')) : h(Pill, { tone: 'muted' }, t('pending')) },
-      ],
-      rows: OP_TOPICS, empty: t('empty'),
-    })),
-    h(Card, { title: t('costMix'), unit: t('unitNote') }, h(StackedShare, { segments: shareSegments })),
-    h(Card, { title: t('trendTitle'), unit: t('unitNote') },
-      h(GroupedBars, {
-        data: trendData,
-        series: [
-          { key: 'prSubmitted', label: t('kpiPrSubmitted'), tone: 'a' },
-          { key: 'prEstimated', label: t('kpiPrEstimated'), tone: 'b' },
-          { key: 'paid', label: t('kpiPaid'), tone: 'c' },
-        ],
-      })),
-    h(Card, { title: t('netFlowTitle'), unit: t('unitNote') }, h(NetBars, { data: netData })))
+      h(KpiCard, { icon: 'data', label: t('kpiExecRate'), value: ratio(exec, 1) ?? '—', hint: `${t('kpiBudget')} ${wan(m.budgetAmount) ?? '—'}`, onClick: () => onDrill('budget', { view: 'lines' }) }),
+      h(KpiCard, { icon: 'plan', label: t('kpiPayRate'), value: ratio(m.paidAmount, m.prSubmittedAmount) ?? '—', hint: `${t('kpiPrSubmitted')} ${wan(m.prSubmittedAmount) ?? '—'}`, onClick: () => onDrill('budget', { view: 'ledger', recordType: 'SUBMITTED' }) }),
+      h(KpiCard, { icon: 'goal', label: t('kpiNetInflow'), value: wan(net.actual) ?? '—', hint: net.actual === null ? '实际收支尚未补齐' : '实际收支口径', negative: net.actual !== null && net.actual < 0, onClick: () => onDrill('cash', { view: 'summary' }) })),
+    h(Card, { title: '费用构成（年度预算）', unit: t('unitNote') },
+      h(StackedShare, { segments }),
+      h('div', { className: 'sf-row' }, ...segments.map(segment => h(GhostButton, { key: segment.expenseType || 'unknown', onClick: () => onDrill('budget', { view: 'lines', ...(segment.expenseType ? { expenseType: segment.expenseType } : {}) }) }, `${segment.label} · ${wan(segment.value)}`)))),
+    h(Card, { title: t('trendTitle'), unit: t('unitNote') }, h(GroupedBars, { data: trend, series: [
+      { key: 'prSubmitted', label: t('kpiPrSubmitted'), tone: 'a' }, { key: 'prEstimated', label: t('kpiPrEstimated'), tone: 'b' }, { key: 'paid', label: t('kpiPaid'), tone: 'c' },
+    ], onBarClick: point => onDrill('budget', { view: 'month', month: Number(point.label) }) })),
+    h(Card, { title: '收支净额：计划 vs 实际', unit: t('unitNote') },
+      h('p', { className: 'sf-note' }, '计划与实际分别计算；任一主体缺少收支金额时，显示待补齐。'),
+      h(Table, { tableId: 'finance-operations-net', rows: net.list, empty: t('empty'), onRowClick: row => onDrill('cash', { view: 'summary', month: row.month }), columns: [
+        { key: 'label', label: '月份' },
+        { key: 'planned', label: '计划净流入', num: true, render: row => row.plannedComplete ? wan(row.planned) : '待补齐' },
+        { key: 'actual', label: '实际净流入', num: true, render: row => row.actualComplete ? wan(row.actual) : '待补齐' },
+      ] })))
 }

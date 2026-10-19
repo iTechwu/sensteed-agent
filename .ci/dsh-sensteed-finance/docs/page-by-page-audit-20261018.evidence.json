@@ -1,0 +1,302 @@
+{
+  "auditDate": "2026-10-18",
+  "method": "read-only source inventory, actual destination function and OperationsView with synthetic data; no production business session",
+  "baselines": {
+    "helm": "e20608ee1ca3c04c5a12fbfe489e3728da25ca32",
+    "datasource": "63f8778330888d5fa0a904e124990dc454804539",
+    "initialHelm": "ac28ef0aa6e03ee21608dc2565362bdf556587e2"
+  },
+  "inventory": {
+    "pageCount": 29,
+    "canonicalBusinessPages": 25,
+    "mappedCanonicalPages": 24,
+    "unmappedCanonicalPages": [
+      "/data-center/cost-items"
+    ],
+    "canonical": [
+      {
+        "path": "/alerts",
+        "destination": {
+          "tab": "alerts",
+          "params": {}
+        }
+      },
+      {
+        "path": "/assistant",
+        "destination": {
+          "tab": "analyze",
+          "params": {}
+        }
+      },
+      {
+        "path": "/budget/comparison/monthly-roll",
+        "destination": {
+          "tab": "comparisons",
+          "params": {
+            "mode": "monthly"
+          }
+        }
+      },
+      {
+        "path": "/budget/comparison/versions",
+        "destination": {
+          "tab": "comparisons",
+          "params": {
+            "mode": "versions"
+          }
+        }
+      },
+      {
+        "path": "/budget/comparison/yearly",
+        "destination": {
+          "tab": "comparisons",
+          "params": {
+            "mode": "yearly"
+          }
+        }
+      },
+      {
+        "path": "/budget",
+        "destination": {
+          "tab": "budget",
+          "params": {}
+        }
+      },
+      {
+        "path": "/budget-engine",
+        "destination": {
+          "tab": "engine",
+          "params": {}
+        }
+      },
+      {
+        "path": "/cash",
+        "destination": {
+          "tab": "cash",
+          "params": {}
+        }
+      },
+      {
+        "path": "/cost-engineering",
+        "destination": {
+          "tab": "bom",
+          "params": {}
+        }
+      },
+      {
+        "path": "/dashboard",
+        "destination": {
+          "tab": "overview",
+          "params": {}
+        }
+      },
+      {
+        "path": "/data-center/cost-items",
+        "destination": null
+      },
+      {
+        "path": "/data-center",
+        "destination": {
+          "tab": "datacenter",
+          "params": {}
+        }
+      },
+      {
+        "path": "/data-entry",
+        "destination": {
+          "tab": "entry",
+          "params": {}
+        }
+      },
+      {
+        "path": "/filing/activities",
+        "destination": {
+          "tab": "filing",
+          "params": {
+            "section": "tasks"
+          }
+        }
+      },
+      {
+        "path": "/filing/budget",
+        "destination": {
+          "tab": "budget-filing",
+          "params": {}
+        }
+      },
+      {
+        "path": "/filing/department",
+        "destination": {
+          "tab": "filing",
+          "params": {
+            "section": "department"
+          }
+        }
+      },
+      {
+        "path": "/filing/records",
+        "destination": {
+          "tab": "filing",
+          "params": {
+            "section": "mine"
+          }
+        }
+      },
+      {
+        "path": "/filing/tasks",
+        "destination": {
+          "tab": "filing",
+          "params": {
+            "section": "assignments"
+          }
+        }
+      },
+      {
+        "path": "/notifications",
+        "destination": {
+          "tab": "notifications",
+          "params": {}
+        }
+      },
+      {
+        "path": "/operations",
+        "destination": {
+          "tab": "operations",
+          "params": {}
+        }
+      },
+      {
+        "path": "/review",
+        "destination": {
+          "tab": "review",
+          "params": {}
+        }
+      },
+      {
+        "path": "/settings/identity/directory",
+        "destination": {
+          "tab": "identity",
+          "params": {
+            "directorySection": "directory"
+          }
+        }
+      },
+      {
+        "path": "/settings/identity/employment",
+        "destination": {
+          "tab": "identity",
+          "params": {
+            "directorySection": "employment"
+          }
+        }
+      },
+      {
+        "path": "/settings/identity/members",
+        "destination": {
+          "tab": "identity",
+          "params": {
+            "directorySection": "members"
+          }
+        }
+      },
+      {
+        "path": "/settings/identity/permissions",
+        "destination": {
+          "tab": "permissions",
+          "params": {}
+        }
+      }
+    ],
+    "excluded": [
+      "/",
+      "/settings/finance-permissions",
+      "/login",
+      "/auth/oidc/success"
+    ]
+  },
+  "destinationProbes": [
+    {
+      "path": "/data-center/cost-items",
+      "actual": null
+    },
+    {
+      "path": "/budget?view=snapshot-compare&year=2026",
+      "actual": {
+        "tab": "budget",
+        "params": {
+          "year": "2026"
+        }
+      }
+    },
+    {
+      "path": "/budget?view=year-compare&year=2026",
+      "actual": {
+        "tab": "budget",
+        "params": {
+          "year": "2026"
+        }
+      }
+    },
+    {
+      "path": "/budget?view=versions&year=2026",
+      "actual": {
+        "tab": "budget",
+        "params": {
+          "view": "versions",
+          "year": "2026"
+        }
+      }
+    },
+    {
+      "path": "/budget?view=lines&unassigned=1&orgs=a,b&months=1,2&depts=d,e",
+      "actual": {
+        "tab": "budget",
+        "params": {
+          "view": "lines"
+        }
+      }
+    },
+    {
+      "path": "/budget-engine?version=11111111-1111-4111-8111-111111111111&year=2026",
+      "actual": {
+        "tab": "engine",
+        "params": {
+          "year": "2026"
+        }
+      }
+    },
+    {
+      "path": "/review?task=11111111-1111-4111-8111-111111111111",
+      "actual": {
+        "tab": "review",
+        "params": {
+          "taskId": "11111111-1111-4111-8111-111111111111"
+        }
+      }
+    }
+  ],
+  "operationsProbe": {
+    "fixture": {
+      "year": 2026,
+      "month": 1,
+      "actualIncome": null,
+      "actualExpense": 80,
+      "plannedIncome": 200,
+      "plannedExpense": 50
+    },
+    "pluginActualNetKpi": -80,
+    "pluginMonthlyNetBars": [
+      {
+        "label": "01",
+        "value": 120
+      }
+    ],
+    "webExpectedFromCompletenessBranches": {
+      "actualNet": null,
+      "actualLabel": "—",
+      "plannedNet": 150
+    },
+    "formattingStub": "wan returns raw CNY values so the probe records underlying values rather than 万元 display"
+  },
+  "concurrentReview": "Rechecked concurrent commit 5117d35b: analysis prompts now carry year and org ID; audited navigation, operations, budget, review and BOM implementations are unchanged from the initial baseline."
+}

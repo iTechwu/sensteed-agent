@@ -294,11 +294,14 @@ export async function refreshBundledContents(root, options = {}) {
     // Filtered runs must not shrink the committed set: carry through the
     // committed outputs of manifest skills this run did not fetch.
     const manifestPath = resolve(root, BUNDLED_MANIFEST)
-    const manifestRepositories = new Set(manifest.skills.map(entry => entry.repository))
-    const fetchedRepositories = new Set(fetchedSkills.map(({ skill }) => skill.repository))
+    // Several independent sibling skills can share a repository URL.
+    const untouched = manifest.skills.filter(skill => !fetchedSkills.some(entry => entry.skill === skill))
+    const replacedPaths = new Set(skillOutputs.map(output => output.path))
     const carried = existsSync(manifestPath)
       ? (JSON.parse(await readFile(manifestPath, 'utf8')).skills ?? [])
-        .filter(output => manifestRepositories.has(output.repository) && !fetchedRepositories.has(output.repository))
+        .filter(output => !replacedPaths.has(output.path) && untouched.some(skill =>
+          skill.repository === output.repository && (skill.snapshotDir === BUNDLED_SKILLS_ROOT
+            || resolve(root, skill.snapshotDir) === resolve(root, BUNDLED_SKILLS_ROOT, output.path))))
       : []
     const allOutputs = [...carried, ...skillOutputs]
     await pruneStaleSkills(root, allOutputs, emit)

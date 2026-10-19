@@ -208,48 +208,114 @@ function financeFormBody(fields, values) {
     return financeSetField(body, field.key, converted)
   }, {})
 }
-function FinanceFormDialog({ title, fields, initial = {}, onSubmit, onClose }) {
-  const [values, setValues] = useState(initial)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState(null)
-  const lock = useRef(false)
+// 统一字段校验：自定义选择器与原生输入使用相同的提交、错误定位规则。
+function financeFormErrors(fields, values) {
+  const errors = {}
+  for (const field of fields) {
+    if (field.when && !field.when(values)) continue
+    const value = financeFieldValue(values, field.key)
+    const empty = value == null || (Array.isArray(value) ? !value.length : !String(value).trim())
+    if (empty) { if (field.required) errors[field.key] = `请${field.options || field.multi ? '选择' : '填写'}${field.label}`; continue }
+    if (field.options && (field.multi ? value.some(item => !field.options.some(([id]) => id === item)) : !field.options.some(([id]) => id === value))) errors[field.key] = `请重新选择${field.label}`
+    else if (field.type === 'number') {
+      const number = Number(value)
+      if (!Number.isFinite(number)) errors[field.key] = `${field.label}须为有效数字`
+      else if (field.min != null && number < field.min) errors[field.key] = `${field.label}不能小于 ${field.min}`
+      else if (field.max != null && number > field.max) errors[field.key] = `${field.label}不能大于 ${field.max}`
+    } else if (['date', 'datetime-local'].includes(field.type) && !Number.isFinite(new Date(value).getTime())) errors[field.key] = `请填写有效的${field.label}`
+    else if (String(value).length > (field.maxLength || 500)) errors[field.key] = `${field.label}不能超过 ${field.maxLength || 500} 字`
+  }
+  return errors
+}
+function financeFocusFormError(form) {
+  requestAnimationFrame(() => form?.querySelector('[aria-invalid="true"]')?.focus())
+}
+function financeFormFields(fields, values, onChange, errors, busy, prefix, rowNumber) {
+  return fields.filter(field => !field.when || field.when(values)).map(field => {
+    const message = errors[field.key], errorId = `${prefix}-${field.key}-error`
+    const props = { 'aria-label': `${field.label}${rowNumber ? ` ${rowNumber}` : ''}`, 'aria-invalid': message ? true : undefined, 'aria-describedby': message ? errorId : undefined, value: financeFieldValue(values, field.key) ?? '', onChange: value => onChange(field.key, value), required: field.required, disabled: busy }
+    return h(FormRow, { key: field.key, label: `${field.label}${field.required ? '（必填）' : ''}` },
+      h('div', { className: 'sf-field-control' },
+        field.multi ? h(MultiSearchSelect, { ...props, value: props.value || [], options: field.options || [], placeholder: field.label })
+          : field.options ? h(field.searchable ? SearchSelect : Select, { ...props, ...(field.searchable ? { buttonTrigger: true } : {}), options: field.options, placeholder: '请选择' })
+          : h(field.type === 'textarea' ? Textarea : Field, { ...props, type: field.type || 'text', min: field.min, max: field.max, maxLength: field.maxLength || 500, step: field.type === 'number' ? 'any' : undefined }),
+        message ? h('span', { id: errorId, className: 'sf-neg sf-field-error' }, message) : null))
+  })
+}
+function useFinanceFormExit(initial, values, busy, onClose) {
+  const baseline = useRef(JSON.stringify(initial)), [leaving, setLeaving] = useState(false)
+  const promptRef = useRef(null), previousFocus = useRef(null)
+  const dirty = JSON.stringify(values) !== baseline.current
+  useEffect(() => {
+    if (!dirty) return undefined
+    const prevent = event => { event.preventDefault(); event.returnValue = '' }
+    window.addEventListener('beforeunload', prevent)
+    return () => window.removeEventListener('beforeunload', prevent)
+  }, [dirty])
+  useEffect(() => { if (leaving) requestAnimationFrame(() => promptRef.current?.querySelector('button')?.focus()) }, [leaving])
+  const close = () => { if (!busy) { if (dirty) { previousFocus.current = document.activeElement; setLeaving(true) } else onClose() } }
+  const prompt = leaving ? h('div', { ref: promptRef, className: 'sf-form-exit sf-stack', role: 'alert' },
+    h('p', null, '有尚未保存的修改。离开后这些内容将丢失。'),
+    h('div', { className: 'sf-row' }, h(GhostButton, { disabled: busy, onClick: () => { setLeaving(false); requestAnimationFrame(() => previousFocus.current?.focus()) } }, '继续编辑'), h(GhostButton, { disabled: busy, onClick: onClose }, '放弃修改并关闭'))) : null
+  return { close, prompt }
+}
+function FinanceFormDialog({ title, description, fields, initial = {}, onSubmit, onClose }) {
+  const [values, setValues] = useState(initial), [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null), [errors, setErrors] = useState({})
+  const lock = useRef(false), formRef = useRef(null), prefix = useId()
+  const exit = useFinanceFormExit(initial, values, busy, onClose)
+  const change = (key, value) => {
+    const next = financeSetField(values, key, value); setValues(next)
+    // 提交后继续输入时就地更新错误，也移除已隐藏条件字段的错误。
+    if (Object.keys(errors).length) setErrors(financeFormErrors(fields, next))
+    setError(null)
+  }
   const submit = async event => {
     event.preventDefault()
     if (lock.current) return
+    const invalid = financeFormErrors(fields, values); setErrors(invalid)
+    if (Object.keys(invalid).length) { financeFocusFormError(formRef.current); return }
     lock.current = true; setBusy(true); setError(null)
     try { await onSubmit(financeFormBody(fields, values)); onClose() }
     catch (failure) { setError(failure.message) }
     finally { lock.current = false; setBusy(false) }
   }
-  return h(Dialog, { title, onClose: busy ? undefined : onClose },
-    h('form', { onSubmit: submit, className: 'sf-stack' },
-      ...fields.filter(field => !field.when || field.when(values)).map(field => h(FormRow, { key: field.key, label: field.label },
-        field.options ? h(Select, { 'aria-label': field.label, value: financeFieldValue(values, field.key) ?? '', onChange: value => setValues(current => financeSetField(current, field.key, value)), options: field.options, placeholder: '请选择', required: field.required, disabled: busy })
-          : h(field.type === 'textarea' ? Textarea : Field, { 'aria-label': field.label, value: financeFieldValue(values, field.key) ?? '', onChange: value => setValues(current => financeSetField(current, field.key, value)), type: field.type || 'text', required: field.required, min: field.min, max: field.max, maxLength: field.maxLength || 500, step: field.type === 'number' ? 'any' : undefined, disabled: busy }))),
+  return h(Dialog, { title, onClose: exit.close, dismissDisabled: busy },
+    h('form', { ref: formRef, noValidate: true, onSubmit: submit, className: 'sf-stack sf-workflow-form' },
+      description ? h('p', { className: 'sf-note' }, description) : null,
+      ...financeFormFields(fields, values, change, errors, busy, prefix),
+      Object.keys(errors).length ? h('p', { role: 'alert', className: 'sf-neg' }, `请检查 ${Object.keys(errors).length} 项输入，已定位到首个错误。`) : null,
       error ? h('p', { role: 'alert', className: 'sf-neg' }, error) : null,
-      h('div', { className: 'sf-row' }, h(PrimaryButton, { type: 'submit', busy }, '确认'), h(GhostButton, { disabled: busy, onClick: onClose }, '取消'))))
+      exit.prompt,
+      h('div', { className: 'sf-row' }, h(PrimaryButton, { type: 'submit', busy }, '确认'), h(GhostButton, { disabled: busy, onClick: exit.close }, '取消'))))
 }
 function FinanceRowsDialog({ title, fields, initial = [{}], maxRows = 200, onSubmit, onClose }) {
-  const [rows, setRows] = useState(initial)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState(null)
-  const lock = useRef(false)
+  const [rows, setRows] = useState(initial), [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null), [errors, setErrors] = useState([])
+  const lock = useRef(false), formRef = useRef(null), prefix = useId()
+  const exit = useFinanceFormExit(initial, rows, busy, onClose)
+  const update = next => { setRows(next); if (errors.length) setErrors(next.map(row => financeFormErrors(fields, row))); setError(null) }
   const submit = async event => {
     event.preventDefault()
     if (lock.current) return
+    const invalid = rows.map(row => financeFormErrors(fields, row)); setErrors(invalid)
+    if (!rows.length || rows.length > maxRows) { setError(`请填写 1 至 ${maxRows} 行明细`); return }
+    if (invalid.some(row => Object.keys(row).length)) { financeFocusFormError(formRef.current); return }
     lock.current = true; setBusy(true); setError(null)
     try { await onSubmit(rows.map(row => financeFormBody(fields, row))); onClose() }
     catch (failure) { setError(failure.message) }
     finally { lock.current = false; setBusy(false) }
   }
-  return h(Dialog, { title, width: 'lg', onClose: busy ? undefined : onClose }, h('form', { onSubmit: submit, className: 'sf-stack' },
+  const invalidRows = errors.flatMap((row, index) => Object.keys(row).length ? [index + 1] : [])
+  return h(Dialog, { title, width: 'lg', onClose: exit.close, dismissDisabled: busy }, h('form', { ref: formRef, noValidate: true, onSubmit: submit, className: 'sf-stack sf-workflow-form' },
+    h('p', { className: 'sf-note', 'aria-live': 'polite' }, `共 ${rows.length} 行，最多 ${maxRows} 行。确认提交前请核对各行内容。`),
     ...rows.map((row, index) => h('fieldset', { key: index, disabled: busy, className: 'sf-stack' }, h('legend', null, `第 ${index + 1} 行`),
-      ...fields.map(field => h(FormRow, { key: field.key, label: field.label }, field.options
-        ? h(Select, { 'aria-label': `${field.label} ${index + 1}`, value: row[field.key] ?? '', options: field.options, placeholder: '请选择', required: field.required, onChange: value => setRows(current => current.map((item, i) => i === index ? { ...item, [field.key]: value } : item)) })
-        : h(Field, { 'aria-label': `${field.label} ${index + 1}`, value: row[field.key] ?? '', type: field.type || 'text', required: field.required, min: field.min, max: field.max, step: 'any', onChange: value => setRows(current => current.map((item, i) => i === index ? { ...item, [field.key]: value } : item)) }))),
-      rows.length > 1 ? h(GhostButton, { onClick: () => setRows(current => current.filter((_, i) => i !== index)) }, '移除此行') : null)),
-    h(GhostButton, { disabled: busy || rows.length >= maxRows, onClick: () => setRows(current => [...current, {}]) }, '添加一行'),
-    error ? h('p', { role: 'alert', className: 'sf-neg' }, error) : null, h(PrimaryButton, { type: 'submit', busy }, '确认提交')))
+      ...financeFormFields(fields, row, (key, value) => update(rows.map((item, i) => i === index ? financeSetField(item, key, value) : item)), errors[index] || {}, busy, `${prefix}-${index}`, index + 1),
+      rows.length > 1 ? h(GhostButton, { onClick: () => update(rows.filter((_, i) => i !== index)) }, '移除此行') : null)),
+    h(GhostButton, { disabled: busy || rows.length >= maxRows, onClick: () => update([...rows, {}]) }, '添加一行'),
+    invalidRows.length ? h('p', { role: 'alert', className: 'sf-neg' }, `第 ${invalidRows.join('、')} 行存在输入错误，已定位到首个错误。`) : null,
+    error ? h('p', { role: 'alert', className: 'sf-neg' }, error) : null, exit.prompt,
+    h('div', { className: 'sf-row' }, h(PrimaryButton, { type: 'submit', busy }, '确认提交'), h(GhostButton, { disabled: busy, onClick: exit.close }, '取消'))))
 }
 
 function useFinanceCapabilities() {
@@ -292,6 +358,7 @@ const FINANCE_SECTION_PERMISSIONS = {
 }
 function financeSectionAllowed(section, identity) {
   if (section === 'entry') return Boolean(identity.financeWriter && identity.permissions?.includes('budget.submission.edit'))
+  if (section === 'costitems') return identity.role === 'FINANCE_OWNER'
   if (section === 'identity') return identity.role === 'FINANCE_OWNER'
   const permission = FINANCE_SECTION_PERMISSIONS[section]
   if (section === 'facts') return Boolean(identity.permissions?.some(code => ['budget.execution.read', 'cash.plan.read', 'finance.source.review'].includes(code)))

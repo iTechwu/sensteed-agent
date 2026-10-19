@@ -1,16 +1,17 @@
 const BUDGET_OUTPUT_LABELS = { REVENUE: '收入', RECEIPT: '回款', CASH_BALANCE: '月末现金', FUNDING_GAP: '资金缺口', TAX: '应缴税费', PAYMENT: '实际付款', INVENTORY_HOLDING: '存货占用', LABOR_COST: '人工成本', OVERHEAD_COST: '制造费用' }
 function EngineView({ ctx }) {
-  const [versionId, setVersionId] = useState('')
-  const [paramId, setParamId] = useState('')
-  const [runId, setRunId] = useState('')
-  const [baseRunId, setBaseRunId] = useState('')
+  const [versionId, setVersionId] = useFinanceViewState(ctx, 'engineVersion', ctx.drillParams?.versionId || '')
+  const [paramId, setParamId] = useFinanceViewState(ctx, 'engineParam', '')
+  const [runId, setRunId] = useFinanceViewState(ctx, 'engineRun', '')
+  const [baseRunId, setBaseRunId] = useFinanceViewState(ctx, 'engineBaseRun', '')
   const [dialog, setDialog] = useState(null)
   const [receipt, setReceipt] = useState(null)
   const action = useFinanceAction()
   const revision = `${ctx.revision}-${action.revision}`
   const versions = useFinanceResource(`/finance/budget/versions?year=${ctx.year}`, revision)
   const rows = financeRows(versions.data)
-  const version = rows.find(row => row.id === versionId)
+  const defaultVersion = rows.find(row => row.status === 'DRAFT') || rows.find(row => row.isPrimary) || rows[0]
+  const version = versionId ? rows.find(row => row.id === versionId) : defaultVersion
   const validId = version?.id
   const draft = version?.status === 'DRAFT'
   const path = validId ? `/budget-engine/versions/${validId}` : null
@@ -24,8 +25,8 @@ function EngineView({ ctx }) {
   const outputs = useFinanceResource(validRun ? `/budget-engine/runs/${validRun}/outputs` : null, revision)
   const statements = useFinanceResource(validRun ? `/budget-engine/runs/${validRun}/statements` : null, revision)
   const diff = useFinanceResource(validRun && validBase ? `/budget-engine/runs/diff?baseRunId=${validBase}&targetRunId=${validRun}` : null, revision)
-  const selectedParams = financeRows(params.data).find(row => row.id === paramId)
-  useEffect(() => { setVersionId(''); setParamId(''); setRunId(''); setBaseRunId(''); setDialog(null) }, [ctx.year])
+  const selectedParams = paramId ? financeRows(params.data).find(row => row.id === paramId) : financeRows(params.data)[0]
+  const readiness = useFinanceResource(validId ? `/finance/budget/summary?year=${ctx.year}&versionId=${validId}&unassigned=true` : null, revision)
   const selectVersion = value => { setVersionId(value); setParamId(''); setRunId(''); setBaseRunId(''); setReceipt(null); setDialog(null) }
   const canEdit = ctx.financeWriter && ctx.permissions.includes('budget.version.manage')
   const canPublish = ctx.financeWriter && ctx.permissions.includes('budget.version.publish')
@@ -34,6 +35,9 @@ function EngineView({ ctx }) {
   return h('div', { className: 'sf-stack' },
     h(FinanceResource, { resource: versions }, h(FormRow, { label: '预算版本' }, h(Select, { 'aria-label': '编制预算版本', value: validId || '', options: rows.map(row => [row.id, `${row.name} · ${financeDisplayValue(row.status, 'status')}${row.isPrimary ? ' · 主版本' : ''}`]), placeholder: '选择预算版本', onChange: selectVersion }))),
     h(Notice, null, action.notice),
+    !versions.loading && !versions.error && !rows.length ? h('div', { role: 'status', className: 'sf-stack' }, '该年度暂无预算版本。请先新建预算草稿，再开始填报和编制。', h(GhostButton, { onClick: () => ctx.onNavigate('comparisons', { mode: 'versions', year: ctx.year }) }, '前往预算版本')) : null,
+    versionId && !versions.loading && !versions.error && !version ? h('p', { role: 'alert' }, '指定版本不在当前年度或不可访问，请重新选择预算版本。') : null,
+    version ? h(Card, { title: '预算准备度', actions: [h(GhostButton, { key: 'unassigned', onClick: () => ctx.onNavigate('budget', { year: ctx.year, versionId: validId, orgId: '', unassigned: true, view: 'lines' }) }, '核对未分配主体预算')] }, h(FinanceResource, { resource: readiness }, h('p', null, `版本明细 ${version.lineCount ?? '—'} 行 · 未分配主体预算 ${readiness.data ? formatNumber(readiness.data.totals?.budgetAmount) ?? '—' : '—'} 元`))) : null,
     version ? h('p', { className: 'sf-note' }, `${financeDisplayValue(version.status, 'status')} · ${version.lineCount ?? 0} 行。草稿可编辑；确认、发布和锁定以服务端状态与发布检查为准。`) : null,
     validId && (canEdit || canPublish) ? h('div', { className: 'sf-row' },
       canEdit ? h(GhostButton, { disabled: action.busy, onClick: () => setDialog({ kind: 'roll', title: '创建滚动预测草稿' }) }, '创建滚动草稿') : null,

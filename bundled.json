@@ -84,7 +84,7 @@
       "source": "sibling",
       "siblingDir": "../docker-helm.dofe.ai/skills/finance-monthly-risk",
       "snapshotDir": "dsh-plugin-desktop/bundled/skills/finance-monthly-risk",
-      "resolvedSha": "06be24a348619ff50bf4cdfa7588fca3d7200ba3"
+      "resolvedSha": "5117d35b1510bc0756948ac5b765ffb02b993dab"
     },
     {
       "name": "finance-cost-structure",
@@ -93,7 +93,7 @@
       "source": "sibling",
       "siblingDir": "../docker-helm.dofe.ai/skills/finance-cost-structure",
       "snapshotDir": "dsh-plugin-desktop/bundled/skills/finance-cost-structure",
-      "resolvedSha": "06be24a348619ff50bf4cdfa7588fca3d7200ba3"
+      "resolvedSha": "5117d35b1510bc0756948ac5b765ffb02b993dab"
     },
     {
       "name": "finance-cash-pressure",
@@ -102,7 +102,7 @@
       "source": "sibling",
       "siblingDir": "../docker-helm.dofe.ai/skills/finance-cash-pressure",
       "snapshotDir": "dsh-plugin-desktop/bundled/skills/finance-cash-pressure",
-      "resolvedSha": "06be24a348619ff50bf4cdfa7588fca3d7200ba3"
+      "resolvedSha": "264307feb11ad5a460500ff8d79024043c74d086"
     },
     {
       "name": "finance-budget-review",
@@ -111,7 +111,7 @@
       "source": "sibling",
       "siblingDir": "../docker-helm.dofe.ai/skills/finance-budget-review",
       "snapshotDir": "dsh-plugin-desktop/bundled/skills/finance-budget-review",
-      "resolvedSha": "06be24a348619ff50bf4cdfa7588fca3d7200ba3"
+      "resolvedSha": "5117d35b1510bc0756948ac5b765ffb02b993dab"
     },
     {
       "name": "finance-revenue-attainment",
@@ -120,7 +120,7 @@
       "source": "sibling",
       "siblingDir": "../docker-helm.dofe.ai/skills/finance-revenue-attainment",
       "snapshotDir": "dsh-plugin-desktop/bundled/skills/finance-revenue-attainment",
-      "resolvedSha": "06be24a348619ff50bf4cdfa7588fca3d7200ba3"
+      "resolvedSha": "896e6b7e2121c747513c5ab688543b85ba1af95f"
     },
     {
       "name": "finance-data-quality",
@@ -129,7 +129,7 @@
       "source": "sibling",
       "siblingDir": "../docker-helm.dofe.ai/skills/finance-data-quality",
       "snapshotDir": "dsh-plugin-desktop/bundled/skills/finance-data-quality",
-      "resolvedSha": "06be24a348619ff50bf4cdfa7588fca3d7200ba3"
+      "resolvedSha": "5117d35b1510bc0756948ac5b765ffb02b993dab"
     },
     {
       "name": "finance-cost-cash-forecast",
@@ -138,7 +138,7 @@
       "source": "sibling",
       "siblingDir": "../docker-helm.dofe.ai/skills/finance-cost-cash-forecast",
       "snapshotDir": "dsh-plugin-desktop/bundled/skills/finance-cost-cash-forecast",
-      "resolvedSha": "06be24a348619ff50bf4cdfa7588fca3d7200ba3"
+      "resolvedSha": "264307feb11ad5a460500ff8d79024043c74d086"
     },
     {
       "name": "finance-budget-version-health",
@@ -147,7 +147,7 @@
       "source": "sibling",
       "siblingDir": "../docker-helm.dofe.ai/skills/finance-budget-version-health",
       "snapshotDir": "dsh-plugin-desktop/bundled/skills/finance-budget-version-health",
-      "resolvedSha": "06be24a348619ff50bf4cdfa7588fca3d7200ba3"
+      "resolvedSha": "576edd33710233fe7d0a08b716a2868cc29d741b"
     },
     {
       "name": "finance-alert-rules-audit",
@@ -156,7 +156,7 @@
       "source": "sibling",
       "siblingDir": "../docker-helm.dofe.ai/skills/finance-alert-rules-audit",
       "snapshotDir": "dsh-plugin-desktop/bundled/skills/finance-alert-rules-audit",
-      "resolvedSha": "06be24a348619ff50bf4cdfa7588fca3d7200ba3"
+      "resolvedSha": "5117d35b1510bc0756948ac5b765ffb02b993dab"
     }
   ],
   "plugins": [
