@@ -3,6 +3,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
+import { createHubNavigation, nativeHubNavigation, HubContext } from './HubNavigation.tsx'
 import { HubSetupSection } from './HubSetupSection.tsx'
 import { Blocks, Sparkles } from 'lucide-react'
 import { HubPage, type CatalogSkill } from './HubPage.tsx'
@@ -34,9 +35,22 @@ export function registerHubPages(ctx: Context, props: {
     ['plugin', 'plugins', 0, Blocks, 'pluginsNav'],
     ['skill', 'sensteed-skill-manager', 1, Sparkles, 'skillsNav'],
   ] as const) {
+    const navigation = createHubNavigation()
+    const create = async () => { await startCreatorConversation(ctx, kind) }
+    ctx.slots.inject('desktop.navigation.context' as never, () => ctx.slots.register({
+      name: 'desktop.navigation.context', key: id,
+      inject: () => {
+        const main = ctx.slots.entriesOfSlot('main').find(entry => entry.options.key === id)
+        // Native plugin manager pins one instance in its registration handle.
+        const native = kind === 'plugin' && main?.component !== HubPage && main?.store && 'create' in main.store ? main.store.create() : undefined
+        return { kind, navigation: native ? nativeHubNavigation(native as unknown as Parameters<typeof nativeHubNavigation>[0]) : navigation,
+          create, settingsScope: props.settingsScope,
+          selectPanel: (panel: 'plugins' | 'sensteed-skill-manager') => ctx.layout.selectPanel(panel as Parameters<typeof ctx.layout.selectPanel>[0]) }
+      },
+    } as never, HubContext))
     ctx.slots.inject('main', () => ctx.slots.register({
       name: 'main', key: id, priority: 100, locale: 'dofe.access',
-      inject: () => ({ ...props, kind, loadSkills, create: async () => { await startCreatorConversation(ctx, kind) } }),
+      inject: () => ({ ...props, kind, loadSkills, create, navigation }),
     }, HubPage))
     ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
       name: 'sidebar.panellist', id, priority: -100, order, label: () => props.t(label), locale: 'dofe.access',

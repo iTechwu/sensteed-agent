@@ -1,5 +1,6 @@
 /** Desktop management pages remain available without the native npm installer. */
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
+import type { HubNavigation } from './HubNavigation.tsx'
 import { Plus, Sparkles, Blocks } from 'lucide-react'
 import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { DofeAccessSettings } from '../dofe-plugins.ts'
@@ -11,6 +12,7 @@ import type { HubKind } from './hub-setup-state.ts'
 
 export interface CatalogSkill { name: string; description: string }
 export interface HubPageProps {
+  navigation?: HubNavigation
   kind: HubKind
   t: (key: DofeAccessLocaleKey) => string
   settingsScope: ConfigForm<DofeAccessSettings>
@@ -48,8 +50,11 @@ export function HubPage(props: HubPageProps) {
   return account ? <HubPageContent key={`${account}:${connectionEpoch}`} {...props} /> : <p role="status">{props.t('settingsLoginRequired')}</p>
 }
 
-function HubPageContent({ kind, t, create, loadSkills, ...props }: HubPageProps) {
+function HubPageContent({ kind, t, create, loadSkills, navigation, ...props }: HubPageProps) {
   const [tab, setTab] = useState<'catalog' | 'installed'>('catalog'), [creating, setCreating] = useState(false), [failed, setFailed] = useState(false)
+  const externalTab = useSyncExternalStore(navigation?.subscribe ?? noSubscribe, navigation?.getSnapshot ?? defaultTab, navigation?.getSnapshot ?? defaultTab)
+  const currentTab = navigation ? externalTab : tab
+  const selectTab = (value: 'catalog' | 'installed') => navigation ? navigation.select(value) : setTab(value)
   const Icon = kind === 'plugin' ? Blocks : Sparkles
   const secondary = kind === 'plugin' ? 'builtInTab' : 'localSkillsTab'
   return <div className="dshHubPage"><div className="dshHubContent">
@@ -61,11 +66,14 @@ function HubPageContent({ kind, t, create, loadSkills, ...props }: HubPageProps)
     </header>
     {failed && <p role="alert">{t('catalogCreateFailed')}</p>}
     <div className="dshHubTabs" role="group" aria-label={t(kind === 'plugin' ? 'pluginsNav' : 'skillsNav')}>
-      <button type="button" aria-pressed={tab === 'catalog'} onClick={() => setTab('catalog')}>{t('catalogTab')}</button>
-      <button type="button" aria-pressed={tab === 'installed'} onClick={() => setTab('installed')}>{t(secondary)}</button>
+      <button type="button" aria-pressed={currentTab === 'catalog'} onClick={() => selectTab('catalog')}>{t('catalogTab')}</button>
+      <button type="button" aria-pressed={currentTab === 'installed'} onClick={() => selectTab('installed')}>{t(secondary)}</button>
     </div>
-    <div hidden={tab !== 'catalog'}><HubSetupSection kind={kind} t={t} {...props} /></div>
-    {tab === 'installed' && (kind === 'skill' ? <SkillLibrary loadSkills={loadSkills} t={t} />
+    <div hidden={currentTab !== 'catalog'}><HubSetupSection kind={kind} t={t} {...props} /></div>
+    {currentTab === 'installed' && (kind === 'skill' ? <SkillLibrary loadSkills={loadSkills} t={t} />
       : <ul className="dshHubCatalog">{dofePluginsForBrand('sensteed').map(plugin => <li className="dshHubCard" key={plugin.id}><h3>{plugin.name}</h3><DofePluginCard plugin={plugin} settingsScope={props.settingsScope} t={t} view="page" /></li>)}</ul>)}
   </div></div>
 }
+
+const noSubscribe = () => () => {}
+const defaultTab = () => 'catalog' as const

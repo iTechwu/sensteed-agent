@@ -9,6 +9,7 @@ it.each([true, false])('keeps legacy pages when present and falls back after dis
   core.register({ name: 'root', children: {
     main: { kind: 'keyed', scope: 'root' },
     'sidebar.panellist': { kind: 'list', scope: 'root' },
+    'desktop.navigation.context': { kind: 'keyed', scope: 'root' },
     'plugins.tab': { kind: 'list', scope: 'root' },
   } }, (() => null) as never)
   const Legacy = () => null
@@ -21,6 +22,7 @@ it.each([true, false])('keeps legacy pages when present and falls back after dis
   expect(core.entriesOfSlot('main').find(entry => entry.options.key === 'plugins')?.component).toBe(Legacy)
   expect(core.entriesOfSlot('plugins.tab').map(entry => entry.options.id)).toEqual(['sensteed-enterprise'])
   expect(core.entriesOfSlot('sidebar.panellist').map(entry => entry.options.id)).toEqual(['plugins', 'sensteed-skill-manager'])
+  expect(core.entriesOfSlot('desktop.navigation.context').map(entry => entry.options.key)).toEqual(['plugins', 'sensteed-skill-manager'])
   remove()
   expect(core.entriesOfSlot('main').find(entry => entry.options.key === 'plugins')?.component).toBe(HubPage)
 })
