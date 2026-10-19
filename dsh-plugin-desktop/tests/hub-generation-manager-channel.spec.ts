@@ -34,7 +34,7 @@ function fixture(active:boolean){
  let manager!:{check(input:unknown):Promise<{channel:'stable'|'beta'}>;preview(input:unknown):Promise<unknown>}
  const scope={hubHostClient:client,provide:(_name:string,value:unknown)=>{manager=value as typeof manager},effect:()=>{},inject:()=>{}}
  registerHubGenerationManager({inject:(_keys:string[],fn:(v:unknown)=>void)=>fn(scope)} as never,{target,userData:root,profileDirectory:root})
- return{manager,check}
+ return{manager,check,client}
 }
 it.each([[true,{},'beta'],[false,{},'stable'],[true,{channel:'stable'},'stable'],[false,{channel:'beta'},'beta']]as const)('resolves channel from verified active inventory while preserving explicit intent (%s, %j)',async(active,input,expected)=>{
  const f=fixture(active),result=await f.manager.check(input)
@@ -48,4 +48,9 @@ it('requires a channel for preview and never guesses from invalid inventory',asy
  const f=fixture(true);await expect(f.manager.preview({requested:[]})).rejects.toThrow()
  vi.mocked(inspectSavedHubPlan).mockImplementation(()=>{throw Error('invalid signed inventory')})
  await expect(f.manager.check({})).rejects.toThrow('invalid signed inventory');expect(f.check).not.toHaveBeenCalled()
+})
+it('keeps the repair check available when the old active boot lease is revoked',async()=>{
+ const f=fixture(true);vi.mocked(f.client.bootAuthorization).mockRejectedValue(new Error('old lease revoked'))
+ await expect(f.manager.check({})).resolves.toMatchObject({activeGenerationDigest:'c'.repeat(64)})
+ expect(f.check).toHaveBeenCalledTimes(1)
 })

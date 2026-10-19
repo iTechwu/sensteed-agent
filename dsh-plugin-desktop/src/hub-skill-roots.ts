@@ -61,10 +61,10 @@ function registerUserSkillProvider(ctx:Context):void {ctx.inject(['skills'],asyn
 export function registerHubSkillRoots(ctx: Context, boot: ReturnType<typeof prepareHubHostBoot>,userRoot?:string): void {
   const descriptor = boot.store.activeDescriptor()
   if (!descriptor || descriptor.generationId !== boot.generationId) throw new Error('Hub skill generation changed before root registration')
-  const disabled = new Set(Object.keys(descriptor.files).flatMap(path => {
+  const disabled = new Set([...(descriptor.suppressedSkills ?? []), ...Object.keys(descriptor.files).flatMap(path => {
     const match = /^disabled-skills\/([a-z0-9]+(?:-[a-z0-9]+)*)\/SKILL\.md$/u.exec(path)
     return match ? [match[1]!] : []
-  }))
+  })])
   const roots = [{ path: boot.skillsRoot, source: 'hub' as const, rank: 100 }, ...sealedBundledRoots(disabled)]
   const dispose = installRootPolicy(ctx, {
     ...(userRoot?{userRoots:[userRoot]}:{}),

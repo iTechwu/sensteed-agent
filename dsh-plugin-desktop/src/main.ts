@@ -1816,7 +1816,8 @@ async function start(): Promise<void> {
     const hostPatches = hubBoot === undefined ? prepared.patches : hubBoot.patches
     const profileBoot = createDesktopProfileBoot(prepared, desktopPnpmBootstrap, hubBoot?.selection, hubBoot === undefined ? [] : [hubBoot.patch],hubRuntimeTarget===undefined?undefined:hubBaseComposition,hubRuntimeTarget!==undefined,hubBoot?.compose)
     const hubSupervisor=new HubHostSupervisor()
-    generation.bindHost({fiber:{dispose:()=>hubSupervisor.dispose()}})
+    let embeddedHost: import('./startup-generation.ts').DesktopStartupGenerationHost|undefined
+    generation.bindHost({fiber:{dispose:async()=>{await embeddedHost?.fiber.dispose();await hubSupervisor.dispose()}}})
     const hubBasePrepared=prepared
     const bootIsolatedHost=async(nextPrepared:typeof prepared,bindNext:(host:import('./startup-generation.ts').DesktopStartupGenerationHost)=>void)=>{
       await startIsolatedDesktopHost({
@@ -1994,7 +1995,10 @@ async function start(): Promise<void> {
               ...(await scope.sensteedQuitInspection.inspect()),
             })
           })
-          generation.bindHost(hostCtx)
+          // The startup generation owns a stable wrapper. Rebinding it to the
+          // in-process Context would violate the single Host invariant when
+          // DSH_DESKTOP_ISOLATED_HOST=0.
+          embeddedHost=hostCtx
           await hostCtx.plugin(PluginPackages, { resolution })
           hostCtx.effect(
             () => async () => { await flushProfilePreferencesWrites() },

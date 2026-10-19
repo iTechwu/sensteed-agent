@@ -37,6 +37,9 @@ export interface HubVerifiedComposition {
 export interface HubGenerationDescriptor {
   readonly schemaVersion: 1 | 2
   readonly verifiedComposition?: HubVerifiedComposition
+  /** Signed-plan-derived tombstones used to suppress sealed bundled fallbacks. */
+  readonly suppressedPackages?: readonly string[]
+  readonly suppressedSkills?: readonly string[]
   readonly identity: HubGenerationIdentity
   readonly generationId: string
   readonly packages: readonly HubGenerationPackage[]
@@ -166,7 +169,7 @@ function pointer(value: unknown): Pointer | null {
 }
 function descriptor(value: unknown, expected: HubGenerationIdentity): HubGenerationDescriptor {
   const item = record(value)
-  keys(item, ['schemaVersion', 'identity', 'generationId', 'packages', 'skillsRoot', 'files', ...(item.schemaVersion === 2 ? ['verifiedComposition'] : [])])
+  keys(item, ['schemaVersion', 'identity', 'generationId', 'packages', 'skillsRoot', 'files', ...(item.schemaVersion === 2 ? ['verifiedComposition'] : []), ...(item.schemaVersion === 2 && Object.hasOwn(item, 'suppressedPackages') ? ['suppressedPackages'] : []), ...(item.schemaVersion === 2 && Object.hasOwn(item, 'suppressedSkills') ? ['suppressedSkills'] : [])])
   if (![1, 2].includes(item.schemaVersion as number) || hubGenerationScope(identity(item.identity)) !== hubGenerationScope(expected)) fail('cross-profile or identity mismatch')
   token(item.generationId); safeRelative(item.skillsRoot)
   if (!Array.isArray(item.packages) || item.packages.length > 1024) fail('invalid package list')
@@ -188,6 +191,12 @@ function descriptor(value: unknown, expected: HubGenerationIdentity): HubGenerat
   }
   for (const raw of item.packages) if (!Object.hasOwn(files, record(raw).manifest as string)) fail('package manifest missing from file set')
   if (item.schemaVersion === 2) {
+    for (const [field, pattern] of [['suppressedPackages', PACKAGE], ['suppressedSkills', /^[a-z0-9]+(?:-[a-z0-9]+)*$/u]] as const) {
+      const values = item[field]
+      if (values === undefined) continue
+      if (!Array.isArray(values) || values.length > 1024 || values.some(value => typeof value !== 'string' || !pattern.test(value))) fail(`invalid ${field}`)
+      if (new Set(values).size !== values.length) fail(`duplicate ${field}`)
+    }
     const composition = record(item.verifiedComposition); keys(composition, ['entries', 'skills'])
     if (!Array.isArray(composition.entries) || composition.entries.length > 1024 || !Array.isArray(composition.skills) || composition.skills.length > 1024) fail('invalid verified composition')
     const ids = new Set<string>(), skills = new Set<string>()

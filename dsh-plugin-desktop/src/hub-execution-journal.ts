@@ -15,6 +15,7 @@ const recordSchema = z.strictObject({
   phase: z.enum(['PLANNED', 'CONSUMING', 'AUTHORIZED', 'STAGED', 'COMMITTED', 'ACTIVATED', 'ROLLED_BACK', 'NEEDS_ATTENTION']),
   revision: z.number().int().nonnegative(), receiptSeq: z.number().int().nonnegative(),
   executionGeneration: z.string().regex(/^[1-9][0-9]*$/u).nullable(), executionExpiresAt: z.iso.datetime().nullable(),
+  consumptionStarted: z.boolean().default(false),
   signedPlan: z.record(z.string(),z.unknown()).nullable(),
   descriptorDigest: digest.nullable(), pendingReceipt: receiptSchema.nullable(),
 })
@@ -74,10 +75,11 @@ export class HubExecutionJournal {
     }
     return await withFileLock(this.path, async () => {
       const old = this.read()
-      if (old && (old.pendingReceipt!==null || old.phase !== 'ACTIVATED' && old.phase !== 'ROLLED_BACK')) throw new Error('Hub execution is already pending')
+      const retryableFailure=old?.phase==='NEEDS_ATTENTION'&&old.pendingReceipt===null&&!old.consumptionStarted
+      if (old && !retryableFailure && (old.pendingReceipt!==null || old.phase !== 'ACTIVATED' && old.phase !== 'ROLLED_BACK')) throw new Error('Hub execution is already pending')
       const value = recordSchema.parse({ schemaVersion: 1, scope: this.store.scope, planId: plan.planId, planDigest: plan.planDigest,
         operationId, previousGenerationDigest: plan.expectedActiveGenerationDigest, generationDigest: plan.proposedGenerationDigest,
-        phase: 'PLANNED', revision: (old?.revision ?? -1) + 1, receiptSeq: 0, executionGeneration: null, executionExpiresAt: null, signedPlan, descriptorDigest: null, pendingReceipt:null })
+        phase: 'PLANNED', revision: (old?.revision ?? -1) + 1, receiptSeq: 0, executionGeneration: null, executionExpiresAt: null, consumptionStarted:false, signedPlan, descriptorDigest: null, pendingReceipt:null })
       this.write(value); return Object.freeze(value)
     })
   }
@@ -150,7 +152,7 @@ export class HubExecutionJournal {
       if (!old || old.operationId !== expected.operationId || old.revision !== expected.revision) throw new Error('Stale Hub execution worker')
       if (old.pendingReceipt!==null) throw new Error('Hub receipt acknowledgment is pending')
       if (!transitions[old.phase].includes(phase)) throw new Error('Invalid Hub execution phase transition')
-      const value = recordSchema.parse({ ...old, ...update, phase, revision: old.revision + 1 })
+      const value = recordSchema.parse({ ...old, ...update, phase, revision: old.revision + 1, consumptionStarted:old.consumptionStarted||phase==='CONSUMING' })
       if (value.receiptSeq !== old.receiptSeq) throw new Error('Invalid Hub receipt sequence')
       if (old.executionGeneration !== null && value.executionGeneration !== old.executionGeneration) throw new Error('Hub execution generation changed')
       if (phase === 'AUTHORIZED' && (!value.executionGeneration || !value.executionExpiresAt || Date.parse(value.executionExpiresAt) <= Date.now())) throw new Error('Hub execution authorization missing')

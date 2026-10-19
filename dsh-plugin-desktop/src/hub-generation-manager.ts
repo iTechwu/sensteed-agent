@@ -30,15 +30,17 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
    const context=await client.context(),identity=await resolveHubHostIdentity(options.userData,options.profileDirectory,client,context)
    const store=new HubGenerationStore(options.userData,identity);lastStore=store
    const state=store.readState(),journal=new HubExecutionJournal(store),pendingRecord=journal.read(),record=pendingRecord?.descriptorDigest===state.active?.descriptorDigest?pendingRecord:journal.readHealthyInventory()
-   if(requireIdle&&pendingRecord&&(pendingRecord.pendingReceipt!=null||pendingRecord.phase!=='ACTIVATED'&&pendingRecord.phase!=='ROLLED_BACK'))throw new Error('HUB_OPERATION_PENDING')
+   const retryableFailure=pendingRecord?.phase==='NEEDS_ATTENTION'&&pendingRecord.pendingReceipt===null&&!pendingRecord.consumptionStarted
+   if(requireIdle&&pendingRecord&&!retryableFailure&&(pendingRecord.pendingReceipt!=null||pendingRecord.phase!=='ACTIVATED'&&pendingRecord.phase!=='ROLLED_BACK'))throw new Error('HUB_OPERATION_PENDING')
    let activeGenerationDigest:string|null=null,minimumPolicyRevision=0,channel=requestedChannel??'stable'
    let installed:Parameters<HubHostClient['check']>[1]['installed']=[]
    if(state.active!==null){
     if(!record||record.phase!=='ACTIVATED'&&record.phase!=='COMMITTED')throw new Error('HUB_ACTIVE_INVENTORY_RECOVERY_REQUIRED')
     const saved=inspectSavedHubPlan(record,identity,options.target,trust)
     channel=requestedChannel??saved.plan.channel
-    const lease=await client.bootAuthorization(context,{deviceId:identity.deviceId,profileId:identity.profileId,generationDigest:saved.plan.proposedGenerationDigest,target:options.target})
-    verifyHubBootAuthorization(lease,trust,{...identity,target:options.target,generationDigest:saved.plan.proposedGenerationDigest,minimumPolicyRevision:saved.plan.policyRevision})
+    // An old active generation is inventory evidence for planning, not a
+    // prerequisite for querying or repairing it. Its boot lease may have been
+    // revoked while a newer compatible release is still installable.
     activeGenerationDigest=saved.plan.proposedGenerationDigest;minimumPolicyRevision=saved.plan.policyRevision
     installed=saved.plan.items.map(i=>({kind:i.kind,itemId:i.itemId,releaseId:i.releaseId,artifactDigest:i.artifactDigest,channelRevision:i.channelRevision,enabled:i.enabled,userRemoved:i.action==='uninstall'}))
    }
@@ -171,5 +173,12 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
   scope.effect(()=>()=>intents.clear(),'Desktop Hub intent lifetime')
  })
 }
-function summary(store:HubGenerationStore){const record=new HubExecutionJournal(store).read();return record===undefined?undefined:{operationId:record.operationId,state:record.phase,phase:record.phase,restartRequired:record.phase==='STAGED'||record.phase==='COMMITTED',restartReady:record.phase==='STAGED'&&record.pendingReceipt===null}}
+/** Renderer-safe projection of durable journal state. Evidence digests and timestamps stay Host-only. */
+export function hubOperationSummary(store:HubGenerationStore){
+ const record=new HubExecutionJournal(store).read()
+ if(record===undefined)return undefined
+ const pending=record.pendingReceipt??null,pendingReceipt=pending===null?undefined:{phase:pending.phase,seq:pending.seq,errorCode:pending.errorCode}
+ return {operationId:record.operationId,state:record.phase,phase:record.phase,restartRequired:record.phase==='STAGED'||record.phase==='COMMITTED',restartReady:record.phase==='STAGED'&&pending===null,errorCode:pendingReceipt?.errorCode??(record.phase==='NEEDS_ATTENTION'?'HUB_NEEDS_ATTENTION':undefined),receiptSeq:record.receiptSeq,outboxState:pendingReceipt===undefined?'clear' as const:'pending' as const,pendingReceipt}
+}
+function summary(store:HubGenerationStore){return hubOperationSummary(store)}
 declare module'@deepseek-ai/cordis'{interface Context{hubGenerationManager:unknown}}

@@ -49,6 +49,17 @@ it('persists operation identity before consume and forbids stale and terminal wo
  await expect(journal.advance(rollback, 'AUTHORIZED')).rejects.toThrow('transition')
  expect(readFileSync(join(store.directory, 'execution.json'), 'utf8')).not.toContain('executionGrant')
 })
+it('allows a fresh operation after an authorize failure before consumption starts', async () => {
+ const f = fixture(), root = realpathSync(mkdtempSync(join(tmpdir(), 'hub-retry-'))); roots.push(root)
+ const store = new HubGenerationStore(root, { origin:f.expected.origin,tenantId:f.expected.tenantId,actorRef:f.expected.actorRef,deviceId:f.expected.deviceId,profileId:f.expected.profileId }), journal = new HubExecutionJournal(store)
+ const cap = verifyHubGenerationPlan(f.signed(), f.trust, f.expected)
+ const failed = await journal.advance(await journal.begin(cap), 'NEEDS_ATTENTION')
+ const retried = await journal.begin(cap)
+ expect(retried.operationId).not.toBe(failed.operationId)
+ const consumed = await journal.advance(retried, 'CONSUMING')
+ await journal.advance(consumed, 'NEEDS_ATTENTION')
+ await expect(journal.begin(cap)).rejects.toThrow('already pending')
+})
 it('rejects forged plan capability and journal identity tampering', async () => {
  const f=fixture(), root=realpathSync(mkdtempSync(join(tmpdir(),'hub-execution-'))); roots.push(root)
  const store=new HubGenerationStore(root, { origin:f.expected.origin,tenantId:f.expected.tenantId,actorRef:f.expected.actorRef,deviceId:f.expected.deviceId,profileId:f.expected.profileId }), journal=new HubExecutionJournal(store)

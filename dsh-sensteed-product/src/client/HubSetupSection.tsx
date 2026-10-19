@@ -66,13 +66,13 @@ function HubSetupEditor({t}:Pick<Props,'t'>){
    <code>{preview.planDigest}</code><ul>{preview.items.map(item=><li key={hubKey(item)}><strong>{item.displayName??item.itemId}</strong> · {item.kind} · {item.action} · {item.version??t('hubUnknown')} · {item.enabled?t('hubEnabled'):t('hubDisabled')}
     {item.releaseId&&<div>{t('hubRelease')}: <code>{item.releaseId}</code></div>}
     {item.compatibility&&<p>{item.compatibility}{item.evidence?` · ${item.evidence}`:''}</p>}
-    <p>{t('hubPermissions')}: {item.accessDeclaration?`${t('hubScripts')}: ${String(item.accessDeclaration.containsScripts)}; ${t('hubFiles')}: ${item.accessDeclaration.fileAccess}; ${t('hubNetwork')}: ${item.accessDeclaration.networkHosts.join(', ')||t('hubNone')}`:t('hubPermissionUnknown')}</p>
+    <p>{t('hubPermissions')}: {item.accessDeclaration?`${t('hubScripts')}: ${String(item.accessDeclaration.containsScripts)}; ${t('hubFiles')}: ${item.accessDeclaration.fileAccess}; ${t('hubNetwork')}: ${item.accessDeclaration.networkHosts.join(', ')||t('hubNone')}${item.accessDeclaration.localPreview?`; ${t('hubPreviewScope')}: ${item.accessDeclaration.localPreview.scope} (${item.accessDeclaration.localPreview.protocols.join(', ')})`:''}`:t('hubPermissionUnknown')}</p>
    </li>)}</ul><p>{t('hubConfirmHint')}</p>
    {missingAccess&&<p role="alert">{t('hubAccessRequired')}</p>}
    <Button disabled={busy||recovering||pending||expired||missingAccess||!intent.current} onClick={()=>{const value=intent.current;if(!value||Date.parse(value.expiresAt)<=Date.now()||value.items.some(i=>(i.action==='install'||i.action==='update')&&!i.accessDeclaration))return;intent.current=undefined;setPreview(undefined);void run(async()=>{try{setOperation(await hubSetupRequest<HubOperation>('execute',{intentId:value.intentId,confirmationNonce:value.confirmationNonce}))}catch(e){setRecovering(true);throw e}})}}>{expired?t('hubExpired'):t('hubExecute')}</Button>
   </div>}
   {operation&&<div role="status"><h3>{t('hubOperation')}</h3><p>{operation.state}{operation.phase&&operation.phase!==operation.state?` · ${operation.phase}`:''}{operation.errorCode?` · ${operation.errorCode}`:''}</p>
-   <p><code>{operation.operationId}</code></p>{operation.restartRequired&&<p>{t('hubRestartRequired')}</p>}
+   <p><code>{operation.operationId}</code></p>{operation.outboxState==='pending'?<p>{t('hubReceiptPending')}</p>:operation.receiptSeq!==undefined&&<p>{t('hubReceiptSynced')} · {operation.receiptSeq}</p>}{operation.restartRequired&&<p>{t('hubRestartRequired')}</p>}
    {operation.restartReady&&<Button disabled={busy||recovering} onClick={()=>void run(async()=>{setRecovering(true);try{setOperation(await hubSetupRequest<HubOperation>('restart',{operationId:operation.operationId}))}catch{setError(t('hubConnectionRecovering'))}})}>{t('hubRestart')}</Button>}
   </div>}
   {recovering&&<p role="status">{t('hubConnectionRecovering')}</p>}

@@ -1,7 +1,7 @@
 import{hubNodeIncluded,verifyHubNodeMetadata,verifyHubNodeDependencies}from'./hub-plugin-graph.ts'
 /** Private, link-free materialization. Never executes install hooks or uses a public registry. */
 import { createHash } from 'node:crypto'
-import { mkdirSync, writeFileSync, existsSync, openSync, fsyncSync, closeSync } from 'node:fs'
+import { mkdirSync, writeFileSync, existsSync, openSync, fsyncSync, closeSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { load, JSON_SCHEMA } from 'js-yaml'
 import { HubGenerationStore, type HubGenerationDescriptor } from './hub-generation-store.ts'
@@ -10,6 +10,7 @@ import { hubGenerationConsumptionData, type VerifiedHubGenerationConsumption } f
 import type { HubReleaseTrust } from './hub-sync-verifier.ts'
 import { hubSyncDigest } from './hub-sync-verifier.ts'
 import { verifyHubGenerationDownloads } from './hub-generation-downloads.ts'
+import { HubGenerationDownloadsSchema } from './hub-artifact-schemas.ts'
 import { readHubPluginArchive } from './hub-plugin-archive.ts'
 import { HUB_RELEASE_EVIDENCE_FILE,verifyHubGenerationContent } from './hub-generation-content.ts'
 import { unpackSkillArchive, fileManifestDigest } from './hub-skill-archive.mjs'
@@ -39,7 +40,22 @@ export async function materializeHubGeneration(options:{
  const downloads=verifyHubGenerationDownloads(options.downloads,plan,proof,options.trust),root=store.generationDirectory(options.generationId)
  if(existsSync(root))throw new Error('Generation staging directory already exists')
  mkdirSync(root,{mode:0o700})
- const files:Record<string,string>={},packages:HubGenerationDescriptor['packages'][number][]=[],entries:{id:string;packageName:string;config:Record<string,unknown>}[]=[],skills:{name:string;path:string;sha256:string}[]=[]
+ const files:Record<string,string>={},packages:HubGenerationDescriptor['packages'][number][]=[],entries:{id:string;packageName:string;config:Record<string,unknown>}[]=[],skills:{name:string;path:string;sha256:string}[]=[],suppressedPackages:string[]=[],suppressedSkills:string[]=[]
+ const removedReleases=new Set(plan.items.filter(item=>item.action==='uninstall').map(item=>item.releaseId))
+ const previous=store.activeDescriptor()
+ if(previous!==undefined){suppressedPackages.push(...(previous.suppressedPackages??[]));suppressedSkills.push(...(previous.suppressedSkills??[]))}
+ if(previous!==undefined&&removedReleases.size>0){
+  for(const pkg of previous.packages)if(removedReleases.has(pkg.releaseId))suppressedPackages.push(pkg.name)
+  const evidencePath=join(store.generationDirectory(previous.generationId),HUB_RELEASE_EVIDENCE_FILE)
+  if(existsSync(evidencePath)){
+   const manifests=HubGenerationDownloadsSchema.pick({manifests:true}).parse(JSON.parse(readFileSync(evidencePath,'utf8'))).manifests
+   for(const row of manifests){
+    const manifest=row.envelope.manifest as {releaseId?:string;skillId?:string;installName?:string}
+    if(!manifest.releaseId||!removedReleases.has(manifest.releaseId))continue
+    if(row.kind==='skill'&&manifest.skillId&&manifest.installName)suppressedSkills.push(manifest.installName)
+   }
+  }
+ }
  const portable=new Set<string>();let total=0
  const put=(relative:string,bytes:Buffer)=>{
   path(relative);const folded=relative.toLowerCase()
@@ -109,7 +125,7 @@ export async function materializeHubGeneration(options:{
  mkdirSync(join(root,'skills'),{recursive:true,mode:0o700});mkdirSync(join(root,'profile'),{recursive:true,mode:0o700})
  put(HUB_RELEASE_EVIDENCE_FILE,Buffer.from(JSON.stringify({manifests:downloads.manifests})))
  hubGenerationConsumptionData(proof)
- const descriptor:HubGenerationDescriptor={schemaVersion:2,identity:store.identity,generationId:options.generationId,packages,skillsRoot:'skills',files,verifiedComposition:{entries,skills}}
+ const descriptor:HubGenerationDescriptor={schemaVersion:2,identity:store.identity,generationId:options.generationId,packages,skillsRoot:'skills',files,verifiedComposition:{entries,skills},...(suppressedPackages.length>0?{suppressedPackages:[...new Set(suppressedPackages)]}:{}),...(suppressedSkills.length>0?{suppressedSkills:[...new Set(suppressedSkills)]}:{})}
  verifyHubGenerationContent(store,plan,options.trust,descriptor)
  return descriptor
 }

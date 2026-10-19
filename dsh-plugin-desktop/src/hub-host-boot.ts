@@ -26,7 +26,8 @@ export function prepareHubHostBoot(input: HubTrustedHostBootInput, logicalProfil
   const boot = reopenHubGenerationBoot(input.reference, input.expectedIdentity, logicalProfileDirectory)
   const store = new HubGenerationStore(input.reference.root, input.expectedIdentity)
   const patch = hubGenerationPatch(store)
-  const managedPackages = store.activeDescriptor()!.packages.map(pkg => pkg.name)
+  const descriptor = store.activeDescriptor()!
+  const managedPackages = [...descriptor.packages.map(pkg => pkg.name), ...(descriptor.suppressedPackages ?? [])]
   const compose = (base: readonly PatchOptions[]) => hubOverlayComposition(base, patch, managedPackages)
   const patches = compose(basePatches)
   return {

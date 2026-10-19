@@ -10,8 +10,10 @@ export class HubHostSupervisor{
    if(this.stopped)throw new Error('Hub supervisor is stopped')
    const old=this.host
    if(old){await old.fiber.dispose();this.host=undefined}
+   if(this.stopped)throw new Error('Hub supervisor is stopped')
    // Failure to stop leaves the original Host owned; mutation never ran.
    await mutate()
+   if(this.stopped)throw new Error('Hub supervisor is stopped')
    try{await start(host=>this.bind(host))}catch(cause){await this.host?.fiber.dispose();this.host=undefined;throw cause}
   })
   this.tail=task.catch(()=>{});return await task
