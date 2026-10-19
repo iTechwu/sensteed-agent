@@ -140,6 +140,7 @@ window.__ModuleLoader__.load({
         select(id) { if (state.status !== 'ready' || !state.items.some(item => item.id === id) || !select) return false; select(id); return true },
         leave(action) { if (leave) leave(action); else action() },
         attach() { attached++; emit({ attached: true }); return () => { attached--; emit({ attached: attached > 0 }) } },
+        accessUnavailable(reason) { return reason === 'supply_chain_unavailable' || reason === 'connection_unavailable' },
         useAccess(url, onScope) {
           const [allowed, setAllowed] = React.useState(null)
           const snapshot = React.useSyncExternalStore(bridge.subscribe, bridge.getSnapshot, bridge.getSnapshot)
@@ -154,7 +155,7 @@ window.__ModuleLoader__.load({
                 const response = await fetch(url, { credentials: 'same-origin', redirect: 'error', signal: AbortSignal.any([local.signal, bridge.signal, AbortSignal.timeout(30000)]) })
                 const body = await response.json()
                 if (disposed || generation !== epoch) return
-                if (response.status === 401 || response.status === 403 || body.allowed === false) { setAllowed(false); bridge.invalidate(); return }
+                if (response.status === 401 || response.status === 403 || body.allowed === false && !bridge.accessUnavailable(body.reason)) { setAllowed(false); bridge.invalidate(); return }
                 if (!response.ok || body.allowed !== true) throw new Error('access_unavailable')
                 if (onScope) onScope(body.scopeId); else bridge.adoptScope(body.scopeId)
                 bridge.resume(); setAllowed(true)
@@ -279,7 +280,7 @@ window.__ModuleLoader__.load({
       }
       useEffect(() => {
         if (access === true) bridge.publish(TABS.map(([id, label]) => ({ id, label })), tab, id => { setError(''); setTab(id) })
-        else if (access === false && bridge.getSnapshot().status !== 'denied') bridge.invalidate()
+        else if (access === false && !bridge.accessUnavailable(accessReason) && bridge.getSnapshot().status !== 'denied') bridge.invalidate()
       })
       useEffect(() => () => bridge.clearSource(), [])
       if (access === null) return h('main', { className: 'sr-page', role: 'status' }, '正在连接供应链工作台…')
@@ -787,7 +788,7 @@ window.__ModuleLoader__.load({
     exports.apply = apply
     exports.inject = ['slots', 'locale', 'sessions', 'uiWorkspace', 'layout']
 
-    function SupplierPage() { const { allowed, epoch } = supplierNavigation().useAccess(`${BASE}/access`, adoptScope); return allowed === true ? h(Workbench, { key: epoch }) : h('p', { role: 'status' }, allowed === false ? '当前模块不可访问' : '正在确认访问权限…') }
+    function SupplierPage() { const { allowed, epoch } = supplierNavigation().useAccess(`${BASE}/access`, adoptScope); return allowed !== false ? h(Workbench, { key: epoch }) : h('p', { role: 'status' }, '当前模块不可访问') }
 
     exports.apply = apply; exports.inject = ['slots', 'locale', 'sessions', 'uiWorkspace', 'layout']; return module.exports; },
 });
