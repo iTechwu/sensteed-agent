@@ -1099,32 +1099,27 @@ describe('packaged desktop runtime verification', () => {
       new URL('../node_modules/pnpm/package.json', import.meta.url),
       'utf8',
     )).version as string
-    const run = vi.fn<PackagedElectronRunner>((_executable, args, environment) => {
+    const run = vi.fn<PackagedElectronRunner>((_executable, args) => {
       const normalizedArgs = args.map(arg => arg.replaceAll('\\', '/'))
-      if (normalizedArgs.some(arg => arg.endsWith('/lib/desktop-cli.js')) && args.includes('--help')) {
-        const packageDir = join(environment.DSH_HOME!, 'profiles', 'node_modules', 'yaml')
-        const target = pathToFileURL(join(
-          resolvePackagedAsarPath(runtimeContext),
-          'node_modules',
-          'yaml',
-          'dist',
-          'index.js',
-        )).href
-        mkdirSync(packageDir, { recursive: true })
-        writeFileSync(join(packageDir, 'package.json'), JSON.stringify({
-          name: 'yaml',
-          version: '2.9.0',
-          private: true,
-          type: 'module',
-          exports: { '.': './entry-0.js' },
-          dsh: { moduleFallback: { targets: { '.': target } } },
-        }))
-        writeFileSync(join(packageDir, 'entry-0.js'), [
-          `export * from ${JSON.stringify(target)}`,
-          `import * as target from ${JSON.stringify(target)}`,
-          'export default target.default',
-          '',
-        ].join('\n'))
+      if (normalizedArgs.some(arg => arg.endsWith('/lib/desktop-cli.js'))) {
+        // 密封企业 CLI：只读回复放行，业务参数（含 profile 前缀）被拒。
+        if (args.includes('--dump-config')) {
+          return {
+            status: 1,
+            stdout: '',
+            stderr: 'Sensteed sealed CLI: business startup and plugin management require Desktop Hub authorization. '
+              + 'Open Desktop → Plugins & Skills; no command was executed.',
+          }
+        }
+        if (args.includes('--help')) {
+          return {
+            status: 0,
+            stdout: 'Sensteed Agent: manage enterprise plugins and skills in Desktop → Plugins & Skills. '
+              + 'Business CLI startup and independent installation are unavailable.\n',
+            stderr: '',
+          }
+        }
+        return { status: 0, stdout: 'Sensteed Agent sealed Hub CLI (desktop-managed)\n', stderr: '' }
       }
       return {
         status: 0,
@@ -1134,11 +1129,7 @@ describe('packaged desktop runtime verification', () => {
             ? pnpmVersion
             : normalizedArgs.some(arg => arg.endsWith('/fs-ext/fs-ext.js'))
               ? ''
-            : args.includes('--dump-config')
-              ? '# == cordis.yml\n- name: @deepseek-ai/dsh-base\n'
-              : normalizedArgs.some(arg => arg.endsWith('/lib/desktop-cli.js'))
-                ? 'Usage: dsh --profile headless [options]'
-                : 'DSH_PACKAGED_RUNTIME_OK',
+              : 'DSH_PACKAGED_RUNTIME_OK',
         stderr: '',
       }
     })
@@ -1151,7 +1142,7 @@ describe('packaged desktop runtime verification', () => {
     }
 
     // Windows 的会话后端免 fs-ext（prepare-fs-ext not-required），冒烟少一次调用。
-    const expectedRuns = runtimeContext.electronPlatformName === 'win32' ? 5 : 6
+    const expectedRuns = runtimeContext.electronPlatformName === 'win32' ? 6 : 7
     expect(run).toHaveBeenCalledTimes(expectedRuns)
     if (runtimeContext.electronPlatformName !== 'win32') {
       expect(run.mock.calls.some(([, args]) => args.some(arg => arg.endsWith('/fs-ext/fs-ext.js')))).toBe(true)

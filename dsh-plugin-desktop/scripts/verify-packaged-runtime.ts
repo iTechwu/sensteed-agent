@@ -647,13 +647,13 @@ export function smokePackagedElectronRuntime(
       label: 'DSH CLI',
       entry: join(runtimeRoot, 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js'),
       args: ['--version'],
-      accepts: (stdout: string) => stdout.trim() === DSH_RUNTIME_VERSION,
+      accepts: (result: PackagedElectronResult) => result.status === 0 && result.stdout.trim() === DSH_RUNTIME_VERSION,
     },
     {
       label: 'pnpm CLI',
       entry: join(runtimeRoot, 'node_modules', 'pnpm', 'bin', 'pnpm.mjs'),
       args: ['--version'],
-      accepts: (stdout: string) => stdout.trim() === PNPM_RUNTIME_VERSION,
+      accepts: (result: PackagedElectronResult) => result.status === 0 && result.stdout.trim() === PNPM_RUNTIME_VERSION,
     },
     // Windows 的会话后端走命名信号量，prepare-fs-ext 在 win32 明确
     // not-required；包内 fs-ext 是 Node-ABI 构建，在 Electron 下必然
@@ -662,27 +662,34 @@ export function smokePackagedElectronRuntime(
       label: 'fs-ext native ABI',
       entry: join(runtimeRoot, 'node_modules', 'fs-ext', 'fs-ext.js'),
       args: [],
-      accepts: (stdout: string) => stdout.trim() === '',
+      accepts: (result: PackagedElectronResult) => result.status === 0 && result.stdout.trim() === '',
     }]),
     {
       label: 'ASAR/Profile/CJS/ripgrep',
       entry: join(runtimeRoot, 'lib', 'packaged-runtime-smoke.js'),
       args: [],
-      accepts: (stdout: string) => stdout.trim() === 'DSH_PACKAGED_RUNTIME_OK',
+      accepts: (result: PackagedElectronResult) => result.status === 0 && result.stdout.trim() === 'DSH_PACKAGED_RUNTIME_OK',
+    },
+    // 密封企业 CLI 策略(hub-cli-policy.ts)：打包安装内的 desktop-cli 只应答
+    // 只读身份信息，profile/env 参数不得解锁业务启动。正向验证两条只读回复
+    // （仍走完整入口引导），并负向断言带 profile 前缀的业务参数被拒。
+    {
+      label: 'Desktop CLI sealed readonly help',
+      entry: join(runtimeRoot, 'lib', 'desktop-cli.js'),
+      args: ['--help'],
+      accepts: (result: PackagedElectronResult) => result.status === 0 && result.stdout.includes('Plugins & Skills'),
     },
     {
-      label: 'Desktop CLI config composition',
+      label: 'Desktop CLI sealed readonly version',
+      entry: join(runtimeRoot, 'lib', 'desktop-cli.js'),
+      args: ['--version'],
+      accepts: (result: PackagedElectronResult) => result.status === 0 && result.stdout.includes('sealed Hub CLI (desktop-managed)'),
+    },
+    {
+      label: 'Desktop CLI sealed business boundary',
       entry: join(runtimeRoot, 'lib', 'desktop-cli.js'),
       args: ['--profile', 'headless', '--dump-config'],
-      accepts: (stdout: string) => stdout.includes('# == ') && stdout.includes('name:'),
-    },
-    {
-      // This is deliberately the Desktop wrapper rather than DSH's bin.js:
-      // a child RunAsNode process cannot inherit main's resolver hook.
-      label: 'Desktop CLI Loader boot',
-      entry: join(runtimeRoot, 'lib', 'desktop-cli.js'),
-      args: ['--profile', 'headless', '--help'],
-      accepts: (stdout: string) => stdout.includes('dsh --profile headless'),
+      accepts: (result: PackagedElectronResult) => result.status !== 0 && result.stderr.includes('require Desktop Hub authorization'),
     },
   ] as const
   try {
@@ -693,7 +700,7 @@ export function smokePackagedElectronRuntime(
           cause: result.error,
         })
       }
-      if (result.status !== 0 || !check.accepts(result.stdout)) {
+      if (!check.accepts(result)) {
         throw new Error(
           `dsh-plugin-desktop: packaged ${check.label} smoke failed with status ${String(result.status)}; `
           + `signal=${String(result.signal ?? null)}; `
