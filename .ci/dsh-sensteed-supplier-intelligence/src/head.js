@@ -77,6 +77,7 @@ function errorText(error) {
     gateway_request_failed: '供应链服务暂不可用。', supplier_mcp_request_failed: '供应链服务暂不可用。',
     VERSION_CONFLICT: '记录已被其他操作更新，请刷新后重试。', STALE_EVIDENCE: '证据已变化，请刷新后重新保存。',
     SUPPLIER_NOT_FOUND: '该供应商当前不可用。', REPORT_NOT_READY: '周报尚未生成完成。',
+    supplier_list_incomplete: '供应商台账已发生变化，未能完整读取，请刷新重试。',
   }
   return map[error?.message] || `加载或保存失败（${error?.message || '未知错误'}）`
 }
