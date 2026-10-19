@@ -2,7 +2,6 @@ import { expect, it, vi } from 'vitest'
 import { Readable } from 'node:stream'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { handleHubUpdatesRequest } from '../src/hub-update-route.ts'
-import { HUB_API_ORIGIN } from '../src/hub-update-contract.ts'
 
 function request(): IncomingMessage {
   const req = Readable.from([]) as IncomingMessage
@@ -21,27 +20,20 @@ function response() {
   }
 }
 
-it('uses the fixed Hub origin and the SSO session, without a Models key', async () => {
-  const fetcher = vi.fn(async (url: string | URL, init?: RequestInit) => {
-    const urlText = String(url)
-    expect(urlText.startsWith(HUB_API_ORIGIN)).toBe(true)
-    expect(init?.headers).toEqual({ Authorization: 'Bearer sso-access', Accept: 'application/json' })
-    const plugin = urlText.includes('/plugins?')
-    return Response.json({ code: 200, msg: 'ok', data: { items: plugin ? [] : [{ skillId: 'skill-1', displayName: 'Skill One', stableVersion: '1.2.0', status: 'active' }], total: 1 } })
-  })
+it('retires catalog-based update claims without reading credentials or contacting Hub', async () => {
+  const auth = { getDatasourceSession: vi.fn(() => ({ accessToken: 'sso-access', tenantId: 'tenant', operator: 'user' })) }
+  const fetcher = vi.fn(async () => Response.json({}))
   const result = response()
-  await handleHubUpdatesRequest(request(), result.value, 'http://127.0.0.1:43120', {
-    getDatasourceSession: () => ({ accessToken: 'sso-access', tenantId: 'tenant', operator: 'user' }),
-  }, fetcher)
-  expect(result.body()).toEqual({ updates: [{ kind: 'skill', itemId: 'skill-1', displayName: 'Skill One', version: '1.2.0' }] })
-  expect(fetcher).toHaveBeenCalledTimes(2)
+  await handleHubUpdatesRequest(request(), result.value, 'http://127.0.0.1:43120', auth, fetcher)
+  expect(result.value.statusCode).toBe(410)
+  expect(result.body()).toEqual({ error: 'hub_signed_check_required' })
+  expect(auth.getDatasourceSession).not.toHaveBeenCalled()
+  expect(fetcher).not.toHaveBeenCalled()
 })
 
-it.each([401, 403])('preserves Hub auth rejection %s and returns no body details', async status => {
+it('keeps the same-origin guard on the retired endpoint', async () => {
+  const req = request(); req.headers.origin = 'https://untrusted.example'
   const result = response()
-  await handleHubUpdatesRequest(request(), result.value, 'http://127.0.0.1:43120', {
-    getDatasourceSession: () => ({ accessToken: 'sso-access', tenantId: 'tenant', operator: 'user' }),
-  }, vi.fn(async () => new Response('{}', { status })))
-  expect((result.value as unknown as { statusCode?: number }).statusCode).toBe(status)
-  expect(result.body()).toEqual({ error: 'hub_auth_required' })
+  await handleHubUpdatesRequest(req, result.value, 'http://127.0.0.1:43120', { getDatasourceSession: () => undefined })
+  expect(result.value.statusCode).toBe(403)
 })
