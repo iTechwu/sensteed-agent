@@ -370,7 +370,7 @@ window.__ModuleLoader__.load({
               h('time', null, fmt(item.riskPromptedAt || item.retrievedAt))))) : h('p', { className: 'sr-muted' }, '暂无已记录的风险变化。可先查看供应商台账，确认来源覆盖与更新时间。')),
           h('section', { className: 'sr-section' }, h('h2', null, '来源覆盖'), !(value.sources || []).length ? h('p', { className: 'sr-muted' }, '暂无来源覆盖记录。请先核对供应商台账；不能据此判断风险较低。') : null,
             ...(value.sources || []).map(source => h('div', { className: 'sr-source', key: source.sourceId || source.source || source.name },
-              h('span', null, source.name || source.platform || source.sourceId || source.source || '未命名来源'),
+              h('span', null, ({ aiqicha: '爱企查', douyin: '抖音', weibo: '微博', 'xiaohongshu-v2': '小红书', xiaohongshu: '小红书', qcc_mcp: '企查查', public_media: '公开媒体', dongchedi: '懂车帝', autohome: '汽车之家' }[source.name || source.platform || source.sourceId || source.source] || source.name || source.platform || source.sourceId || source.source || '未命名来源')),
               h('span', { className: 'sr-status', 'data-tone': source.status === 'available' && !source.stale ? 'confirmed' : 'candidate' }, source.stale ? '数据滞后' : ({ available: '已覆盖', unavailable: '暂不可用', pending: '待接入' }[source.status] || '待核对')),
               h('small', null, source.lastSuccessAt ? `最近成功 ${fmt(source.lastSuccessAt)}` : source.reason || '暂无成功记录'))),
             h('p', { className: 'sr-source-note' }, '页面只读取已保存数据，不触发外部采集。'))),
