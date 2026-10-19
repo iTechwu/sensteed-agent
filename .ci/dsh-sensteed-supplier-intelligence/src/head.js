@@ -78,6 +78,8 @@ function fmt(value) {
 
 function errorText(error) {
   const map = {
+    supply_chain_unavailable: '供应链数据服务暂不可用，请稍后重试。',
+    connection_unavailable: '本地工作台连接已中断，请重新连接后重试。',
     credential_unavailable: '本机 Models 凭据不可用，请检查 Sensteed 登录状态。',
     gateway_request_failed: '供应链服务暂不可用。', supplier_mcp_request_failed: '供应链服务暂不可用。',
     VERSION_CONFLICT: '记录已被其他操作更新，请刷新后重试。', STALE_EVIDENCE: '证据已变化，请刷新后重新保存。',

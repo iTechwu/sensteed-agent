@@ -1080,7 +1080,7 @@ window.__ModuleLoader__.load({
         : h(
             "div",
             { className: "yk-node-detail yk-node-detail-empty", role: "status" },
-            t("noSelection"),
+            t(nodes.length ? "noSelection" : "graphNoResult"),
           );
       const typeStats = h(
         "div",
@@ -1294,6 +1294,13 @@ window.__ModuleLoader__.load({
       const [resourceId, setResourceId] = useState("");
       const [aclActions, setAclActions] = useState("");
       const [documentId, setDocumentId] = useState("");
+      const [sourceName, setSourceName] = useState("");
+      const [ingestTitle, setIngestTitle] = useState("");
+      const [ingestContent, setIngestContent] = useState("");
+      const [promoteTitle, setPromoteTitle] = useState("");
+      const [promoteReason, setPromoteReason] = useState("");
+      const [documentPrincipalId, setDocumentPrincipalId] = useState("");
+      const [documentAclActions, setDocumentAclActions] = useState("");
       const validSourceConfig = validManagementJson(sourceConfig, 'object');
       const validConstraints = validManagementJson(ontologyConstraints, 'array');
       const validAlignments = validManagementJson(ontologyAlignments, 'array');
@@ -1330,10 +1337,10 @@ window.__ModuleLoader__.load({
           ),
           h("details", { className: "yk-management-form" },
             h("summary", null, t("createSource")),
-            h(ManagementField, { control: "input", className: "yk-management-input", value: title, placeholder: t("sourceName"), onInput: event => setTitle(event.currentTarget.value) }),
+            h(ManagementField, { control: "input", className: "yk-management-input", value: sourceName, placeholder: t("sourceName"), onInput: event => setSourceName(event.currentTarget.value) }),
             h(ManagementField, { control: "input", className: "yk-management-input", value: sourceType, placeholder: t("sourceKind"), onInput: event => setSourceType(event.currentTarget.value) }),
             h(ManagementField, { control: "textarea", className: "yk-management-input", value: sourceConfig, placeholder: t("sourceConfig"), error: validSourceConfig ? undefined : t("jsonObjectError"), onInput: event => setSourceConfig(event.currentTarget.value), rows: 3 }),
-            h("button", { type: "button", className: "yk-primary", disabled: busy || !validSourceConfig || !title.trim() || !sourceType.trim() || !capabilityAllowed(data, "knowledge.create_source", "write"), onClick: () => onWrite("create_source", { name: title.trim(), type: sourceType.trim(), config: parseJsonObject(sourceConfig) }) }, t("createSource")),
+            h("button", { type: "button", className: "yk-primary", disabled: busy || !validSourceConfig || !sourceName.trim() || !sourceType.trim() || !capabilityAllowed(data, "knowledge.create_source", "write"), onClick: () => onWrite("create_source", { name: sourceName.trim(), type: sourceType.trim(), config: parseJsonObject(sourceConfig) }) }, t("createSource")),
           ),
           h("details", { className: "yk-management-form" },
             h("summary", null, t("createOntology")),
@@ -1367,9 +1374,9 @@ window.__ModuleLoader__.load({
           h("details", { className: "yk-management-form" },
             h("summary", null, t("grantDocument")),
             h(ManagementField, { control: "input", className: "yk-management-input", value: documentId, placeholder: t("documentId"), onInput: event => setDocumentId(event.currentTarget.value) }),
-            h(ManagementField, { control: "input", className: "yk-management-input", value: principalId, placeholder: t("principalId"), onInput: event => setPrincipalId(event.currentTarget.value) }),
-            h(ManagementField, { control: "input", className: "yk-management-input", value: aclActions, placeholder: t("aclActions"), onInput: event => setAclActions(event.currentTarget.value) }),
-            h("button", { type: "button", className: "yk-primary", disabled: busy || !documentId.trim() || !principalId.trim() || !aclActions.trim() || !capabilityAllowed(data, "knowledge.grant_document_principal", "write"), onClick: () => onWrite("grant_document_principal", { documentId: documentId.trim(), principalId: principalId.trim(), actions: aclActions.split(",").map(value => value.trim()).filter(Boolean) }) }, t("grantDocument")),
+            h(ManagementField, { control: "input", className: "yk-management-input", value: documentPrincipalId, placeholder: t("principalId"), onInput: event => setDocumentPrincipalId(event.currentTarget.value) }),
+            h(ManagementField, { control: "input", className: "yk-management-input", value: documentAclActions, placeholder: t("aclActions"), onInput: event => setDocumentAclActions(event.currentTarget.value) }),
+            h("button", { type: "button", className: "yk-primary", disabled: busy || !documentId.trim() || !documentPrincipalId.trim() || !documentAclActions.trim() || !capabilityAllowed(data, "knowledge.grant_document_principal", "write"), onClick: () => onWrite("grant_document_principal", { documentId: documentId.trim(), principalId: documentPrincipalId.trim(), actions: documentAclActions.split(",").map(value => value.trim()).filter(Boolean) }) }, t("grantDocument")),
           ),
           h(ManagementRecords, { records, result, busy, t }),
         ),
@@ -1377,18 +1384,18 @@ window.__ModuleLoader__.load({
       if (tab === "knowledge") return h("div", { className: "yk-page" },
         h("section", { className: "yk-panel" },
           h(Title, { title: t("ingestTitle") }),
-          h(ManagementField, { control: "textarea", className: "yk-management-input", value: content, placeholder: t("content"), onInput: event => setContent(event.currentTarget.value), rows: 7 }),
-          h(ManagementField, { control: "input", className: "yk-management-input", value: title, placeholder: t("titleField"), onInput: event => setTitle(event.currentTarget.value) }),
+          h(ManagementField, { control: "textarea", className: "yk-management-input", value: ingestContent, placeholder: t("content"), onInput: event => setIngestContent(event.currentTarget.value), rows: 7 }),
+          h(ManagementField, { control: "input", className: "yk-management-input", value: ingestTitle, placeholder: t("titleField"), onInput: event => setIngestTitle(event.currentTarget.value) }),
           h(ManagementField, { control: "input", className: "yk-management-input", value: fileUrl, placeholder: t("fileUrl"), onInput: event => setFileUrl(event.currentTarget.value) }),
-          h("button", { type: "button", className: "yk-primary", disabled: busy || !content.trim() || !fileUrl.trim() || !capabilityAllowed(data, "knowledge.ingest_file", "write"), onClick: () => write("ingest_file", { text: content.trim(), fileUrl: fileUrl.trim(), title: title.trim() || undefined }) }, busy ? t("loadingCapability") : t("ingest")),
+          h("button", { type: "button", className: "yk-primary", disabled: busy || !ingestContent.trim() || !fileUrl.trim() || !capabilityAllowed(data, "knowledge.ingest_file", "write"), onClick: () => write("ingest_file", { text: ingestContent.trim(), fileUrl: fileUrl.trim(), title: ingestTitle.trim() || undefined }) }, busy ? t("loadingCapability") : t("ingest")),
           !capabilityAllowed(data, "knowledge.ingest_file", "write") ? h("p", { className: "yk-muted" }, t("missingWriteCapability")) : null,
         ),
         h("section", { className: "yk-panel" },
           h(Title, { title: t("promoteTitle") }),
           h(ManagementField, { control: "input", className: "yk-management-input", value: sourceMemoryIds, placeholder: t("sourceMemoryIds"), onInput: event => setSourceMemoryIds(event.currentTarget.value) }),
-          h(ManagementField, { control: "input", className: "yk-management-input", value: title, placeholder: t("titleField"), onInput: event => setTitle(event.currentTarget.value) }),
-          h(ManagementField, { control: "input", className: "yk-management-input", value: reason, placeholder: t("reason"), onInput: event => setReason(event.currentTarget.value) }),
-          h("button", { type: "button", className: "yk-primary", disabled: busy || !sourceMemoryIds.trim() || !title.trim() || !reason.trim() || !capabilityAllowed(data, "knowledge.promote", "write"), onClick: () => write("promote", { sourceMemoryIds: sourceMemoryIds.split(",").map(value => value.trim()).filter(Boolean), targetSpaceKey: "tenant.all", title: title.trim(), classification: "INTERNAL", reason: reason.trim() }) }, busy ? t("loadingCapability") : t("promote")),
+          h(ManagementField, { control: "input", className: "yk-management-input", value: promoteTitle, placeholder: t("titleField"), onInput: event => setPromoteTitle(event.currentTarget.value) }),
+          h(ManagementField, { control: "input", className: "yk-management-input", value: promoteReason, placeholder: t("reason"), onInput: event => setPromoteReason(event.currentTarget.value) }),
+          h("button", { type: "button", className: "yk-primary", disabled: busy || !sourceMemoryIds.trim() || !promoteTitle.trim() || !promoteReason.trim() || !capabilityAllowed(data, "knowledge.promote", "write"), onClick: () => write("promote", { sourceMemoryIds: sourceMemoryIds.split(",").map(value => value.trim()).filter(Boolean), targetSpaceKey: "tenant.all", title: promoteTitle.trim(), classification: "INTERNAL", reason: promoteReason.trim() }) }, busy ? t("loadingCapability") : t("promote")),
         ),
       );
       if (tab === "memoryManage") return h("div", { className: "yk-page" },
