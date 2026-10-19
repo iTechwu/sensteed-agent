@@ -85,8 +85,15 @@ export function DesktopNavigationSidebar({ collapsed, startSession, toggleSideba
   const home = active === null || active === 'conversation'
   const zh = t('session.new') === '新会话' || t('session.new').includes('新')
   const homeLabel = zh ? '主页' : 'Home'
-  const toggleLabel = collapsed ? (zh ? '展开项目与聊天' : 'Expand projects and chats')
-    : (zh ? '收起项目与聊天' : 'Collapse projects and chats')
+  const businessLabels: Record<string, string> = {
+    'sensteed-knowledge': zh ? '知识与记忆' : 'Knowledge & memory',
+    'sensteed-finance': zh ? '财务管理' : 'Finance',
+    'supplier-risk': zh ? '供应链管理' : 'Supply chain',
+  }
+  const contextLabel = home ? homeLabel : panels.find(p => p.id === active)?.label ?? businessLabels[active ?? ''] ?? (zh ? '业务工作区' : 'Business workspace')
+  const contextTarget = home ? (zh ? '项目与聊天' : 'projects and chats') : `${contextLabel}${zh ? '导航' : ' navigation'}`
+  const toggleLabel = collapsed ? (zh ? `展开${contextTarget}` : `Expand ${contextTarget}`) : (zh ? `收起${contextTarget}` : `Collapse ${contextTarget}`)
+  const extensionActive = (id: string) => id === active || id === 'dofe-sensteed-finance' && active === 'sensteed-finance'
   const ordered = [...panels].sort((a, b) => {
     const rank = (id: string) => id === 'schedules' ? 0 : id === 'plugins' ? 1 : id === 'sensteed-skill-manager' ? 2 : 3
     return rank(a.id) - rank(b.id) || a.order - b.order
@@ -104,7 +111,7 @@ export function DesktopNavigationSidebar({ collapsed, startSession, toggleSideba
         </RailButton>)}
       </nav>
       <div className="sensteedModuleExtensions" aria-label={zh ? '业务与扩展' : 'Business and extensions'}>
-        {extensions.filter(id => id !== 'dofe-sensteed-knowledge').map(id => <div key={id} className="sensteedExtensionModule">
+        {extensions.filter(id => id !== 'dofe-sensteed-knowledge').map(id => <div key={id} className="sensteedExtensionModule" data-active={extensionActive(id) || undefined}>
           <PluginRailSeat beforeNavigate={action => { if (leaveGuard.current) leaveGuard.current(action); else action() }}>{renderSlot('sidebar.footer.action', { wide: false }, { only: id })}</PluginRailSeat>
         </div>)}
       </div>
@@ -116,8 +123,8 @@ export function DesktopNavigationSidebar({ collapsed, startSession, toggleSideba
   </>
   return <>
     {target !== null && createPortal(rail, target)}
-    <section className="sensteedContextSidebar" aria-label={homeLabel} hidden={collapsed}>
-      <header className="sensteedContextHeader"><strong>{home ? homeLabel : (active === 'sensteed-knowledge' ? (zh ? '知识与记忆' : 'Knowledge & memory') : panels.find(p => p.id === active)?.label ?? (zh ? '业务工作区' : 'Business workspace'))}</strong>
+    <section className="sensteedContextSidebar" aria-label={contextLabel} hidden={collapsed}>
+      <header className="sensteedContextHeader"><strong>{contextLabel}</strong>
         <RailButton label={toggleLabel} onClick={toggleSidebar}><PanelLeft size={18} /></RailButton>
       </header>
       <div data-context="home" className="sensteedContextHome" hidden={!home || collapsed}>

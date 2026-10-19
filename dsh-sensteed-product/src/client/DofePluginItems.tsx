@@ -55,15 +55,14 @@ export function DofePluginCard(props: DofePluginCardProps) {
   return <div className="dshDofePluginPage">
     <p className="dshDofePluginDescription">{plugin.description}</p>
     <div className="dshDofeAccessField">
-      <span className="dshDofeAccessLabel">{t('pluginServersTitle')}</span>
-      {plugin.servers.length > 0
-        ? <ul className="dshDofePluginServers">{plugin.servers.map(server => <li className="dshDofePluginServer" key={server}>{server}</li>)}</ul>
-        : <span className="dshDofeAccessHint">{t('pluginNoServer')}</span>}
-    </div>
-    <div className="dshDofeAccessField">
       <span className="dshDofeAccessLabel">{t('pluginStateTitle')}</span>
       <span className={stateClass}>{stateLabel}</span>
     </div>
+    <details className="dshHubDetails"><summary>{t('pluginServersTitle')}</summary>
+      {plugin.servers.length > 0
+        ? <ul className="dshDofePluginServers">{plugin.servers.map(server => <li className="dshDofePluginServer" key={server}>{server}</li>)}</ul>
+        : <span className="dshDofeAccessHint">{t('pluginNoServer')}</span>}
+    </details>
     {!plugin.builtIn && <p className="dshDofePluginHint">{t('pluginManageHint')}</p>}
   </div>
 }

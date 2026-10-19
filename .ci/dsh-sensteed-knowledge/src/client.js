@@ -32,7 +32,7 @@ const copy = {
     loading: "正在读取企业知识…",
     retry: "重新加载",
     overview: "总览",
-    memoriesTab: "Memory 召回",
+    memoriesTab: "记忆召回",
     graphTab: "知识图谱",
     templates: "业务空间",
     source: "数据源",
@@ -101,11 +101,12 @@ const copy = {
     retryOverview: "统计暂不可用，但路由与模板仍可用",
     noContent: "没有可展示内容",
     entities: "实体",
-    ontologyTab: "Ontology 管理",
+    entityAssertionsLabel: "实体断言", relationAssertionsLabel: "关系断言", mergesLabel: "实体合并记录", lineageLabel: "来源追溯", entityIdLabel: "实体 ID", loadRecordsHint: "点击读取按钮查看当前账号可访问的记录。", noRecords: "本次返回没有列表记录，可查看响应详情。", recordDetails: "查看详细数据", recordLabel: "记录",
+    ontologyTab: "本体模型",
     assertionsTab: "实体与关系断言",
     lineageTab: "溯源与合并",
-    knowledgeTab: "Knowledge 管理",
-    memoryManageTab: "Memory 采集",
+    knowledgeTab: "知识库管理",
+    memoryManageTab: "记忆采集",
     consoleTab: "知识运营",
     manage: "治理能力",
     capabilityRead: "读取",
@@ -232,6 +233,7 @@ const copy = {
     retryOverview: "Stats unavailable; route and templates remain available",
     noContent: "Nothing to show",
     entities: "Entities",
+    entityAssertionsLabel: "Entity assertions", relationAssertionsLabel: "Relation assertions", mergesLabel: "Entity merges", lineageLabel: "Provenance", entityIdLabel: "Entity ID", loadRecordsHint: "Load records available to the current account using the read actions.", noRecords: "No list records in this response. View details for the full result.", recordDetails: "View detailed data", recordLabel: "Record",
     ontologyTab: "Ontology",
     assertionsTab: "Assertions",
     lineageTab: "Lineage & merges",
@@ -1143,6 +1145,18 @@ function parseJsonArray(value) {
     return [];
   }
 }
+function ManagementField({ control = "input", placeholder, ...props }) {
+  return h("label", { className: "yk-management-field" }, h("span", null, placeholder), h(control, { ...props, "aria-label": placeholder }));
+}
+function ManagementRecords({ records, result, busy, t }) {
+  if (busy) return h("p", { role: "status", className: "yk-muted" }, t("loadingCapability"));
+  if (result == null) return h("p", { className: "yk-empty-compact" }, t("loadRecordsHint"));
+  if (!records.length) return h("div", { className: "yk-empty-compact" }, t("noRecords"), h("details", null, h("summary", null, t("recordDetails")), h("pre", null, JSON.stringify(result, null, 2))));
+  return h("div", { className: "yk-management-records" }, records.slice(0, 100).map((item, index) => h("article", { className: "yk-management-record", key: item?.id || index },
+    h("strong", null, item?.title || item?.name || item?.version || item?.id || `${t("recordLabel")} ${index + 1}`),
+    item?.description || item?.summary || item?.status ? h("p", { className: "yk-muted" }, item.description || item.summary || item.status) : null,
+    h("details", null, h("summary", null, t("recordDetails")), h("pre", null, JSON.stringify(item, null, 2))))));
+}
 function Management({ data, t, tab, busy, result, onLoad, onWrite }) {
   const [content, setContent] = useState("");
   const [title, setTitle] = useState("");
@@ -1170,13 +1184,13 @@ function Management({ data, t, tab, busy, result, onLoad, onWrite }) {
   const rows = Array.isArray(capabilities.tools) ? capabilities.tools : [];
   const write = (tool, input) => onWrite?.(tool, input);
   const allowed = new Set(tab === "ontology"
-    ? ["knowledge.entity_assertions"]
+    ? ["knowledge.ontologies"]
     : tab === "assertions"
-      ? ["knowledge.relation_assertions"]
+      ? ["knowledge.entity_assertions", "knowledge.relation_assertions"]
       : ["knowledge.entity_merges", "knowledge.provenance_lineage"]);
   const items = rows.filter(item => allowed.has(item.remoteName || item.name)).slice(0, 100);
-  const tool = tab === "ontology" ? "entity_assertions" : tab === "assertions" ? "relation_assertions" : "provenance_lineage";
-  const managementTools = tab === "lineage" ? ["entity_merges", "provenance_lineage"] : [tool];
+  const managementTools = tab === "ontology" ? ["ontologies"] : tab === "assertions" ? ["entity_assertions", "relation_assertions"] : ["entity_merges", "provenance_lineage"];
+  const toolLabel = tool => t(({ ontologies: 'ontologyTab', entity_assertions: 'entityAssertionsLabel', relation_assertions: 'relationAssertionsLabel', entity_merges: 'mergesLabel', provenance_lineage: 'lineageLabel' })[String(tool).replace(/^knowledge[._]/, '')] || 'reloadData');
   const payload = result?.structuredContent || result?.data || result;
   const records = Array.isArray(payload?.items) ? payload.items : Array.isArray(payload?.list) ? payload.list : [];
   if (tab === "console") return h("div", { className: "yk-page" },
@@ -1190,80 +1204,80 @@ function Management({ data, t, tab, busy, result, onLoad, onWrite }) {
         ["acl_grants", "资源授权"], ["principals", "主体"], ["ontologies", "Ontology"],
       ].map(([tool, label]) => h("button", { type: "button", className: "yk-management-card", key: tool, disabled: busy || !capabilityAllowed(data, `knowledge.${tool}`, "read"), onClick: () => onLoad(tool) }, h("strong", null, label), h("span", null, capabilityAllowed(data, `knowledge.${tool}`, "read") ? t("reloadData") : t("capabilityUnavailable"))))),
       h("button", { type: "button", className: "yk-primary", disabled: busy || !capabilityAllowed(data, "knowledge.rebuild_graph", "write"), onClick: () => onWrite("rebuild_graph", { reason: "desktop-console" }) }, busy ? t("loadingCapability") : t("rebuildGraph")),
-      h("section", { className: "yk-management-form" },
-        h("strong", null, t("createSpace")),
-        h("input", { className: "yk-management-input", value: title, placeholder: t("titleField"), onInput: event => setTitle(event.currentTarget.value) }),
-        h("input", { className: "yk-management-input", value: spaceDescription, placeholder: t("spaceDescription"), onInput: event => setSpaceDescription(event.currentTarget.value) }),
+      h("details", { className: "yk-management-form" },
+        h("summary", null, t("createSpace")),
+        h(ManagementField, { control: "input", className: "yk-management-input", value: title, placeholder: t("titleField"), onInput: event => setTitle(event.currentTarget.value) }),
+        h(ManagementField, { control: "input", className: "yk-management-input", value: spaceDescription, placeholder: t("spaceDescription"), onInput: event => setSpaceDescription(event.currentTarget.value) }),
         h("button", { type: "button", className: "yk-primary", disabled: busy || !title.trim() || !capabilityAllowed(data, "knowledge.create_space", "write"), onClick: () => onWrite("create_space", { name: title.trim(), description: spaceDescription.trim() || undefined }) }, t("createSpace")),
       ),
-      h("section", { className: "yk-management-form" },
-        h("strong", null, t("createSource")),
-        h("input", { className: "yk-management-input", value: title, placeholder: t("sourceName"), onInput: event => setTitle(event.currentTarget.value) }),
-        h("input", { className: "yk-management-input", value: sourceType, placeholder: t("sourceKind"), onInput: event => setSourceType(event.currentTarget.value) }),
-        h("textarea", { className: "yk-management-input", value: sourceConfig, placeholder: t("sourceConfig"), onInput: event => setSourceConfig(event.currentTarget.value), rows: 3 }),
+      h("details", { className: "yk-management-form" },
+        h("summary", null, t("createSource")),
+        h(ManagementField, { control: "input", className: "yk-management-input", value: title, placeholder: t("sourceName"), onInput: event => setTitle(event.currentTarget.value) }),
+        h(ManagementField, { control: "input", className: "yk-management-input", value: sourceType, placeholder: t("sourceKind"), onInput: event => setSourceType(event.currentTarget.value) }),
+        h(ManagementField, { control: "textarea", className: "yk-management-input", value: sourceConfig, placeholder: t("sourceConfig"), onInput: event => setSourceConfig(event.currentTarget.value), rows: 3 }),
         h("button", { type: "button", className: "yk-primary", disabled: busy || !title.trim() || !sourceType.trim() || !capabilityAllowed(data, "knowledge.create_source", "write"), onClick: () => onWrite("create_source", { name: title.trim(), type: sourceType.trim(), config: parseJsonObject(sourceConfig) }) }, t("createSource")),
       ),
-      h("section", { className: "yk-management-form" },
-        h("strong", null, t("createOntology")),
-        h("input", { className: "yk-management-input", value: ontologyVersion, placeholder: t("ontologyVersion"), onInput: event => setOntologyVersion(event.currentTarget.value) }),
-        h("input", { className: "yk-management-input", value: ontologyClasses, placeholder: t("ontologyClasses"), onInput: event => setOntologyClasses(event.currentTarget.value) }),
-        h("input", { className: "yk-management-input", value: ontologyPredicates, placeholder: t("ontologyPredicates"), onInput: event => setOntologyPredicates(event.currentTarget.value) }),
-        h("textarea", { className: "yk-management-input", value: ontologyConstraints, placeholder: "Constraints JSON array", onInput: event => setOntologyConstraints(event.currentTarget.value), rows: 2 }),
-        h("textarea", { className: "yk-management-input", value: ontologyAlignments, placeholder: "Alignments JSON array", onInput: event => setOntologyAlignments(event.currentTarget.value), rows: 2 }),
+      h("details", { className: "yk-management-form" },
+        h("summary", null, t("createOntology")),
+        h(ManagementField, { control: "input", className: "yk-management-input", value: ontologyVersion, placeholder: t("ontologyVersion"), onInput: event => setOntologyVersion(event.currentTarget.value) }),
+        h(ManagementField, { control: "input", className: "yk-management-input", value: ontologyClasses, placeholder: t("ontologyClasses"), onInput: event => setOntologyClasses(event.currentTarget.value) }),
+        h(ManagementField, { control: "input", className: "yk-management-input", value: ontologyPredicates, placeholder: t("ontologyPredicates"), onInput: event => setOntologyPredicates(event.currentTarget.value) }),
+        h(ManagementField, { control: "textarea", className: "yk-management-input", value: ontologyConstraints, placeholder: "Constraints JSON array", onInput: event => setOntologyConstraints(event.currentTarget.value), rows: 2 }),
+        h(ManagementField, { control: "textarea", className: "yk-management-input", value: ontologyAlignments, placeholder: "Alignments JSON array", onInput: event => setOntologyAlignments(event.currentTarget.value), rows: 2 }),
         h("button", { type: "button", className: "yk-primary", disabled: busy || !ontologyVersion.trim() || !ontologyClasses.trim() || !ontologyPredicates.trim() || !capabilityAllowed(data, "knowledge.create_ontology_version", "write"), onClick: () => onWrite("create_ontology_version", { version: ontologyVersion.trim(), classes: ontologyClasses.split(",").map(value => value.trim()).filter(Boolean), predicates: ontologyPredicates.split(",").map(value => value.trim()).filter(Boolean), constraints: parseJsonArray(ontologyConstraints), alignments: parseJsonArray(ontologyAlignments) }) }, t("createOntology")),
       ),
-      h("section", { className: "yk-management-form" },
-        h("strong", null, t("publishOntology")),
-        h("input", { className: "yk-management-input", value: ontologyId, placeholder: t("ontologyId"), onInput: event => setOntologyId(event.currentTarget.value) }),
+      h("details", { className: "yk-management-form" },
+        h("summary", null, t("publishOntology")),
+        h(ManagementField, { control: "input", className: "yk-management-input", value: ontologyId, placeholder: t("ontologyId"), onInput: event => setOntologyId(event.currentTarget.value) }),
         h("select", { className: "yk-management-input", value: ontologyStatus, onChange: event => setOntologyStatus(event.currentTarget.value) }, ["WARNING", "ENFORCE", "RETIRED"].map(value => h("option", { key: value, value }, value))),
         h("button", { type: "button", className: "yk-primary", disabled: busy || !ontologyId.trim() || !capabilityAllowed(data, "knowledge.publish_ontology", "write"), onClick: () => onWrite("publish_ontology", { ontologyId: ontologyId.trim(), targetStatus: ontologyStatus }) }, t("publishOntology")),
         h("button", { type: "button", className: "yk-quiet", disabled: busy || !ontologyId.trim() || !capabilityAllowed(data, "knowledge.export_ontology", "read"), onClick: () => onLoad("export_ontology", { ontologyId: ontologyId.trim() }) }, t("exportOntology")),
       ),
-      h("section", { className: "yk-management-form" },
-        h("strong", null, t("importOntology")),
-        h("textarea", { className: "yk-management-input", value: ontologyJsonLd, placeholder: t("ontologyJsonLd"), onInput: event => setOntologyJsonLd(event.currentTarget.value), rows: 4 }),
+      h("details", { className: "yk-management-form" },
+        h("summary", null, t("importOntology")),
+        h(ManagementField, { control: "textarea", className: "yk-management-input", value: ontologyJsonLd, placeholder: t("ontologyJsonLd"), onInput: event => setOntologyJsonLd(event.currentTarget.value), rows: 4 }),
         h("button", { type: "button", className: "yk-primary", disabled: busy || !ontologyJsonLd.trim() || !capabilityAllowed(data, "knowledge.import_ontology", "write"), onClick: () => onWrite("import_ontology", { jsonLd: ontologyJsonLd.trim() }) }, t("importOntology")),
       ),
-      h("section", { className: "yk-management-form" },
-        h("strong", null, t("grantAcl")),
-        h("input", { className: "yk-management-input", value: principalId, placeholder: t("principalId"), onInput: event => setPrincipalId(event.currentTarget.value) }),
-        h("input", { className: "yk-management-input", value: resourceType, placeholder: t("resourceType"), onInput: event => setResourceType(event.currentTarget.value) }),
-        h("input", { className: "yk-management-input", value: resourceId, placeholder: t("resourceId"), onInput: event => setResourceId(event.currentTarget.value) }),
-        h("input", { className: "yk-management-input", value: aclActions, placeholder: t("aclActions"), onInput: event => setAclActions(event.currentTarget.value) }),
+      h("details", { className: "yk-management-form" },
+        h("summary", null, t("grantAcl")),
+        h(ManagementField, { control: "input", className: "yk-management-input", value: principalId, placeholder: t("principalId"), onInput: event => setPrincipalId(event.currentTarget.value) }),
+        h(ManagementField, { control: "input", className: "yk-management-input", value: resourceType, placeholder: t("resourceType"), onInput: event => setResourceType(event.currentTarget.value) }),
+        h(ManagementField, { control: "input", className: "yk-management-input", value: resourceId, placeholder: t("resourceId"), onInput: event => setResourceId(event.currentTarget.value) }),
+        h(ManagementField, { control: "input", className: "yk-management-input", value: aclActions, placeholder: t("aclActions"), onInput: event => setAclActions(event.currentTarget.value) }),
         h("button", { type: "button", className: "yk-primary", disabled: busy || !principalId.trim() || !resourceType.trim() || !resourceId.trim() || !aclActions.trim() || !capabilityAllowed(data, "knowledge.grant_acl", "write"), onClick: () => onWrite("grant_acl", { principalId: principalId.trim(), resourceType: resourceType.trim(), resourceId: resourceId.trim(), actions: aclActions.split(",").map(value => value.trim()).filter(Boolean) }) }, t("grantAcl")),
       ),
-      h("section", { className: "yk-management-form" },
-        h("strong", null, t("grantDocument")),
-        h("input", { className: "yk-management-input", value: documentId, placeholder: t("documentId"), onInput: event => setDocumentId(event.currentTarget.value) }),
-        h("input", { className: "yk-management-input", value: principalId, placeholder: t("principalId"), onInput: event => setPrincipalId(event.currentTarget.value) }),
-        h("input", { className: "yk-management-input", value: aclActions, placeholder: t("aclActions"), onInput: event => setAclActions(event.currentTarget.value) }),
+      h("details", { className: "yk-management-form" },
+        h("summary", null, t("grantDocument")),
+        h(ManagementField, { control: "input", className: "yk-management-input", value: documentId, placeholder: t("documentId"), onInput: event => setDocumentId(event.currentTarget.value) }),
+        h(ManagementField, { control: "input", className: "yk-management-input", value: principalId, placeholder: t("principalId"), onInput: event => setPrincipalId(event.currentTarget.value) }),
+        h(ManagementField, { control: "input", className: "yk-management-input", value: aclActions, placeholder: t("aclActions"), onInput: event => setAclActions(event.currentTarget.value) }),
         h("button", { type: "button", className: "yk-primary", disabled: busy || !documentId.trim() || !principalId.trim() || !aclActions.trim() || !capabilityAllowed(data, "knowledge.grant_document_principal", "write"), onClick: () => onWrite("grant_document_principal", { documentId: documentId.trim(), principalId: principalId.trim(), actions: aclActions.split(",").map(value => value.trim()).filter(Boolean) }) }, t("grantDocument")),
       ),
-      records.length ? h("div", { className: "yk-management-records" }, records.slice(0, 100).map((item, index) => h("pre", { key: item.id || index }, JSON.stringify(item, null, 2)))) : null,
+      h(ManagementRecords, { records, result, busy, t }),
     ),
   );
   if (tab === "knowledge") return h("div", { className: "yk-page" },
     h("section", { className: "yk-panel" },
       h(Title, { title: t("ingestTitle") }),
-      h("textarea", { className: "yk-management-input", value: content, placeholder: t("content"), onInput: event => setContent(event.currentTarget.value), rows: 7 }),
-      h("input", { className: "yk-management-input", value: title, placeholder: t("titleField"), onInput: event => setTitle(event.currentTarget.value) }),
-      h("input", { className: "yk-management-input", value: fileUrl, placeholder: t("fileUrl"), onInput: event => setFileUrl(event.currentTarget.value) }),
+      h(ManagementField, { control: "textarea", className: "yk-management-input", value: content, placeholder: t("content"), onInput: event => setContent(event.currentTarget.value), rows: 7 }),
+      h(ManagementField, { control: "input", className: "yk-management-input", value: title, placeholder: t("titleField"), onInput: event => setTitle(event.currentTarget.value) }),
+      h(ManagementField, { control: "input", className: "yk-management-input", value: fileUrl, placeholder: t("fileUrl"), onInput: event => setFileUrl(event.currentTarget.value) }),
       h("button", { type: "button", className: "yk-primary", disabled: busy || !content.trim() || !fileUrl.trim() || !capabilityAllowed(data, "knowledge.ingest_file", "write"), onClick: () => write("ingest_file", { text: content.trim(), fileUrl: fileUrl.trim(), title: title.trim() || undefined }) }, busy ? t("loadingCapability") : t("ingest")),
       !capabilityAllowed(data, "knowledge.ingest_file", "write") ? h("p", { className: "yk-muted" }, t("missingWriteCapability")) : null,
     ),
     h("section", { className: "yk-panel" },
       h(Title, { title: t("promoteTitle") }),
-      h("input", { className: "yk-management-input", value: sourceMemoryIds, placeholder: t("sourceMemoryIds"), onInput: event => setSourceMemoryIds(event.currentTarget.value) }),
-      h("input", { className: "yk-management-input", value: title, placeholder: t("titleField"), onInput: event => setTitle(event.currentTarget.value) }),
-      h("input", { className: "yk-management-input", value: reason, placeholder: t("reason"), onInput: event => setReason(event.currentTarget.value) }),
+      h(ManagementField, { control: "input", className: "yk-management-input", value: sourceMemoryIds, placeholder: t("sourceMemoryIds"), onInput: event => setSourceMemoryIds(event.currentTarget.value) }),
+      h(ManagementField, { control: "input", className: "yk-management-input", value: title, placeholder: t("titleField"), onInput: event => setTitle(event.currentTarget.value) }),
+      h(ManagementField, { control: "input", className: "yk-management-input", value: reason, placeholder: t("reason"), onInput: event => setReason(event.currentTarget.value) }),
       h("button", { type: "button", className: "yk-primary", disabled: busy || !sourceMemoryIds.trim() || !title.trim() || !reason.trim() || !capabilityAllowed(data, "knowledge.promote", "write"), onClick: () => write("promote", { sourceMemoryIds: sourceMemoryIds.split(",").map(value => value.trim()).filter(Boolean), targetSpaceKey: "tenant.all", title: title.trim(), classification: "INTERNAL", reason: reason.trim() }) }, busy ? t("loadingCapability") : t("promote")),
     ),
   );
   if (tab === "memoryManage") return h("div", { className: "yk-page" },
     h("section", { className: "yk-panel" },
       h(Title, { title: t("memoryCaptureTitle") }),
-      h("textarea", { className: "yk-management-input", value: content, placeholder: t("content"), onInput: event => setContent(event.currentTarget.value), rows: 7 }),
-      h("input", { className: "yk-management-input", value: reason, placeholder: t("reason"), onInput: event => setReason(event.currentTarget.value) }),
+      h(ManagementField, { control: "textarea", className: "yk-management-input", value: content, placeholder: t("content"), onInput: event => setContent(event.currentTarget.value), rows: 7 }),
+      h(ManagementField, { control: "input", className: "yk-management-input", value: reason, placeholder: t("reason"), onInput: event => setReason(event.currentTarget.value) }),
       h("button", { type: "button", className: "yk-primary", disabled: busy || !content.trim() || !capabilityAllowed(data, "knowledge.remember", "write"), onClick: () => write("remember", { content: content.trim(), captureReason: reason.trim() || "user-created" }) }, busy ? t("loadingCapability") : t("remember")),
       !capabilityAllowed(data, "knowledge.remember", "write") ? h("p", { className: "yk-muted" }, t("missingWriteCapability")) : null,
     ),
@@ -1272,13 +1286,13 @@ function Management({ data, t, tab, busy, result, onLoad, onWrite }) {
     h("section", { className: "yk-panel" },
       h(Title, { title: t(tab === "ontology" ? "ontologyTab" : tab === "assertions" ? "assertionsTab" : "lineageTab") }),
       h("p", { className: "yk-muted" }, items.length ? `${items.length} ${t("manage")}` : t("noCapability")),
-      tab === "lineage" ? h("input", { className: "yk-management-input", value: entityId, placeholder: "Entity ID", onInput: event => setEntityId(event.currentTarget.value) }) : null,
+      tab === "lineage" ? h(ManagementField, { control: "input", className: "yk-management-input", value: entityId, placeholder: t("entityIdLabel"), onInput: event => setEntityId(event.currentTarget.value) }) : null,
       h("div", { className: "yk-management-list" }, items.map(item => h("div", { className: "yk-management-row", key: item.name || item.remoteName },
-        h("strong", null, item.name || item.remoteName),
+        h("strong", null, toolLabel(item.remoteName || item.name)),
         h("span", null, item.allowed === false ? t("capabilityUnavailable") : item.access === "write" ? t("capabilityWrite") : item.access === "read" ? t("capabilityRead") : t("capabilityUnavailable")),
       ))),
-      records.length ? h("div", { className: "yk-management-records" }, records.slice(0, 100).map((item, index) => h("pre", { key: item.id || index }, JSON.stringify(item, null, 2)))) : null,
-      h("div", { className: "yk-management-actions" }, managementTools.map(item => h("button", { type: "button", className: "yk-primary", key: item, disabled: busy || !capabilityAllowed(data, `knowledge.${item}`, "read") || (item === "provenance_lineage" && !entityId.trim()), onClick: () => onLoad(item, item === "provenance_lineage" ? { entityId: entityId.trim(), maxDepth: 5 } : { page: 1, limit: 100 }) }, busy ? t("loadingCapability") : t("refresh")))),
+      h(ManagementRecords, { records, result, busy, t }),
+      h("div", { className: "yk-management-actions" }, managementTools.map(item => h("button", { type: "button", className: "yk-primary", key: item, disabled: busy || !capabilityAllowed(data, `knowledge.${item}`, "read") || (item === "provenance_lineage" && !entityId.trim()), onClick: () => onLoad(item, item === "provenance_lineage" ? { entityId: entityId.trim(), maxDepth: 5 } : { page: 1, limit: 100 }) }, busy ? t("loadingCapability") : `${t("reloadData")} ${toolLabel(item)}`))),
     ),
   );
 }
@@ -1290,6 +1304,9 @@ function Overlay({ t, embedded = false, onClose = closeOverlay }) {
   const [tab, setTab, externalNavigation] = bridge.usePage();
   const [managementResult, setManagementResult] = useState(null);
   const [managementBusy, setManagementBusy] = useState(false);
+  const managementSequence = useRef(0);
+  const managementLock = useRef(false);
+  useEffect(() => { managementSequence.current++; managementLock.current = false; setManagementBusy(false); setManagementResult(null); setActionError(false); }, [tab, bridge.epoch]);
   const [revision, setRevision] = useState(0);
   const [data, setData] = useState(null);
   const [error, setError] = useState(false);
@@ -1372,30 +1389,36 @@ function Overlay({ t, embedded = false, onClose = closeOverlay }) {
     setRevision((value) => value + 1);
   };
   const loadManagement = async (tool, input = { page: 1, limit: 100 }) => {
-    if (managementBusy) return;
+    if (managementLock.current) return;
+    managementLock.current = true;
+    const sequence = ++managementSequence.current;
     setManagementBusy(true);
     setActionError(false);
     try {
       const response = await mutate({ action: tool, input });
+      if (sequence !== managementSequence.current) return;
       setManagementResult(response.result || response);
     } catch (cause) {
-      setActionError(cause);
+      if (sequence === managementSequence.current) setActionError(cause);
     } finally {
-      setManagementBusy(false);
+      if (sequence === managementSequence.current) { managementLock.current = false; setManagementBusy(false); }
     }
   };
   const runManagementAction = async (tool, input) => {
-    if (managementBusy) return;
+    if (managementLock.current) return;
+    managementLock.current = true;
+    const sequence = ++managementSequence.current;
     setManagementBusy(true);
     setActionError(false);
     try {
       const response = await mutate({ action: tool, input });
+      if (sequence !== managementSequence.current) return;
       setManagementResult(response.result || response);
       await reload();
     } catch (cause) {
-      setActionError(cause);
+      if (sequence === managementSequence.current) setActionError(cause);
     } finally {
-      setManagementBusy(false);
+      if (sequence === managementSequence.current) { managementLock.current = false; setManagementBusy(false); }
     }
   };
   const runGraph = async (value) => {
@@ -1698,7 +1721,7 @@ const themeCss = `.yk-overlay{background:var(--dsw-alias-bg-base)!important;colo
 const themeRefinementCss = `.yk-metric,.yk-record,.yk-memory-row{border-color:var(--dsw-alias-border-l1)!important}.yk-bar-track{background:var(--dsw-alias-bg-layer-2)!important}.yk-record-icon,.yk-template b,.yk-node-detail{background:var(--dsw-alias-bg-layer-2)!important;color:var(--dsw-alias-brand-primary)!important}.yk-template em{color:var(--dsw-alias-brand-primary)!important}.yk-chip{background:var(--dsw-alias-bg-layer-2)!important;border-color:var(--dsw-alias-border-l1)!important;color:var(--dsw-alias-label-primary)!important}.yk-row-actions .yk-quiet,.yk-error button{border-color:var(--dsw-alias-border-l1)!important;background:var(--dsw-alias-bg-layer-1)!important;color:var(--dsw-alias-label-secondary)!important}.yk-node-detail small,.yk-node-detail-empty{color:var(--dsw-alias-label-secondary)!important}.yk-source-ready i{background:var(--dsw-alias-state-success-primary)!important}.yk-source-degraded i,.yk-source-unavailable i{background:var(--dsw-alias-state-warn-primary)!important}.yk-source-error i{background:var(--dsw-alias-state-error-primary)!important}.yk-source-queued i{background:var(--dsw-alias-brand-primary)!important}.yk-spinner{border-color:var(--dsw-alias-border-l2)!important;border-top-color:var(--dsw-alias-brand-primary)!important}.yk-metric:before,.yk-metric-blue:before{background:var(--dsw-alias-brand-primary)!important}.yk-metric-teal:before,.yk-bar-processing{background:var(--dsw-alias-state-success-primary)!important}.yk-metric-violet:before,.yk-bar-queued{background:var(--dsw-alias-label-tertiary)!important}.yk-metric-amber:before{background:var(--dsw-alias-state-warn-primary)!important}.yk-bar-failed{background:var(--dsw-alias-state-error-primary)!important}.yk-edge{stroke:var(--dsw-alias-border-l2)!important}.yk-node circle{fill:color-mix(in srgb,var(--dsw-alias-brand-primary) 12%,var(--dsw-alias-bg-layer-1))!important;stroke:var(--dsw-alias-brand-primary)!important}.yk-node:nth-of-type(4n) circle{fill:color-mix(in srgb,var(--dsw-alias-state-success-primary) 12%,var(--dsw-alias-bg-layer-1))!important;stroke:var(--dsw-alias-state-success-primary)!important}.yk-node:nth-of-type(4n+1) circle{fill:color-mix(in srgb,var(--dsw-alias-state-warn-primary) 12%,var(--dsw-alias-bg-layer-1))!important;stroke:var(--dsw-alias-state-warn-primary)!important}.yk-node.is-selected circle{fill:var(--dsw-alias-bg-layer-1)!important;stroke:var(--dsw-alias-brand-primary)!important}.yk-node text{fill:var(--dsw-alias-label-secondary)!important}.yk-node.is-selected text{fill:var(--dsw-alias-label-primary)!important}`;
 // Keep long node identities inside the detail card; the graph canvas owns its own scrolling.
 const contentLayoutCss = `.yk-page,.yk-graph-panel,.yk-graph-wrap,.yk-node-detail{min-width:0}.yk-graph-panel,.yk-graph-wrap{grid-template-columns:minmax(0,1fr)}.yk-node-detail{overflow-wrap:anywhere}`;
-const managementCss = `.yk-management-list{display:grid;gap:8px}.yk-management-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--dsw-alias-border-l1);border-radius:7px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font-size:12px}.yk-management-row span{color:var(--dsw-alias-label-secondary);font-size:11px}.yk-management-records{display:grid;gap:8px;max-height:420px;overflow:auto}.yk-management-records pre{margin:0;padding:10px;border:1px solid var(--dsw-alias-border-l1);border-radius:7px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-secondary);font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere}.yk-management-input{box-sizing:border-box;width:100%;padding:9px 10px;border:1px solid var(--dsw-alias-border-l1);border-radius:7px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;resize:vertical}.yk-management-actions{display:flex;flex-wrap:wrap;gap:8px}.yk-management-form{display:grid;gap:8px;padding-top:12px;border-top:1px solid var(--dsw-alias-border-l1)}.yk-management-console{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.yk-management-card{display:grid;gap:4px;padding:12px;border:1px solid var(--dsw-alias-border-l1);border-radius:7px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);text-align:left;cursor:pointer}.yk-management-card span{color:var(--dsw-alias-label-secondary);font-size:11px}.yk-management-card:disabled{cursor:not-allowed;opacity:.45}@media(max-width:720px){.yk-management-console{grid-template-columns:repeat(2,minmax(0,1fr))}}`;
+const managementCss = `.yk-management-field{display:grid;gap:6px;font-size:13px;color:var(--dsw-alias-label-secondary)}.yk-management-form summary{cursor:pointer;font-weight:600;padding:8px 0}.yk-management-form:not([open]){display:block}.yk-management-record{padding:12px;border:1px solid var(--dsw-alias-border-l1);border-radius:7px}.yk-management-record details{font-size:12px;color:var(--dsw-alias-label-secondary)}.yk-management-list{display:grid;gap:8px}.yk-management-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--dsw-alias-border-l1);border-radius:7px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font-size:12px}.yk-management-row span{color:var(--dsw-alias-label-secondary);font-size:11px}.yk-management-records{display:grid;gap:8px;max-height:420px;overflow:auto}.yk-management-records pre{margin:0;padding:10px;border:1px solid var(--dsw-alias-border-l1);border-radius:7px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-secondary);font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere}.yk-management-input{box-sizing:border-box;width:100%;padding:9px 10px;border:1px solid var(--dsw-alias-border-l1);border-radius:7px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;resize:vertical}.yk-management-actions{display:flex;flex-wrap:wrap;gap:8px}.yk-management-form{display:grid;gap:8px;padding-top:12px;border-top:1px solid var(--dsw-alias-border-l1)}.yk-management-console{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.yk-management-card{display:grid;gap:4px;padding:12px;border:1px solid var(--dsw-alias-border-l1);border-radius:7px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);text-align:left;cursor:pointer}.yk-management-card span{color:var(--dsw-alias-label-secondary);font-size:11px}.yk-management-card:disabled{cursor:not-allowed;opacity:.45}@media(max-width:720px){.yk-management-console{grid-template-columns:repeat(2,minmax(0,1fr))}}`;
 function apply(ctx) {
   ctx.effect(() => {
     const reset = () => { closeOverlay(); knowledgeNavigation().invalidate(); if (ctx.layout.panelInfo.getSnapshot().activePanelId === 'sensteed-knowledge') ctx.layout.selectPanel(null) }
@@ -1749,6 +1772,9 @@ module.exports = {
   apply,
   inject: ["slots", "locale", "layout"],
   __test: {
+    Management,
+    ManagementField,
+    ManagementRecords,
     actionErrorLabel,
     count,
     confidenceLabel,

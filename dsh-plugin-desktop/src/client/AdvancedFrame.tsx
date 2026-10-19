@@ -69,6 +69,8 @@ function DesktopOwnedFrameBody({
     }
   }, [])
 
+  const activePanel = usePanelInfo(info => info.activePanelId)
+  const conversationContext = activePanel === null || activePanel === 'conversation'
   const narrow = viewport < SIDEBAR_AUTO_COLLAPSE
   useEffect(() => { layout.setNarrow(narrow) }, [layout, narrow])
 
@@ -77,14 +79,14 @@ function DesktopOwnedFrameBody({
   const rightbarPreference = panels.rightbar ?? viewport * RIGHTBAR_DEFAULT_RATIO
   const normal = computeDesktopColumns(
     viewport, !panels.rightbarShown && narrow ? 0 : sidebarPreference,
-    rightbarPreference, collapsedSidebarWidth(mode, platform),
+    conversationContext ? rightbarPreference : 0, collapsedSidebarWidth(mode, platform),
   )
   const normalRef = useRef(normal)
   normalRef.current = normal
   const columns = computeDesktopColumns(
     viewport,
     sidebarPreference,
-    panels.rightbarTrack ? rightbarPreference : 0,
+    conversationContext && panels.rightbarTrack ? rightbarPreference : 0,
     collapsedSidebarWidth(mode, platform),
   )
   const sidebarOwnerWidth = columns.sidebar
@@ -118,10 +120,11 @@ function DesktopOwnedFrameBody({
       data-desktop-platform={platform}
       data-sidebar-collapsed={collapsed || undefined}
       data-rightbar-collapsed={columns.rightbar === 0 || undefined}
-      data-rightbar-fullscreen={panels.rightbarFullscreen || undefined}
+      data-rightbar-fullscreen={conversationContext && panels.rightbarFullscreen || undefined}
       data-dragging={dragging || undefined}
       style={{ gridTemplateColumns: `${columns.sidebar}px minmax(0, 1fr) ${columns.rightbar}px` }}
     >
+      <a className="sensteedSkipLink" href="#sensteed-main-workspace">{(typeof document !== 'undefined' && document.documentElement?.lang?.startsWith('zh')) ? '跳到工作区' : 'Skip to workspace'}</a>
       {mode === 'advanced' && platform === 'darwin' && <div className="sensteedAgentMacCaptionRow" aria-hidden="true" />}
       <aside className="sensteedAgentSidebarSurface">
         {/*
@@ -137,9 +140,9 @@ function DesktopOwnedFrameBody({
           {renderSlot('sidebar', { collapsed, width: sidebarOwnerWidth })}
         </div>
       </aside>
-      <main className="sensteedAgentConversationSurface"><MainPanel usePanelInfo={usePanelInfo} renderSlot={renderSlot} /></main>
-      <aside className="sensteedAgentRightbarSurface" data-rightbar-col>
-        {renderSlot('rightbar', { width: normal.rightbar, viewportWidth: viewport, canShow: normal.rightbar > 0 })}
+      <main id="sensteed-main-workspace" tabIndex={-1} className="sensteedAgentConversationSurface"><MainPanel usePanelInfo={usePanelInfo} renderSlot={renderSlot} /></main>
+      <aside className="sensteedAgentRightbarSurface" data-rightbar-col hidden={!conversationContext}>
+        {renderSlot('rightbar', { width: normal.rightbar, viewportWidth: viewport, canShow: conversationContext && normal.rightbar > 0 })}
       </aside>
       {/* Electron resolves app regions in DOM order; Desktop overlays must remain later. */}
       {mode === 'advanced' && platform === 'win32' && <div className="sensteedAgentWindowsCaptionRow" aria-hidden="true" />}
@@ -155,7 +158,7 @@ function DesktopOwnedFrameBody({
           onEnd={onDragEnd}
         />
       )}
-      {panels.rightbarShown && normal.rightbar > 0 && !panels.rightbarFullscreen && (
+      {conversationContext && panels.rightbarShown && normal.rightbar > 0 && !panels.rightbarFullscreen && (
         <ResizeHandle
           side="rightbar"
           left={viewport - normal.rightbar}

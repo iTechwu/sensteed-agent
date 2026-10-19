@@ -55,6 +55,8 @@ function HubPageContent({ kind, t, create, loadSkills, navigation, ...props }: H
   const externalTab = useSyncExternalStore(navigation?.subscribe ?? noSubscribe, navigation?.getSnapshot ?? defaultTab, navigation?.getSnapshot ?? defaultTab)
   const currentTab = navigation ? externalTab : tab
   const selectTab = (value: 'catalog' | 'installed') => navigation ? navigation.select(value) : setTab(value)
+  const selectedPlugin = useSyncExternalStore(navigation?.selectedPlugin.subscribe ?? noSubscribe, navigation?.selectedPlugin.getSnapshot ?? noSelectedPlugin, navigation?.selectedPlugin.getSnapshot ?? noSelectedPlugin)
+  const builtInPlugins = dofePluginsForBrand('sensteed').filter(plugin => !selectedPlugin || plugin.id === selectedPlugin)
   const Icon = kind === 'plugin' ? Blocks : Sparkles
   const secondary = kind === 'plugin' ? 'builtInTab' : 'localSkillsTab'
   return <div className="dshHubPage"><div className="dshHubContent">
@@ -71,9 +73,11 @@ function HubPageContent({ kind, t, create, loadSkills, navigation, ...props }: H
     </div>
     <div hidden={currentTab !== 'catalog'}><HubSetupSection kind={kind} t={t} {...props} /></div>
     {currentTab === 'installed' && (kind === 'skill' ? <SkillLibrary loadSkills={loadSkills} t={t} />
-      : <ul className="dshHubCatalog">{dofePluginsForBrand('sensteed').map(plugin => <li className="dshHubCard" key={plugin.id}><h3>{plugin.name}</h3><DofePluginCard plugin={plugin} settingsScope={props.settingsScope} t={t} view="page" /></li>)}</ul>)}
+      : <><div className="dshHubToolbar">{selectedPlugin && <button type="button" className="dshHubSecondary" onClick={() => navigation?.select('installed')}>{t('catalogBackToAll')}</button>}</div><ul className="dshHubCatalog">{builtInPlugins.map(plugin => <li className="dshHubCard" key={plugin.id}><h3>{plugin.name}</h3><DofePluginCard plugin={plugin} settingsScope={props.settingsScope} t={t} view="page" /></li>)}</ul></>)}
   </div></div>
 }
 
 const noSubscribe = () => () => {}
 const defaultTab = () => 'catalog' as const
+
+const noSelectedPlugin = () => null

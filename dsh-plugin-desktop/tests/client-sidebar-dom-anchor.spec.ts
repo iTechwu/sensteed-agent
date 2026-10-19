@@ -56,6 +56,25 @@ describe('desktop sidebar DOM anchor', () => {
       .toBe(body.querySelector('[class*="sidebarCol"]'))
   })
 
+  it('keeps chat-owned side panels out of global modules and restores their layout preferences on return', () => {
+    const layout = new DesktopLayoutState(() => true)
+    layout.openRightbar(true, false)
+    const before = layout.getSnapshot()
+    const props = { layout, platform: 'win32', renderSlot: (name: string) => createElement('span', { 'data-slot': name }),
+      usePanelInfo: (select: (info: PanelInfo) => unknown) => select(layout.getPanelInfo()),
+    } as unknown as AdvancedFrameProps
+    layout.selectPanel('plugins' as never)
+    document.body.innerHTML = renderToStaticMarkup(createElement(AdvancedFrame, props))
+    expect(document.querySelector('.sensteedAgentRightbarSurface')?.hasAttribute('hidden')).toBe(true)
+    expect(document.querySelector('.sensteedAgentFrame')?.getAttribute('style')).toContain('0px')
+    expect(layout.getSnapshot()).toBe(before)
+    layout.selectPanel(null)
+    document.body.innerHTML = renderToStaticMarkup(createElement(AdvancedFrame, props))
+    expect(document.querySelector('.sensteedAgentRightbarSurface')?.hasAttribute('hidden')).toBe(false)
+    expect(layout.getSnapshot().rightbarShown).toBe(true)
+    expect(document.querySelector('.sensteedSkipLink')?.getAttribute('href')).toBe('#sensteed-main-workspace')
+  })
+
   it('keeps the compatibility class spelled the way attribute selectors match', () => {
     // `class` attribute matching is case-sensitive in standards mode, so the
     // upstream substring has to survive verbatim.

@@ -125,7 +125,7 @@
     }
   },
   "scripts": {
-    "build": "corepack pnpm run generate:brand && node ../scripts/build-dofe-ui.mjs && node scripts/clean.mjs && tsdown && vite build --config vite.client.config.ts && vite build --config vite.native-ui.config.ts && tsc -p tsconfig.json --emitDeclarationOnly && tsc -p tsconfig.client.json --emitDeclarationOnly && node scripts/generate-profile-closure.mjs",
+    "build": "corepack pnpm run generate:brand && node ../scripts/build-dofe-ui.mjs && node ../scripts/verify-dofe-ui-install.mjs && node scripts/clean.mjs && tsdown && vite build --config vite.client.config.ts && vite build --config vite.native-ui.config.ts && tsc -p tsconfig.json --emitDeclarationOnly && tsc -p tsconfig.client.json --emitDeclarationOnly && node scripts/generate-profile-closure.mjs",
     "generate:brand": "node scripts/generate-brand-assets.mjs && node scripts/generate-lockup.ts && node scripts/generate-client-brand-module.mjs && node scripts/generate-product-identity.mjs && node scripts/generate-mac-app-icon.mjs && node scripts/generate-tray-icons.mjs && node scripts/generate-windows-app-icon.mjs",
     "verify:brand": "node scripts/verify-brand-sync.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit && tsc -p tsconfig.native-ui.json --noEmit && tsc -p tsconfig.tests.json --noEmit && tsc -p tsconfig.tests.client.json --noEmit",
@@ -141,7 +141,7 @@
     "verify:closure": "node --test scripts/runtime-closure.spec.mjs && node scripts/verify-runtime-closure.mjs && node scripts/generate-profile-closure.mjs --check",
     "verify:cli": "node scripts/verify-cli-runtime.mjs",
     "verify:loader": "node scripts/verify-loader-boot.mjs",
-    "verify:sensteed-clients": "node --test scripts/sensteed-client-runtime.spec.mjs && node scripts/verify-sensteed-client-runtime.mjs",
+    "verify:sensteed-clients": "node --test ../scripts/installed-plugin-copy.test.mjs && node ../scripts/verify-dofe-ui-install.mjs --verify-only && node --test scripts/sensteed-client-runtime.spec.mjs && node scripts/verify-sensteed-client-runtime.mjs",
     "verify:profile": "node scripts/verify-profile-boot.mjs",
     "verify:renderer": "node scripts/verify-profile-boot.mjs --renderer --compatibility && node scripts/verify-profile-boot.mjs --renderer",
     "verify:licenses": "node --test scripts/license-file.spec.mjs && node scripts/verify-licenses.mjs",
