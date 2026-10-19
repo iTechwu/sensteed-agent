@@ -306,3 +306,19 @@ const scopeExports={};new Function('exports','z',ts.transpileModule(scopeStateme
 assert.ok(scopeExports.PermissionPolicyScopeSchema.safeParse(policyPlugin.financePolicyScopes(policyBase)[0]).success)
 for(const member of memberCases)assert.equal(pluginPeople({members:[member]},'permission').length>0,memberModule.exports.canSelectOrganizationMember(member,'permission'),`完整策略成员资格漂移 ${member.userId}`)
 console.log(`OK: ${policyCases.length} complete-policy drafts: field errors with/without confirmation, intersecting scopes, summaries and member eligibility match`)
+
+// 部门资金填报：空白占位、部分输入、草稿/提交使用相同的逐行校验。
+const filingValidationModule = { exports: {} }
+new Function('exports', ts.transpileModule(await readFile(resolve(datasource, 'apps/web/components/finance/filing-row-validation.ts'), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(filingValidationModule.exports)
+const filingErrors = new Function(await readFile(resolve(root, 'src/views/entry.js'), 'utf8') + '\nreturn financeFilingRowErrors')()
+for (const row of [{}, { month: '10' }, { costItemId: 'c1' }, { description: '未填金额' }, { plannedAmount: '0' }, { plannedAmount: '-1' }, { plannedAmount: 'Infinity' }, { plannedAmount: '10', month: 13 }, { plannedAmount: '10', month: 1.5 }, { plannedAmount: '10', month: 10 }, { costItemId: 'c1', plannedAmount: '20.50', month: 10 }, { plannedAmount: '10', description: '字'.repeat(501) }]) {
+  for (const submit of [false, true]) assert.deepEqual(filingErrors([row], submit, 10), filingValidationModule.exports.financeFilingRowErrors([row], submit, 10))
+}
+console.log('OK: 24 filing draft/submit validation cases including partially entered rows')
+
+const engineValidationModule = { exports: {} }
+new Function('exports', ts.transpileModule(await readFile(resolve(datasource, 'apps/web/components/budget-engine/budget-engine-validation.ts'), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(engineValidationModule.exports)
+const nextParameterVersion = new Function(await readFile(resolve(root, 'src/views/engine.js'), 'utf8') + '\nreturn financeEngineParameterVersion')()
+for (const versions of [[], [{version:'P3'}], [{version:'P1'},{version:'P7'}], [{version:'custom'}], [{version:'P999'}]]) assert.equal(nextParameterVersion(versions), engineValidationModule.exports.budgetParameterVersionName(versions))
+assert.equal(nextParameterVersion([{version:'P3'}]), 'P4')
+console.log('OK: parameter batch names advance beyond sparse historical P versions')

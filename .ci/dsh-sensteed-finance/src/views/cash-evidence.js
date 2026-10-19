@@ -15,6 +15,9 @@ function financeBeijingInstant(localValue) {
 
 // 客户端仅镜像服务端 Zod 规则（RegisterCashSettlementSchema）用于提交前提示；occurredAt 须已是 ISO 字符串，最终以服务端校验为准。
 function financeSettlementBody(t, input) {
+  const sourceSystem = String(input.sourceSystem ?? 'PROJECT_ENTRY').trim()
+  if (!sourceSystem || sourceSystem.length > 100) return { error: '来源系统：1-100' }
+  input = { ...input, cash: input.cash ?? input.cashAmount, acceptance: input.acceptance ?? input.acceptanceAmount, process: input.process ?? input.processNo }
   const sourceId = String(input.sourceId ?? '').trim()
   if (!sourceId || sourceId.length > 200) return { error: `${t('settlementSourceId')}：1-200` }
   if (!input.occurredAt) return { error: t('settlementOccurredAt') }
@@ -33,7 +36,7 @@ function financeSettlementBody(t, input) {
   const processNo = String(input.process ?? '').trim() || null
   if (processNo && processNo.length > 200) return { error: t('settlementProcessNo') }
   return { body: {
-    sourceSystem: 'PROJECT_ENTRY', sourceId, sourceRef, direction: input.direction, planId: input.planId,
+    sourceSystem, sourceId, sourceRef, direction: input.direction, planId: input.planId,
     occurredAt: input.occurredAt, currency, amount, cashAmount, acceptanceAmount, processNo,
     reversesId: input.reversesId || null, note,
   } }
@@ -49,6 +52,8 @@ function CashSettlementsSection({ planId, direction, ctx, t }) {
   const [error, setError] = useState(null)
   const [ok, setOk] = useState(null)
   const lock = useRef(false)
+  const [pending, setPending] = useState(false)
+  const exit = useFinanceFormExit(form, form, () => lock.current, () => {})
   const setField = (key, value) => setForm(current => ({ ...current, [key]: value }))
   useEffect(() => {
     let cancelled = false
@@ -58,33 +63,33 @@ function CashSettlementsSection({ planId, direction, ctx, t }) {
       .catch(() => { if (!cancelled) setData({ error: true }) })
     return () => { cancelled = true }
   }, [planId, direction, page, retry])
-  const resetEntry = () => setForm(current => ({ ...current, sourceId: '', amount: '', cash: '', acceptance: '', reversesId: null }))
+  const resetEntry = () => { const clean = { sourceId: '', occurred: '', amount: '', cash: '', acceptance: '', process: '', currency: 'CNY', reference: '', note: '', reversesId: null }; setForm(clean); exit.reset(clean) }
   const submit = async () => {
     if (lock.current || !confirmed) return
     const occurredAt = financeBeijingInstant(form.occurred)
     const parsed = financeSettlementBody(t, { ...form, sourceRef: form.reference, occurredAt, direction, planId })
     if (parsed.error) { setError(parsed.error); return }
-    lock.current = true; setError(null); setOk(null)
+    lock.current = true; setPending(true); setError(null); setOk(null)
     try {
       await post('/rest/finance/cash-evidence/settlements', parsed.body)
       setOk(t('settlementRegisterOk')); resetEntry(); setConfirmed(false); setRetry(value => value + 1)
-    } catch (err) { setError(err.message) } finally { lock.current = false }
+    } catch (err) { setError(err.message) } finally { lock.current = false; setPending(false) }
   }
   const importFile = async file => {
     if (!file || lock.current || !confirmed) return
     setError(null); setOk(null)
     if (file.size > 1024 * 1024) { setError(t('settlementTooLarge')); return }
-    lock.current = true
+    lock.current = true; setPending(true)
     try {
       const input = JSON.parse(await file.text())
-      if (!input || input.planId !== planId || input.direction !== direction) { setError(t('settlementImportMismatch')); return }
+      if (!input || typeof input.sourceSystem !== 'string' || input.planId !== planId || input.direction !== direction) { setError(t('settlementImportMismatch')); return }
       const occurred = input.occurredAt ? new Date(input.occurredAt) : null
       if (!occurred || Number.isNaN(occurred.getTime())) { setError(t('settlementOccurredAt')); return }
-      const parsed = financeSettlementBody(t, { ...input, occurredAt: occurred.toISOString() })
+      const parsed = financeSettlementBody(t, { ...input, cash: input.cashAmount, acceptance: input.acceptanceAmount, process: input.processNo, occurredAt: occurred.toISOString() })
       if (parsed.error) { setError(parsed.error); return }
       await post('/rest/finance/cash-evidence/settlements', parsed.body)
       setOk(t('settlementImportOk')); setConfirmed(false); setRetry(value => value + 1)
-    } catch (err) { setError(err instanceof SyntaxError ? t('settlementFileFail') : err.message) } finally { lock.current = false }
+    } catch (err) { setError(err instanceof SyntaxError ? t('settlementFileFail') : err.message) } finally { lock.current = false; setPending(false) }
   }
   const rows = data?.list || []
   return h('div', { className: 'sf-stack' },
@@ -105,23 +110,24 @@ function CashSettlementsSection({ planId, direction, ctx, t }) {
         { key: 'sourceRef', label: t('settlementRefCol') },
         { key: 'verifiedBy', label: t('settlementVerifier') },
         { key: 'actions', label: t('actions'), sortable: false, render: row => canWrite && !row.reversesId
-          ? h(LinkButton, { onClick: () => { resetEntry(); setField('reversesId', row.id); setField('process', row.processNo ?? ''); setField('currency', row.currency ?? 'CNY'); setConfirmed(false); setError(null); setOk(null) } }, t('settlementReverseAction'))
+          ? h(LinkButton, { disabled: pending, onClick: () => exit.leave(() => { resetEntry(); setField('reversesId', row.id); setField('process', row.processNo ?? ''); setField('currency', row.currency ?? 'CNY'); setConfirmed(false); setError(null); setOk(null) }, '放弃修改并切换冲销') }, t('settlementReverseAction'))
           : null },
       ] }) : h('p', { className: 'sf-note' }, t('settlementEmptyNote')),
       h(Pager, { page, total: data.total, limit: data.limit || 20, onPage: setPage })) : null,
-    canWrite ? h('div', { className: 'sf-stack' },
+    canWrite ? h('fieldset', { disabled: pending, className: 'sf-stack sf-fieldset' },
       h('label', { className: 'sf-row' },
         h('input', { type: 'checkbox', checked: confirmed, onChange: event => { setConfirmed(event.target.checked); setError(null); setOk(null) } }),
         t('settlementAttest')),
       h('div', { className: 'sf-stack' },
         error ? h('p', { role: 'alert', className: 'sf-neg' }, error) : null,
         ok ? h('p', { role: 'status' }, ok) : null,
+        exit.prompt,
         form.reversesId ? h('p', { role: 'status', className: 'sf-row' }, `${t('settlementReverses')}：${form.reversesId}`,
-          h(LinkButton, { onClick: () => setField('reversesId', null) }, t('settlementCancelReverse'))) : null,
+          h(LinkButton, { onClick: () => exit.leave(() => { resetEntry(); setConfirmed(false) }, '放弃修改并取消冲销') }, t('settlementCancelReverse'))) : null,
         h('div', { className: 'sf-inline-form' },
           h(FormRow, { label: `${t('settlementSourceId')} *` }, h(Field, { value: form.sourceId, onChange: value => setField('sourceId', value), maxLength: 200, disabled: lock.current })),
           h(FormRow, { label: `${t('settlementOccurredAt')} *` }, h(Field, { type: 'datetime-local', value: form.occurred, onChange: value => setField('occurred', value), disabled: lock.current })),
-          h(FormRow, { label: `${t('amount')} *` }, h(Field, { value: form.amount, onChange: value => setField('amount', value), disabled: lock.current })),
+          h(FormRow, { label: '本笔金额 *' }, h(Field, { value: form.amount, onChange: value => setField('amount', value), disabled: lock.current })),
           h(FormRow, { label: `${t('paymentCurrency')} *` }, h(Field, { value: form.currency, onChange: value => setField('currency', value.toUpperCase()), maxLength: 3, disabled: lock.current })),
           h(FormRow, { label: t('settlementCashUnknown') }, h(Field, { value: form.cash, onChange: value => setField('cash', value), disabled: lock.current })),
           h(FormRow, { label: t('settlementAcceptanceUnknown') }, h(Field, { value: form.acceptance, onChange: value => setField('acceptance', value), disabled: lock.current })),
@@ -131,7 +137,7 @@ function CashSettlementsSection({ planId, direction, ctx, t }) {
         h('div', { className: 'sf-row' },
           h(PrimaryButton, { disabled: lock.current || !confirmed, onClick: submit }, form.reversesId ? t('settlementRegisterReverse') : direction === 'PAYMENT' ? t('settlementRegisterPayment') : t('settlementRegisterReceipt')),
           h('label', { className: 'sf-row' }, t('settlementImport'),
-            h('input', { type: 'file', accept: '.json', 'aria-label': t('settlementImport'), disabled: lock.current || !confirmed, onChange: event => { void importFile(event.target.files?.[0]) } }))))) : null)
+            h('input', { type: 'file', accept: '.json', 'aria-label': t('settlementImport'), disabled: lock.current || !confirmed, onChange: event => { const file = event.target.files?.[0]; event.target.value = ''; void importFile(file) } }))))) : null)
 }
 
 const CASH_ACCURACY_STATUS_KEYS = { READY: 'accReady', RULE_NOT_CONFIRMED: 'accRuleNotConfirmed', INSUFFICIENT_EVIDENCE: 'accInsufficient', NOT_APPLICABLE: 'accNotApplicable' }

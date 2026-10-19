@@ -254,6 +254,22 @@ function MyFilingSection({ assignments, busy, t, act, onDialog, onRetry, onReope
 }
 
 /** 部门行编辑器：月份/说明/金额多行 + 暂存/提交；复核定稿在弹窗内完成，重开走外层 ReasonDialog */
+function financeFilingRowErrors(rows, thenSubmit, defaultMonth) {
+  return rows.map((row) => {
+    const amount = String(row.plannedAmount ?? '').trim()
+    const description = String(row.description ?? '')
+    const month = String(row.month ?? '')
+    // 默认月份不代表用户已经填写；仅完全空白的占位行允许忽略。
+    const touched = Boolean(amount || row.costItemId || description.trim() || (month && month !== String(defaultMonth ?? '')))
+    if (!touched) return ''
+    if (!amount || !Number.isFinite(Number(amount)) || Number(amount) <= 0) return '金额必须大于 0（元）'
+    if (month && (!Number.isInteger(Number(month)) || Number(month) < 1 || Number(month) > 12)) return '月份须为 1 至 12 月'
+    if (description.length > 500) return '说明不能超过 500 字'
+    if (thenSubmit && (!row.costItemId || !month)) return '提交前请补全费用类别和月份'
+    return ''
+  })
+}
+
 function AssignmentDialog({ assignment, canEdit = true, canVerify = true, busy, t, onClose, act }) {
   const task = assignment.task
   const editable = canEdit && task?.status === 'OPEN' && (!task.dueAt || new Date(task.dueAt).getTime() >= Date.now()) &&
@@ -265,8 +281,10 @@ function AssignmentDialog({ assignment, canEdit = true, canVerify = true, busy, 
   const [reload, setReload] = useState(0)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [rowErrors, setRowErrors] = useState([])
   const [excelBusy, setExcelBusy] = useState(false)
   const writeLock = useRef(false)
+  const exit = useFinanceFormExit(rows, rows, () => writeLock.current || busy || excelBusy, onClose)
   useEffect(() => {
     let cancelled = false
     setCostError(false)
@@ -279,13 +297,11 @@ function AssignmentDialog({ assignment, canEdit = true, canVerify = true, busy, 
   const updateRow = (index, patch) => setRows(current => current.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)))
   const persist = async thenSubmit => {
     if (!editable || saving || busy || excelBusy || writeLock.current) return
+    const errors = financeFilingRowErrors(rows, thenSubmit, task?.month)
     const filled = rows.filter(row => String(row.plannedAmount ?? '').trim())
-    if (filled.some(row => !Number.isFinite(Number(row.plannedAmount)) || Number(row.plannedAmount) <= 0)) {
-      setError('请填写大于 0 的金额'); return
-    }
-    if (thenSubmit && (!filled.length || filled.some(row => !row.costItemId || !row.month))) {
-      setError('请至少填写一行，并补全费用类别、月份和金额'); return
-    }
+    setRowErrors(errors)
+    if (errors.some(Boolean)) { setError('请修正标出的填报行，填写内容已保留'); return }
+    if (thenSubmit && !filled.length) { setError('请至少填写一行金额后再提交验证'); return }
     writeLock.current = true
     setSaving(true); setError('')
     try {
@@ -298,6 +314,7 @@ function AssignmentDialog({ assignment, canEdit = true, canVerify = true, busy, 
         })),
       }, t('saved'))
       if (!saved) { setError('保存失败，填写内容已保留，请重试'); return }
+      exit.reset(rows)
       if (thenSubmit && !await act('/filing-assignments/' + assignment.id + '/submit', {})) {
         setError('内容已暂存，提交失败，请重试'); return
       }
@@ -306,18 +323,18 @@ function AssignmentDialog({ assignment, canEdit = true, canVerify = true, busy, 
       setError('操作失败，填写内容已保留，请重试')
     } finally { writeLock.current = false; setSaving(false) }
   }
-  return h(Dialog, { title: t('assignmentTitle') + ' · ' + (assignment.departmentName ?? ''), width: 'lg', dismissDisabled: saving || excelBusy, onClose: saving || excelBusy ? undefined : onClose, footer: [
+  return h(Dialog, { title: t('assignmentTitle') + ' · ' + (assignment.departmentName ?? ''), width: 'lg', dismissDisabled: saving || excelBusy, onClose: exit.close, footer: [
     editable ? h(GhostButton, { key: 'save', disabled: busy || saving || excelBusy, onClick: () => persist(false) }, t('saveDraft')) : null,
     editable ? h(PrimaryButton, { key: 'submit', busy: busy || saving || excelBusy, onClick: () => persist(true) }, t('submitFiling')) : null,
     canVerify && assignment.status === 'SUBMITTED' ? h(PrimaryButton, {
       key: 'commit', busy: busy || saving || excelBusy,
       onClick: async () => { if (await act('/filing-assignments/' + assignment.id + '/commit', {})) onClose() },
     }, t('commitFiling')) : null,
-    h(GhostButton, { key: 'cancel', disabled: saving || excelBusy, onClick: onClose }, t('close')),
+    h(GhostButton, { key: 'cancel', disabled: saving || excelBusy, onClick: exit.close }, t('close')),
   ] },
     h('div', { className: 'sf-stack' },
       !editable ? h('p', { className: 'sf-note' }, '当前填报只读；仅开放且未过期的活动可填写，已提交记录须在允许修改的窗口内重提。') : null,
-      editable ? h(FilingExcelDraft, { assignmentId: assignment.id, disabled: saving || busy, onBusyChange: setExcelBusy, onApply: imported => setRows(imported.map(row => ({ ...row, month: row.month == null ? '' : String(row.month), plannedAmount: String(row.plannedAmount) }))) }) : null,
+      editable ? h(FilingExcelDraft, { assignmentId: assignment.id, disabled: saving || busy, onBusyChange: setExcelBusy, hasExistingRows: rows.some(row => String(row.plannedAmount ?? '').trim() || row.costItemId || row.description?.trim()), onApply: imported => setRows(imported.map(row => ({ ...row, month: row.month == null ? '' : String(row.month), plannedAmount: String(row.plannedAmount) }))) }) : null,
       costError ? h('div', { role: 'alert' }, '费用类别加载失败', h(LinkButton, { onClick: () => setReload(value => value + 1) }, '重试')) : null,
       costItems && !costItems.length && !costError ? h('p', { className: 'sf-note' }, '暂无可用费用类别，请联系财务维护。') : null,
       error ? h('p', { role: 'alert', className: 'sf-neg' }, error) : null,
@@ -329,12 +346,14 @@ function AssignmentDialog({ assignment, canEdit = true, canVerify = true, busy, 
           h(FormRow, { label: '费用类别' }, h(SearchSelect, {
             value: row.costItemId ?? '', onChange: value => updateRow(index, { costItemId: value }),
             options: (costItems || []).map(item => [item.id, item.name]),
-            placeholder: costItems ? '费用类别' : '费用类别（加载中）', disabled: !editable || busy || saving || !costItems || costError,
+            placeholder: costItems ? '费用类别' : '费用类别（加载中）', disabled: !editable || busy || saving || excelBusy || !costItems || costError,
           })),
-          h(FormRow, { label: t('monthCol') }, h(Select, { value: String(row.month ?? ''), onChange: value => updateRow(index, { month: value }), options: months, placeholder: t('monthCol'), disabled: !editable || busy || saving })),
-          h(FormRow, { label: t('description') }, h(Field, { value: row.description ?? '', onChange: value => updateRow(index, { description: value }), maxLength: 500, disabled: !editable || busy || saving })),
-          h(FormRow, { label: t('planned') }, h(Field, { type: 'number', min: '0.01', step: '0.01', value: row.plannedAmount ?? '', onChange: value => updateRow(index, { plannedAmount: value }), disabled: !editable || busy || saving })),
-          editable ? h(LinkButton, { disabled: busy || saving || excelBusy, onClick: () => setRows(current => current.filter((_, rowIndex) => rowIndex !== index)) }, h(Glyph, { name: 'trash', size: 13 })) : null))),
+          h(FormRow, { label: t('monthCol') }, h(Select, { value: String(row.month ?? ''), onChange: value => updateRow(index, { month: value }), options: months, placeholder: t('monthCol'), disabled: !editable || busy || saving || excelBusy })),
+          h(FormRow, { label: '说明（付款内容 / 编制说明）' }, h(Field, { value: row.description ?? '', onChange: value => updateRow(index, { description: value }), maxLength: 500, disabled: !editable || busy || saving || excelBusy })),
+          h(FormRow, { label: '金额（元）' }, h(Field, { inputMode: 'decimal', value: row.plannedAmount ?? '', onChange: value => updateRow(index, { plannedAmount: value }), disabled: !editable || busy || saving || excelBusy })),
+          editable ? h(LinkButton, { 'aria-label': `删除第 ${index + 1} 行`, disabled: rows.length === 1 || busy || saving || excelBusy, onClick: () => setRows(current => current.filter((_, rowIndex) => rowIndex !== index)) }, h(Glyph, { name: 'trash', size: 13 })) : null),
+        rowErrors[index] ? h('p', { role: 'alert', className: 'sf-neg' }, `第 ${index + 1} 行：${rowErrors[index]}`) : null)),
+      exit.prompt,
       h('p', { className: 'sf-note' }, t('entryHint'))))
 }
 
