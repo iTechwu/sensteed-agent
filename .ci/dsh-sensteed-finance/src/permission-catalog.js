@@ -18,6 +18,7 @@ const FINANCE_PERMISSION_NAMES = {
   "cash.plan.read": "查看资金计划",
   "cash.plan.write": "填报资金计划",
   "cash.plan.verify": "确认资金计划",
+  "cash.plan.adjustment.approve": "资金计划调整审批",
   "finance.source.review": "来源数据清洗/确认/退回",
   "finance.invoice.check": "发票重复/真伪校验",
   "finance.archive.read": "电子档案查询",
@@ -61,7 +62,8 @@ const FINANCE_PERMISSION_GROUPS = [
     "permissions": [
       "cash.plan.read",
       "cash.plan.write",
-      "cash.plan.verify"
+      "cash.plan.verify",
+      "cash.plan.adjustment.approve"
     ]
   },
   {
@@ -89,7 +91,8 @@ const FINANCE_PERMISSION_GROUPS = [
 const FINANCE_HIGH_RISK_PERMISSIONS = [
   "budget.activity.reopen",
   "budget.version.publish",
-  "finance.permission.manage"
+  "finance.permission.manage",
+  "cash.plan.adjustment.approve"
 ]
 const FINANCE_ROLE_PERMISSION_BASELINE = {
   "FINANCE_OWNER": [
@@ -111,6 +114,7 @@ const FINANCE_ROLE_PERMISSION_BASELINE = {
     "cash.plan.read",
     "cash.plan.write",
     "cash.plan.verify",
+    "cash.plan.adjustment.approve",
     "finance.source.review",
     "finance.invoice.check",
     "finance.archive.read",

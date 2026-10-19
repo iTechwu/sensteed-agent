@@ -1698,6 +1698,7 @@ window.__ModuleLoader__.load({
       "cash.plan.read": "查看资金计划",
       "cash.plan.write": "填报资金计划",
       "cash.plan.verify": "确认资金计划",
+      "cash.plan.adjustment.approve": "资金计划调整审批",
       "finance.source.review": "来源数据清洗/确认/退回",
       "finance.invoice.check": "发票重复/真伪校验",
       "finance.archive.read": "电子档案查询",
@@ -1741,7 +1742,8 @@ window.__ModuleLoader__.load({
         "permissions": [
           "cash.plan.read",
           "cash.plan.write",
-          "cash.plan.verify"
+          "cash.plan.verify",
+          "cash.plan.adjustment.approve"
         ]
       },
       {
@@ -1769,7 +1771,8 @@ window.__ModuleLoader__.load({
     const FINANCE_HIGH_RISK_PERMISSIONS = [
       "budget.activity.reopen",
       "budget.version.publish",
-      "finance.permission.manage"
+      "finance.permission.manage",
+      "cash.plan.adjustment.approve"
     ]
     const FINANCE_ROLE_PERMISSION_BASELINE = {
       "FINANCE_OWNER": [
@@ -1791,6 +1794,7 @@ window.__ModuleLoader__.load({
         "cash.plan.read",
         "cash.plan.write",
         "cash.plan.verify",
+        "cash.plan.adjustment.approve",
         "finance.source.review",
         "finance.invoice.check",
         "finance.archive.read",
@@ -5744,7 +5748,7 @@ window.__ModuleLoader__.load({
       const rows = financeRows(list.data)
       const selectedRows = rows.filter(row => selected.includes(row.id))
       const mixedTasks = new Set(selectedRows.map(row => row.taskId)).size > 1
-      const canVerify = ctx.permissions.includes(section === 'facts' ? 'finance.source.review' : section === 'budget' ? 'budget.adjustment.approve' : section === 'plans' ? 'cash.plan.verify' : 'budget.submission.verify') && ctx.financeWriter
+      const canVerify = ctx.permissions.includes(section === 'facts' ? 'finance.source.review' : section === 'budget' ? 'budget.adjustment.approve' : section === 'plans' ? 'cash.plan.verify' : 'budget.submission.verify') && ctx.financeWriter && (section !== 'plans' || ctx.permissions.includes('cash.plan.adjustment.approve'))
       const act = async (target, body) => { const result = await action.run(target, body); if (result?.results) setReceipt(result); return result }
       return h('div', { className: 'sf-stack' },
         h(Card, { title: '复核队列汇总' }, h(FinanceResource, { resource: summary }, h('div', { className: 'sf-kpis' }, ...(summary.data?.sources || []).map(row => h(KpiCard, { key: row.source, label: ({ FILING: '填报', FACT_BATCH: '事实批次', BUDGET_ADJUSTMENT: '预算调整', PLAN_ADJUSTMENT: '计划调整' })[row.source], value: row.pending, onClick: () => { const next = ({ FILING: 'filing', FACT_BATCH: 'facts', BUDGET_ADJUSTMENT: 'budget', PLAN_ADJUSTMENT: 'plans' })[row.source]; if (next) { setSection(next); setPage(1); setDialog(null) } } }))))),

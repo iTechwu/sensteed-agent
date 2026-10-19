@@ -18,7 +18,7 @@ function ReviewView({ ctx }) {
   const rows = financeRows(list.data)
   const selectedRows = rows.filter(row => selected.includes(row.id))
   const mixedTasks = new Set(selectedRows.map(row => row.taskId)).size > 1
-  const canVerify = ctx.permissions.includes(section === 'facts' ? 'finance.source.review' : section === 'budget' ? 'budget.adjustment.approve' : section === 'plans' ? 'cash.plan.verify' : 'budget.submission.verify') && ctx.financeWriter
+  const canVerify = ctx.permissions.includes(section === 'facts' ? 'finance.source.review' : section === 'budget' ? 'budget.adjustment.approve' : section === 'plans' ? 'cash.plan.verify' : 'budget.submission.verify') && ctx.financeWriter && (section !== 'plans' || ctx.permissions.includes('cash.plan.adjustment.approve'))
   const act = async (target, body) => { const result = await action.run(target, body); if (result?.results) setReceipt(result); return result }
   return h('div', { className: 'sf-stack' },
     h(Card, { title: '复核队列汇总' }, h(FinanceResource, { resource: summary }, h('div', { className: 'sf-kpis' }, ...(summary.data?.sources || []).map(row => h(KpiCard, { key: row.source, label: ({ FILING: '填报', FACT_BATCH: '事实批次', BUDGET_ADJUSTMENT: '预算调整', PLAN_ADJUSTMENT: '计划调整' })[row.source], value: row.pending, onClick: () => { const next = ({ FILING: 'filing', FACT_BATCH: 'facts', BUDGET_ADJUSTMENT: 'budget', PLAN_ADJUSTMENT: 'plans' })[row.source]; if (next) { setSection(next); setPage(1); setDialog(null) } } }))))),

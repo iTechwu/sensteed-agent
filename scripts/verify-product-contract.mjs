@@ -43,6 +43,7 @@ const OWN_ROW_IDS = new Set([
   'sensteed-skill-manager',
   'dofe-product-client', 'dofe-product-routes', 'sensteed-quit-inspection',
   'sensteed-update-policy', 'sensteed-agent-knowledge-capture',
+  'dofe-host-auth', 'dofe-host-capabilities', 'dofe-auth-routes',
 ])
 
 const patchPath = resolve(root, 'dsh-sensteed-product/cordis.patch.yml')
