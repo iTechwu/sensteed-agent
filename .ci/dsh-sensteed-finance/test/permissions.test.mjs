@@ -8,8 +8,15 @@ test('finance tools and guidance follow authorization, connections, and scoped v
   const sections = []
   let allowed = false
   let connected = true
+  let hubDisposed = 0
   const emit = name => listeners.get(name)?.()
   const dispose = apply({
+    hubMcp: {
+      register(config) {
+        assert.deepEqual(config, { capability: 'finance', serverName: 'finance', path: 'finance', timeoutMs: 60000 })
+        return { dispose: () => { hubDisposed++ } }
+      },
+    },
     dofeAccess: () => ({ ready: true, financeAllowed: allowed }),
     webServer: { port: 1, register: () => () => {} },
     on(name, callback) { listeners.set(name, callback); return () => listeners.delete(name) },
@@ -43,5 +50,6 @@ test('finance tools and guidance follow authorization, connections, and scoped v
   assert.equal(tools.size, 0)
   assert.equal(prompt(), '')
   dispose()
+  assert.equal(hubDisposed, 1)
   assert.equal(listeners.size, 0)
 })
