@@ -34,7 +34,7 @@ const WRITE_TOOLS = new Set([
 let credentialFingerprint = ''
 let credentialScopeId = randomUUID()
 
-export const inject = ['tools', 'systemPrompt', 'webServer', 'credentials', 'dofeAccess', 'dofeAuth']
+export const inject = ['tools', 'systemPrompt', 'webServer', 'credentials', 'dofeAccess', 'dofeAuth', 'hubMcp']
 export const capabilities = Object.freeze([
   {
     "id": "supplier-intelligence",
@@ -47,6 +47,9 @@ export const capabilities = Object.freeze([
 
 export function apply(ctx, overrides = {}) {
   const disposers = []
+  if (!ctx.hubMcp?.register) throw new Error('HUB_MCP_SERVICE_REQUIRED')
+  const registration = ctx.hubMcp.register({ capability: 'supplier-intelligence', serverName: 'supply-chain', path: 'tools/supply-chain', timeoutMs: 120000 })
+  disposers.push(() => registration.dispose())
   // Match the desktop product's built-in supplier entitlement policy.
   const entitlementAllowsSupplier = gate => gate?.entitlements?.plugins?.includes('supplier-intelligence')
     || gate?.entitlements?.plugins?.includes('tools')
