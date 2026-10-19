@@ -20,6 +20,11 @@ const recordSchema = z.strictObject({
   descriptorDigest: digest.nullable(), pendingReceipt: receiptSchema.nullable(),
 })
 export type HubExecutionRecord = Readonly<z.infer<typeof recordSchema>>
+/** Never replace an operation after consumption might have started or while a receipt is unsent. */
+export function hubExecutionCanBegin(record:HubExecutionRecord|undefined):boolean{
+ return record===undefined||record.pendingReceipt===null&&(
+  record.phase==='ACTIVATED'||record.phase==='ROLLED_BACK'||record.phase==='NEEDS_ATTENTION'&&record.consumptionStarted===false)
+}
 /** Local observation only; callers still verify signed inventory and boot authority. */
 export function parseHubHealthyInventory(input:unknown,scope:string):HubExecutionRecord{
  const value=recordSchema.parse(input)
@@ -75,8 +80,7 @@ export class HubExecutionJournal {
     }
     return await withFileLock(this.path, async () => {
       const old = this.read()
-      const retryableFailure=old?.phase==='NEEDS_ATTENTION'&&old.pendingReceipt===null&&!old.consumptionStarted
-      if (old && !retryableFailure && (old.pendingReceipt!==null || old.phase !== 'ACTIVATED' && old.phase !== 'ROLLED_BACK')) throw new Error('Hub execution is already pending')
+      if (!hubExecutionCanBegin(old)) throw new Error('Hub execution is already pending')
       const value = recordSchema.parse({ schemaVersion: 1, scope: this.store.scope, planId: plan.planId, planDigest: plan.planDigest,
         operationId, previousGenerationDigest: plan.expectedActiveGenerationDigest, generationDigest: plan.proposedGenerationDigest,
         phase: 'PLANNED', revision: (old?.revision ?? -1) + 1, receiptSeq: 0, executionGeneration: null, executionExpiresAt: null, consumptionStarted:false, signedPlan, descriptorDigest: null, pendingReceipt:null })

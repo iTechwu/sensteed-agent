@@ -6,6 +6,7 @@ import {afterEach,expect,it,vi} from 'vitest'
 import {registerHubGenerationManager} from '../src/hub-generation-manager.ts'
 import {HubGenerationStore} from '../src/hub-generation-store.ts'
 import {HubExecutionJournal} from '../src/hub-execution-journal.ts'
+import {HubGenerationClient} from '../src/hub-generation-client.ts'
 import {inspectSavedHubPlan} from '../src/hub-saved-plan.ts'
 import {resolveHubHostIdentity} from '../src/hub-host-identity.ts'
 import {readSealedHubReleaseTrust} from '../src/hub-release-trust.ts'
@@ -53,4 +54,22 @@ it('keeps the repair check available when the old active boot lease is revoked',
  const f=fixture(true);vi.mocked(f.client.bootAuthorization).mockRejectedValue(new Error('old lease revoked'))
  await expect(f.manager.check({})).resolves.toMatchObject({activeGenerationDigest:'c'.repeat(64)})
  expect(f.check).toHaveBeenCalledTimes(1)
+})
+it('previews a fresh plan after an authorization failure before consumption',async()=>{
+ const f=fixture(false)
+ vi.mocked(HubExecutionJournal.prototype.read).mockReturnValue({phase:'NEEDS_ATTENTION',pendingReceipt:null,consumptionStarted:false} as never)
+ const prepare=vi.spyOn(HubGenerationClient.prototype,'prepare').mockRejectedValue(new Error('PREPARE_REACHED'))
+ await expect(f.manager.preview({channel:'stable',requested:[]})).rejects.toThrow('PREPARE_REACHED')
+ expect(prepare).toHaveBeenCalledOnce()
+})
+it.each([
+ {phase:'NEEDS_ATTENTION',pendingReceipt:null,consumptionStarted:true},
+ {phase:'NEEDS_ATTENTION',pendingReceipt:{phase:'NEEDS_ATTENTION'},consumptionStarted:false},
+ {phase:'CONSUMING',pendingReceipt:null,consumptionStarted:true},
+])('keeps ambiguous consumption and unsent receipts fenced (%j)',async record=>{
+ const f=fixture(false)
+ vi.mocked(HubExecutionJournal.prototype.read).mockReturnValue(record as never)
+ const prepare=vi.spyOn(HubGenerationClient.prototype,'prepare')
+ await expect(f.manager.preview({channel:'stable',requested:[]})).rejects.toThrow('HUB_OPERATION_PENDING')
+ expect(prepare).not.toHaveBeenCalled()
 })

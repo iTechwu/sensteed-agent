@@ -14,3 +14,9 @@ it('projects the durable failure reason and receipt outbox state for the rendere
  vi.spyOn(HubExecutionJournal.prototype,'read').mockReturnValue({operationId:randomUUID(),phase:'NEEDS_ATTENTION',receiptSeq:4,pendingReceipt:{phase:'ROLLED_BACK',seq:4,errorCode:'HUB_BOOT_FAILED'}} as never)
  expect(hubOperationSummary(store)).toMatchObject({phase:'NEEDS_ATTENTION',state:'NEEDS_ATTENTION',errorCode:'HUB_BOOT_FAILED',outboxState:'pending',receiptSeq:4,pendingReceipt:{phase:'ROLLED_BACK',seq:4,errorCode:'HUB_BOOT_FAILED'}})
 })
+it.each([false,true])('only exposes safe pre-consumption retry to the renderer (consumptionStarted=%s)',consumptionStarted=>{
+ const root=realpathSync(mkdtempSync(join(tmpdir(),'hub-summary-')));roots.push(root)
+ const store=new HubGenerationStore(root,{origin:'https://ai.hozonauto.com/plugins/api',tenantId:randomUUID(),actorRef:'user',deviceId:randomUUID(),profileId:randomUUID()})
+ vi.spyOn(HubExecutionJournal.prototype,'read').mockReturnValue({operationId:randomUUID(),phase:'NEEDS_ATTENTION',consumptionStarted,receiptSeq:0,pendingReceipt:null} as never)
+ expect(hubOperationSummary(store)).toMatchObject({retryAllowed:!consumptionStarted,outboxState:'clear'})
+})

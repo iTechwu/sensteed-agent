@@ -49,6 +49,19 @@ it('shows a durable receipt waiting state instead of hiding the failure outcome'
  vi.stubGlobal('fetch',vi.fn(async(path:string)=>Response.json(path.endsWith('/status')?operation:{...check,operation})))
  await mount();expect(container.textContent).toContain(DOFE_ACCESS_COPY.zh.hubReceiptPending);expect(container.textContent).toContain('HUB_BOOT_FAILED')
 })
+it.each([
+ [{state:'NEEDS_ATTENTION',retryAllowed:true,outboxState:'clear'},false],
+ [{state:'NEEDS_ATTENTION',retryAllowed:false,outboxState:'clear'},true],
+ [{state:'NEEDS_ATTENTION',outboxState:'clear'},true],
+ [{state:'NEEDS_ATTENTION',retryAllowed:true,outboxState:'pending'},true],
+ [{state:'ROLLED_BACK',outboxState:'pending'},true],
+])('only enables a fresh preview when the Host confirms retry is safe (%j)',async(fields,disabled)=>{
+ const operation={operationId:'operation',...fields}
+ const fetcher=vi.fn(async(path:string)=>Response.json(path.endsWith('/status')?operation:path.endsWith('/preview')?plan:{...check,operation}));vi.stubGlobal('fetch',fetcher)
+ await mount()
+ expect([...container.querySelectorAll('button')].find(b=>b.textContent===DOFE_ACCESS_COPY.zh.hubPreview)?.disabled).toBe(disabled)
+ if(!disabled){await click(DOFE_ACCESS_COPY.zh.hubPreview);expect(fetcher.mock.calls.some(([p])=>p.endsWith('/preview'))).toBe(true)}
+})
 it('clearly reports an unavailable base service',async()=>{vi.stubGlobal('fetch',vi.fn(async()=>Response.json({available:false,reason:'BASE_VERSION_NOT_ENABLED'})));await mount();expect(container.textContent).toContain(DOFE_ACCESS_COPY.zh.hubUnavailable)})
 
 it('blocks confirmation when a new install lacks signed access declarations',async()=>{vi.stubGlobal('fetch',vi.fn(async(path:string)=>Response.json(path.endsWith('/check')?check:{...plan,items:[{...item,action:'install'}]})));await mount();await click(DOFE_ACCESS_COPY.zh.hubPreview);expect(container.textContent).toContain(DOFE_ACCESS_COPY.zh.hubPermissionUnknown);expect([...container.querySelectorAll('button')].find(b=>b.textContent===DOFE_ACCESS_COPY.zh.hubExecute)?.disabled).toBe(true)})

@@ -9,7 +9,7 @@ import{resolveHubHostIdentity}from'./hub-host-identity.ts'
 import{HubGenerationStore}from'./hub-generation-store.ts'
 import{HubGenerationClient,HubRecoveryAuthorizationUnavailable}from'./hub-generation-client.ts'
 import{HubGenerationExecution}from'./hub-generation-execution.ts'
-import{HubExecutionJournal}from'./hub-execution-journal.ts'
+import{HubExecutionJournal,hubExecutionCanBegin}from'./hub-execution-journal.ts'
 import{readSealedHubReleaseTrust}from'./hub-release-trust.ts'
 import{hubSyncSnapshotData,hubSyncDigest,type HubSyncTarget,type HubSyncExpected}from'./hub-sync-verifier.ts'
 import{generationPlanData,type VerifiedHubGenerationPlan,type HubGenerationPlanExpected}from'./hub-generation-verifier.ts'
@@ -30,8 +30,7 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
    const context=await client.context(),identity=await resolveHubHostIdentity(options.userData,options.profileDirectory,client,context)
    const store=new HubGenerationStore(options.userData,identity);lastStore=store
    const state=store.readState(),journal=new HubExecutionJournal(store),pendingRecord=journal.read(),record=pendingRecord?.descriptorDigest===state.active?.descriptorDigest?pendingRecord:journal.readHealthyInventory()
-   const retryableFailure=pendingRecord?.phase==='NEEDS_ATTENTION'&&pendingRecord.pendingReceipt===null&&!pendingRecord.consumptionStarted
-   if(requireIdle&&pendingRecord&&!retryableFailure&&(pendingRecord.pendingReceipt!=null||pendingRecord.phase!=='ACTIVATED'&&pendingRecord.phase!=='ROLLED_BACK'))throw new Error('HUB_OPERATION_PENDING')
+   if(requireIdle&&!hubExecutionCanBegin(pendingRecord))throw new Error('HUB_OPERATION_PENDING')
    let activeGenerationDigest:string|null=null,minimumPolicyRevision=0,channel=requestedChannel??'stable'
    let installed:Parameters<HubHostClient['check']>[1]['installed']=[]
    if(state.active!==null){
@@ -57,7 +56,7 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
    async preview(input:unknown){
     const{channel,requested}=z.strictObject({channel:z.enum(['stable','beta']),requested:requestedSchema}).parse(input),env=await environment(channel,true)
     const pending=new HubExecutionJournal(env.store).read()
-    if(pending&&(pending.pendingReceipt!==null||pending.phase!=='ACTIVATED'&&pending.phase!=='ROLLED_BACK'))throw new Error('HUB_OPERATION_PENDING')
+    if(!hubExecutionCanBegin(pending))throw new Error('HUB_OPERATION_PENDING')
     const executionClient=new HubGenerationClient(client,env.context),expected:HubGenerationPlanExpected={...env.expected,snapshotId:env.snapshot.snapshotId,snapshotDigest:hubSyncDigest(env.snapshot),expectedActiveGenerationDigest:env.activeGenerationDigest,requested}
     const cap=await executionClient.prepare(expected,trust,randomUUID()),plan=generationPlanData(cap),intentId=randomUUID(),confirmationNonce=randomUUID()
     intents.clear();intents.set(intentId,{nonce:confirmationNonce,cap,client:executionClient,execution:new HubGenerationExecution(env.store,executionClient,client,env.context,trust),store:env.store})
@@ -178,7 +177,7 @@ export function hubOperationSummary(store:HubGenerationStore){
  const record=new HubExecutionJournal(store).read()
  if(record===undefined)return undefined
  const pending=record.pendingReceipt??null,pendingReceipt=pending===null?undefined:{phase:pending.phase,seq:pending.seq,errorCode:pending.errorCode}
- return {operationId:record.operationId,state:record.phase,phase:record.phase,restartRequired:record.phase==='STAGED'||record.phase==='COMMITTED',restartReady:record.phase==='STAGED'&&pending===null,errorCode:pendingReceipt?.errorCode??(record.phase==='NEEDS_ATTENTION'?'HUB_NEEDS_ATTENTION':undefined),receiptSeq:record.receiptSeq,outboxState:pendingReceipt===undefined?'clear' as const:'pending' as const,pendingReceipt}
+ return {operationId:record.operationId,state:record.phase,phase:record.phase,retryAllowed:record.phase==='NEEDS_ATTENTION'&&hubExecutionCanBegin(record),restartRequired:record.phase==='STAGED'||record.phase==='COMMITTED',restartReady:record.phase==='STAGED'&&pending===null,errorCode:pendingReceipt?.errorCode??(record.phase==='NEEDS_ATTENTION'?'HUB_NEEDS_ATTENTION':undefined),receiptSeq:record.receiptSeq,outboxState:pendingReceipt===undefined?'clear' as const:'pending' as const,pendingReceipt}
 }
 function summary(store:HubGenerationStore){return hubOperationSummary(store)}
 declare module'@deepseek-ai/cordis'{interface Context{hubGenerationManager:unknown}}
