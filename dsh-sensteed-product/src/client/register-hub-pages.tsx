@@ -24,7 +24,7 @@ export function registerHubPages(ctx: Context, props: {
   ctx.effect(installHubCatalogStyles, 'sensteed: catalog styles')
   const loadSkills = async (signal: AbortSignal): Promise<readonly CatalogSkill[]> => {
     const sessions = ctx.sessions.list.getSnapshot()
-    const latest = sessions.ids.map(id => sessions.byId[id]).filter(value => value !== undefined).sort((a, b) => b.updatedAt - a.updatedAt)[0]
+    const latest = sessions.ids.map(id => sessions.byId[id]).filter(value => value !== undefined).filter(value => value.origin !== 'subagent').sort((a, b) => b.updatedAt - a.updatedAt)[0]
     if (!latest) return []
     return ctx.sessions.using(latest.id, { source: 'sensteedHubCatalog', signal }, async reference => {
       signal.throwIfAborted()

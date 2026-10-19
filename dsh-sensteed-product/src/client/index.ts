@@ -15,6 +15,7 @@ export const inject = [
   'remote',
   'remote.credentials',
   'remote.settings',
+  'remote.skills',
   'configForms',
   'sessions',
   'workspaces',
