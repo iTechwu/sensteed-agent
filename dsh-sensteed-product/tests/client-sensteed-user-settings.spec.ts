@@ -68,7 +68,6 @@ it('registers user settings before General so each normal settings open defaults
   const sections = register.mock.calls.filter(([options]) => options.name === 'settings.section').map(([options]) => ({ id: options.id, order: options.order, label: options.label() }))
   expect(sections).toEqual([
     { id: 'dofe-access', order: -100, label: '用户设置' },
-    { id: 'hub-setup', order: -90, label: '插件与技能安装' },
     { id: 'models', order: 10, label: '模型设置' },
     { id: 'dofe-capabilities', order: 12, label: '内置能力' },
   ])
@@ -76,4 +75,7 @@ it('registers user settings before General so each normal settings open defaults
   expect(sections.find(s => s.id === 'models')!.order).toBeGreaterThan(0)
   expect(sections.find(s => s.id === 'dofe-capabilities')!.order).toBeLessThan(15)
   expect(trigger.priority).toBeLessThan(0)
+  const panels = register.mock.calls.filter(([options]) => options.name === 'sidebar.panellist').map(([options]) => ({ id: options.id, label: options.label() }))
+  expect(panels).toEqual([{ id: 'plugins', label: '插件' }, { id: 'sensteed-skill-manager', label: '技能' }])
+  expect(register.mock.calls.filter(([options]) => options.name === 'main').map(([options]) => options.key)).toEqual(panels.map(panel => panel.id))
 })

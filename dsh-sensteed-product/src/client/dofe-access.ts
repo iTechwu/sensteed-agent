@@ -1,3 +1,4 @@
+import { HUB_CATALOG_COPY } from './hub-catalog-copy.ts'
 import { BRAND_DISPLAY_NAME } from '../generated-product-identity.ts'
 
 export type DofeAccessKey = 'MODELS_API_KEY'
@@ -10,6 +11,7 @@ const TENANT_LABEL_EN = 'Sensteed'
 
 export const DOFE_ACCESS_COPY = {
   zh: {
+    ...HUB_CATALOG_COPY.zh,
     hubPersonalSkills: "个人技能单独保存在本机 skills 目录，以 user-local- 前缀显示，不属于企业目录。",
     hubAccessRequired: "新增安装或更新缺少签名访问声明，不能确认。请重新检查或联系管理员。",
     hubNav: "插件与技能安装", hubUpdateNotice: '企业目录有待处理变更', hubUpdateAvailable: '可更新项目', hubInitialAdded: '新增初始项目', hubOpenSetup: '打开企业目录设置', hubCloseSetup: '关闭',
@@ -20,6 +22,7 @@ export const DOFE_ACCESS_COPY = {
     pluginStateBuiltIn: '已内置启用', pluginStateEnabled: '已启用', pluginStateUnentitled: '未开通', pluginStateDisabled: '未启用', pluginServersTitle: 'MCP 数据源', pluginStateTitle: '当前状态', pluginNoServer: '内置调研通道，不经过 MCP。', pluginManageHint: '在 设置 → 内置能力 中调整这些能力的开关。',
   },
   en: {
+    ...HUB_CATALOG_COPY.en,
     hubPersonalSkills: "Personal skills stay in the local skills directory and appear with the user-local- prefix, separately from the enterprise catalog.",
     hubAccessRequired: "An install or update lacks its signed access declaration. Confirmation is blocked; check again or contact an administrator.",
     hubNav: "Install plugins and skills", hubUpdateNotice: 'Enterprise catalog changes available', hubUpdateAvailable: 'Updates', hubInitialAdded: 'New initial items', hubOpenSetup: 'Open enterprise catalog setup', hubCloseSetup: 'Close',

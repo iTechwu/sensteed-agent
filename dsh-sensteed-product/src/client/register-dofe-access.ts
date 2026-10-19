@@ -7,7 +7,7 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { DofeAccessSection, DofeUserSection, DofeModelSection, DofeCapabilitiesSection, installDofeAccessGate, installDofeAccessStyles } from './DofeAccessSection.tsx'
 import { installHubUpdateNotice } from './HubUpdateNotice.tsx'
-import { HubSetupSection } from './HubSetupSection.tsx'
+import { registerHubPages } from './register-hub-pages.tsx'
 import { registerDofePluginItems } from './DofePluginItems.tsx'
 import { DOFE_ACCESS_COPY } from './dofe-access.ts'
 import { DOFE_ACCESS_SETTINGS_NAMESPACE, type DofeAccessSettings } from '../dofe-plugins.ts'
@@ -35,6 +35,7 @@ export function applyDofeAccess(ctx: Context): void {
   // card; the activation switches live on the Built-in capabilities page.
   registerDofePluginItems(ctx, settingsScope, t)
   if (BRAND_VARIANT === 'sensteed') {
+    registerHubPages(ctx, props)
     ctx.effect(() => installHubUpdateNotice({ settingsScope, t, subscribeReconnect }), 'desktop: read-only Hub update notice')
     ctx.slots.inject('settings.trigger', () => ctx.slots.register({
       name: 'settings.trigger', priority: -100, inject: () => ({ settingsScope }),
@@ -43,7 +44,6 @@ export function applyDofeAccess(ctx: Context): void {
   if (BRAND_VARIANT === 'sensteed') {
     for (const section of [
       { id: 'dofe-access', order: -100, label: 'nav', component: DofeUserSection },
-      { id: 'hub-setup', order: -90, label: 'hubNav', component: HubSetupSection },
       { id: 'models', order: 10, label: 'modelNav', component: DofeModelSection },
       { id: 'dofe-capabilities', order: 12, label: 'capabilityNav', component: DofeCapabilitiesSection },
     ] as const) {

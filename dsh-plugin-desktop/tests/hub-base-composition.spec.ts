@@ -29,3 +29,11 @@ it('suppresses every bundled subpath of a disabled managed package during boot a
  const base=[{insert:[{id:'core',name:'@deepseek-ai/dsh-skill'},{id:'finance-host',name},{id:'finance-client',name:`${name}/client`},{id:'finance-tools',name:`${name}/tools`}]}]
  expect(hubOverlayComposition(base,{insert:[]},[name])).toEqual([{insert:[{id:'core',name:'@deepseek-ai/dsh-skill'}]}])
 })
+
+it('removes the obsolete skill-manager redirect while retaining the product catalog owner', () => {
+ const result = hubBaseComposition([{insert:[
+  {id:'sensteed-skill-manager',name:'@dofe/dsh-sensteed-skill-manager'},
+  {id:'product',name:'@dofe/dsh-sensteed-product'},
+ ]}])
+ expect(result[0]?.insert?.map(row=>row.id)).toEqual(['product'])
+})

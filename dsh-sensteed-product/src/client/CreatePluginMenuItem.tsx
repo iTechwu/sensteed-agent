@@ -31,7 +31,7 @@ function currentWorkspaceId(ctx: Context): WorkspaceId | undefined {
 }
 
 /** Create, select, and prompt a fresh Creator session. */
-export async function startCreatorConversation(ctx: Context): Promise<SessionId> {
+export async function startCreatorConversation(ctx: Context, kind: 'plugin' | 'skill' = 'plugin'): Promise<SessionId> {
   const workspaceId = currentWorkspaceId(ctx)
   const sessionId = await ctx.sessions.create({
     ...(workspaceId === undefined ? {} : { workspaceId }),
@@ -41,7 +41,7 @@ export async function startCreatorConversation(ctx: Context): Promise<SessionId>
   const reference = ctx.sessions.retain(sessionId, { source: 'sensteedCreatePlugin' })
   try {
     const binding = await reference.ready
-    const result = await binding.session.prompt([{ type: 'text', text: INITIAL_PROMPT }], 'queue')
+    const result = await binding.session.prompt([{ type: 'text', text: kind === 'plugin' ? INITIAL_PROMPT : '/skill-creator\n\n请先询问我需要创建的技能目标、使用场景、输入和期望结果，然后引导我完成技能创建。' }], 'queue')
     if (!result.ok) throw new Error(result.error.message)
     return sessionId
   } finally {
