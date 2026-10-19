@@ -52,7 +52,8 @@ it.each([401, 503])('recovers the finance entry after an initial HTTP %i without
   let ready = false
   vi.stubGlobal('fetch', vi.fn(async () => Response.json(ready ? { ok: true, allowed: true } : { ok: false }, { status: ready ? 200 : status })))
   await mountFinance()
-  expect(container.querySelector('button')).toBeNull()
+  if (status === 401) expect(container.querySelector('button')).toBeNull()
+  else expect(container.querySelector('button')?.getAttribute('aria-busy')).toBe('true')
   ready = true
   await act(async () => { await vi.advanceTimersByTimeAsync(5_000) })
   expect(container.querySelector('button')?.getAttribute('aria-label')).toBe('open')

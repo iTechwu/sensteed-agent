@@ -399,6 +399,7 @@ for (const name of clientPlugins) {
   const sidebarOrder = source.match(/name:\s*['"]sidebar\.footer\.action['"][\s\S]{0,180}?order:\s*(\d+)/u)?.[1]
   const overlayOrder = source.match(/name:\s*['"]shell\.overlay['"][\s\S]{0,180}?order:\s*(\d+)/u)?.[1]
   const manifest = JSON.parse(await readFile(new URL(`../.ci/${name}/package.json`, import.meta.url), 'utf8'))
+  const isMainPageOnly = /name:\s*['"]main['"]/.test(source) && !/name:\s*['"]shell\.overlay['"]/.test(source)
   const hasDialog = /role:\s*['"]dialog['"]/.test(source)
   const hasAccessibleName = /aria-label/.test(source) || /aria-labelledby/.test(source)
   const hasClientBuild = manifest.exports?.['./client'] === './lib/client.js'
@@ -435,12 +436,12 @@ for (const name of clientPlugins) {
   const hasDirectRevisionHandler = /onClick\s*:\s*\(\s*\)\s*=>\s*(?:\{[^}\n]*)?setRevision\s*\(/.test(source)
   const newWindowLinkCount = (source.match(/target:\s*['"]_blank['"]/g) || []).length
   const noreferrerLinkCount = (source.match(/rel:\s*['"]noreferrer['"]/g) || []).length
-  if (!hasDialog) failures.push(`${name}: client overlay has no dialog role`)
+  if (!isMainPageOnly && !hasDialog) failures.push(`${name}: client overlay has no dialog role`)
   if (!hasAccessibleName) failures.push(`${name}: client surface has no accessible name`)
   if (!hasClientBuild) failures.push(`${name}: client export is not wired to lib/client.js`)
   if (!hasCheckScript) failures.push(`${name}: package check script is missing`)
-  if (!isMandatoryAccessGate && !hasEscapeClose) failures.push(`${name}: dismissible overlay has no Escape handler`)
-  if (!isMandatoryAccessGate && !restoresTriggerFocus) failures.push(`${name}: dismissible overlay does not restore trigger focus`)
+  if (!isMainPageOnly && !isMandatoryAccessGate && !hasEscapeClose) failures.push(`${name}: dismissible overlay has no Escape handler`)
+  if (!isMainPageOnly && !isMandatoryAccessGate && !restoresTriggerFocus) failures.push(`${name}: dismissible overlay does not restore trigger focus`)
   if (!hasThemeAliases) failures.push(`${name}: client styles do not use desktop theme aliases`)
   if (sameOriginCount !== fetchCount) failures.push(`${name}: every fetch must use same-origin credentials`)
   if (rejectRedirectCount !== fetchCount) failures.push(`${name}: every fetch must reject redirects`)

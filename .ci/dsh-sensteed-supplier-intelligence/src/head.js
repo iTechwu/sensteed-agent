@@ -81,6 +81,8 @@ function errorText(error) {
     credential_unavailable: '本机 Models 凭据不可用，请检查 Sensteed 登录状态。',
     gateway_request_failed: '供应链服务暂不可用。', supplier_mcp_request_failed: '供应链服务暂不可用。',
     VERSION_CONFLICT: '记录已被其他操作更新，请刷新后重试。', STALE_EVIDENCE: '证据已变化，请刷新后重新保存。',
+    EVIDENCE_NOT_FOUND: '这条证据已不可用，请返回列表选择其他记录。',
+    invalid_gateway_response: '服务返回的数据不完整，请重试；已有草稿会保留。',
     SUPPLIER_NOT_FOUND: '该供应商当前不可用。', REPORT_NOT_READY: '周报尚未生成完成。',
     supplier_list_incomplete: '供应商台账已发生变化，未能完整读取，请刷新重试。',
   }

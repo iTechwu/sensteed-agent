@@ -10,3 +10,5 @@ Host 只从 Sensteed credential store 解析 `MODELS_API_KEY`，仅请求固定�
 npm test
 npm run check
 ```
+
+逐页体验回归：`npm run test:ui` 使用独立 Chrome 与模拟接口测试六页任务、失败恢复、空态、明暗主题和三种宽度。需要可解析的 React、React DOM、esbuild、Playwright 测试依赖与 Chrome，可通过 `NODE_PATH` 提供可选依赖；`SUPPLIER_UX_OUTPUT` 指定截图目录。脚本不连接生产后端、不使用个人浏览器配置，不包含生产凭据。

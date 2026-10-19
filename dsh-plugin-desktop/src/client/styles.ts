@@ -6,7 +6,6 @@ import {
   MACOS_TRAFFIC_LIGHT_SAFE_WIDTH,
   WINDOWS_CAPTION_CONTROLS_WIDTH,
 } from '../window-chrome.ts'
-import { SIDEBAR_COLLAPSED } from './layout-state.ts'
 
 /** Desktop-owned shell stylesheet kept as a plain string so the client bundle stays self-contained. */
 const DESKTOP_OWNED_STYLES = `
@@ -15,6 +14,7 @@ body:is([data-sensteed-agent-mode="extended"], [data-sensteed-agent-mode="advanc
 .sensteedAgentFrame { position: relative; display: grid; grid-template-rows: 100%; width: 100%; height: 100%; overflow: hidden; background: transparent; transition: grid-template-columns var(--ds-transition-duration-slow) var(--ds-ease-in-out); }
 .sensteedAgentSidebarSurface { --dsw-specific-sidebar-fill: transparent; position: relative; grid-column: 1; grid-row: 1; min-width: 0; overflow: hidden; background: transparent; border-right: 1px solid var(--dsw-alias-border-l1); }
 body:is([data-sensteed-agent-mode="extended"], [data-sensteed-agent-mode="advanced"])[data-sensteed-agent-material="off"] .sensteedAgentSidebarSurface { --dsw-specific-sidebar-fill: var(--dsw-alias-bg-layer-1); background: var(--dsw-alias-bg-layer-1); }
+.sensteedAgentFrame[data-sidebar-collapsed] .sensteedAgentSidebarSurface { border-right:0; }
 .sensteedAgentUpstreamSidebar { box-sizing: border-box; width: 100%; height: 100%; }
 body:is([data-sensteed-agent-mode="extended"], [data-sensteed-agent-mode="advanced"]) [data-slot="sidebar.footer.action"],
 body:is([data-sensteed-agent-mode="extended"], [data-sensteed-agent-mode="advanced"]) [data-slot="sidebar.settings"] { --dsh-sidebar-footer-control-height: 36px; --dsh-sidebar-footer-control-gap: 4px; --dsh-sidebar-footer-icon-size: 16px; --dsh-sidebar-footer-font-size: 14px; }
@@ -33,7 +33,6 @@ body:is([data-sensteed-agent-mode="extended"], [data-sensteed-agent-mode="advanc
 body:is([data-sensteed-agent-mode="extended"], [data-sensteed-agent-mode="advanced"]) [data-sidebar-collapsed] [data-slot="sidebar.footer.action"] > button:has(> svg):not(:has(> span))::after { content: none; }
 body:is([data-sensteed-agent-mode="extended"], [data-sensteed-agent-mode="advanced"]) [data-sidebar-collapsed] [data-slot="sidebar.settings"] > div:first-child { width: var(--dsh-sidebar-footer-control-height); }
 .sensteedAgentFrame[data-desktop-mode="advanced"][data-desktop-platform="darwin"] .sensteedAgentUpstreamSidebar { padding-top: ${ADVANCED_MACOS_CONTENT_INSET}px; }
-.sensteedAgentFrame[data-desktop-mode="advanced"][data-desktop-platform="darwin"][data-sidebar-collapsed] .sensteedAgentUpstreamSidebar { width: ${SIDEBAR_COLLAPSED}px; margin: 0 auto; }
 .sensteedAgentFrame[data-desktop-mode="advanced"][data-desktop-platform="darwin"] { grid-template-rows: ${ADVANCED_MACOS_DRAG_REGION_HEIGHT}px minmax(0, 1fr); }
 .sensteedAgentFrame[data-desktop-mode="advanced"][data-desktop-platform="darwin"] .sensteedAgentSidebarSurface { grid-row: 1 / -1; }
 .sensteedAgentFrame[data-desktop-mode="advanced"][data-desktop-platform="darwin"] .sensteedAgentConversationSurface,

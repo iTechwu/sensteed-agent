@@ -9,6 +9,7 @@ import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SidebarPanelMetadata } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
+import { ScheduleContext, type ScheduleContextSource } from './ScheduleContext.tsx'
 import { DesktopNavigationSidebar } from './DesktopNavigation.tsx'
 import { installDesktopNavigationStyles } from './desktop-navigation-styles.ts'
 
@@ -83,5 +84,12 @@ export function applyDesktopNavigation(ctx: Context): void {
     sync()
     return () => { off(); remove?.() }
   }, 'desktop: knowledge navigation label')
+  ctx.slots.inject('desktop.navigation.context', () => ctx.slots.inject('main', () => ctx.slots.register({
+    name: 'desktop.navigation.context', key: 'schedules',
+    inject: () => {
+      const source = ctx.slots.entriesOfSlot('main').find(entry => entry.options.key === 'schedules')
+      return { source: source?.inject?.() as unknown as ScheduleContextSource | undefined }
+    },
+  }, ScheduleContext)))
   refresh()
 }

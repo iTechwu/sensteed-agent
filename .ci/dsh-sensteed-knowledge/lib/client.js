@@ -1779,7 +1779,7 @@ window.__ModuleLoader__.load({
     }
     function Button({ wide, t, onOpen = openOverlay }) {
       const { allowed } = knowledgeNavigation().useAccess(`${PATH}?access=1`);
-      if (allowed !== true) return null;
+      if (allowed === false) return null;
       return h(
         Tooltip,
         { label: t("open"), disabled: wide },
@@ -1789,6 +1789,7 @@ window.__ModuleLoader__.load({
             type: "button",
             className: `yk-button${wide ? " yk-wide" : ""}`,
             "aria-label": t("open"),
+            "aria-busy": allowed === null,
             onClick: onOpen,
           },
           h(IconDataOutlineRegular, { size: wide ? 14 : 18 }),

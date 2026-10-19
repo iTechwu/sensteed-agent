@@ -219,7 +219,7 @@ describe('advanced desktop layout', () => {
       expect(reducedMotion?.[2]).toMatch(/transition:\s*none !important;/)
       expect(reducedMotion?.[2]).toMatch(/animation-duration:\s*0\.01ms !important;/)
       expect(css).toMatch(/\.sensteedAgentSidebarSurface\s*\{[^}]*--dsw-specific-sidebar-fill:\s*transparent;/)
-      expect(css).toMatch(/data-desktop-mode="advanced"\]\[data-desktop-platform="darwin"\]\[data-sidebar-collapsed\][^{]*\.sensteedAgentUpstreamSidebar \{[^}]*width:\s*56px;[^}]*margin:\s*0 auto;/)
+      expect(css).not.toContain('[data-sidebar-collapsed] .sensteedAgentUpstreamSidebar')
       expect(css).not.toMatch(/data-desktop-mode="extended"[^{}]*data-sidebar-collapsed[^{}]*\.sensteedAgentUpstreamSidebar/)
       expect(css).toMatch(new RegExp(`data-desktop-mode="advanced"\\]\\[data-desktop-platform="darwin"\\] \\.sensteedAgentUpstreamSidebar \\{[^}]*padding-top: ${ADVANCED_MACOS_CONTENT_INSET}px;`))
       expect(css).not.toMatch(/\.sensteedAgentUpstreamSidebar \{[^}]*-webkit-app-region: no-drag;/)
@@ -463,14 +463,14 @@ describe('advanced desktop layout', () => {
     expect(disposed).toBe(true)
   })
 
-  it('keeps the wider macOS rail in enhanced mode and the upstream width in extended mode', () => {
+  it('reserves no second rail when the desktop context collapses', () => {
     expect(computeDesktopColumns(1440, 0, 0)).toEqual({ sidebar: SIDEBAR_COLLAPSED, center: 1384, rightbar: 0 })
     expect(computeDesktopColumns(1440, 0, 0, MACOS_SIDEBAR_COLLAPSED))
       .toEqual({ sidebar: MACOS_SIDEBAR_COLLAPSED, center: 1350, rightbar: 0 })
     expect(SIDEBAR_COLLAPSED).toBe(56)
-    expect(collapsedSidebarWidth('advanced', 'darwin')).toBe(MACOS_SIDEBAR_COLLAPSED)
-    expect(collapsedSidebarWidth('extended', 'darwin')).toBe(SIDEBAR_COLLAPSED)
-    expect(collapsedSidebarWidth('extended', 'win32')).toBe(SIDEBAR_COLLAPSED)
+    expect(computeDesktopColumns(1440, 0, 0, collapsedSidebarWidth('advanced', 'darwin'))).toEqual({ sidebar: 0, center: 1440, rightbar: 0 })
+    expect(collapsedSidebarWidth('extended', 'darwin')).toBe(0)
+    expect(collapsedSidebarWidth('extended', 'win32')).toBe(0)
     expect(MACOS_SIDEBAR_COLLAPSED).toBe(90)
   })
 

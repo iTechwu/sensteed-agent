@@ -84,6 +84,8 @@ window.__ModuleLoader__.load({
         credential_unavailable: '本机 Models 凭据不可用，请检查 Sensteed 登录状态。',
         gateway_request_failed: '供应链服务暂不可用。', supplier_mcp_request_failed: '供应链服务暂不可用。',
         VERSION_CONFLICT: '记录已被其他操作更新，请刷新后重试。', STALE_EVIDENCE: '证据已变化，请刷新后重新保存。',
+        EVIDENCE_NOT_FOUND: '这条证据已不可用，请返回列表选择其他记录。',
+        invalid_gateway_response: '服务返回的数据不完整，请重试；已有草稿会保留。',
         SUPPLIER_NOT_FOUND: '该供应商当前不可用。', REPORT_NOT_READY: '周报尚未生成完成。',
         supplier_list_incomplete: '供应商台账已发生变化，未能完整读取，请刷新重试。',
       }
@@ -210,9 +212,12 @@ window.__ModuleLoader__.load({
     .sr-page button,.sr-page select,.sr-page input{min-height:44px}.sr-field{font-size:14px;font-weight:500;gap:8px}.sr-field textarea{min-height:80px;line-height:1.6}.sr-field input,.sr-field select{height:44px}.sr-field input,.sr-field textarea,.sr-field select{color:var(--sr-text);background:var(--sr-surface);border-color:var(--sr-border);padding:10px 12px}.sr-field input::placeholder,.sr-field textarea::placeholder{color:var(--sr-muted);opacity:1}
     .sr-section{padding:24px;border-radius:10px}.sr-section h2,.sr-section h3{font-size:18px}.sr-section p{line-height:1.65}.sr-form{gap:20px}.sr-form>p{margin:0}.sr-form>.sr-button{justify-self:start}.sr-business-grid{display:block;max-width:880px}.sr-mode-switch{display:flex;gap:8px;margin:0 0 20px;flex-wrap:wrap}.sr-mode-switch button{padding:10px 16px;border:1px solid var(--sr-border);border-radius:6px;background:transparent;color:var(--sr-muted);font:inherit;cursor:pointer}.sr-mode-switch button[aria-pressed=true]{color:var(--sr-accent);border-color:var(--sr-accent);background:var(--sr-soft);font-weight:600}
     .sr-disclosure{border-top:1px solid var(--sr-border);padding-top:12px}.sr-disclosure summary{cursor:pointer;color:var(--sr-accent);padding:8px 0;min-height:44px}.sr-disclosure .sr-field{margin-top:16px}.sr-selected-evidence{display:grid;gap:8px;margin:16px 0;padding:16px;background:var(--sr-soft);border-left:3px solid var(--sr-accent);border-radius:4px}.sr-selected-evidence p{margin:0}
-    .sr-toolbar-actions,.sr-review-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.sr-intake{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}.sr-intake-result{grid-column:1/-1}.sr-detail{margin:16px 0}.sr-review-box{display:grid;gap:16px;margin-top:20px}.sr-status{color:var(--sr-accent);border-color:var(--sr-border);font-size:12px}.sr-status[data-tone=candidate]{color:light-dark(#78520b,#f0cf88);border-color:light-dark(#c8ac72,#8d7845)}.sr-metric small,.sr-table th,.sr-field-hint,.sr-list-row time,.sr-evidence time{font-size:12px}.sr-table th{font-weight:600}.sr-table td:first-child{white-space:normal;min-width:180px}.sr-table tbody tr:hover,.sr-list-row:hover{background:var(--sr-soft)}.sr-page button:not(:disabled):hover{filter:brightness(.95)}.sr-page button:disabled{cursor:not-allowed}.sr-success{padding:12px 16px;border-left:3px solid var(--sr-accent);background:var(--sr-soft)}
+    .sr-toolbar-actions,.sr-review-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.sr-intake{display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:24px}.sr-intake-result{grid-column:1/-1}.sr-detail{margin:16px 0}.sr-review-box{display:grid;gap:16px;margin-top:20px}.sr-status{color:var(--sr-accent);border-color:var(--sr-border);font-size:12px}.sr-status[data-tone=candidate]{color:light-dark(#78520b,#f0cf88);border-color:light-dark(#c8ac72,#8d7845)}.sr-metric small,.sr-table th,.sr-field-hint,.sr-list-row time,.sr-evidence time{font-size:12px}.sr-table th{font-weight:600}.sr-table td:first-child{white-space:normal;min-width:180px}.sr-table tbody tr:hover,.sr-list-row:hover{background:var(--sr-soft)}.sr-page button:not(:disabled):hover{filter:brightness(.95)}.sr-page button:disabled{cursor:not-allowed}.sr-success{padding:12px 16px;border-left:3px solid var(--sr-accent);background:var(--sr-soft)}
     .sr-scope-picker{min-width:0;border:1px solid var(--sr-border);border-radius:6px;padding:16px}.sr-scope-picker legend{padding:0 8px;font-weight:600}.sr-scope-picker .sr-search{width:100%}.sr-scope-options{max-height:280px;overflow:auto;margin-top:12px}.sr-scope-options label{min-height:44px;cursor:pointer}.sr-scope-options input{min-height:0}.sr-scope-picker:disabled{opacity:.65}
     @media(max-width:600px){.sr-intake{grid-template-columns:1fr}.sr-section{padding:16px}.sr-toolbar form{width:100%;flex-wrap:wrap}.sr-search{width:100%;flex:1;min-width:180px}.sr-header h1{font-size:22px}.sr-metrics{gap:8px}.sr-metric{padding:12px;min-height:90px}.sr-list-row{grid-template-columns:auto minmax(0,1fr)}.sr-list-row time{grid-column:2}.sr-mode-switch button{flex:1;padding:8px}.sr-tabs button{padding:12px 10px}.sr-header{align-items:flex-start}.sr-section-heading{flex-wrap:wrap}}
+    .sr-metric[type=button]{text-align:left;background:transparent;color:var(--sr-text);font:inherit;cursor:pointer}.sr-metric[type=button]:hover{background:var(--sr-soft)}
+    .sr-filter-bar,.sr-filter-summary{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin:0 0 16px}.sr-filter-summary{padding:8px 12px;border:1px solid var(--sr-border);border-radius:6px}.sr-filter-bar .sr-select-label select{width:min(320px,60vw)}.sr-select-label{flex-wrap:wrap}.sr-detail a{color:var(--sr-accent);text-underline-offset:3px}.sr-detail :is(h2,h3),.sr-report h2{scroll-margin-top:20px}.sr-list-row[aria-pressed=true]{background:var(--sr-soft);outline:1px solid var(--sr-accent);outline-offset:-1px}.sr-page h2:focus{outline:2px solid var(--sr-accent);outline-offset:4px}.sr-empty-panel .sr-field{max-width:520px;margin:20px 0}
+    @media(max-width:600px){.sr-filter-bar{align-items:stretch}.sr-filter-bar .sr-select-label{width:100%;justify-content:space-between}.sr-filter-bar .sr-select-label select{flex:1;min-width:0}.sr-evidence-actions{justify-content:flex-start}.sr-icon-button{min-width:44px}.sr-page{font-size:16px}.sr-table{font-size:14px}}
     @media(prefers-reduced-motion:no-preference){.sr-page button,.sr-page a{transition:background-color 160ms,color 160ms,border-color 160ms}}
     `
 
@@ -225,6 +230,13 @@ window.__ModuleLoader__.load({
       const [accessReason, setAccessReason] = useState('')
       const [scopeReady, setScopeReady] = useState(false)
       const [unread, setUnread] = useState(0)
+      const openRecords = (id, status = '') => {
+        const filters = id === 'suppliers'
+          ? { 'supplier-query': '', 'supplier-filter': '', 'supplier-page': 1 }
+          : { [`${id}-status`]: status, [`${id}-page`]: 1, [`${id}-detail`]: '', [`${id}-supplier-filter`]: '' }
+        for (const [key, value] of Object.entries(filters)) panelMemory[`${currentScopeId}:${key}`] = value
+        setTab(id)
+      }
       const accessRequest = useRef(null)
       const retryAccess = () => {
         accessRequest.current?.abort()
@@ -280,7 +292,7 @@ window.__ModuleLoader__.load({
         }, label, id === 'weekly' && unread > 0 ? h('span', { className: 'sr-unread' }, unread) : null))) : null,
         error ? h('div', { className: 'sr-error', role: 'alert' }, error, h('button', { type: 'button', onClick: refresh }, '重试')) : null,
         h('section', { className: 'sr-content' },
-          tab === 'overview' ? h(Overview, { revision, setError, onUnread: setUnread, onOpen: (id, name) => { setSelected(id, name); setTab('business') } }) : null,
+          tab === 'overview' ? h(Overview, { revision, setError, onUnread: setUnread, onNavigate: openRecords, onOpen: (id, name) => { setSelected(id, name); setTab('business') } }) : null,
           tab === 'suppliers' ? h(Suppliers, { revision, setError, onSelect: (id, name) => { setSelected(id, name); setTab('business') }, onImported: refresh }) : null,
           tab === 'enterprise' ? h(Evidence, { kind: 'enterprise', revision, setError, onSelect: row => { setSelected(row.supplierId, row.supplierName); setEvidence(row.evidenceId, 'enterprise', row.eventId); setTab('business') } }) : null,
           tab === 'media' ? h(Evidence, { kind: 'media', revision, setError, onSelect: row => { setSelected(row.supplierId, row.supplierName); setEvidence(row.evidenceId, 'media', row.eventId); setTab('business') } }) : null,
@@ -311,7 +323,7 @@ window.__ModuleLoader__.load({
       useEffect(() => {
         const controller = new AbortController()
         let active = true
-        setState(value => ({ ...value, loading: true, error: null }))
+        setState({ loading: true, data: null, error: null })
         loader(controller.signal).then(data => { if (active) setState({ loading: false, data }) })
           .catch(error => { if (active) { setState({ loading: false, data: null, error: errorText(error) }); setError(errorText(error)) } })
         return () => { active = false; controller.abort() }
@@ -326,11 +338,11 @@ window.__ModuleLoader__.load({
       return null
     }
 
-    function Metric({ label, value, hint }) {
-      return h('div', { className: 'sr-metric' }, h('span', null, label), h('strong', null, value ?? '—'), hint ? h('small', null, hint) : null)
+    function Metric({ label, value, hint, onClick }) {
+      return h(onClick ? 'button' : 'div', { className: 'sr-metric', ...(onClick ? { type: 'button', onClick, 'aria-label': `${label} ${value ?? '—'}，查看记录` } : {}) }, h('span', null, label), h('strong', null, value ?? '—'), hint ? h('small', null, hint) : null)
     }
 
-    function Overview({ revision, setError, onUnread, onOpen }) {
+    function Overview({ revision, setError, onUnread, onOpen, onNavigate }) {
       const state = useLoad(() => api('supply_chain_workbench_overview_get'), [revision], setError)
       const value = state.data
       if (!value) return h(Loading, { state })
@@ -339,17 +351,18 @@ window.__ModuleLoader__.load({
       const sourceGapCount = (value.sources || []).filter(source => source.status !== 'available' || source.stale).length
       return h(React.Fragment, null,
         h('div', { className: 'sr-metrics' },
-          h(Metric, { label: '供应商', value: counts.suppliers ?? 0, hint: '当前团队台账' }),
-          h(Metric, { label: '高优先级事项', value: counts.priorityItems ?? 0, hint: '已确认风险' }),
-          h(Metric, { label: '待核验线索', value: counts.pendingClues ?? 0 }),
-          h(Metric, { label: '来源缺口', value: sourceGapCount, hint: `统计于 ${fmt(value.statisticsAt)}` })),
+          h(Metric, { label: '供应商', value: counts.suppliers ?? 0, hint: '查看供应商台账', onClick: () => onNavigate('suppliers') }),
+          h(Metric, { label: '高优先级事项', value: counts.priorityItems ?? 0, hint: '已确认风险，见近期变化' }),
+          h(Metric, { label: '待核验线索', value: counts.pendingClues ?? 0, hint: '工商与媒体线索合计' }),
+          h(Metric, { label: '来源缺口', value: value.sources?.length ? sourceGapCount : '—', hint: value.sources?.length ? `统计于 ${fmt(value.statisticsAt)}` : '暂无覆盖统计' })),
+        h('div', { className: 'sr-filter-bar' }, h('span', { className: 'sr-muted' }, '下一步'), h('button', { type: 'button', className: 'sr-button sr-secondary', onClick: () => onNavigate('enterprise', 'PENDING_REVIEW') }, '核对工商与司法线索'), h('button', { type: 'button', className: 'sr-button sr-secondary', onClick: () => onNavigate('media', 'PENDING_REVIEW') }, '核验媒体线索')),
         h('div', { className: 'sr-columns' },
           h('section', { className: 'sr-section' }, h('h2', null, '近期变化'),
             changes.length ? h('div', { className: 'sr-list' }, ...changes.slice(0, 10).map((item, index) => h('button', { type: 'button', className: 'sr-list-row', key: item.evidenceId || item.eventId || index, onClick: () => onOpen(item.supplierId, item.supplierName) },
               h('span', { className: 'sr-status', 'data-tone': item.isConfirmed ? 'confirmed' : 'candidate' }, item.isConfirmed ? '已确认' : '待核验'),
               h('span', null, h('strong', null, item.supplierName || item.supplierId), h('small', null, item.title || item.summary || '证据摘要未提供')),
               h('time', null, fmt(item.riskPromptedAt || item.retrievedAt))))) : h('p', { className: 'sr-muted' }, '暂无已记录的风险变化。可先查看供应商台账，确认来源覆盖与更新时间。')),
-          h('section', { className: 'sr-section' }, h('h2', null, '来源覆盖'),
+          h('section', { className: 'sr-section' }, h('h2', null, '来源覆盖'), !(value.sources || []).length ? h('p', { className: 'sr-muted' }, '暂无来源覆盖记录。请先核对供应商台账；不能据此判断风险较低。') : null,
             ...(value.sources || []).map(source => h('div', { className: 'sr-source', key: source.sourceId || source.source || source.name },
               h('span', null, source.name || source.platform || source.sourceId || source.source || '未命名来源'),
               h('span', { className: 'sr-status', 'data-tone': source.status === 'available' && !source.stale ? 'confirmed' : 'candidate' }, source.stale ? '数据滞后' : ({ available: '已覆盖', unavailable: '暂不可用', pending: '待接入' }[source.status] || '待核对')),
@@ -369,15 +382,16 @@ window.__ModuleLoader__.load({
       const state = useLoad(() => api('supply_chain_workbench_suppliers_list', { page, pageSize: 20, ...(submitted ? { query: submitted } : {}) }), [page, submitted, revision], setError)
       const data = state.data
       const clearFilter = () => { setQuery(''); setSubmitted(''); setPage(1) }
-      let lastTrigger = null
+      const intakeTrigger = useRef(null)
       const closeIntake = () => {
         setShowAdd(false)
-        requestAnimationFrame(() => lastTrigger?.focus?.())
+        requestAnimationFrame(() => intakeTrigger.current?.focus?.())
       }
       return h(React.Fragment, null,
-        h('div', { className: 'sr-toolbar' }, h('form', { onSubmit: event => { event.preventDefault(); setPage(1); setSubmitted(query.trim()) } }, h('label', { className: 'sr-search' }, h(IconSearchOutlineRegular, { size: 16 }), h('input', { value: query, onChange: event => setQuery(event.target.value), placeholder: '搜索供应商名称或统一社会信用代码', 'aria-label': '搜索供应商' })), h('button', { type: 'submit', className: 'sr-button' }, '搜索')),
-          h('div', { className: 'sr-toolbar-actions' }, h('span', { className: 'sr-muted' }, `${data?.total ?? '—'} 家供应商`), h('button', { type: 'button', className: 'sr-button sr-secondary', ref: element => { lastTrigger = element }, 'aria-haspopup': 'dialog', 'aria-expanded': showAdd, onClick: () => { showAdd ? closeIntake() : setShowAdd(true) } }, showAdd ? '收起新增' : '新增 / 导入'))),
-        showAdd ? h('div', { role: 'dialog', 'aria-label': '新增或导入供应商', onKeyDown: event => { if (event.key === 'Escape') { event.stopPropagation(); closeIntake() } } },
+        h('div', { className: 'sr-toolbar' }, h('form', { onSubmit: event => { event.preventDefault(); setPage(1); setSubmitted(query.trim()) } }, h('label', { className: 'sr-search' }, h(IconSearchOutlineRegular, { size: 16 }), h('input', { type: 'search', value: query, onChange: event => setQuery(event.target.value), placeholder: '搜索供应商名称或统一社会信用代码', 'aria-label': '搜索供应商' })), h('button', { type: 'submit', className: 'sr-button' }, '搜索')),
+          h('div', { className: 'sr-toolbar-actions' }, h('span', { className: 'sr-muted' }, `${data?.total ?? '—'} 家供应商`), h('button', { type: 'button', className: 'sr-button sr-secondary', ref: intakeTrigger, 'aria-expanded': showAdd, onClick: () => { showAdd ? closeIntake() : setShowAdd(true) } }, showAdd ? '收起新增' : '新增 / 导入'))),
+        submitted && data?.items.length > 0 ? h('div', { className: 'sr-filter-summary', role: 'status' }, `搜索“${submitted}” · 找到 ${data.total} 家供应商`, h('button', { type: 'button', className: 'sr-link', onClick: clearFilter }, '清除筛选')) : null,
+        showAdd ? h('div', { role: 'region', 'aria-label': '新增或导入供应商', onKeyDown: event => { if (event.key === 'Escape') { event.stopPropagation(); closeIntake() } } },
           h(SupplierIntake, { newName, setNewName, importText, setImportText, busy, setBusy, setError, onDone: () => { setPage(1); setSubmitted(''); onImported?.(); window.dispatchEvent(new CustomEvent('supplier-risk:refresh')) } })) : null,
         h(Loading, { state }), data && data.items.length === 0 ? h('section', { className: 'sr-section sr-empty-panel', role: 'status' },
           h('h2', null, submitted ? '没有匹配的供应商' : page > 1 ? '这一页暂无供应商' : '当前团队尚未导入供应商'),
@@ -385,7 +399,7 @@ window.__ModuleLoader__.load({
           submitted || page > 1 ? h('button', { type: 'button', className: 'sr-button sr-secondary', onClick: clearFilter }, submitted ? '清除筛选' : '返回第一页') :
             h('button', { type: 'button', className: 'sr-button sr-secondary', onClick: () => setShowAdd(true) }, '新增 / 导入供应商')) : null,
         data && data.items.length > 0 ? h(React.Fragment, null,
-          h('div', { className: 'sr-table-wrap' }, h('table', { className: 'sr-table' }, h('thead', null, h('tr', null, ...['供应商', '统一社会信用代码', '类别', '主体核验', '监控范围', '来源覆盖', '更新时间', ''].map(label => h('th', { key: label }, label)))), h('tbody', null,
+          h('div', { className: 'sr-table-wrap' }, h('table', { className: 'sr-table' }, h('thead', null, h('tr', null, ...['供应商', '统一社会信用代码', '类别', '主体核验', '监控范围', '来源覆盖', '更新时间', ''].map(label => h('th', { key: label, scope: 'col' }, label || '操作')))), h('tbody', null,
             ...data.items.map(row => h('tr', { key: row.supplierId }, h('td', null, h('strong', null, row.displayName)), h('td', null, row.creditCode || '未关联'), h('td', null, row.category || '未分类'), h('td', null, h(Status, { value: row.verificationStatus })), h('td', null, ({ LEGAL_ENTITY_ONLY: '仅法人主体', LEGAL_ENTITY_AND_SUBSIDIARIES: '法人及子公司', LEGAL_ENTITY_AND_SUBSIDIARIES_AND_INVESTMENTS: '法人、子公司及投资企业' }[row.monitoringScope] || '未设置')), h('td', null, ({ partial: '部分覆盖', complete: '完整覆盖', available: '已覆盖' }[row.coverage?.status] || '待接入')), h('td', null, fmt(row.updatedAt)), h('td', null, h('button', { type: 'button', className: 'sr-link', onClick: () => onSelect(row.supplierId, row.displayName) }, '业务影响'))))))),
           h(Pagination, { page, pageSize: 20, total: data.total, onChange: setPage })) : null)
     }
@@ -412,6 +426,8 @@ window.__ModuleLoader__.load({
       const [category, setCategory] = useRemembered('supplier-add-category', '')
       const [monitoringScope, setMonitoringScope] = useRemembered('supplier-add-scope', 'LEGAL_ENTITY_ONLY')
       const run = useRun(runId)
+      const [intakeMode, setIntakeMode] = useRemembered('supplier-intake-mode', 'add')
+      const pending = busy || Boolean(runId && !run?.terminal)
       useEffect(() => { if (run?.terminal) window.dispatchEvent(new CustomEvent('supplier-risk:refresh')) }, [run?.terminal])
       const add = async event => {
         event.preventDefault(); setBusy(true); setError(''); setResult('')
@@ -432,9 +448,20 @@ window.__ModuleLoader__.load({
         } catch (error) { setError(errorText(error)) } finally { setBusy(false) }
       }
       return h('div', { className: 'sr-intake' },
-        h('form', { className: 'sr-section sr-form', onSubmit: add }, h('h3', null, '新增供应商'), h('p', { className: 'sr-muted' }, '新记录进入待核验状态；关联登记主体前不会扩展企业监控。'), Field('供应商名称', h('input', { required: true, maxLength: 256, value: newName, onChange: event => setNewName(event.target.value) })), Field('供应商类别', h('input', { maxLength: 256, value: category, onChange: event => setCategory(event.target.value), placeholder: '可选' })), Field('监控范围', h('select', { value: monitoringScope, onChange: event => setMonitoringScope(event.target.value) }, h('option', { value: 'LEGAL_ENTITY_ONLY' }, '仅法人主体'), h('option', { value: 'LEGAL_ENTITY_AND_SUBSIDIARIES' }, '法人及子公司'), h('option', { value: 'LEGAL_ENTITY_AND_SUBSIDIARIES_AND_INVESTMENTS' }, '法人、子公司及投资企业'))), h('button', { type: 'submit', className: 'sr-button', disabled: busy || !newName.trim() }, '确认新增')),
-        h('form', { className: 'sr-section sr-form', onSubmit: importCsv }, h('h3', null, '批量导入映射'), h('p', { className: 'sr-muted' }, 'CSV 表头：supplier_name、country_region、monitoring_scope、seed_source。'), Field('CSV 内容', h('textarea', { rows: 5, maxLength: 20000, value: importText, onChange: event => setImportText(event.target.value), placeholder: 'supplier_name,country_region,monitoring_scope,seed_source' })), h('button', { type: 'submit', className: 'sr-button sr-secondary', disabled: busy || !importText.trim() }, '确认导入')),
-        result ? h('div', { className: 'sr-intake-result', role: 'status' }, h('p', { className: 'sr-success' }, result), run ? h('p', null, `状态：${run.status}${run.result?.created !== undefined ? ` · 新增 ${run.result.created} · 重复 ${run.result.duplicates || 0} · 错误 ${run.result.errorCount || 0}` : ''}${run.error?.code ? ` · ${run.error.code}` : ''}`) : runId ? h('p', null, `任务 ${runId} 正在确认…`) : null, run?.result?.errorsTruncated ? h('p', { className: 'sr-muted' }, '仅显示前 100 条行错误。') : null, run?.result?.rowErrors?.length ? h('ul', null, ...run.result.rowErrors.map(error => h('li', { key: `${error.row}-${error.errorCode}` }, `第 ${error.row} 行：${error.errorCode === 'INVALID_SUPPLIER_INPUT' ? '字段格式无效' : '该行未能导入'}`))) : null) : null)
+        h('div', { className: 'sr-mode-switch', 'aria-label': '录入方式' }, ...[['add', '新增一家供应商'], ['import', '批量导入 CSV']].map(([id, label]) => h('button', { key: id, type: 'button', 'aria-pressed': intakeMode === id, onClick: () => setIntakeMode(id) }, label))),
+        h('form', { className: 'sr-section sr-form', hidden: intakeMode !== 'add', onSubmit: add }, h('h3', null, '新增供应商'), h('p', { className: 'sr-muted' }, '新记录进入待核验状态；关联登记主体前不会扩展企业监控。'), Field('供应商名称', h('input', { required: true, maxLength: 256, value: newName, onChange: event => setNewName(event.target.value) })), Field('供应商类别', h('input', { maxLength: 256, value: category, onChange: event => setCategory(event.target.value), placeholder: '可选' })), Field('监控范围', h('select', { value: monitoringScope, onChange: event => setMonitoringScope(event.target.value) }, h('option', { value: 'LEGAL_ENTITY_ONLY' }, '仅法人主体'), h('option', { value: 'LEGAL_ENTITY_AND_SUBSIDIARIES' }, '法人及子公司'), h('option', { value: 'LEGAL_ENTITY_AND_SUBSIDIARIES_AND_INVESTMENTS' }, '法人、子公司及投资企业'))), h('button', { type: 'submit', className: 'sr-button', disabled: pending || !newName.trim() }, '确认新增')),
+        h('form', { className: 'sr-section sr-form', hidden: intakeMode !== 'import', onSubmit: importCsv }, h('h3', null, '批量导入 CSV'), h('p', { className: 'sr-muted' }, '从表格复制或粘贴 CSV 文本。首行为字段名，每行一家供应商；单次最多 20,000 个字符。'), Field('CSV 内容', h('textarea', { rows: 5, spellCheck: false, maxLength: 20000, value: importText, onChange: event => setImportText(event.target.value), placeholder: 'supplier_name,country_region,monitoring_scope,seed_source\n示例供应商,中国,LEGAL_ENTITY_ONLY,采购台账' })), h('button', { type: 'submit', className: 'sr-button sr-secondary', disabled: pending || !importText.trim() }, '确认导入')),
+        (result || runId) ? h('div', { className: 'sr-intake-result', role: 'status' }, h('p', { className: 'sr-muted' }, result || '上次提交的任务'), run ? h('p', { role: run.status === 'failed' ? 'alert' : 'status' }, `状态：${runStatus(run)}${run.result?.created !== undefined ? ` · 新增 ${run.result.created} · 重复 ${run.result.duplicates || 0} · 错误 ${run.result.errorCount || 0}` : ''}${run.error?.code ? ` · ${run.error.code}` : ''}`) : runId ? h('p', null, '正在确认任务状态，请勿重复提交…') : null, run?.result?.errorsTruncated ? h('p', { className: 'sr-muted' }, '仅显示前 100 条行错误。') : null, run?.result?.rowErrors?.length ? h('ul', null, ...run.result.rowErrors.map(error => h('li', { key: `${error.row}-${error.errorCode}` }, `第 ${error.row} 行：${error.errorCode === 'INVALID_SUPPLIER_INPUT' ? '字段格式无效' : '该行未能导入'}`))) : null) : null)
+    }
+
+    function safeSourceUrl(value) {
+      if (typeof value !== 'string') return undefined
+      try { const url = new URL(value); return ['https:', 'http:'].includes(url.protocol) ? url.href : undefined } catch { return undefined }
+    }
+
+    function reportStatus(report) {
+      if (report.status === 'succeeded') return report.isRead ? '已读' : '未读'
+      return { failed: '生成失败', running: '生成中', pending: '等待生成', queued: '等待生成' }[report.status] || '状态待确认'
     }
 
     function Status({ value }) {
@@ -447,15 +474,23 @@ window.__ModuleLoader__.load({
       const [page, setPage] = useRemembered(`${kind}-page`, 1)
       const [status, setStatus] = useRemembered(`${kind}-status`, '')
       const [detailId, setDetailId] = useRemembered(`${kind}-detail`, '')
-      const [reviewReason, setReviewReason] = useRemembered(`${kind}-review-reason`, '')
+      const [supplierFilter, setSupplierFilter] = useRemembered(`${kind}-supplier-filter`, '')
+      const detailHeading = useRef(null)
+      const evidenceTrigger = useRef(null)
+      const returnToEvidence = () => { setDetailId(''); requestAnimationFrame(() => evidenceTrigger.current?.focus()) }
+      const [reviewReason, setReviewReason] = useRemembered(`${kind}-review-reason:${detailId}`, '')
       const [reviewNote, setReviewNote] = useState('')
-      const [reviewRunId, setReviewRunId] = useRemembered(`${kind}-review-run`, '')
+      const [reviewRunId, setReviewRunId] = useRemembered(`${kind}-review-run:${detailId}`, '')
       const reviewRun = useRun(reviewRunId)
       const [reviewBusy, setReviewBusy] = useState(false)
-      const state = useLoad(() => api('supply_chain_workbench_evidence_list', { kind, page, pageSize: 20, ...(status ? { reviewStatus: status } : {}) }), [kind, page, status, revision], setError)
-      const detailState = useLoad(() => detailId ? api('supply_chain_workbench_evidence_get', { kind, evidenceId: detailId }) : Promise.resolve(null), [kind, detailId, revision], setError)
+      const reviewPending = reviewBusy || Boolean(reviewRunId && !reviewRun?.terminal)
+      const state = useLoad(() => api('supply_chain_workbench_evidence_list', { kind, page, pageSize: 20, ...(supplierFilter ? { supplierId: supplierFilter } : {}), ...(status ? { reviewStatus: status } : {}) }), [kind, page, status, supplierFilter, revision], setError)
+      const detailState = useLoad(() => detailId ? api('supply_chain_workbench_evidence_get', { kind, evidenceId: detailId }) : Promise.resolve(null), [kind, detailId, revision], () => {})
+      const supplierState = useLoad(signal => loadSupplierOptions(signal), [], () => {})
       const data = state.data
       const detail = detailState.data?.evidence
+      useEffect(() => { setReviewNote('') }, [kind, detailId])
+      useEffect(() => { if (detailId) detailHeading.current?.focus() }, [kind, detailId])
       useEffect(() => { if (reviewRun?.terminal) window.dispatchEvent(new CustomEvent('supplier-risk:refresh')) }, [reviewRun?.terminal])
       const submitReview = async decision => {
         if (!detail?.eventId || !reviewReason.trim()) return
@@ -468,22 +503,25 @@ window.__ModuleLoader__.load({
         } catch (error) { setError(errorText(error)) } finally { setReviewBusy(false) }
       }
       return h(React.Fragment, null,
-        h('div', { className: 'sr-toolbar' }, h('div', null, h('h2', null, kind === 'enterprise' ? '工商与司法风险' : '媒体舆情线索'), h('p', { className: 'sr-muted' }, kind === 'enterprise' ? '仅展示已持久化风险事件和来源时间。' : '媒体命中属于候选线索，主体匹配不等同于事实核验。')),
-          h('label', { className: 'sr-select-label' }, '核验状态', h('select', { value: status, onChange: event => { setPage(1); setStatus(event.target.value) }, 'aria-label': '按核验状态筛选' }, h('option', { value: '' }, '全部'), h('option', { value: 'PENDING_REVIEW' }, '待核验'), h('option', { value: 'CONFIRMED' }, '已确认'), h('option', { value: 'REJECTED' }, '已排除')))),
-        h(Loading, { state }), data?.items?.length === 0 ? h('section', { className: 'sr-section sr-empty-panel', role: 'status' }, h('h2', null, status ? '没有符合筛选条件的记录' : '暂无已归集证据'), h('p', { className: 'sr-muted' }, '暂无记录不代表没有风险。请核对供应商台账与来源覆盖，或调整核验状态筛选。'), status ? h('button', { type: 'button', className: 'sr-button sr-secondary', onClick: () => { setStatus(''); setPage(1) } }, '查看全部状态') : null) : null, data ? h(React.Fragment, null,
-          h('div', { className: 'sr-evidence-list', hidden: Boolean(detailId) }, ...data.items.map(row => h('article', { className: 'sr-evidence', key: row.evidenceId },
+        h('div', { className: 'sr-toolbar' }, h('div', null, h('h2', null, kind === 'enterprise' ? '工商与司法风险' : '媒体舆情线索'), h('p', { className: 'sr-muted' }, kind === 'enterprise' ? '查看企业登记与司法风险记录，核对主体、来源及发生时间后评估影响。' : '媒体命中属于候选线索，主体匹配不等同于事实核验。')),
+          h('label', { className: 'sr-select-label' }, '核验状态', h('select', { value: status, onChange: event => { setDetailId(''); setPage(1); setStatus(event.target.value) }, 'aria-label': '按核验状态筛选' }, h('option', { value: '' }, '全部'), h('option', { value: 'PENDING_REVIEW' }, '待核验'), h('option', { value: 'CONFIRMED' }, '已确认'), h('option', { value: 'REJECTED' }, '已排除')))),
+        h('div', { className: 'sr-filter-bar' }, h('label', { className: 'sr-select-label' }, '供应商', h('select', { value: supplierFilter, 'aria-label': '按供应商筛选证据', disabled: supplierState.loading, onChange: event => { setSupplierFilter(event.target.value); setPage(1); setDetailId('') } }, h('option', { value: '' }, '全部供应商'), ...(supplierState.data || []).map(row => h('option', { key: row.supplierId, value: row.supplierId }, row.displayName || '未命名供应商')), supplierFilter && !supplierState.data?.some(row => row.supplierId === supplierFilter) ? h('option', { value: supplierFilter }, '已选供应商') : null)), supplierState.error ? h('span', { className: 'sr-muted' }, '供应商选项加载失败，仍可查看当前证据。') : null, (supplierFilter || status) ? h('button', { type: 'button', className: 'sr-link', onClick: () => { setSupplierFilter(''); setStatus(''); setDetailId(''); setPage(1) } }, '清除证据筛选') : null),
+        h(Loading, { state }), !detailId && data?.items?.length === 0 ? h('section', { className: 'sr-section sr-empty-panel', role: 'status' }, h('h2', null, (status || supplierFilter) ? '没有符合筛选条件的记录' : '暂无已归集证据'), h('p', { className: 'sr-muted' }, '暂无记录不代表没有风险。请核对供应商台账与来源覆盖，或调整核验状态筛选。'), status ? h('button', { type: 'button', className: 'sr-button sr-secondary', onClick: () => { setStatus(''); setPage(1) } }, '查看全部状态') : null) : null, (data || detailId) ? h(React.Fragment, null,
+          h('div', { className: 'sr-evidence-list', hidden: Boolean(detailId) }, ...(data?.items || []).map(row => h('article', { className: 'sr-evidence', key: row.evidenceId },
             h('div', { className: 'sr-evidence-head' }, h(Status, { value: row.reviewStatus }), h('span', null, row.supplierName || row.supplierId), h('time', null, fmt(row.occurredAt || row.exposedAt || row.riskPromptedAt || row.retrievedAt))),
             h('h3', null, row.title || row.category || '未命名证据'), h('p', null, row.summary || row.description || '未提供摘要'),
             h('div', { className: 'sr-evidence-meta' }, h('span', null, `来源 ${row.platform || row.source || '未知'}`), row.readCount !== null && row.readCount !== undefined ? h('span', null, `阅读量 ${row.readCount}${row.readCountScope ? ` · ${row.readCountScope}` : ''}`) : null, h('span', null, `采集 ${fmt(row.retrievedAt)}`)),
-            h('div', { className: 'sr-evidence-actions' }, row.sourceUrl ? h('a', { href: row.sourceUrl, target: '_blank', rel: 'noreferrer' }, '查看原文', h(IconRightUpOutlineRegular, { size: 14 })) : null, h('button', { type: 'button', className: 'sr-link', onClick: () => setDetailId(row.evidenceId) }, '查看证据'), h('button', { type: 'button', className: 'sr-link', onClick: () => onSelect(row) }, '加入业务分析'))))),
-          detailId ? h('section', { className: 'sr-section sr-detail' }, detail ? h(React.Fragment, null,
-            h('div', { className: 'sr-section-heading' }, h('h2', null, '证据详情'), h('button', { type: 'button', className: 'sr-link', onClick: () => setDetailId('') }, '返回证据列表')),
+            h('div', { className: 'sr-evidence-actions' }, safeSourceUrl(row.sourceUrl) ? h('a', { href: safeSourceUrl(row.sourceUrl), target: '_blank', rel: 'noreferrer' }, '查看原文', h(IconRightUpOutlineRegular, { size: 14 })) : null, h('button', { type: 'button', className: 'sr-link', onClick: event => { evidenceTrigger.current = event.currentTarget; setDetailId(row.evidenceId) } }, '查看证据'), h('button', { type: 'button', className: 'sr-link', onClick: () => onSelect(row) }, '加入业务分析'))))),
+          detailId ? h('section', { className: 'sr-section sr-detail' },
+            h('div', { className: 'sr-section-heading' }, h('h2', { ref: detailHeading, tabIndex: -1 }, '证据详情'), h('button', { type: 'button', className: 'sr-link', onClick: returnToEvidence }, '返回证据列表')),
+            detail ? h(React.Fragment, null, h(Status, { value: detail.reviewStatus }),
             h('h3', null, detail.title || '未命名证据'), h('p', null, detail.summary || detail.description || '未提供摘要'),
             h('p', { className: 'sr-footnote' }, `主体 ${detail.supplierName || detail.supplierId} · 来源 ${detail.platform || detail.source || '未知'} · 发布时间 ${fmt(detail.exposedAt || detail.occurredAt)} · 采集时间 ${fmt(detail.retrievedAt)}`),
-            detail.sourceUrl ? h('a', { href: detail.sourceUrl, target: '_blank', rel: 'noreferrer' }, '打开来源') : null,
-            h('h3', null, '核验轨迹'), detail.reviews?.length ? h('ul', null, ...detail.reviews.map(review => h('li', { key: review.reviewId }, `${review.decision} · ${review.reasonCode} · ${fmt(review.createdAt)}`))) : h('p', { className: 'sr-muted' }, '尚无人工核验记录。'),
-            kind === 'media' && detail.eventId && detail.reviewStatus === 'PENDING_REVIEW' ? h('div', { className: 'sr-review-box' }, h('label', { className: 'sr-field' }, h('span', null, '核验原因'), h('input', { value: reviewReason, onChange: event => setReviewReason(event.target.value), placeholder: '例如：主体与来源已交叉核实', maxLength: 256 })), h('div', { className: 'sr-review-actions' }, h('button', { type: 'button', className: 'sr-button', disabled: reviewBusy || !reviewReason.trim(), onClick: () => submitReview('CONFIRMED') }, '确认事件'), h('button', { type: 'button', className: 'sr-button sr-secondary', disabled: reviewBusy || !reviewReason.trim(), onClick: () => submitReview('REJECTED') }, '排除事件')), reviewNote ? h('p', { className: 'sr-success', role: 'status' }, `${reviewNote}${reviewRun ? ` 状态：${reviewRun.status}` : reviewRunId ? ` 任务 ${reviewRunId} 处理中` : ''}`) : null) : null) : h(Loading, { state: detailState })) : null,
-          h(Pagination, { page, pageSize: 20, total: data.total, onChange: setPage })) : null)
+            safeSourceUrl(detail.sourceUrl) ? h('a', { href: safeSourceUrl(detail.sourceUrl), target: '_blank', rel: 'noreferrer' }, '打开来源') : null,
+            h('div', { className: 'sr-evidence-actions' }, h('button', { type: 'button', className: 'sr-button sr-secondary', onClick: () => onSelect(detail) }, '评估这条证据的业务影响')),
+            h('h3', null, '核验轨迹'), detail.reviews?.length ? h('ul', null, ...detail.reviews.map(review => h('li', { key: review.reviewId }, `${{ CONFIRMED: '已确认', REJECTED: '已排除' }[review.decision] || '已处理'} · ${review.reasonCode} · ${fmt(review.createdAt)}`))) : h('p', { className: 'sr-muted' }, '尚无人工核验记录。'),
+            kind === 'media' && detail.eventId && detail.reviewStatus === 'PENDING_REVIEW' ? h('div', { className: 'sr-review-box' }, h('label', { className: 'sr-field' }, h('span', null, '核验原因'), h('input', { value: reviewReason, onChange: event => setReviewReason(event.target.value), placeholder: '例如：主体与来源已交叉核实', maxLength: 256 })), h('div', { className: 'sr-review-actions' }, h('button', { type: 'button', className: 'sr-button', disabled: reviewPending || !reviewReason.trim(), onClick: () => submitReview('CONFIRMED') }, '确认事件'), h('button', { type: 'button', className: 'sr-button sr-secondary', disabled: reviewPending || !reviewReason.trim(), onClick: () => submitReview('REJECTED') }, '排除事件')), reviewNote ? h('p', { className: 'sr-success', role: 'status' }, `${reviewNote}${reviewRun?.pollError ? ' 任务状态读取失败，正在重试，请勿重复提交。' : reviewRun?.terminal ? (reviewRun.status === 'succeeded' ? ' 核验已完成。' : ' 核验未完成，请检查后重试。') : reviewRunId ? ' 正在核验，请勿重复提交。' : ''}`) : null) : null) : h(Loading, { state: detailState })) : null,
+          !detailId && data ? h(Pagination, { page, pageSize: 20, total: data.total, onChange: setPage }) : null) : null)
     }
 
     function Pagination({ page, pageSize, total, onChange }) {
@@ -494,24 +532,34 @@ window.__ModuleLoader__.load({
     }
 
     function useRun(runId) {
-      const [run, setRun] = useState(null)
+      const [state, setState] = useState({ id: '', run: null })
       useEffect(() => {
-        if (!runId) { setRun(null); return undefined }
-        let active = true
-        let timer
+        if (!runId) return undefined
+        let active = true, timer
+        const controller = new AbortController()
         const poll = async () => {
           try {
-            const data = await api('supply_chain_run_get', { runId })
+            const data = await api('supply_chain_run_get', { runId }, controller.signal)
             const next = data?.run || data
             if (!active) return
-            setRun(next)
+            setState({ id: runId, run: next })
             if (next?.terminal !== true) timer = setTimeout(poll, Math.max(1500, (next?.pollAfterSeconds || 2) * 1000))
-          } catch { if (active) timer = setTimeout(poll, 5000) }
+          } catch {
+            if (active) {
+              setState({ id: runId, run: { terminal: false, pollError: true } })
+              timer = setTimeout(poll, 5000)
+            }
+          }
         }
         void poll()
-        return () => { active = false; clearTimeout(timer) }
+        return () => { active = false; clearTimeout(timer); controller.abort() }
       }, [runId])
-      return run
+      return state.id === runId ? state.run : null
+    }
+
+    function runStatus(run) {
+      if (run?.pollError) return '任务状态暂时无法读取，正在重试；请勿重复提交'
+      return { succeeded: '已完成', completed: '已完成', failed: '处理失败', running: '处理中', pending: '等待处理', queued: '排队中', cancelled: '已取消' }[run?.status] || '正在确认任务状态'
     }
 
     function Business({ revision, setError, onScopeReady }) {
@@ -520,17 +568,19 @@ window.__ModuleLoader__.load({
       const [analysis, setAnalysis] = useRemembered(`business-analysis:${supplierId}`, { dimension: 'other', externalSignal: '', possibleImpact: '', assumptions: '', informationGaps: '', suggestedActions: '', kind: 'human' })
       const [busy, setBusy] = useState(false)
       const [notice, setNotice] = useState('')
+      const [agentBusy, setAgentBusy] = useState(false)
       const [mode, setMode] = useRemembered(`business-mode:${supplierId}`, selectedEvidence ? 'analysis' : 'context')
       useEffect(() => { if (selectedEvidence) setMode('analysis') }, [selectedEvidence])
+      const supplierState = useLoad(signal => onScopeReady ? loadSupplierOptions(signal) : Promise.resolve(null), [onScopeReady], () => {})
       const state = useLoad(() => (onScopeReady && supplierId ? Promise.all([
         api('supply_chain_business_context_get', { supplierId }),
         api('supply_chain_business_analysis_list', { supplierId, page: 1, pageSize: 20 }),
-        loadSupplierOptions(),
+        Promise.resolve(null),
         selectedEvidence ? api('supply_chain_workbench_evidence_get', { kind: selectedEvidenceKind, evidenceId: selectedEvidence }) : Promise.resolve(null),
       ]) : Promise.resolve(null)), [supplierId, revision, selectedEvidence, selectedEvidenceKind], setError)
       const context = state.data?.[0]
       const analyses = state.data?.[1]
-      const supplier = state.data?.[2]?.find(item => item.supplierId === supplierId)
+      const supplier = supplierState.data?.find(item => item.supplierId === supplierId)
       const selectedEvidenceDetail = state.data?.[3]?.evidence
       useEffect(() => {
         if (context) setForm(current => current ?? ({ _baseVersion: context.version, category: '', criticalMaterials: [], inventoryDays: '', inTransitOrders: '', alternatives: '', alternativeCapacity: '', procurementOwner: '', logisticsOwner: '', sqeOwner: '', impactAnalysis: '', ...(context.context?.fields || {}) }))
@@ -557,7 +607,9 @@ window.__ModuleLoader__.load({
           setRevisionAfterSave()
         } catch (error) { setError(errorText(error)) } finally { setBusy(false) }
       }
-      if (!supplierId) return h('section', { className: 'sr-section sr-empty-panel' }, h('h2', null, '选择供应商'), h('p', { className: 'sr-muted' }, '从供应商台账打开一家供应商，补充库存、订单、替代产能和业务影响。'), h('button', { type: 'button', className: 'sr-button', onClick: () => window.dispatchEvent(new CustomEvent('supplier-risk:open-suppliers')) }, '浏览供应商台账'))
+      if (!supplierId) return h('section', { className: 'sr-section sr-empty-panel' }, h('h2', null, '选择要评估的供应商'), h('p', { className: 'sr-muted' }, '选择供应商后，补充业务背景或评估风险对交付与经营的影响。'),
+        supplierState.data?.length ? Field('供应商', h('select', { value: '', onChange: event => { const row = supplierState.data.find(item => item.supplierId === event.target.value); if (row) { setSelected(row.supplierId, row.displayName); setSupplierId(row.supplierId) } } }, h('option', { value: '' }, '请选择供应商'), ...supplierState.data.map(row => h('option', { key: row.supplierId, value: row.supplierId }, row.displayName || '未命名供应商')))) : supplierState.data?.length === 0 ? h('p', { className: 'sr-muted', role: 'status' }, '暂无供应商，请先在台账中新增或导入。') : h(Loading, { state: supplierState }),
+        h('button', { type: 'button', className: 'sr-button sr-secondary', onClick: () => window.dispatchEvent(new CustomEvent('supplier-risk:open-suppliers')) }, '浏览供应商台账'))
       if (!context || !form) return h(Loading, { state })
       return h(React.Fragment, null,
         h('div', { className: 'sr-toolbar' }, h('div', null, h('h2', null, supplier?.displayName || selectedSupplierName || '供应商详情'), h('p', { className: 'sr-muted' }, context.version ? '已保存业务背景 · 可补充或更新' : '尚未补充业务背景 · 可先填写已知信息')), h('button', { type: 'button', className: 'sr-link', onClick: () => { setSelected(''); setSupplierId('') } }, '更换供应商')),
@@ -584,7 +636,7 @@ window.__ModuleLoader__.load({
               Field('建议动作', textArea(analysis.suggestedActions, value => setAnalysis({ ...analysis, suggestedActions: value }))),
               h('button', { type: 'submit', className: 'sr-button', disabled: busy || !analysis.possibleImpact.trim() }, busy ? '保存中…' : '保存人工判断')),
             h('div', { className: 'sr-history' }, h('h3', null, '历史分析'), !analyses.items?.length ? h('p', { className: 'sr-muted' }, '暂无已保存判断。补充可能影响后保存，或交由 Agent 分析已保存的数据。') : null, ...(analyses.items || []).map(item => h('article', { key: item.id }, h('span', null, `版本 ${item.version} · ${fmt(item.createdAt)}`), item.stale ? h(Status, { value: 'STALE' }) : null, h('p', null, item.fields?.possibleImpact || '未填写影响描述')))),
-            h('button', { type: 'button', className: 'sr-button sr-secondary', onClick: () => sendSupplierAnalysis(supplierId, context, selectedEvidence) }, '用已保存数据发起 Agent 分析')))
+            h('button', { type: 'button', className: 'sr-button sr-secondary', disabled: agentBusy || busy || state.loading, onClick: async () => { setAgentBusy(true); try { await sendSupplierAnalysis(supplierId, context, selectedEvidence) } finally { setAgentBusy(false) } } }, agentBusy ? '正在打开分析会话…' : '用已保存数据发起 Agent 分析')))
       )
     }
 
@@ -608,26 +660,27 @@ window.__ModuleLoader__.load({
 
     function Weekly({ revision, setError, onUnread, onScopeReady }) {
       const [reportId, setReportId] = useRemembered('weekly-report', '')
+      const [historyPage, setHistoryPage] = useRemembered('weekly-history-page', 1)
       const [busy, setBusy] = useState(false)
       const [notice, setNotice] = useState('')
       const [scopeQuery, setScopeQuery] = useState('')
       const [planFields, setPlanFields] = useRemembered('weekly-plan-draft', null)
-      const state = useLoad(() => (onScopeReady ? Promise.all([
-        api('supply_chain_weekly_report_plan_get'),
-        api('supply_chain_weekly_reports_list', { page: 1, pageSize: 20 }),
-        reportId ? api('supply_chain_weekly_report_get', { reportId }) : Promise.resolve(null),
-      ]) : Promise.resolve(null)), [revision, reportId], setError)
-      const supplierState = useLoad(signal => onScopeReady ? loadSupplierOptions(signal) : Promise.resolve(null), [revision, onScopeReady], setError)
-      const plan = state.data?.[0]?.plan
-      const reports = state.data?.[1]
-      const report = state.data?.[2]?.report
+      const reportHeading = useRef(null)
+      const planState = useLoad(() => onScopeReady ? api('supply_chain_weekly_report_plan_get') : Promise.resolve(null), [revision, onScopeReady], setError)
+      const reportsState = useLoad(() => onScopeReady ? api('supply_chain_weekly_reports_list', { page: historyPage, pageSize: 20 }) : Promise.resolve(null), [revision, historyPage, onScopeReady], setError)
+      const supplierState = useLoad(signal => onScopeReady ? loadSupplierOptions(signal) : Promise.resolve(null), [revision, onScopeReady], () => {})
+      const reportState = useLoad(() => onScopeReady && reportId ? api('supply_chain_weekly_report_get', { reportId }) : Promise.resolve(null), [revision, reportId, onScopeReady], () => {})
+      const plan = planState.data?.plan
+      const reports = reportsState.data
+      const report = reportState.data?.report
+      useEffect(() => { if (reportId) reportHeading.current?.focus() }, [reportId])
       const suppliers = supplierState.data || []
       const selectedIds = normalizeSupplierIds(planFields?.supplierIds)
       const unavailableIds = selectedIds.filter(id => !suppliers.some(supplier => supplier.supplierId === id))
       useEffect(() => { if (plan) setPlanFields(current => current ?? ({ ...plan, supplierIds: normalizeSupplierIds(plan.supplierIds) })) }, [plan])
-      useEffect(() => { if (reports) onUnread(reports.unreadCount || 0) }, [reports?.unreadCount])
+      useEffect(() => { if (reports) onUnread(reports?.unreadCount || 0) }, [reports?.unreadCount])
       const savePlan = async event => {
-        event.preventDefault(); setBusy(true); setNotice('')
+        event.preventDefault(); setBusy(true); setNotice(''); setError('')
         try {
           const supplierIds = normalizeSupplierIds(planFields.supplierIds)
           const saved = await api('supply_chain_weekly_report_plan_save', { expectedVersion: planFields.version, fields: { enabled: planFields.enabled === true, weekday: 0, hour: 9, minute: 0, timezone: 'Asia/Shanghai', supplierIds, collectionBudget: Number(planFields.collectionBudget || 0) }, idempotencyKey: crypto.randomUUID(), confirm: true })
@@ -637,17 +690,19 @@ window.__ModuleLoader__.load({
         } catch (error) { setError(errorText(error)) } finally { setBusy(false) }
       }
       const mutateReport = async (tool, id) => {
-        setBusy(true); setNotice('')
+        setBusy(true); setNotice(''); setError('')
         try {
           await api(tool, { reportId: id, confirm: true })
+          setNotice(tool === 'supply_chain_weekly_report_mark_read' ? '周报已标为已读。' : '重试请求已提交，请稍后刷新查看。')
           setReportId(id); window.dispatchEvent(new CustomEvent('supplier-risk:refresh'))
         } catch (error) { setError(errorText(error)) } finally { setBusy(false) }
       }
-      if (!planFields || !reports) return h(Loading, { state })
       return h(React.Fragment, null,
+        notice ? h('p', { className: 'sr-success', role: 'status' }, notice) : null,
         h('div', { className: 'sr-weekly-layout' },
           h('section', { className: 'sr-section' }, h('h2', null, '周报计划'), h('p', { className: 'sr-muted' }, '服务端每周一 09:00（Asia/Shanghai）汇总已保存事实，不会启动外部采集或模型调用。'),
-            h('form', { className: 'sr-form', onSubmit: savePlan }, h('label', { className: 'sr-toggle' }, h('input', { type: 'checkbox', checked: planFields.enabled === true, onChange: event => setPlanFields({ ...planFields, enabled: event.target.checked }) }), h('span', null, '启用每周风险周报')),
+            plan && planFields ? h('form', { className: 'sr-form', onSubmit: savePlan },
+              planFields.version < plan.version ? h('div', { className: 'sr-error', role: 'alert' }, '计划已在其他位置更新，当前选择仍保留。', h('button', { type: 'button', onClick: () => { if (window.confirm('放弃当前计划草稿，读取最新保存的计划？')) setPlanFields({ ...plan, supplierIds: normalizeSupplierIds(plan.supplierIds) }) } }, '读取最新计划')) : null, h('label', { className: 'sr-toggle' }, h('input', { type: 'checkbox', checked: planFields.enabled === true, onChange: event => setPlanFields({ ...planFields, enabled: event.target.checked }) }), h('span', null, '启用每周风险周报')),
               h('fieldset', { className: 'sr-scope-picker', disabled: supplierState.loading || !supplierState.data },
                 h('legend', null, '供应商范围'),
                 h('p', { className: 'sr-footnote' }, selectedIds.length ? `已选择 ${selectedIds.length} 家供应商` : '全部供应商，包含后续新增'),
@@ -658,14 +713,13 @@ window.__ModuleLoader__.load({
                 unavailableIds.length ? h('p', { className: 'sr-footnote' }, `有 ${unavailableIds.length} 家已选供应商当前不可用，原选择仍保留。`) : null),
               h('small', { className: 'sr-field-hint', role: 'status' }, supplierState.loading ? '正在读取供应商台账…' : !supplierState.data ? '供应商台账读取失败，请刷新重试；已保存范围保留。' : suppliers.length ? '勾选限定范围；不勾选表示全部供应商。' : '当前团队暂无供应商，请先核对台账或历史数据迁移。'),
               h('details', { className: 'sr-disclosure' }, h('summary', null, '预算备注（选填）'), h('p', { className: 'sr-footnote' }, '仅记录预算，不会启动采集或限制支出。'), Field('采集预算记录', h('input', { type: 'number', min: 0, value: planFields.collectionBudget || 0, onChange: event => setPlanFields({ ...planFields, collectionBudget: event.target.value }) }))),
-              h('p', { className: 'sr-footnote' }, `下次执行：${fmt(plan.nextRunAt)} · 当前运行：${plan.currentRunStatus || '无'}${plan.failureCode ? ` · ${plan.failureCode}` : ''}`),
-              h('button', { type: 'submit', className: 'sr-button', disabled: busy }, busy ? '保存中…' : '保存计划'))),
-          h('section', { className: 'sr-section' }, h('div', { className: 'sr-section-heading' }, h('h2', null, '历史周报'), h('span', { className: 'sr-unread-count' }, `未读 ${reports.unreadCount || 0}`)),
-            reports.items.length ? h('div', { className: 'sr-list' }, ...reports.items.map(item => h('button', { type: 'button', className: 'sr-list-row', key: item.reportId, onClick: () => setReportId(item.reportId) }, h(Status, { value: item.status === 'succeeded' ? (item.isRead ? 'CONFIRMED' : 'PENDING_REVIEW') : item.status }), h('span', null, h('strong', null, `${fmt(item.periodStart)} - ${fmt(item.periodEnd)}`), h('small', null, item.errorCode || item.summary || '查看报告详情')), h('time', null, fmt(item.generatedAt || item.createdAt))))) : h('p', { className: 'sr-muted' }, '暂无已生成周报。'))),
-        report ? h('section', { className: 'sr-section sr-report' }, h('div', { className: 'sr-section-heading' }, h('h2', null, '周报详情'), h('div', null, report.status === 'failed' ? h('button', { type: 'button', className: 'sr-button sr-secondary', disabled: busy, onClick: () => mutateReport('supply_chain_weekly_report_retry', report.reportId) }, '重试原任务') : null, report.status === 'succeeded' && !report.isRead ? h('button', { type: 'button', className: 'sr-button sr-secondary', disabled: busy, onClick: () => mutateReport('supply_chain_weekly_report_mark_read', report.reportId) }, '标为已读') : null)),
-          h('p', { className: 'sr-muted' }, `${fmt(report.periodStart)} 至 ${fmt(report.periodEnd)} · ${report.sourcesChanged ? '来源事实已有更新，本快照保留生成时内容。' : '本报告为生成时的数据快照。'}`),
-          report.content ? h(ReportContent, { content: report.content }) : h('p', { role: 'status' }, report.errorCode || report.status)) : null,
-        notice ? h('p', { className: 'sr-success', role: 'status' }, notice) : null)
+              h('p', { className: 'sr-footnote' }, `${plan.enabled ? `下次执行：${fmt(plan.nextRunAt)}` : '已保存计划：未启用'} · 当前任务：${plan.currentRunStatus ? runStatus({ status: plan.currentRunStatus }) : '无进行中的任务'}${plan.failureCode ? ' · 上次执行失败，请检查后重试' : ''}`),
+              h('button', { type: 'submit', className: 'sr-button', disabled: busy }, busy ? '保存中…' : '保存计划')) : h(Loading, { state: planState })),
+          h('section', { className: 'sr-section' }, h('div', { className: 'sr-section-heading' }, h('h2', null, '历史周报'), reports?.unreadCount ? h('span', { className: 'sr-unread-count' }, `未读 ${reports.unreadCount}`) : h('span', { className: 'sr-muted' }, reports?.items?.length ? '全部已读' : '暂无周报')),
+            !reports ? h(Loading, { state: reportsState }) : reports.items.length ? h('div', { className: 'sr-list' }, ...reports.items.map(item => h('button', { type: 'button', className: 'sr-list-row', key: item.reportId, 'aria-pressed': reportId === item.reportId, onClick: () => setReportId(item.reportId) }, h('span', { className: 'sr-status' }, reportStatus(item)), h('span', null, h('strong', null, `${fmt(item.periodStart)} - ${fmt(item.periodEnd)}`), h('small', null, item.errorCode || item.summary || '查看报告详情')), h('time', null, fmt(item.generatedAt || item.createdAt))))) : h('p', { className: 'sr-muted' }, '暂无已生成周报。启用计划并保存后，将在下次执行时间生成首份周报。'), reports && reports.total > 20 ? h(Pagination, { page: historyPage, pageSize: 20, total: reports.total, onChange: setHistoryPage }) : null)),
+        reportId ? h('section', { className: 'sr-section sr-report' }, h('div', { className: 'sr-section-heading' }, h('h2', { ref: reportHeading, tabIndex: -1 }, '周报详情'), h('div', null, h('button', { type: 'button', className: 'sr-link', onClick: () => setReportId('') }, '收起周报'), report?.status === 'failed' ? h('button', { type: 'button', className: 'sr-button sr-secondary', disabled: busy, onClick: () => mutateReport('supply_chain_weekly_report_retry', report.reportId) }, '重试原任务') : null, report?.status === 'succeeded' && !report.isRead ? h('button', { type: 'button', className: 'sr-button sr-secondary', disabled: busy, onClick: () => mutateReport('supply_chain_weekly_report_mark_read', report.reportId) }, '标为已读') : null)),
+          report ? h(React.Fragment, null, h('p', { className: 'sr-muted' }, `${fmt(report.periodStart)} 至 ${fmt(report.periodEnd)} · ${report.sourcesChanged ? '来源事实已有更新，本快照保留生成时内容。' : '本报告为生成时的数据快照。'}`),
+          report.content ? h(ReportContent, { content: report.content }) : h('p', { role: 'status' }, report.status === 'failed' ? '本期周报生成失败，请重试原任务。' : '周报正在生成，请稍后刷新。')) : h(Loading, { state: reportState })) : null)
     }
 
     function ReportContent({ content }) {
@@ -710,13 +764,10 @@ window.__ModuleLoader__.load({
           },
         })
         const onShowAgent = () => ctx.layout.selectPanel(null)
-        const onAgentError = () => window.dispatchEvent(new CustomEvent('supplier-risk:refresh'))
         window.addEventListener('supplier-risk:show-agent', onShowAgent)
-        window.addEventListener('supplier-risk:agent-error', onAgentError)
         return () => {
           delete globalThis.__supplier_risk_sessions
           window.removeEventListener('supplier-risk:show-agent', onShowAgent)
-          window.removeEventListener('supplier-risk:agent-error', onAgentError)
         }
       }, 'supplier risk agent bridge')
       ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID, locale: 'dofe.supplier-risk' }, SupplierPage))
@@ -726,9 +777,9 @@ window.__ModuleLoader__.load({
 
     function FooterButton({ wide, t, onOpen }) {
       const { allowed } = supplierNavigation().useAccess(`${BASE}/access`, adoptScope)
-      if (allowed !== true) return null
+      if (allowed === false) return null
       return h(Tooltip, { label: t('panel'), disabled: wide },
-        h('button', { type: 'button', className: `sr-launcher${wide ? ' sr-wide' : ''}`, 'aria-label': t('panel'), onClick: onOpen },
+        h('button', { type: 'button', className: `sr-launcher${wide ? ' sr-wide' : ''}`, 'aria-label': t('panel'), 'aria-busy': allowed === null, onClick: onOpen },
           h(IconShieldOutlineRegular, { size: wide ? 14 : 18 }), wide ? h('span', null, t('panel')) : null))
     }
     exports.apply = apply
