@@ -21,7 +21,7 @@ export function installDesktopNavigationStyles(): () => void {
 .sensteedNavigationFrame button:focus-visible { outline:2px solid var(--dsw-alias-brand-primary); outline-offset:-2px; }
 .sensteedModuleFoot { width:40px; display:flex; flex-direction:column; align-items:center; gap:8px; padding-top:8px; }
 .sensteedKnowledgeModule { margin-bottom:8px; }
-.sensteedKnowledgeModule[data-active] button { background:var(--dsw-alias-bg-layer-2); color:var(--dsw-alias-label-primary); }
+.sensteedKnowledgeModule[data-active] button,.sensteedExtensionModule[data-active] button { background:var(--dsw-alias-bg-layer-2); color:var(--dsw-alias-label-primary); }
 .sensteedModuleExtensions:not(:has(button)) { display:none; }
 .sensteedModuleExtensions { margin-top:16px; padding-top:12px; border-top:1px solid var(--dsw-alias-border-l1); }
 body .sensteedNavigationFrame .sensteedModuleRail [data-slot="sidebar.footer.action"] { max-height:none; overflow:visible; scrollbar-gutter:auto; width:40px; margin:0; padding:0; gap:8px; }
@@ -31,10 +31,12 @@ body .sensteedNavigationFrame .sensteedModuleRail [data-slot="sidebar.footer.act
 .sensteedModuleRail [data-slot="sidebar.settings"] > div:first-child { width:40px; }
 .sensteedModuleRail [data-slot="sidebar.settings"] button { max-width:40px; }
 .sensteedModuleRail .dshSensteedUserSettingsTrigger .dshDofeAccessAvatar { width:26px; height:26px; }
+.sensteedModuleButton,.sensteedBusinessNavigation button { transition:background-color 150ms ease,color 150ms ease; }
+@media(prefers-reduced-motion:reduce) { .sensteedModuleButton,.sensteedBusinessNavigation button { transition:none; } }
 .sensteedContextSidebar { --dsh-sidebar-inline-padding:12px; box-sizing:border-box; height:100%; min-height:0; display:flex; flex-direction:column; padding:12px; background:var(--dsw-alias-bg-layer-1); }
 .sensteedContextSidebar[hidden],.sensteedContextHome[hidden] { display:none; }
 .sensteedBusinessNavigation { overflow-y:auto; min-height:0; padding:0 4px 12px; }
-.sensteedBusinessNavigation h3 { font-size:12px; color:var(--dsw-alias-label-secondary); margin:18px 8px 6px; font-weight:500; }
+.sensteedBusinessNavigation h3,.sensteedContextGroup { font-size:12px; color:var(--dsw-alias-label-secondary); margin:18px 8px 6px; font-weight:500; }
 .sensteedBusinessNavigation button { display:block; width:100%; min-height:34px; border:0; border-radius:8px; padding:7px 10px; background:transparent; color:inherit; text-align:left; cursor:pointer; font:inherit; }
 .sensteedBusinessNavigation button:hover,.sensteedBusinessNavigation button[aria-current="page"] { background:var(--dsw-alias-bg-layer-2); }
 .sensteedBusinessNavigation small { display:block; margin-top:4px; color:var(--dsw-alias-label-secondary); font-size:11px; }

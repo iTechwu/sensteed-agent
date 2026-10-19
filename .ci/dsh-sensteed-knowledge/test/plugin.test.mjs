@@ -30,8 +30,8 @@ test('aligns Memory and Knowledge permissions with the shared access gate', asyn
 
 test('exposes full Knowledge, Memory, Ontology, and graph management surfaces in the client', async () => {
   const source = await readFile(new URL('src/client.js', root), 'utf8')
-  assert.match(source, /memoriesTab:\s*"Memory 召回"/u)
-  assert.match(source, /memoryManageTab:\s*"Memory 采集"/u)
+  assert.match(source, /memoriesTab:\s*"记忆召回"/u)
+  assert.match(source, /memoryManageTab:\s*"记忆采集"/u)
   assert.match(source, /memoriesTab:\s*"Memory recall"/u)
   assert.match(source, /memoryManageTab:\s*"Capture Memory"/u)
   for (const token of ['knowledgeTab', 'memoryManageTab', 'consoleTab', 'yk-management-console', 'ingest_file', 'fileUrl', 'knowledge.promote', 'knowledge.remember', 'knowledge.entity_assertions', 'knowledge.relation_assertions', 'knowledge.entity_merges', 'knowledge.provenance_lineage', 'knowledge.create_space', 'knowledge.create_source', 'knowledge.create_ontology_version', 'knowledge.publish_ontology', 'knowledge.export_ontology', 'knowledge.import_ontology', 'knowledge.grant_acl', 'knowledge.grant_document_principal', 'knowledge.rebuild_graph', 'memoryCaptureTitle', 'ingestTitle', 'promoteTitle', 'entityId', 'capabilityAllowed']) assert.match(source, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'u'))
@@ -41,7 +41,7 @@ test('exposes full Knowledge, Memory, Ontology, and graph management surfaces in
 async function loadClientTestApi() {
   const source = await readFile(new URL('src/client.js', root), 'utf8')
   const module = { exports: {} }
-  const react = { createElement() {}, useEffect() {}, useMemo(factory) { return factory() }, useState() { return [null, () => {}] }, useSyncExternalStore() {}, Fragment: Symbol('Fragment') }
+  const react = { createElement(type, props, ...children) { return { type, props: props || {}, children } }, useEffect() {}, useMemo(factory) { return factory() }, useState(initial) { return [initial, () => {}] }, useSyncExternalStore() {}, Fragment: Symbol('Fragment') }
   vm.runInNewContext(source, { module, exports: module.exports, require(id) { return id === 'react' ? react : { Tooltip() {} } }, Intl, Map, Set, Date, JSON, Number, Array, Object, String, Math })
   return module.exports.__test
 }
@@ -542,3 +542,28 @@ async function invoke(route, method, body) {
   await route.handler(req, res)
   return { status, headers, body: output ? JSON.parse(output) : null }
 }
+
+
+test('governance reads the correct domains and labels fields persistently', async () => {
+  const { Management, ManagementField, ManagementRecords } = await loadClientTestApi()
+  const walk = value => !value || typeof value !== 'object' ? [] : [value, ...(value.children || []).flat(Infinity).flatMap(walk)]
+  const actions = []
+  const render = tab => Management({ data: {}, t: key => key, tab, busy: false, result: null, onLoad: name => actions.push(name), onWrite() {} })
+  for (const node of walk(render('ontology')).filter(node => node.type === 'button')) node.props.onClick?.()
+  assert.deepEqual(actions, ['ontologies'])
+  actions.length = 0
+  for (const node of walk(render('assertions')).filter(node => node.type === 'button')) node.props.onClick?.()
+  assert.deepEqual(actions, ['entity_assertions', 'relation_assertions'])
+  const field = ManagementField({ placeholder: '实体 ID', value: 'entity-1' })
+  assert.equal(field.type, 'label')
+  assert.equal(field.children[0].children[0], '实体 ID')
+  assert.equal(field.children[1].props['aria-label'], '实体 ID')
+  const unread = ManagementRecords({ records: [], result: null, busy: false, t: key => key })
+  assert.equal(unread.children[0], 'loadRecordsHint')
+  const records = ManagementRecords({ records: [{ title: '测试本体', status: 'draft' }], result: {}, busy: false, t: key => key })
+  assert.equal(walk(records).find(node => node.type === 'strong').children[0], '测试本体')
+  assert.equal(walk(records).find(node => node.type === 'details').props.open, undefined)
+  const forms = walk(render('console')).filter(node => node.type === 'details' && node.props.className === 'yk-management-form')
+  assert.ok(forms.length >= 7)
+  assert.ok(forms.every(node => !node.props.open && node.children[0].type === 'summary'))
+})
