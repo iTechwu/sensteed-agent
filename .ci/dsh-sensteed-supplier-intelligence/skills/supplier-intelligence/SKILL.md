@@ -36,6 +36,13 @@ Sensteed 默认插件提供“供应商风险”主内容区：风险总览、�
 
 遇到 `QCC_MCP_UNAVAILABLE`、认证/账号/余额错误、`ONEAPI_BUDGET_EXHAUSTED` 或环境不可用时，立即停止对应外部采集分支，保留已完成数据并报告稳定错误码。代码或参数错误可修正后继续剩余项；不得用直接 Provider 请求绕过 MCP、缓存、预算或入库流程。
 
+## 微信、头条与西瓜公开资料
+
+- 供应商正式采集支持 `wechat-search` 来源：先发现 `supply_chain_getone_social_source_authorize` 并按用户授权登记来源，再对已核验供应商运行 `supply_chain_social_monitoring_collect`。固定搜索公众号文章，使用已批准来源、`confirm=true` 与稳定幂等键；不要替用户自动授权或扩大采集范围。
+- 跨平台临时研究由 Tools 插件的 `mcp__tools-platform__getoneapi_social_capabilities_get` 发现五组目录及 workflows，`getoneapi_social_read_prepare` 本地验证参数，`getoneapi_social_read` 显式读取单页/详情。若该工具未出现在当前会话目录，报告工具未启用，不直连 Provider。
+- 头条/西瓜目录提供已知账号和内容读取，没有关键词搜索。视频号需服务端目录要求的真实账号/作品标识，不猜测 ID。公众号文章详情可以补充临时分析引用，但不会自动写入供应商证据表。
+- 目录/prepare 不产生外部调用；read 缓存未命中可能计费。保留来源、原 `retrievedAt`、本次 `observedAt`、`cacheHit`、`charged`、`externalCallMade`。不自动重试或翻页；长文按 `dataPointer`/`textOffset` 继续读缓存。短期媒体地址和 `decode_key` 不能描述为永久发布链接。
+
 ## 舆情分析
 
 对每家供应商调用 `supply_chain_intelligence_report_get`，只使用已持久化的证据、告警和已审核关系。将社媒命中分为正向、中性、混合、负向或证据不足，并同时给出证据数量、来源、时间范围与核验状态。

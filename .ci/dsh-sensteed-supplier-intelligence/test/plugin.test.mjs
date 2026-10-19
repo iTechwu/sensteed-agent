@@ -9,6 +9,7 @@ function loadHost(names = []) {
   const sections = []
   return import('../index.js').then(({ apply }) => {
     apply({
+    hubMcp: { register() { return { async dispose() {} } } },
       tools: {
         schemas: () => names.map(name => ({ name })),
         register(value) { tools.set(value.name, value); return () => {} },
@@ -19,13 +20,13 @@ function loadHost(names = []) {
   })
 }
 
-test('package registers the supply-chain MCP patch', async () => {
+test('package activates itself while the sealed product owns the supply-chain transport', async () => {
   const manifest = JSON.parse(await readFile(new URL('package.json', root), 'utf8'))
   const patch = await readFile(new URL('cordis.patch.yml', root), 'utf8')
   assert.equal(manifest.name, '@dofe/dsh-sensteed-supplier-intelligence')
   assert.equal(manifest.dsh.bundle.patch, './cordis.patch.yml')
-  assert.match(patch, /serverName: supply-chain/u)
-  assert.match(patch, /https:\/\/ai\.hozonauto\.com\/mcp\/tools\/supply-chain/u)
+  assert.match(patch, /name: '@dofe\/dsh-sensteed-supplier-intelligence'/u)
+  assert.doesNotMatch(patch, /dsh-mcp-client|serverName:|!!js/u)
   assert.doesNotMatch(patch, /authorizationCredential|api[_-]?key|token/u)
 })
 
@@ -70,6 +71,7 @@ test('supplier guidance and bootstrap follow the live product gate and tool conn
   let connected = true
   let section
   const dispose = apply({
+    hubMcp: { register() { return { async dispose() {} } } },
     dofeAccess: () => ({ ready: true, enabledPlugins: enabled ? ['supplier-intelligence'] : [], entitlements: { plugins: enabled ? ['supplier-intelligence'] : [] } }),
     on(name, callback) { listeners.set(name, callback); return () => listeners.delete(name) },
     tools: {
@@ -99,6 +101,7 @@ test('workbench host adapter uses only the fixed gateway and hides the stored ke
   let route
   let request
   const dispose = apply({
+    hubMcp: { register() { return { async dispose() {} } } },
     webServer: { port: 43123, register(value) { route = value; return () => {} } },
     dofeAccess: () => ({ ready: true, enabledPlugins: ['supplier-intelligence'], entitlements: { plugins: ['supplier-intelligence'] } }),
     tools: { schemas: () => [
@@ -165,6 +168,7 @@ test('workbench and guidance honor the product Tools entitlement without grantin
   const tools = new Map()
   let externalCalls = 0
   const dispose = apply({
+    hubMcp: { register() { return { async dispose() {} } } },
     dofeAccess: () => gate,
     webServer: { port: 43123, register(value) { route = value; return () => {} } },
     systemPrompt: { section(value) { section = value; return () => {} } },
