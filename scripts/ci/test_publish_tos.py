@@ -1,4 +1,6 @@
 import copy
+import base64
+import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import redirect_stdout
 import importlib.util
@@ -65,7 +67,26 @@ class FakeTos:
 
 
 class PublicationTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # Synthetic ephemeral test identity; never used by a deployed verifier.
+        script = "const p=require('node:crypto').generateKeyPairSync('ed25519');console.log(JSON.stringify({private:p.privateKey.export({type:'pkcs8',format:'pem'}),public:p.publicKey.export({type:'spki',format:'pem'})}))"
+        cls.keypair = json.loads(subprocess.check_output(['node', '-e', script], text=True))
+
+    def signed_config(self):
+        return {**self.config, 'DESKTOP_RELEASE_MANIFEST_SIGNING_KEY_ID': 'synthetic-test',
+                'DESKTOP_RELEASE_MANIFEST_SIGNING_KEY_PEM': self.keypair['private']}
+
     def setUp(self):
+        identity = patch.object(publisher, 'build_identity', side_effect=lambda env: dict(
+            appVersion=env['DESKTOP_VERSION'], tag=env['DESKTOP_VERSION'], harnessVersion='0.2.1-rc.2',
+            upstreamCommit=env['UPSTREAM_SHA']))
+        identity.start()
+        self.addCleanup(identity.stop)
+        upload_input = patch.object(publisher, 'immutable_upload_input', return_value=SimpleNamespace(
+            request_headers={'x-tos-forbid-overwrite': 'true'}))
+        upload_input.start()
+        self.addCleanup(upload_input.stop)
         self.temp = TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
@@ -89,11 +110,7 @@ class PublicationTests(unittest.TestCase):
             stream.truncate(1024 ** 3 + 1)
         client = FakeTos()
         publisher.publish(client, self.config, self.context, self.root)
-        self.assertEqual(len(client.calls), 12)
-
-    def test_signed_url_helper_is_defined_before_script_entrypoint(self):
-        source = Path(__file__).with_name('publish-tos.py').read_text()
-        self.assertLess(source.index('def signed_download_url('), source.index("if __name__ == '__main__':"))
+        self.assertEqual(len(client.calls), 6)
 
     def test_upload_stamp_prefers_version_timestamp_and_falls_back_to_run_time(self):
         self.assertEqual(publisher.upload_stamp('2.0.11-beta.202610160930'), '26101609')
@@ -111,7 +128,22 @@ class PublicationTests(unittest.TestCase):
         self.assertEqual(manifest['version'], version)
         self.assertEqual(len(manifest['artifacts']), 5)
         self.assertLess(publisher.version_key(version), publisher.version_key('0.2.1-alpha.2-beta.202610131601'))
-        self.assertGreater(publisher.version_key(version), publisher.version_key('2.0.11-beta.21'))
+        self.assertLess(publisher.version_key(version), publisher.version_key('2.0.11-beta.21'))
+
+    def test_partial_or_invalid_signer_and_oversized_artifact_fail_before_upload(self):
+        for config in [dict(self.config, DESKTOP_RELEASE_MANIFEST_SIGNING_KEY_ID='synthetic'),
+                       dict(self.signed_config(), DESKTOP_RELEASE_MANIFEST_SIGNING_KEY_PEM='invalid')]:
+            client = FakeTos()
+            with self.assertRaisesRegex(ValueError, 'manifest sign'):
+                publisher.publish(client, config, self.context, self.root)
+            self.assertEqual(client.calls, [])
+        path = next((self.root / 'macos').iterdir())
+        with path.open('wb') as stream:
+            stream.truncate(4 * 1024 ** 3 + 1)
+        client = FakeTos()
+        with self.assertRaises(ValueError):
+            publisher.publish(client, self.config, self.context, self.root)
+        self.assertEqual(client.calls, [])
 
     def test_config_supports_endpoint_hostname_and_requires_secrets(self):
         self.assertEqual(self.config['TOS_ENDPOINT'], 'https://tos.example.com')
@@ -122,18 +154,19 @@ class PublicationTests(unittest.TestCase):
             with self.subTest(name=name, value=value), self.assertRaises(ValueError):
                 publisher.settings({**self.env, name: value})
 
-    def test_signed_release_requires_credentials_only_in_preflight(self):
+    def test_signed_release_requires_manifest_signer_and_preflight_checks_code_signing(self):
         env = {**self.env, 'RELEASE': 'true'}
         with self.assertRaisesRegex(ValueError, 'MAC_CERT_P12_BASE64'):
             publisher.settings(env, check_signing=True)
-        publisher.settings(env)
+        with self.assertRaisesRegex(ValueError, 'manifest signing'):
+            publisher.settings(env)
 
     def test_candidate_uploads_every_platform_before_manifest_and_never_advances_channel(self):
         client = FakeTos()
         key, manifest = publisher.publish(client, self.config, self.context, self.root)
         self.assertEqual(len(manifest['artifacts']), 5)
         self.assertTrue(key.startswith('sensteed-agent/26101609/2.0.11-beta.202610160930-123-2/'))
-        self.assertEqual([call[0] for call in client.calls], ['upload'] * 5 + ['presign'] * 6 + ['put'])
+        self.assertEqual([call[0] for call in client.calls], ['upload'] * 5 + ['put'])
         self.assertTrue(client.calls[-1][2]['forbid_overwrite'])
         self.assertTrue(all(item['signing'] == 'unsigned' for item in manifest['artifacts']))
         self.assertEqual(manifest['upstreamCommit'], 'b' * 40)
@@ -151,7 +184,7 @@ class PublicationTests(unittest.TestCase):
         self.assertEqual([item['name'].split('-')[-1] for item in linux],
                          ['x86_64.AppImage', 'amd64.deb'])
         self.assertIn('Sensteed-Agent%20Beta-', manifest['artifacts'][0]['url'])
-        self.assertEqual([call[0] for call in client.calls], ['upload'] * 5 + ['presign'] * 6 + ['put'])
+        self.assertEqual([call[0] for call in client.calls], ['upload'] * 5 + ['put'])
 
     def test_mac_artifact_requires_arm64_suffix(self):
         target = next((self.root / 'macos').iterdir())
@@ -173,7 +206,7 @@ class PublicationTests(unittest.TestCase):
                 context = publisher.release_context({**self.env, 'RELEASE': release})
                 output = StringIO()
                 with redirect_stdout(output):
-                    key, manifest = publisher.publish(FakeTos(), self.config, context, self.root)
+                    key, manifest = publisher.publish(FakeTos(), self.signed_config() if release == 'true' else self.config, context, self.root)
                 logs = output.getvalue()
                 self.assertEqual(logs.count('TOS download:'), 5)
                 for item in manifest['artifacts']:
@@ -217,39 +250,61 @@ class PublicationTests(unittest.TestCase):
         for options in [dict(fail_upload=True), dict(corrupt_head=True)]:
             client = FakeTos(**options)
             with self.subTest(options=options), self.assertRaises((ValueError, RuntimeError)):
-                publisher.publish(client, self.config, self.context, self.root)
+                publisher.publish(client, self.signed_config(), self.context, self.root)
+            self.assertTrue(any(call[0] == 'upload' for call in client.calls))
             self.assertFalse(any(call[0] == 'put' for call in client.calls))
 
-    def test_release_advances_channel_last_using_compare_and_swap(self):
-        self.context = publisher.release_context({**self.env, 'RELEASE': 'true'})
-        for previous in [None, {'version': '2.0.11-beta.9'}]:
-            client = FakeTos(previous=previous)
-            key, manifest = publisher.publish(client, self.config, self.context, self.root)
-            self.assertIn('sensteed-agent/26101609/2.0.11-beta.202610160930-123-2/', key)
-            self.assertEqual(client.calls[-1][1], 'sensteed-agent/channels/beta.json')
-            self.assertEqual(client.calls[-2][1], key)
-            self.assertEqual(manifest['artifacts'][0]['signing'], 'signed-notarized')
-            condition = client.calls[-1][2]
-            self.assertEqual(condition['cache_control'], 'no-store')
-            if previous:
-                self.assertEqual(condition['if_match'], 'old-etag')
-            else:
-                self.assertTrue(condition['forbid_overwrite'])
+    def test_signed_manifest_is_verified_over_exact_bytes_and_never_advances_channel(self):
+        context = publisher.release_context({**self.env, 'RELEASE': 'true'})
+        client = FakeTos(previous={'version': '9.0.0'})
+        client.get_object = lambda *args: self.fail('CI must not read a channel')
+        key, manifest = publisher.publish(client, self.signed_config(), context, self.root)
+        self.assertEqual(manifest['formatVersion'], 2)
+        self.assertEqual(manifest['product'], 'hozonauto-agent')
+        self.assertEqual(manifest['version'], manifest['tag'])
+        self.assertEqual(manifest['version'], manifest['appVersion'])
+        self.assertEqual(manifest['releaseGeneration'], 'harness-v1')
+        self.assertEqual(manifest['artifacts'][0]['signing'], 'signed-notarized')
+        self.assertEqual([call[0] for call in client.calls], ['upload'] * 5 + ['put'] * 2)
+        self.assertFalse(any('/channels/' in call[1] for call in client.calls))
+        body = client.objects[key]['content']
+        signature = json.loads(client.objects[context['prefix'] + '/manifest.sig.json']['content'])
+        script = "const {verify}=require('node:crypto');const p=JSON.parse(require('node:fs').readFileSync(0,'utf8'));process.exit(verify(null,Buffer.from(p.body,'base64'),p.key,Buffer.from(p.signature,'base64'))?0:1)"
+        for data, expected in [(body, 0), (body + b' ', 1)]:
+            result = subprocess.run(['node', '-e', script], input=json.dumps({
+                'body': base64.b64encode(data).decode(), 'key': self.keypair['public'],
+                'signature': signature['signature']}), text=True, capture_output=True)
+            self.assertEqual(result.returncode, expected)
+        self.assertNotIn('PRIVATE', json.dumps(manifest))
+        self.assertNotIn('signedUrl', json.dumps(manifest))
+        for call in client.calls[:5]:
+            self.assertEqual(call[2]['generic_input'].request_headers, {'x-tos-forbid-overwrite': 'true'})
+        self.assertTrue(client.calls[-1][2]['forbid_overwrite'])
 
-    def test_equal_or_newer_channel_prevents_uploads(self):
-        self.context['release'] = True
-        for version in ['2.0.11-beta.202610160930', '2.0.11-beta.202610160931', '2.0.12-beta.202610161010']:
-            client = FakeTos(previous={'version': version})
-            with self.assertRaisesRegex(ValueError, 'newer'):
-                publisher.publish(client, self.config, self.context, self.root)
-            self.assertEqual(client.calls, [])
+    def test_candidate_can_have_trusted_provenance_without_claiming_code_signing(self):
+        client = FakeTos()
+        _, manifest = publisher.publish(client, self.signed_config(), self.context, self.root)
+        self.assertFalse(manifest['release'])
+        self.assertTrue(all(item['signing'] == 'unsigned' for item in manifest['artifacts']))
+        self.assertTrue(client.calls[-1][1].endswith('/manifest.sig.json'))
 
-    def test_channel_race_is_reported_without_overwriting_existing_pointer(self):
-        self.context['release'] = True
-        client = FakeTos(previous={'version': '2.0.11-beta.17'}, conflict=True)
-        with self.assertRaisesRegex(RuntimeError, 'precondition'):
-            publisher.publish(client, self.config, self.context, self.root)
-        self.assertNotIn('sensteed-agent/channels/beta.json', client.objects)
+    def test_formal_release_without_manifest_signer_fails_before_upload(self):
+        client = FakeTos()
+        with self.assertRaisesRegex(ValueError, 'manifest signing'):
+            publisher.publish(client, self.config, {**self.context, 'release': True}, self.root)
+        self.assertEqual(client.calls, [])
+
+    def test_manifest_signature_failure_never_changes_models_or_tos_channels(self):
+        client = FakeTos()
+        original = client.put_object
+        def write(bucket, key, **kwargs):
+            if key.endswith('manifest.sig.json'):
+                raise RuntimeError('signature upload failed')
+            original(bucket, key, **kwargs)
+        client.put_object = write
+        with self.assertRaisesRegex(RuntimeError, 'signature upload'):
+            publisher.publish(client, self.signed_config(), self.context, self.root)
+        self.assertFalse(any('/channels/' in call[1] for call in client.calls))
 
     def test_missing_platform_extra_file_empty_file_and_version_mismatch_fail_before_upload(self):
         target = next((self.root / 'linux').iterdir())
@@ -273,15 +328,12 @@ class PublicationTests(unittest.TestCase):
             renamed.unlink(missing_ok=True)
             target.write_bytes(original)
 
-    def test_permission_error_reading_channel_is_not_treated_as_empty_channel(self):
-        self.context['release'] = True
-        client = FakeTos()
-        def denied(*args):
-            raise PermissionError('denied')
-        client.get_object = denied
-        with self.assertRaises(PermissionError):
-            publisher.publish(client, self.config, self.context, self.root)
-        self.assertEqual(client.calls, [])
+    def test_publication_identity_mismatch_fails_before_upload(self):
+        with patch.object(publisher, 'build_identity', return_value={
+            'appVersion': '9.0.0', 'tag': self.env['DESKTOP_VERSION'], 'harnessVersion': '0.2.1',
+            'upstreamCommit': self.env['UPSTREAM_SHA']}):
+            with self.assertRaisesRegex(ValueError, 'identity'):
+                publisher.release_context(self.env)
 
     def test_stable_version_cannot_publish_beta_files_or_wrong_architecture(self):
         for version in ['2.0.11', '2.0.11-beta.18']:

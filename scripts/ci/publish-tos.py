@@ -1,5 +1,6 @@
-"""Publish validated desktop artifacts; write the channel pointer only after all uploads succeed."""
+"""Upload immutable CI artifacts and signed provenance; Models alone owns release channels."""
 import argparse
+import base64
 from datetime import datetime, timedelta, timezone
 import hashlib
 import json
@@ -7,6 +8,7 @@ import os
 from pathlib import Path
 import re
 import sys
+import subprocess
 from tempfile import TemporaryDirectory
 from threading import Lock
 from time import monotonic
@@ -27,11 +29,8 @@ def version_key(version):
         raise ValueError('Unsupported release version')
     if prerelease and not re.search(r'(?:^beta\.(0|[1-9]\d*)$|-beta\.[1-9]\d{11}$)', prerelease):
         raise ValueError('Unsupported release version')
-    # The Harness-derived numbering is a new publication generation. It must
-    # replace historical 2.x pointers, while Desktop keeps normal SemVer and
-    # therefore requires manual installation for that one-time migration.
-    generation = bool(re.search(r'-beta\.[1-9]\d{11}$', version))
-    return (generation, int(major), int(minor), int(patch), prerelease is None,
+    # Normal SemVer ordering. Cross-generation migration is an explicit Models decision.
+    return (int(major), int(minor), int(patch), prerelease is None,
             tuple((0, int(value)) if value.isdigit() else (1, value) for value in identifiers))
 
 
@@ -75,6 +74,11 @@ def settings(env, check_signing=False):
         missing = [name for name in signing if not env.get(name, '').strip()]
         if missing:
             raise ValueError('Signed macOS release requires: ' + ', '.join(missing))
+    for name in ['DESKTOP_RELEASE_MANIFEST_SIGNING_KEY_PEM', 'DESKTOP_RELEASE_MANIFEST_SIGNING_KEY_ID']:
+        if env.get(name, '').strip():
+            result[name] = env[name].strip()
+    # Fail before uploads, including partial/malformed candidate signer configuration.
+    sign_manifest(b'configuration-check', result, required=env.get('RELEASE') == 'true')
     return result
 
 
@@ -90,6 +94,9 @@ def upload_stamp(version):
 def release_context(env):
     version = env['DESKTOP_VERSION']
     version_key(version)
+    identity = build_identity(env)
+    if identity['appVersion'] != version or identity['tag'] != version or identity['upstreamCommit'] != env['UPSTREAM_SHA']:
+        raise ValueError('Tagged build identity differs from publication inputs')
     sha = env['GITHUB_SHA']
     upstream_sha = env['UPSTREAM_SHA']
     if not all(re.fullmatch(r'[a-f0-9]{40}', value) for value in [sha, upstream_sha]):
@@ -101,10 +108,56 @@ def release_context(env):
     channel = 'beta' if '-beta.' in version else 'stable'
     # 上传目录按时间组织(sensteed-agent/yymmddhh/...)以便浏览;第二层保留
     # 版本与 run 标识,避免同小时多次发布互相覆盖。
-    return dict(version=version, channel=channel, release=release, commit=sha,
+    return dict(version=version, appVersion=identity['appVersion'], tag=identity['tag'],
+                harnessVersion=identity['harnessVersion'], product='hozonauto-agent',
+                releaseGeneration='harness-v1', channel=channel, release=release, commit=sha,
                 upstreamCommit=upstream_sha, runId=run_id, runAttempt=attempt,
                 prefix=f"sensteed-agent/{upload_stamp(version)}/{version}-{run_id}-{attempt}")
 
+
+
+def build_identity(env):
+    """Reuse the exact tagged-main packaging gate; do not trust freely set CI version fields."""
+    root = Path(__file__).resolve().parents[2]
+    script = "import {assertPackagingRelease} from './scripts/release-contract.mjs'; process.stdout.write(JSON.stringify(assertPackagingRelease()))"
+    try:
+        checked = subprocess.run(['node', '--input-type=module', '-e', script], cwd=root,
+                                 check=True, capture_output=True, text=True, timeout=30)
+        identity = json.loads(checked.stdout)
+        head = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=root, check=True,
+                              capture_output=True, text=True, timeout=10).stdout.strip()
+        if head != env['GITHUB_SHA']:
+            raise ValueError('wrong commit')
+        return dict(appVersion=identity['version'], tag=identity['version'],
+                    harnessVersion=identity['source']['sourceVersion'], upstreamCommit=identity['source']['commit'])
+    except Exception:
+        raise ValueError('Publication requires the verified exact tagged build') from None
+
+
+def sign_manifest(body, config, required=False):
+    """Node's built-in Ed25519 signs exact bytes; keys travel over stdin, never argv or disk."""
+    pem = config.get('DESKTOP_RELEASE_MANIFEST_SIGNING_KEY_PEM', '')
+    key_id = config.get('DESKTOP_RELEASE_MANIFEST_SIGNING_KEY_ID', '')
+    if not pem and not key_id and not required:
+        return None
+    if not pem or not re.fullmatch(r'[A-Za-z0-9._-]{1,100}', key_id):
+        raise ValueError('Desktop manifest signing configuration is required')
+    script = """const {createPrivateKey,sign}=require('node:crypto');
+const {readFileSync}=require('node:fs');
+try { const input=JSON.parse(readFileSync(0,'utf8')); const key=createPrivateKey(input.pem);
+if(key.asymmetricKeyType!=='ed25519')process.exit(2);
+process.stdout.write(sign(null,Buffer.from(input.body,'base64'),key).toString('base64'));
+} catch { process.exit(2) }"""
+    try:
+        result = subprocess.run(['node', '-e', script], input=json.dumps({
+            'pem': pem, 'body': base64.b64encode(body).decode('ascii')}),
+            capture_output=True, text=True, timeout=15, check=True)
+        signature = result.stdout
+        if len(base64.b64decode(signature, validate=True)) != 64:
+            raise ValueError('signature length')
+    except Exception:
+        raise ValueError('Desktop manifest signer is unavailable or invalid') from None
+    return dict(algorithm='Ed25519', keyId=key_id, signature=signature)
 
 def inventory(directory, context, public_url):
     """Require every platform, reject unexpected files, and hash files without loading installers into memory."""
@@ -122,7 +175,7 @@ def inventory(directory, context, public_url):
             if len(matches) != 1:
                 raise ValueError('Missing or duplicate artifact: ' + platform + suffix)
             path = matches[0]
-            if path.is_symlink() or not path.is_file() or path.stat().st_size == 0:
+            if path.is_symlink() or not path.is_file() or not 0 < path.stat().st_size <= 4 * 1024 ** 3:
                 raise ValueError('Artifact must be a nonempty regular file')
             # electron-builder uses target-specific names for the same x64 architecture.
             architecture = {'.AppImage': '(?:x64|x86_64)', '.deb': '(?:x64|amd64)'}.get(suffix, 'x64')
@@ -168,7 +221,7 @@ def diagnostic(error, env):
     if isinstance(error, (ValueError, KeyError)):
         fields['message'] = str(error)
     for name, value in fields.items():
-        for secret in sorted((value for key, value in env.items() if key.startswith('TOS_') and value),
+        for secret in sorted((value for key, value in env.items() if (key.startswith('TOS_') or key.startswith('DESKTOP_RELEASE_MANIFEST_')) and value),
                              key=len, reverse=True):
             value = value.replace(secret, '[redacted]').replace(quote(secret, safe=''), '[redacted]')
         value = re.sub(r'(?:TOS4|AWS4)-HMAC-SHA256[^\r\n]*', '[redacted-authorization]', value)
@@ -197,15 +250,6 @@ def probe(client, config, env):
         raise ValueError('TOS probe verification failed')
     print('TOS multipart upload and HEAD verification passed.', flush=True)
 
-
-def read_channel(client, bucket, key):
-    try:
-        response = client.get_object(bucket, key)
-    except Exception as error:
-        if getattr(error, 'status_code', None) == 404 and getattr(error, 'code', None) == 'NoSuchKey':
-            return None, None
-        raise
-    return json.loads(response.read()), response.etag
 
 
 class UploadProgress:
@@ -242,20 +286,23 @@ class UploadProgress:
                       flush=True)
 
 
+def immutable_upload_input():
+    # tos==2.9.3 upload_file does not expose forbid_overwrite as a keyword.
+    # GenericInput is propagated through multipart create AND complete.
+    from tos.models2 import GenericInput
+    return GenericInput(request_headers={'x-tos-forbid-overwrite': 'true'})
+
+
 def publish(client, config, context, directory):
     bucket = config['TOS_BUCKET']
     files = inventory(directory, context, config['TOS_PUBLIC_BASE_URL'])
-    channel_key = f"sensteed-agent/channels/{context['channel']}.json"
-    etag = None
-    if context['release']:
-        previous, etag = read_channel(client, bucket, channel_key)
-        if previous and version_key(previous['version']) >= version_key(context['version']):
-            raise ValueError('Release must be newer than the published channel version')
+    # Check the signer before touching objects. Never read or write a channel pointer.
+    sign_manifest(b'publication-check', config, required=context['release'])
     for item in files:
         print(f"TOS upload: {item['platform']}/{item['name']} ({item['size']} bytes)", flush=True)
         progress = UploadProgress(item)
         client.upload_file(bucket, item['key'], str(directory / item['platform'] / item['name']),
-                           task_num=4, enable_checkpoint=False,
+                           task_num=4, enable_checkpoint=False, generic_input=immutable_upload_input(),
                            data_transfer_listener=progress.transfer,
                            upload_event_listener=progress.event,
                            content_type='application/octet-stream',
@@ -266,46 +313,24 @@ def publish(client, config, context, directory):
         if head.content_length != item['size'] or head.meta.get('sha256') != item['sha256']:
             raise ValueError('Uploaded artifact verification failed for ' + item['platform'])
         print(f"TOS download: {item['platform']}/{item['name']} -> {item['url']}", flush=True)
-    # candidates/ 不在桶策略的匿名读白名单内：候选模式的下载链接改为限时签名
-    # URL（7 天），正式发布的 releases/ 前缀由桶策略保证公开直链可用。
-    signed_expires = 7 * 24 * 60 * 60
-    if not context['release']:
-        for item in files:
-            item['signedUrl'] = signed_download_url(client, config, item['key'], signed_expires)
-            print(f"TOS signed download: {item['platform']}/{item['name']} (expires in {signed_expires // 3600}h)",
-                  flush=True)
-    manifest = {**context, 'formatVersion': 1, 'artifacts': files}
+    # Permanent, credential-free URLs only. Private candidates are read by Models'
+    # fixed TOS client, then copied into its immutable public release prefix.
+    manifest = {**context, 'formatVersion': 2, 'artifacts': files}
     manifest_key = context['prefix'] + '/manifest.json'
-    if not context['release']:
-        manifest['manifestSignedUrl'] = signed_download_url(client, config, manifest_key, signed_expires)
-        manifest['signedUrlExpiresIn'] = signed_expires
     body = (json.dumps(manifest, indent=2, ensure_ascii=True) + '\n').encode()
+    signature = sign_manifest(body, config, required=context['release'])
     print('TOS write: version manifest', flush=True)
     client.put_object(bucket, manifest_key, content=body, content_type='application/json',
                       cache_control='public, max-age=31536000, immutable', forbid_overwrite=True)
     manifest_url = config['TOS_PUBLIC_BASE_URL'].rstrip('/') + '/' + quote(manifest_key, safe='/')
     print(f'TOS manifest download: {manifest_url}', flush=True)
-    if context['release']:
-        # Compare-and-swap also protects against another workflow or an external publisher.
-        condition = {'if_match': etag} if etag else {'forbid_overwrite': True}
-        print('TOS write: channel index', flush=True)
-        client.put_object(bucket, channel_key, content=body, content_type='application/json',
-                          cache_control='no-store', **condition)
+    if signature:
+        client.put_object(bucket, context['prefix'] + '/manifest.sig.json',
+                          content=(json.dumps(signature, indent=2) + '\n').encode(),
+                          content_type='application/json',
+                          cache_control='public, max-age=31536000, immutable', forbid_overwrite=True)
+    print('CI upload complete; Models validation and explicit channel publication remain required.', flush=True)
     return manifest_key, manifest
-
-
-def signed_download_url(client, config, key, expires):
-    """Presign a GET for keys that the bucket policy does not serve anonymously."""
-    # 真实 SDK 客户端要求 HttpMethodType 枚举；单元测试的 FakeTos 桩不校验
-    # 方法形态且门禁环境不安装 tos 包，此处惰性导入并以 'GET' 字符串回退。
-    try:
-        import tos
-        http_method = tos.HttpMethodType.Http_Method_Get
-    except ImportError:
-        http_method = 'GET'
-    signed = client.pre_signed_url(http_method, bucket=config['TOS_BUCKET'], key=key,
-                                   expires=expires)
-    return signed.signed_url
 
 
 def main():
@@ -330,10 +355,10 @@ def main():
     key, manifest = publish(client, config, context, args.artifacts)
     summary = ['## TOS artifacts', '', f"Version: `{context['version']}`", '',
                f"Manifest: `{key}`", '', '| Platform | File | SHA-256 |', '| --- | --- | --- |']
-    summary += [f"| {item['platform']} | [{item['name']}]({item.get('signedUrl') or item['url']}) | `{item['sha256']}` |"
+    summary += [f"| {item['platform']} | [{item['name']}]({item['url']}) | `{item['sha256']}` |"
                 for item in manifest['artifacts']]
-    if not context['release']:
-        summary += ['', f"候选目录不在匿名读白名单内，以上为 7 天有效签名链接；清单签名地址见 manifest 的 `manifestSignedUrl`。"]
+    summary += ['', '在 Models 桌面发布管理页填写版本与以上永久安装包地址；服务端验证通过后显式发布。',
+                'CI 上传不修改更新渠道。没有 manifest 签名的候选不能通过 Models 验证。']
     if os.environ.get('GITHUB_STEP_SUMMARY'):
         with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as output:
             output.write('\n'.join(summary) + '\n')

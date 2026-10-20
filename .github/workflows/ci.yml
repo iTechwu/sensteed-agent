@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       publish_kind:
-        description: 'Candidate artifacts or a signed release that advances the TOS channel'
+        description: 'Candidate artifacts or code-signed artifacts; Models owns channel publication'
         type: choice
         options: [candidate, release]
         default: candidate
@@ -104,6 +104,9 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.23.2
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
@@ -112,6 +115,8 @@ jobs:
       - name: Validate TOS upload and optional release signing configuration
         env:
           RELEASE: ${{ needs.changes.outputs.release }}
+          DESKTOP_RELEASE_MANIFEST_SIGNING_KEY_PEM: ${{ secrets.DESKTOP_RELEASE_MANIFEST_SIGNING_KEY_PEM }}
+          DESKTOP_RELEASE_MANIFEST_SIGNING_KEY_ID: ${{ secrets.DESKTOP_RELEASE_MANIFEST_SIGNING_KEY_ID }}
           TOS_ACCESS_KEY_ID: ${{ secrets.TOS_ACCESS_KEY_ID }}
           TOS_SECRET_ACCESS_KEY: ${{ secrets.TOS_SECRET_ACCESS_KEY }}
           TOS_BUCKET: ${{ vars.TOS_BUCKET || secrets.TOS_BUCKET || 'dofe-public' }}
@@ -633,6 +638,9 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.23.2
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
@@ -653,6 +661,8 @@ jobs:
       - name: Publish installers and checksum manifest to TOS
         timeout-minutes: 120
         env:
+          DESKTOP_RELEASE_MANIFEST_SIGNING_KEY_PEM: ${{ secrets.DESKTOP_RELEASE_MANIFEST_SIGNING_KEY_PEM }}
+          DESKTOP_RELEASE_MANIFEST_SIGNING_KEY_ID: ${{ secrets.DESKTOP_RELEASE_MANIFEST_SIGNING_KEY_ID }}
           TOS_ACCESS_KEY_ID: ${{ secrets.TOS_ACCESS_KEY_ID }}
           TOS_SECRET_ACCESS_KEY: ${{ secrets.TOS_SECRET_ACCESS_KEY }}
           TOS_BUCKET: ${{ vars.TOS_BUCKET || secrets.TOS_BUCKET || 'dofe-public' }}
