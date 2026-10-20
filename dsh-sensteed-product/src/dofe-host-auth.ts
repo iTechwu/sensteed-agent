@@ -3,7 +3,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { SettingsScope } from '@deepseek-ai/dsh-settings'
 import z from '@deepseek-ai/schemastery'
 import { DEFAULT_DOFE_PLUGIN_IDS, DOFE_ACCESS_SETTINGS_NAMESPACE, DOFE_ACCESS_VALIDATION_VERSION,
-  normalizeDofeEnabledPluginIds, type DofeAccessSettings, type DofePluginId } from './dofe-plugins.ts'
+  supplierCapabilityUpgrade, normalizeDofeEnabledPluginIds, type DofeAccessSettings, type DofePluginId } from './dofe-plugins.ts'
 import { BRAND_VARIANT } from './generated-product-identity.ts'
 import { DofeAuthService } from './dofe-auth-service.ts'
 
@@ -58,6 +58,7 @@ export function registerDofeAccessSettings(ctx: Context): SettingsScope<DofeAcce
     z.object({
       setupComplete: z.boolean().default(false),
       validationVersion: z.number().step(1).min(0).default(0),
+      supplierCapabilityInitialized: z.boolean().default(false),
       enabledPlugins: z.array(z.string()).default(DEFAULT_DOFE_PLUGIN_IDS),
       modelId: z.string().default(''),
       protocol: z.union(['chat-completions', 'messages', 'responses']).default('chat-completions'),
@@ -83,6 +84,8 @@ export async function apply(ctx: Context): Promise<void> {
   const access = registerDofeAccessSettings(ctx)
   ctx.provide('dofeAccessSettings', access)
   if (BRAND_VARIANT === 'sensteed') {
+    const upgrade = supplierCapabilityUpgrade(access.get(), BRAND_VARIANT)
+    if (upgrade) await ctx.settings.update(DOFE_ACCESS_SETTINGS_NAMESPACE, upgrade)
     const auth = new DofeAuthService(
       {
         openExternal: async url => {
@@ -109,6 +112,12 @@ export async function apply(ctx: Context): Promise<void> {
         },
         entitlements,
         enabledPlugins: normalizeDofeEnabledPluginIds(sameUser ? current.enabledPlugins : entitlements.plugins, BRAND_VARIANT, entitlements.plugins),
+        supplierCapabilityInitialized: sameUser ? current.supplierCapabilityInitialized ?? false : false,
+        ...supplierCapabilityUpgrade({
+          enabledPlugins: sameUser ? current.enabledPlugins : entitlements.plugins,
+          entitlements,
+          supplierCapabilityInitialized: sameUser && current.supplierCapabilityInitialized === true,
+        }, BRAND_VARIANT),
         // A successful tenant-bound renewal validates an existing setup across
         // desktop upgrades; profile refresh must never complete an unfinished setup.
         validationVersion: sameUser && current.setupComplete ? DOFE_ACCESS_VALIDATION_VERSION : current.validationVersion,

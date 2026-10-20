@@ -61,6 +61,22 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers() })
 
 describe('Sensteed startup authorization', () => {
+  it('persists the authorized supplier upgrade before renewal and keeps a later opt-out', async () => {
+    const h = harness()
+    h.forgetGrant()
+    await h.ctx.settings.update('dofe-access', {
+      enabledPlugins: ['tools'],
+      entitlements: { plugins: ['tools'], defaultModel: '', allowedProtocols: ['messages'] },
+    } as never)
+    await applyAuth(h.ctx as never)
+    expect(h.getSettings().enabledPlugins).toContain('supplier-intelligence')
+    expect(h.getSettings()).toMatchObject({ supplierCapabilityInitialized: true })
+    await h.dispose()
+    await h.ctx.settings.update('dofe-access', { enabledPlugins: ['tools'] } as never)
+    await applyAuth(h.ctx as never)
+    expect(h.getSettings().enabledPlugins).not.toContain('supplier-intelligence')
+    await h.dispose()
+  })
   it('can boot identity alone with no saved grant and no business clients or network', async () => {
     const h = harness()
     h.forgetGrant()
