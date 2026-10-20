@@ -63,6 +63,13 @@ export const capabilities = Object.freeze([
     "group": "collaboration",
     "name": "文件上传与素材链接",
     "description": "上传本地文件，获取可供后续工具使用的素材链接。"
+  },
+  {
+    "id": "tools-supply-chain",
+    "kind": "business",
+    "group": "business",
+    "name": "供应链数据检索",
+    "description": "读取供应链工具提供的供应商与企业数据，核对已保存的台账和证据。"
   }
 ])
 
