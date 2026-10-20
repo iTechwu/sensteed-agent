@@ -1,5 +1,6 @@
 /** Headless version checks against the branded release service. */
 
+import type { DesktopUpdateFailure } from './update-status.ts'
 import {
   assertDesktopInstallationId,
   DESKTOP_INSTALLATION_ID_HEADER,
@@ -45,6 +46,7 @@ export interface UpdateCheckOptions {
   /** Optional fetch implementation for a host adapter or test. */
   readonly request?: UpdateRequest
   /** Installation UUID attached only to the fixed version-check endpoint. */
+  readonly onFailure?: (failure: DesktopUpdateFailure) => void
   readonly installationId?: DesktopInstallationId
 }
 
@@ -72,13 +74,14 @@ export async function checkForDesktopUpdate(
     options.currentVersion,
     options.currentChannel ?? options.channel,
   )
-  if (current === null) return null
+  const fail = (failure: DesktopUpdateFailure): null => { options.onFailure?.(failure); return null }
+  if (current === null) return fail('invalid-version')
 
   let headers: HeadersInit
   try {
     headers = desktopVersionRequestHeaders(options.installationId, current.version, options.channel)
   } catch {
-    return null
+    return fail('invalid-version')
   }
 
   const init: RequestInit = {
@@ -94,15 +97,24 @@ export async function checkForDesktopUpdate(
   try {
     response = await request(DESKTOP_VERSION_ENDPOINT, init)
   } catch {
-    return null
+    return fail(options.signal?.aborted ? 'timeout' : 'network')
   }
-  if (response.status !== 200) return null
+  if (response.status !== 200) {
+    let unpublished = false
+    if (response.status === 404) {
+      try {
+        const value: unknown = JSON.parse(await readLimitedBody(response))
+        unpublished = isRecord(value) && isRecord(value.error) && value.error.code === 'CHANNEL_NOT_PUBLISHED'
+      } catch { /* A malformed service error is still a service failure. */ }
+    }
+    return fail(unpublished ? 'unpublished' : 'service')
+  }
 
   let body: string
   try {
     body = await readLimitedBody(response)
   } catch {
-    return null
+    return fail(options.signal?.aborted ? 'timeout' : 'invalid-response')
   }
 
   let digestInput: unknown
@@ -112,7 +124,7 @@ export async function checkForDesktopUpdate(
     digestInput = undefined
   }
   const latest = parseVersionResponse(body, options.channel)
-  if (latest === null) return null
+  if (latest === null) return fail('invalid-response')
   const comparison = compareParsedSemVer(latest, current)
   const digests = parseInstallerDigestResponse(digestInput)
   return {

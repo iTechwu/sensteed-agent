@@ -592,7 +592,7 @@ describe('desktop update Host plugin', () => {
     expect(harness.tray.label()).toBe('Check for Updates…')
   })
 
-  it('shares one pending download and silently restores availability after failure', async () => {
+  it('shares one pending download and reports failure while restoring availability', async () => {
     let rejectDownload!: (cause: Error) => void
     const download = new Promise<void>((_resolve, reject) => { rejectDownload = reject })
     const harness = await createHarness({
@@ -610,7 +610,7 @@ describe('desktop update Host plugin', () => {
     await Promise.all([first, second])
 
     expect(harness.downloadAndOpen).toHaveBeenCalledOnce()
-    expect(harness.notifications).toEqual([])
+    expect(harness.notifications).toEqual([expect.objectContaining({ title: 'Update download failed' })])
     expect(harness.warnings).toEqual([])
     expect(harness.tray.label()).toBe('哪吒Agent 2.1.0 Available')
   })
