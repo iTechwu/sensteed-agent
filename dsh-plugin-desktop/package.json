@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-desktop",
-  "version": "0.2.1-rc.2-beta.202610201507",
+  "version": "0.2.1-rc.2-beta.202610201612",
   "description": "哪吒Agent (hozonauto-agent): an Electron desktop product built on DeepSeek Harness",
   "license": "MIT",
   "publishConfig": {
