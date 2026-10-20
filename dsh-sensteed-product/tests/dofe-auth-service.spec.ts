@@ -198,6 +198,25 @@ describe('DofeAuthService', () => {
     await service.dispose()
   })
 
+  it('can restart interactive login after an expired grant leaves an empty record', async () => {
+    const credentials = credentialStore()
+    await credentials.modifyRecord('', async () => ({ kind: 'grant', payload: {} }))
+    const mutate = credentials.modifyRecord.getMockImplementation()!
+    credentials.modifyRecord.mockImplementation(async (key, change) => mutate(key, async current => {
+      const next = await change(current)
+      if (next) expect(JSON.parse(JSON.stringify(next))).toEqual(next)
+      return next
+    }))
+    const openExternal = vi.fn()
+    const service = new DofeAuthService({ openExternal }, credentials as never,
+      vi.fn().mockResolvedValue(response(discovery)))
+    try {
+      await service.start()
+      await vi.waitFor(() => expect(openExternal).toHaveBeenCalledOnce())
+      expect(service.getStatus().status).toBe('pending')
+    } finally { await service.dispose() }
+  })
+
   it('falls back to loopback PKCE once for invalid_grant', async () => {
     const credentials = credentialStore('refresh-old')
     const fetcher = vi.fn().mockResolvedValueOnce(response(discovery))
