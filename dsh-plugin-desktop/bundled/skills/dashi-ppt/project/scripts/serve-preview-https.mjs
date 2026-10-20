@@ -8,6 +8,7 @@ import { getOpenSslExecutablePath } from './openssl-path.mjs';
 import { ensureThemePreviewFresh } from './preview-freshness.mjs';
 import { safePathname } from './preview-path.mjs';
 import { isLoopbackHost } from './preview-export-auth.mjs';
+import { previewBindHost, previewPort } from './preview/network-policy.mjs';
 import { getLocalHostname, getLanIps } from './preview/network.mjs';
 import { ensureCertificate as ensureCertificateImpl, createHttpHttpsMuxServer } from './preview/tls.mjs';
 import { createFileResolver, hasBlockedDotSegment, contentType } from './preview/static-serve.mjs';
@@ -38,8 +39,8 @@ const SERVE_ROOT_ARG = process.argv[2];
 const SERVE_ROOT = SERVE_ROOT_ARG
   ? path.resolve(CALLER_CWD, SERVE_ROOT_ARG)
   : path.resolve(ROOT, 'output/theme-preview/ppt');
-const PORT = Number(process.env.PORT || process.argv[3] || 4178);
-const HOST = process.env.HOST || '127.0.0.1';
+const PORT = previewPort(process.env.PORT || process.argv[3] || 4178);
+const HOST = previewBindHost(process.env.HOST || '127.0.0.1');
 const LOCAL_HOSTNAME = getLocalHostname();
 const LAN_IPS = getLanIps();
 const CERT_DIR = path.join(ROOT, 'output/https-preview');

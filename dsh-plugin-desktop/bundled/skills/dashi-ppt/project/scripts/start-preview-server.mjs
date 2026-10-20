@@ -6,6 +6,7 @@ import http from 'node:http';
 import https from 'node:https';
 import net from 'node:net';
 import os from 'node:os';
+import { previewBindHost, previewHostname, previewPort } from './preview/network-policy.mjs';
 import path from 'node:path';
 import { ensureThemePreviewFresh } from './preview-freshness.mjs';
 import { isLoopbackHost } from './preview-export-auth.mjs';
@@ -18,9 +19,9 @@ const serveRootArg = process.argv[2];
 const serveRoot = serveRootArg
   ? path.resolve(CALLER_CWD, serveRootArg)
   : path.resolve(ROOT, 'output/theme-preview/ppt');
-const requestedPort = Number(process.env.DASHI_PPT_PREVIEW_PORT || process.argv[3] || 4178);
-const host = process.env.DASHI_PPT_PREVIEW_HOST || process.env.HOST || '127.0.0.1';
-const localName = process.env.DASHI_PPT_PREVIEW_NAME || os.hostname().split('.')[0] || 'localhost';
+const requestedPort = previewPort(process.env.DASHI_PPT_PREVIEW_PORT || process.argv[3] || 4178);
+const host = previewBindHost(process.env.DASHI_PPT_PREVIEW_HOST || process.env.HOST || '127.0.0.1');
+const localName = previewHostname(process.env.DASHI_PPT_PREVIEW_NAME || os.hostname().split('.')[0] || 'localhost');
 const portScanLimit = Math.max(40, Number(process.env.DASHI_PPT_PREVIEW_PORT_SCAN || 240));
 const lockDir = process.env.DASHI_PPT_PREVIEW_LOCK_DIR || path.join(os.tmpdir(), 'dashi-ppt-preview-ports');
 const incompleteStartLockStaleMs = 1000;
@@ -116,7 +117,7 @@ async function main() {
 
 async function reserveAvailablePort(start, bindHost) {
   const base = Number.isFinite(start) && start > 0 ? Math.trunc(start) : 4178;
-  for (let port = base; port < base + portScanLimit; port += 1) {
+  for (let port = base; port < Math.min(65536, base + portScanLimit); port += 1) {
     const reservation = await reservePortLock(port, bindHost);
     if (!reservation) continue;
     if (await isPortAvailable(port, bindHost)) return reservation;
