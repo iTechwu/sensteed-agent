@@ -67,7 +67,8 @@ vi.mock('../src/diagnostic-export.ts', () => ({
 }))
 
 
-vi.mock('../src/update-download.ts', () => ({
+vi.mock('../src/update-download.ts', async importOriginal => ({
+  ...await importOriginal<typeof import('../src/update-download.ts')>(),
   desktopUpdateFilename: updater.filename,
   downloadDesktopUpdate: updater.download,
   pendingDesktopUpdateArtifact: updater.pending,
@@ -3253,6 +3254,23 @@ describe('desktop artifact request adapter', () => {
     expect(settled.response.status).toBe(200)
     expect(settled.response.headers.get('content-type')).toBe('application/octet-stream')
     expect(await settled.response.text()).toBe('installer')
+  })
+
+  it('rejects insecure redirect hops before following them', async () => {
+    const fake = fakeNetRequest([{ redirect: [302, 'GET', 'http://example.test/installer'] }])
+    electron.net.request.mockImplementationOnce(() => fake.request)
+    const { requestDesktopArtifact } = await import('../src/electron-runtime.ts')
+    await expect(requestDesktopArtifact('https://example.test/download', { method: 'GET' })).rejects.toThrow()
+    expect(fake.followRedirect).not.toHaveBeenCalled()
+    expect(fake.abort).toHaveBeenCalledOnce()
+  })
+
+  it('bounds redirect loops', async () => {
+    const fake = fakeNetRequest(Array.from({ length: 9 }, () => ({ redirect: [302, 'GET', 'https://example.test/loop'] as [number, string, string] })))
+    electron.net.request.mockImplementationOnce(() => fake.request)
+    const { requestDesktopArtifact } = await import('../src/electron-runtime.ts')
+    await expect(requestDesktopArtifact('https://example.test/download', { method: 'GET' })).rejects.toThrow('Too many update download redirects')
+    expect(fake.followRedirect).toHaveBeenCalledTimes(8)
   })
 
   it('reports the fixed endpoint itself when no redirect happens', async () => {
