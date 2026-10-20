@@ -37,10 +37,15 @@ plugin.apply({
 })
 const buttonSlot = components.get('sidebar.footer.action')
 const pageSlot = components.get('main')
+const contextSlot = components.get('desktop.navigation.context')
+const desktopMode = new URLSearchParams(location.search).has('desktop')
+const registerLeaveGuard = () => () => {}
+const onAccessDenied = () => {}
 function Harness() {
   const panel = React.useSyncExternalStore(listener => { panelListeners.add(listener); return () => panelListeners.delete(listener) }, () => selectedPanel)
   return <>
     {React.createElement(buttonSlot.component, { ...buttonSlot.options.inject(), wide: true })}
+    {desktopMode && panel === pageSlot.options.key ? React.createElement(contextSlot.component, { registerLeaveGuard, onAccessDenied }) : null}
     {panel === pageSlot.options.key ? React.createElement(pageSlot.component, pageSlot.options.inject()) : null}
   </>
 }

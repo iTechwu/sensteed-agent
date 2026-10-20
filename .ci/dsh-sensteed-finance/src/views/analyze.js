@@ -103,6 +103,9 @@ function AnalyzeView({ ctx, t }) {
   const [starting, setStarting] = useState(null)
   const [recovery, setRecovery] = useState(null)
   const [localSubmitted, setSubmitted] = useState(null)
+  const [category, setCategory] = useState('all')
+  const categories = [['all', '全部主题', ANALYSIS_ENTRIES.map(entry => entry.id)], ['planning', '预算与经营', ['budget', 'cost', 'revenue', 'version']], ['risk', '资金与风险', ['risk', 'cash', 'forecast']], ['governance', '数据与规则', ['quality', 'rules']]]
+  const visibleEntries = ANALYSIS_ENTRIES.filter(entry => categories.find(([id]) => id === category)[2].includes(entry.id))
   const bridge = globalThis.__sensteed_finance_conversation?.()
   const operation = useSyncExternalStore(bridge?.subscribe || subscribeIdleAnalysis, bridge?.getSnapshot || getIdleAnalysis, getIdleAnalysis)
   const submitted = localSubmitted || operation.submitted
@@ -132,13 +135,16 @@ function AnalyzeView({ ctx, t }) {
   return h('div', { className: 'sf-view' },
     h('p', { className: 'sf-note', role: 'status' }, t('analysisScope', { year, org: scopeName })),
     h(FinanceInlineAssistant, { key: `${year}-${orgId}`, ctx }),
-    h('h2', null, '新会话深度分析'),
-    h('p', { className: 'sf-note' }, t('analyzeHint')),
+    h('section', { className: 'sf-analysis-intro', 'aria-labelledby': 'sf-analysis-title' },
+      h('h2', { id: 'sf-analysis-title' }, '新会话深度分析'),
+      h('p', { className: 'sf-note' }, '需要归因、预测或行动建议时，选择下方主题。将携带当前年度和主体，在独立会话中分析。'),
+      h('div', { className: 'sf-analysis-categories', role: 'group', 'aria-label': '筛选深度分析主题' }, ...categories.map(([id, label, ids]) =>
+        h('button', { key: id, type: 'button', 'aria-pressed': category === id, onClick: () => setCategory(id) }, `${label} · ${ids.length}`)))),
     notice || submitted || operation.starting ? h('p', { className: 'sf-notice', role: recovery || submitted ? 'alert' : 'status' }, notice || t(submitted ? 'analysisSentNotOpened' : 'analysisStarting')) : null,
     submitted ? h('div', null, h(PrimaryButton, { onClick: reopenSubmitted, disabled: busy, busy: starting === 'reopen', 'aria-label': t('analysisOpenSession') }, t('analysisOpenSession'))) : null,
     recovery ? h('label', { className: 'sf-form-row' }, h('span', null, t('analysisPromptLabel')), h('textarea', { readOnly: true, rows: 6, value: recovery, 'aria-label': t('analysisPromptLabel') })) : null,
-    h('div', { className: 'sf-analysis-grid' }, ...ANALYSIS_ENTRIES.map(entry => h('article', { className: 'sf-card sf-analysis-card', key: entry.id },
-      h('div', { className: 'sf-analysis-head' }, h(Glyph, { name: entry.icon, size: 15 }), h('h2', null, t(`analysis_${entry.id}`))),
+    h('div', { className: 'sf-analysis-grid' }, ...visibleEntries.map(entry => h('article', { className: 'sf-card sf-analysis-card', key: entry.id },
+      h('div', { className: 'sf-analysis-head' }, h(Glyph, { name: entry.icon, size: 15 }), h('h3', null, t(`analysis_${entry.id}`))),
       h('p', null, t(`analysis_${entry.id}_desc`)),
       h('div', null, h(PrimaryButton, { busy: starting === entry.id, disabled: busy || Boolean(submitted), onClick: () => startAnalysis(entry), 'aria-label': `${t(`analysis_${entry.id}`)}：${t('send')}` }, h(Glyph, { name: 'send', size: 12 }), t(starting === entry.id ? 'analysisStarting' : 'send')))))),
     h('p', { className: 'sf-note' }, t('analyzingNote')))

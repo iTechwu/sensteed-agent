@@ -179,3 +179,39 @@ function restoreFinanceScroll(element, top) {
   restore()
   return stop
 }
+
+/** 搜索仅作用于调用方已过滤权限的入口。 */
+function financeNavigationGroups(items, query = '') {
+  const term = query.trim().toLocaleLowerCase()
+  const groups = new Map()
+  for (const item of items) {
+    const group = item.group || '常用入口'
+    if (term && !`${group} ${item.label}`.toLocaleLowerCase().includes(term)) continue
+    if (!groups.has(group)) groups.set(group, [])
+    groups.get(group).push(item)
+  }
+  return [...groups]
+}
+
+function FinanceNavigationGroups({ items, activeId, onSelect }) {
+  const [query, setQuery] = useState('')
+  const [expanded, setExpanded] = financeDesktopNavigation().useField('navigationExpanded', {})
+  const activeGroup = items.find(item => item.id === activeId)?.group
+  useEffect(() => {
+    if (activeGroup) setExpanded(previous => ({ ...previous, [activeGroup]: true }))
+  }, [activeId, activeGroup])
+  const groups = financeNavigationGroups(items, query)
+  return h('div', { className: 'sf-navigation-groups' },
+    h('label', { className: 'sf-navigation-search' }, h('span', null, '查找功能'),
+      h('input', { type: 'search', value: query, placeholder: '搜索页面或分组', onChange: event => setQuery(event.target.value) })),
+    h('div', { className: 'sf-navigation-actions' },
+      h('button', { type: 'button', onClick: () => setExpanded(Object.fromEntries(groups.map(([label]) => [label, true]))) }, '全部展开'),
+      h('button', { type: 'button', onClick: () => setExpanded(Object.fromEntries(groups.map(([label]) => [label, false]))) }, '全部收起')),
+    !groups.length ? h('p', { role: 'status', className: 'sf-note' }, '未找到匹配功能，请更换关键词。') : null,
+    ...groups.map(([label, rows]) => h('details', { key: label, className: 'sf-navigation-group', open: query.trim() ? true : expanded[label] ?? (label === activeGroup || label === '总览'),
+      onToggle: event => { const open = event.currentTarget.open; if (!query.trim()) setExpanded(previous => previous[label] === open ? previous : { ...previous, [label]: open }) } },
+      h('summary', null, h('span', null, label), h('small', { 'aria-label': `${rows.length} 个页面` }, rows.length),
+        rows.some(item => item.id === activeId) ? h('span', { className: 'sf-navigation-current', 'aria-label': '当前页面所在分组' }, '当前') : null),
+      ...rows.map(item => h('button', { type: 'button', key: item.id, 'aria-current': item.id === activeId ? 'page' : undefined,
+        onClick: () => { onSelect(item.id); setQuery('') } }, item.label)))))
+}

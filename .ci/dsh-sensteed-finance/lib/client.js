@@ -363,12 +363,8 @@ window.__ModuleLoader__.load({
           React.useEffect(() => { if (current.status === 'denied') onAccessDenied() }, [current.status, onAccessDenied])
           const h = React.createElement
           if (current.status !== 'ready') return h('p', { role: 'status', className: 'sensteedBusinessNavigationStatus' }, current.status === 'denied' ? '当前模块不可访问' : current.status === 'unavailable' ? '暂时无法加载导航，请在工作区重新连接。' : '正在加载导航…')
-          let group
-          return h('nav', { ref: menu, onScroll: event => { menuScroll = event.currentTarget.scrollTop }, className: 'sensteedBusinessNavigation', 'aria-label': '业务导航' }, ...current.items.flatMap(item => {
-            const heading = item.group && item.group !== group ? h('h3', { key: `group-${item.group}` }, item.group) : null
-            group = item.group
-            return [heading, h('button', { key: item.id, type: 'button', 'aria-current': current.activeId === item.id ? 'page' : undefined, onClick: () => bridge.select(item.id) }, item.label)].filter(Boolean)
-          }))
+          return h('nav', { ref: menu, onScroll: event => { menuScroll = event.currentTarget.scrollTop }, className: 'sensteedBusinessNavigation', 'aria-label': '业务导航' },
+            h(FinanceNavigationGroups, { items: current.items, activeId: current.activeId, onSelect: id => bridge.select(id) }))
         },
       }
       return bridge
@@ -1238,6 +1234,23 @@ window.__ModuleLoader__.load({
     .sf-assistant-question{display:flex;flex-wrap:wrap;gap:8px;width:100%}.sf-assistant-question input{flex:1;min-width:min(220px,100%);max-width:100%;min-height:36px;padding:8px 10px;border:1px solid var(--sf-line2);border-radius:6px;background:var(--sf-card);color:inherit;font:inherit}.sf-assistant-answer{display:grid;gap:12px;min-width:0;font-size:12px;line-height:1.6;overflow-wrap:anywhere}.sf-assistant-answer>p,.sf-assistant-answer>ul{margin:0}.sf-assistant-answer>ul{padding-left:20px}.sf-assistant-answer>.sf-btn{justify-self:start}
     `
 
+    const financeNavigationCss = `
+    .sf-navigation-groups{display:grid;gap:4px;min-width:0}
+    .sf-navigation-search{display:grid;gap:6px;padding:4px 8px 8px;font-size:12px;color:var(--dsw-alias-label-secondary)}
+    .sf-navigation-search input{box-sizing:border-box;width:100%;min-width:0;min-height:32px;padding:6px 8px;border:1px solid var(--dsw-alias-border-l1);border-radius:6px;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font:inherit}
+    .sf-navigation-actions{display:flex;gap:4px;padding:0 4px 8px}
+    .sf-navigation-actions button{width:auto!important;min-height:28px!important;height:auto!important;padding:4px 8px!important;font-size:11px!important;color:var(--dsw-alias-label-secondary)!important}
+    .sf-navigation-group{border-bottom:1px solid var(--dsw-alias-border-l1);padding:4px 0}
+    .sf-navigation-group summary{display:flex;align-items:center;gap:8px;min-height:36px;padding:0 8px;cursor:pointer;list-style:none;font-size:12px;font-weight:600;color:var(--dsw-alias-label-secondary)}
+    .sf-navigation-group summary::-webkit-details-marker{display:none}
+    .sf-navigation-group summary:before{content:'›';font-size:16px;transform:rotate(0deg)}
+    .sf-navigation-group[open]>summary:before{transform:rotate(90deg)}
+    .sf-navigation-group summary small{margin:0!important;font-size:11px;font-weight:400}
+    .sf-navigation-group summary .sf-navigation-current{margin-left:auto;font-size:10px;font-weight:400}
+    .sf-navigation-group>button{padding-left:24px!important}
+    .sf-navigation-group summary:focus-visible,.sf-navigation-groups input:focus-visible{outline:2px solid var(--dsw-alias-label-primary);outline-offset:2px}
+    `
+
     const desktopContextCss = '.sf-root[data-desktop-context-active] .sf-tabs,.sf-root[data-desktop-context-active] .sf-sidebar-brand,.sf-root[data-desktop-context-active] .sf-mobile-nav{display:none}.sf-root[data-desktop-context-active] .sf-shell{grid-template-columns:minmax(0,1fr)}.sf-root[data-desktop-context-active] .sf-header,.sf-root[data-desktop-context-active] .sf-content{grid-column:1}'
 
     // 与 Datasource 同一公开契约；此处只负责编排交互，不重算服务端财务指标。
@@ -1828,6 +1841,42 @@ window.__ModuleLoader__.load({
       }
       restore()
       return stop
+    }
+
+    /** 搜索仅作用于调用方已过滤权限的入口。 */
+    function financeNavigationGroups(items, query = '') {
+      const term = query.trim().toLocaleLowerCase()
+      const groups = new Map()
+      for (const item of items) {
+        const group = item.group || '常用入口'
+        if (term && !`${group} ${item.label}`.toLocaleLowerCase().includes(term)) continue
+        if (!groups.has(group)) groups.set(group, [])
+        groups.get(group).push(item)
+      }
+      return [...groups]
+    }
+
+    function FinanceNavigationGroups({ items, activeId, onSelect }) {
+      const [query, setQuery] = useState('')
+      const [expanded, setExpanded] = financeDesktopNavigation().useField('navigationExpanded', {})
+      const activeGroup = items.find(item => item.id === activeId)?.group
+      useEffect(() => {
+        if (activeGroup) setExpanded(previous => ({ ...previous, [activeGroup]: true }))
+      }, [activeId, activeGroup])
+      const groups = financeNavigationGroups(items, query)
+      return h('div', { className: 'sf-navigation-groups' },
+        h('label', { className: 'sf-navigation-search' }, h('span', null, '查找功能'),
+          h('input', { type: 'search', value: query, placeholder: '搜索页面或分组', onChange: event => setQuery(event.target.value) })),
+        h('div', { className: 'sf-navigation-actions' },
+          h('button', { type: 'button', onClick: () => setExpanded(Object.fromEntries(groups.map(([label]) => [label, true]))) }, '全部展开'),
+          h('button', { type: 'button', onClick: () => setExpanded(Object.fromEntries(groups.map(([label]) => [label, false]))) }, '全部收起')),
+        !groups.length ? h('p', { role: 'status', className: 'sf-note' }, '未找到匹配功能，请更换关键词。') : null,
+        ...groups.map(([label, rows]) => h('details', { key: label, className: 'sf-navigation-group', open: query.trim() ? true : expanded[label] ?? (label === activeGroup || label === '总览'),
+          onToggle: event => { const open = event.currentTarget.open; if (!query.trim()) setExpanded(previous => previous[label] === open ? previous : { ...previous, [label]: open }) } },
+          h('summary', null, h('span', null, label), h('small', { 'aria-label': `${rows.length} 个页面` }, rows.length),
+            rows.some(item => item.id === activeId) ? h('span', { className: 'sf-navigation-current', 'aria-label': '当前页面所在分组' }, '当前') : null),
+          ...rows.map(item => h('button', { type: 'button', key: item.id, 'aria-current': item.id === activeId ? 'page' : undefined,
+            onClick: () => { onSelect(item.id); setQuery('') } }, item.label)))))
     }
 
     // Datasource packages/constants/src/finance-permissions.ts 的展示快照；check:datasource 检查漂移，不参与鉴权。
@@ -5348,6 +5397,9 @@ window.__ModuleLoader__.load({
       const [starting, setStarting] = useState(null)
       const [recovery, setRecovery] = useState(null)
       const [localSubmitted, setSubmitted] = useState(null)
+      const [category, setCategory] = useState('all')
+      const categories = [['all', '全部主题', ANALYSIS_ENTRIES.map(entry => entry.id)], ['planning', '预算与经营', ['budget', 'cost', 'revenue', 'version']], ['risk', '资金与风险', ['risk', 'cash', 'forecast']], ['governance', '数据与规则', ['quality', 'rules']]]
+      const visibleEntries = ANALYSIS_ENTRIES.filter(entry => categories.find(([id]) => id === category)[2].includes(entry.id))
       const bridge = globalThis.__sensteed_finance_conversation?.()
       const operation = useSyncExternalStore(bridge?.subscribe || subscribeIdleAnalysis, bridge?.getSnapshot || getIdleAnalysis, getIdleAnalysis)
       const submitted = localSubmitted || operation.submitted
@@ -5377,13 +5429,16 @@ window.__ModuleLoader__.load({
       return h('div', { className: 'sf-view' },
         h('p', { className: 'sf-note', role: 'status' }, t('analysisScope', { year, org: scopeName })),
         h(FinanceInlineAssistant, { key: `${year}-${orgId}`, ctx }),
-        h('h2', null, '新会话深度分析'),
-        h('p', { className: 'sf-note' }, t('analyzeHint')),
+        h('section', { className: 'sf-analysis-intro', 'aria-labelledby': 'sf-analysis-title' },
+          h('h2', { id: 'sf-analysis-title' }, '新会话深度分析'),
+          h('p', { className: 'sf-note' }, '需要归因、预测或行动建议时，选择下方主题。将携带当前年度和主体，在独立会话中分析。'),
+          h('div', { className: 'sf-analysis-categories', role: 'group', 'aria-label': '筛选深度分析主题' }, ...categories.map(([id, label, ids]) =>
+            h('button', { key: id, type: 'button', 'aria-pressed': category === id, onClick: () => setCategory(id) }, `${label} · ${ids.length}`)))),
         notice || submitted || operation.starting ? h('p', { className: 'sf-notice', role: recovery || submitted ? 'alert' : 'status' }, notice || t(submitted ? 'analysisSentNotOpened' : 'analysisStarting')) : null,
         submitted ? h('div', null, h(PrimaryButton, { onClick: reopenSubmitted, disabled: busy, busy: starting === 'reopen', 'aria-label': t('analysisOpenSession') }, t('analysisOpenSession'))) : null,
         recovery ? h('label', { className: 'sf-form-row' }, h('span', null, t('analysisPromptLabel')), h('textarea', { readOnly: true, rows: 6, value: recovery, 'aria-label': t('analysisPromptLabel') })) : null,
-        h('div', { className: 'sf-analysis-grid' }, ...ANALYSIS_ENTRIES.map(entry => h('article', { className: 'sf-card sf-analysis-card', key: entry.id },
-          h('div', { className: 'sf-analysis-head' }, h(Glyph, { name: entry.icon, size: 15 }), h('h2', null, t(`analysis_${entry.id}`))),
+        h('div', { className: 'sf-analysis-grid' }, ...visibleEntries.map(entry => h('article', { className: 'sf-card sf-analysis-card', key: entry.id },
+          h('div', { className: 'sf-analysis-head' }, h(Glyph, { name: entry.icon, size: 15 }), h('h3', null, t(`analysis_${entry.id}`))),
           h('p', null, t(`analysis_${entry.id}_desc`)),
           h('div', null, h(PrimaryButton, { busy: starting === entry.id, disabled: busy || Boolean(submitted), onClick: () => startAnalysis(entry), 'aria-label': `${t(`analysis_${entry.id}`)}：${t('send')}` }, h(Glyph, { name: 'send', size: 12 }), t(starting === entry.id ? 'analysisStarting' : 'send')))))),
         h('p', { className: 'sf-note' }, t('analyzingNote')))
@@ -6870,7 +6925,24 @@ window.__ModuleLoader__.load({
 
     // 片段 6/7：外壳（tab 导航/全局筛选/上下文加载）、入口按钮、样式注入与插件挂载点
 
-    const sfAnalysisGrid = '.sf-analysis-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}.sf-analysis-card{display:grid;gap:10px;align-content:start;padding:16px}.sf-analysis-head{display:flex;align-items:center;gap:8px}.sf-analysis-head h2{margin:0;font-size:13px}.sf-analysis-card>p{margin:0;color:var(--sf-ink2);font-size:12px;line-height:1.55}.sf-analysis-card>div:last-child{justify-self:start}'
+    const sfAnalysisGrid = `
+    .sf-analysis-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .sf-analysis-card{display:grid;gap:12px;align-content:start;padding:16px}
+    .sf-analysis-head{display:flex;align-items:center;gap:8px}
+    .sf-analysis-head h2,.sf-analysis-head h3{margin:0;font-size:14px;font-weight:600}
+    .sf-analysis-card>p{margin:0;color:var(--sf-ink2);font-size:12px;line-height:1.6}
+    .sf-analysis-card>div:last-child{justify-self:start}
+    .sf-analysis-intro{display:grid;gap:8px}.sf-analysis-intro h2{margin:0;font-size:16px}.sf-analysis-intro p{margin:0}
+    .sf-analysis-categories{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+    .sf-analysis-categories button{min-height:32px;padding:4px 12px;border:1px solid var(--sf-line);border-radius:6px;background:var(--sf-card);color:var(--sf-ink2);font:inherit;font-size:12px;cursor:pointer}
+    .sf-analysis-categories button[aria-pressed=true]{border-color:var(--sf-brand);background:color-mix(in srgb,var(--sf-brand) 8%,var(--sf-card));color:var(--sf-ink);font-weight:600}
+    .sf-analysis-categories button:focus-visible{outline:2px solid var(--sf-brand);outline-offset:2px}
+    .sf-analysis-grid .sf-analysis-card{grid-template-columns:minmax(0,1fr) auto;gap:8px 16px}
+    .sf-analysis-grid .sf-analysis-card>p{grid-column:1;grid-row:2}
+    .sf-analysis-grid .sf-analysis-card>div:last-child{grid-column:2;grid-row:1/3;align-self:center}
+    @media(max-width:1100px){.sf-analysis-grid{grid-template-columns:1fr}}
+    @media(max-width:480px){.sf-analysis-grid .sf-analysis-card{grid-template-columns:1fr}.sf-analysis-grid .sf-analysis-card>div:last-child{grid-column:1;grid-row:auto}.sf-assistant-question{flex-wrap:wrap}.sf-assistant-question>input{width:100%}}
+    `
 
     // 版块元数据对齐 datasource 网页端 sectionCopy：标题 + 描述随页签切换
     const SECTION_META = {
@@ -7001,6 +7073,7 @@ window.__ModuleLoader__.load({
       }
       useEffect(() => restoreFinanceScroll(contentRef.current, navigation.current.scrollTop), [navigation.current.id])
       const briefProps = { brief, t, onDrill, orgId }
+      const briefLoading = ['overview', 'operations'].includes(tab) && briefState === 'loading' && !brief
 
       // 各 tab 的错误/空态由视图内部处理；这里只处理 brief 类视图的加载与失败
       const body = !canOpen(tab) ? h('p', { role: 'alert' }, '当前账号没有此页面权限') : (tab === 'overview' || tab === 'operations') && briefState === 'loading' && !brief
@@ -7046,10 +7119,12 @@ window.__ModuleLoader__.load({
               h('div', { className: 'sf-header-buttons' },
                 h(Tooltip, { label: t('refresh') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('refresh'), onClick: refreshSafely }, h(IconRefreshOutlineRegular, { size: 16 }))),
                 h(Tooltip, { label: t('close') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('close'), onClick: closeSafely }, h(IconCloseOutlineRegular, { size: 16 })))))),
-          h('nav', { className: 'sf-tabs', 'aria-label': t('title') }, ...FINANCE_NAVIGATION.map(([label, items]) => {
-            const visible = items.filter(item => financeNavigationAllowed(item, identity))
-            return visible.length ? h('section', { key: label, className: 'sf-nav-group', 'aria-label': label },
-              h('h2', null, label), ...visible.map(item => h('button', { type: 'button', key: item[0], 'aria-current': activeItem?.[0] === item[0] ? 'page' : undefined, onClick: () => onDrill(item[2], financeSidebarParams(item, tab, drillParams, year)) }, item[1]))) : null
+          h('nav', { className: 'sf-tabs', 'aria-label': t('title') }, h(FinanceNavigationGroups, {
+            items: FINANCE_NAVIGATION.flatMap(([group, items]) => items.filter(item => financeNavigationAllowed(item, identity)).map(item => ({ id: item[0], label: item[1], group }))),
+            activeId: activeItem?.[0], onSelect: id => {
+              const item = FINANCE_NAVIGATION.flatMap(([, items]) => items).find(item => item[0] === id)
+              if (item) onDrill(item[2], financeSidebarParams(item, tab, drillParams, year))
+            },
           })),
           h('label', { className: 'sf-mobile-nav' }, h('span', null, '前往页面'),
             h('select', { value: activeItem?.[0] || 'overview', onChange: event => {
@@ -7059,7 +7134,7 @@ window.__ModuleLoader__.load({
               const visible = items.filter(item => financeNavigationAllowed(item, identity))
               return visible.length ? h('optgroup', { key: label, label }, ...visible.map(item => h('option', { key: item[0], value: item[0] }, item[1]))) : null
             }))),
-          h('div', { ref: contentRef, className: `sf-content${briefState === 'loading' && !brief ? ' sf-refreshing' : ''}`, 'aria-busy': briefState === 'loading' && !brief }, body), leaveGuard.prompt))
+          h('div', { ref: contentRef, className: `sf-content${briefLoading ? ' sf-refreshing' : ''}`, 'aria-busy': briefLoading }, body), leaveGuard.prompt))
     }
 
     function Button({ wide, t, onOpen = openOverlay }) {
@@ -7077,7 +7152,7 @@ window.__ModuleLoader__.load({
       ctx.slots.inject('desktop.navigation.context', () => ctx.slots.register({ name: 'desktop.navigation.context', key: 'sensteed-finance' }, financeDesktopNavigation().Menu))
       ctx.effect(() => ctx.locale.register(NS, copy), 'dofe-sensteed-finance: dictionaries')
       ctx.effect(() => { window.addEventListener(OVERLAY_EVENT, closeOtherOverlay); return () => window.removeEventListener(OVERLAY_EVENT, closeOtherOverlay) }, 'dofe-sensteed-finance: exclusive-overlay')
-      ctx.effect(() => { const style = document.createElement('style'); style.dataset.plugin = '@dofe/dsh-sensteed-finance'; style.textContent = css + sfAnalysisGrid + desktopContextCss; document.head.appendChild(style); return () => style.remove() }, 'dofe-sensteed-finance: styles')
+      ctx.effect(() => { const style = document.createElement('style'); style.dataset.plugin = '@dofe/dsh-sensteed-finance'; style.textContent = css + sfAnalysisGrid + desktopContextCss + financeNavigationCss; document.head.appendChild(style); return () => style.remove() }, 'dofe-sensteed-finance: styles')
       // 深度分析入口走宿主 conversation 服务（由 desktop 宿主在浏览器侧注册）；
       // 通过惰性 getter 注入，避免插件客户端与宿主模块产生编译期耦合。
       ctx.effect(() => {
