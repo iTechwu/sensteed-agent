@@ -5,16 +5,16 @@
   "activeChannel": "beta",
   "channels": {
     "stable": {
-      "productName": "Sensteed-Agent",
-      "appId": "com.sensteed.agent",
-      "artifactPrefix": "Sensteed-Agent",
-      "homeDirectoryName": ".sensteed-agent"
+      "productName": "哪吒Agent Stable",
+      "appId": "com.hozonauto.agent",
+      "artifactPrefix": "hozonauto-agent",
+      "homeDirectoryName": ".hozonauto-agent"
     },
     "beta": {
-      "productName": "Sensteed-Agent Beta",
-      "appId": "com.sensteed.agent.beta",
-      "artifactPrefix": "Sensteed-Agent-Beta",
-      "homeDirectoryName": ".sensteed-agent-beta"
+      "productName": "哪吒Agent",
+      "appId": "com.hozonauto.agent.beta",
+      "artifactPrefix": "hozonauto-agent-beta",
+      "homeDirectoryName": ".hozonauto-agent-beta"
     }
   },
   "packageName": "dsh-plugin-desktop",
@@ -27,9 +27,9 @@
     "en": "Serve and advance the global competitiveness of Chinese intelligent manufacturing"
   },
   "artwork": {
-    "appIconSource": "brand/assets/app-icon-source.jpg",
-    "sidebarMark": "brand/assets/sidebar-mark.png",
-    "heroMark": "brand/assets/hero-mark.png",
+    "appIconSource": "brand/hozonauto/assets/app-icon-source.jpg",
+    "sidebarMark": "brand/hozonauto/assets/sidebar-mark.png",
+    "heroMark": "brand/hozonauto/assets/hero-mark.png",
     "whiteThreshold": 235,
     "iconSize": 1024,
     "macIcon": {
@@ -39,20 +39,20 @@
     "heroSize": 204
   },
   "wordmark": {
-    "image": "brand/assets/wordmark.png",
+    "image": "brand/hozonauto/assets/wordmark.png",
     "text": {
-      "zh": "山子高科",
-      "en": "SENSTEED HI-TECH"
+      "zh": "哪吒Agent",
+      "en": "hozonauto-agent"
     },
     "color": "#0F172A",
     "fontFile": "brand/assets/wordmark-font/STHeiti Medium.ttf",
     "lockup": {
-      "width": 2537,
-      "height": 457
+      "width": 1556,
+      "height": 500
     },
     "display": {
-      "width": 200,
-      "height": 36
+      "width": 187,
+      "height": 60
     }
   },
   "updates": {
@@ -65,16 +65,16 @@
     "downloadBase": "http://10.30.30.212/wumin1/sensteed-agent/-/releases",
     "repoUrl": "http://10.30.30.212/wumin1/sensteed-agent",
     "communityName": {
-      "zh": "Sensteed Agent",
-      "en": "Sensteed Agent"
+      "zh": "哪吒Agent",
+      "en": "hozonauto-agent"
     },
     "maintainer": {
-      "zh": "Sensteed 团队（山子高科）",
-      "en": "Sensteed team (Shandzi High-Tech)"
+      "zh": "哪吒Agent 团队",
+      "en": "hozonauto-agent team"
     },
-    "noticesHeader": "Sensteed-Agent distributes the following third-party packages inside its installers."
+    "noticesHeader": "hozonauto-agent distributes the following third-party packages inside its installers."
   },
   "nsis": {
-    "shortcutName": "Sensteed-Agent Beta"
+    "shortcutName": "哪吒Agent"
   }
 }

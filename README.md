@@ -1,8 +1,8 @@
 <!-- brand:brand-title:start -->
-Sensteed Agent<!-- brand:brand-title:end -->
+哪吒Agent<!-- brand:brand-title:end -->
 
 <p align="center">
-  <strong>山子高科企业级 AI 桌面工作台 —— 基于 DeepSeek Harness 构建，运行于 Windows 与 macOS。</strong>
+  <strong>哪吒Agent 企业级 AI 桌面工作台 —— 基于 DeepSeek Harness 构建，运行于 Windows 与 macOS。</strong>
 </p>
 
 <!-- brand:download-cta:start -->

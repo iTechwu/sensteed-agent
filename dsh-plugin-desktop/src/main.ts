@@ -30,6 +30,7 @@ import { desktopPrimaryRuntime, resolveDesktopOfficeConfig } from './desktop-off
 import { createDesktopProfileBoot } from './profile-context.ts'
 import { logInactiveStartupEntries } from './startup-audit.ts'
 import { app, crashReporter, dialog, safeStorage, session, shell } from 'electron'
+import { legacyBrandUserData } from './legacy-brand-data.ts'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
@@ -2276,6 +2277,7 @@ async function start(): Promise<void> {
 
 async function run(): Promise<void> {
   app.setName(PRODUCT_NAME)
+  app.setPath('userData', legacyBrandUserData(app.getPath('userData'), app.getPath('appData'), DESKTOP_RELEASE_CHANNEL))
   if (process.argv.includes('--export-diagnostics')) {
     try {
       await app.whenReady()

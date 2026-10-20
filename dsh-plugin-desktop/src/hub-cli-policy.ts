@@ -18,10 +18,10 @@ export async function sealedSensteedCliPolicy(options: {
   }
   await options.verify(archive, options.resourcesPath)
   if (options.args.length === 1 && ['--help', '-h', 'help'].includes(options.args[0]!)) {
-    return 'Sensteed Agent: manage enterprise plugins and skills in Desktop → Plugins & Skills. Business CLI startup and independent installation are unavailable. Personal user-local skills remain in your local skills directory.\n'
+    return '哪吒Agent: manage enterprise plugins and skills in Desktop → Plugins & Skills. Business CLI startup and independent installation are unavailable. Personal user-local skills remain in your local skills directory.\n'
   }
   if (options.args.length === 1 && ['--version', '-V'].includes(options.args[0]!)) {
-    return 'Sensteed Agent sealed Hub CLI (desktop-managed)\n'
+    return '哪吒Agent sealed Hub CLI (desktop-managed)\n'
   }
   throw new Error('Sensteed sealed CLI: business startup and plugin management require Desktop Hub authorization. Open Desktop → Plugins & Skills; no command was executed.')
 }

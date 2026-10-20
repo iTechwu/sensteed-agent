@@ -12,7 +12,7 @@ export function installDesktopNavigationStyles(): () => void {
 .sensteedModuleRail [role="tooltip"] { display:none !important; }
 .sensteedRailTooltip { position:fixed; z-index:10000; transform:translateY(-50%); pointer-events:none; max-width:min(280px,calc(100vw - 68px)); overflow-wrap:anywhere; padding:6px 10px; border-radius:7px; border:1px solid var(--dsw-alias-border-l1); background:#292a2d; color:#fff; font-size:12px; line-height:18px; box-shadow:0 2px 8px #0002; }
 .sensteedModuleBrand { height:40px; display:grid; place-items:center; margin-bottom:10px; }
-.sensteedModuleBrand img { width:24px; height:24px; object-fit:contain; }
+.sensteedModuleBrand span { display:block; width:24px; height:24px; background:currentColor; mask-size:contain; mask-position:center; mask-repeat:no-repeat; -webkit-mask-size:contain; -webkit-mask-position:center; -webkit-mask-repeat:no-repeat; }
 .sensteedModuleScroll { width:40px; flex:1; min-height:0; overflow-y:auto; scrollbar-width:none; }
 .sensteedModuleScroll nav { display:flex; flex-direction:column; gap:8px; }
 .sensteedModuleButton { position:relative; display:flex; align-items:center; justify-content:center; width:40px; height:40px; padding:0; border:0; border-radius:8px; background:transparent; color:var(--dsw-alias-label-secondary); cursor:pointer; flex:none; }

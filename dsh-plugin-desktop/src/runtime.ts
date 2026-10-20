@@ -12,7 +12,7 @@ import type {
 } from './window-material.ts'
 import type { DesktopSetupWizardSettings } from './setup-wizard-settings.ts'
 
-/** Electron platforms supported by the Sensteed Agent native adapter. */
+/** Electron platforms supported by the 哪吒Agent native adapter. */
 export type DesktopPlatform = 'darwin' | 'win32' | 'linux'
 
 /** Native presentation modes selected by the desktop-shell Cordis row. */
@@ -308,7 +308,7 @@ export interface DesktopRuntime {
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
-    /** Electron adapter provided by the Sensteed Agent launcher. */
+    /** Electron adapter provided by the 哪吒Agent launcher. */
     desktopRuntime: DesktopRuntime
   }
 }

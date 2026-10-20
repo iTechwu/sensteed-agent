@@ -5,16 +5,16 @@ export const BRAND_RELEASE_IDENTITIES = Object.freeze({
   stable: Object.freeze({
     releaseChannel: 'stable' as const,
     packageName: "dsh-plugin-desktop",
-    productName: "Sensteed-Agent",
-    appId: "com.sensteed.agent",
-    homeDirectoryName: ".sensteed-agent",
+    productName: "哪吒Agent Stable",
+    appId: "com.hozonauto.agent",
+    homeDirectoryName: ".hozonauto-agent",
   }),
   beta: Object.freeze({
     releaseChannel: 'beta' as const,
     packageName: "dsh-plugin-desktop",
-    productName: "Sensteed-Agent Beta",
-    appId: "com.sensteed.agent.beta",
-    homeDirectoryName: ".sensteed-agent-beta",
+    productName: "哪吒Agent",
+    appId: "com.hozonauto.agent.beta",
+    homeDirectoryName: ".hozonauto-agent-beta",
   }),
 })
 
@@ -34,10 +34,10 @@ export const BRAND_TENANT = "sensteed" as const
 export const BRAND_TENANT_ID = "7a8866f9-3994-4341-ade6-b9fa942efe99" as const
 
 /** Artifact filename prefix for the active channel (Setup/Portable/DMG stems). */
-export const BRAND_ARTIFACT_PREFIX = "Sensteed-Agent-Beta"
+export const BRAND_ARTIFACT_PREFIX = "hozonauto-agent-beta"
 
 /** Electron Builder shortcutName for the active channel. */
-export const BRAND_SHORTCUT_NAME = "Sensteed-Agent Beta"
+export const BRAND_SHORTCUT_NAME = "哪吒Agent"
 
 /** Display names shown in chrome that is identical across release channels. */
 export const BRAND_DISPLAY_NAME = Object.freeze({
@@ -60,6 +60,6 @@ export const BRAND_UPDATE_SERVICE = Object.freeze({
 
 /** Sidebar lockup display box consumed by the client brand slots. */
 export const BRAND_WORDMARK_DISPLAY = Object.freeze({
-  width: 200,
-  height: 36,
+  width: 187,
+  height: 60,
 })

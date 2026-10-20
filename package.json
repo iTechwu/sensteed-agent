@@ -1,8 +1,8 @@
 {
-  "name": "sensteed-agent",
+  "name": "hozonauto-agent",
   "version": "0.2.1-rc.2-beta.202610201426",
   "private": true,
-  "description": "Sensteed Agent product workspace",
+  "description": "哪吒Agent (hozonauto-agent) desktop workspace",
   "license": "MIT",
   "packageManager": "pnpm@11.28.5",
   "engines": {
