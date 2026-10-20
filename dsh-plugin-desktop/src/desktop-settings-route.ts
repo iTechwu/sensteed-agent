@@ -457,6 +457,7 @@ export async function handleDesktopUpdateCheckRequest(
   expectedOrigin: string,
   checkNow: () => Promise<void>,
   reportError: (operation: string, cause: unknown) => void = () => {},
+  inspectNow?: () => Promise<import('./update-status.ts').DesktopUpdateStatus>,
 ): Promise<void> {
   if (req.method !== 'POST') return finishJson(res, 405, error('method not allowed'), 'POST')
   if (!isSameOriginLoopbackRequest(req, expectedOrigin, true)) {
@@ -464,6 +465,14 @@ export async function handleDesktopUpdateCheckRequest(
   }
   const value = await parsePostBody(req, res)
   if (value === INVALID_BODY) return
+  if (typeof value === 'object' && value !== null && !Array.isArray(value)
+    && Object.keys(value).length === 1 && 'inspect' in value && value.inspect === true && inspectNow) {
+    try { return finishJson(res, 200, await inspectNow()) }
+    catch (cause) {
+      reportError('inspect updates', cause)
+      return finishJson(res, 500, error('updates could not be checked'))
+    }
+  }
   if (!isEmptyRequest(value)) return finishJson(res, 400, error('invalid update check request'))
   try {
     await checkNow()

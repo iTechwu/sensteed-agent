@@ -272,3 +272,28 @@ describe('Next release isolation', () => {
     expect(await checkForDesktopUpdate({ currentVersion:'2.0.14-next', channel:'next', request:async()=>Response.json(body) })).toBeNull();
   });
 });
+
+
+describe('actionable update failures', () => {
+  it.each([
+    [404, { error: { code: 'CHANNEL_NOT_PUBLISHED' } }, 'unpublished'],
+    [404, { error: { code: 'NOT_FOUND' } }, 'service'],
+    [503, {}, 'service'],
+    [200, { version: 'invalid' }, 'invalid-response'],
+  ] as const)('classifies HTTP %s without exposing service messages', async (status, body, failure) => {
+    const onFailure = vi.fn()
+    await expect(checkForDesktopUpdate({ currentVersion: '0.2.1-rc.2-beta.202610201320', channel: 'beta',
+      request: async () => Response.json(body, { status }), onFailure,
+    })).resolves.toBeNull()
+    expect(onFailure).toHaveBeenCalledWith(failure)
+  })
+  it('distinguishes request deadlines from network failures', async () => {
+    const controller = new AbortController()
+    controller.abort()
+    const onFailure = vi.fn()
+    await checkForStableUpdate({ currentVersion: '2.0.0', signal: controller.signal, onFailure,
+      request: async () => { throw new Error('aborted') },
+    })
+    expect(onFailure).toHaveBeenCalledWith('timeout')
+  })
+})

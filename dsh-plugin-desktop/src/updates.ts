@@ -71,6 +71,7 @@ export function apply(ctx: Context, config: Config): void {
               `dsh-plugin-desktop: failed to ${operation}: ${cause instanceof Error ? cause.message : String(cause)}`,
             )
           },
+          () => lifecycle.inspectNow(),
         )
       },
     })
