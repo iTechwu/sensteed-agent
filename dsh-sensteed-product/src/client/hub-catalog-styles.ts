@@ -21,6 +21,7 @@ const CSS = `
 .dshHubSearch:focus-within{outline:2px solid var(--dsw-alias-label-primary);outline-offset:2px}
 .dshHubPage select,.dshHubSetup select,.dshHubSkillSearch{border:1px solid var(--dsw-alias-border-l1);border-radius:8px;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font:inherit;font-size:13px;min-height:36px;padding:6px 10px;max-width:100%}
 .dshHubSkillSearch{box-sizing:border-box;width:100%;margin:12px 0 20px}
+.dshHubCapabilityGroup{margin:24px 0}.dshHubCapabilityGroup h2{display:flex;align-items:center;gap:8px;font-size:16px;font-weight:600;margin:0 0 12px}.dshHubCapabilityGroup h2 small{font-size:12px;color:var(--dsw-alias-label-secondary);font-weight:400}.dshHubCapabilityGroup .dshDofePluginSummary{display:grid;gap:8px;line-height:1.6}.dshHubCapabilityGroup .dshDofePluginState{justify-self:start}.dshHubCapabilityGroup .dshHubSecondary{align-self:flex-start}
 .dshHubCatalog{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:16px;list-style:none;padding:0;margin:0;align-items:start}
 .dshHubCard{display:flex;flex-direction:column;gap:12px;min-width:0;padding:20px;border:1px solid var(--dsw-alias-border-l1);border-radius:12px;background:var(--dsw-alias-bg-base)}
 .dshHubCard h3{margin:0;font-size:15px;line-height:1.5;font-weight:600;overflow-wrap:anywhere}

@@ -4,7 +4,7 @@ import type { HubNavigation } from './HubNavigation.tsx'
 import { Plus, Sparkles, Blocks } from 'lucide-react'
 import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { DofeAccessSettings } from '../dofe-plugins.ts'
-import { dofePluginsForBrand } from '../dofe-plugins.ts'
+import { pluginPresentations, PLUGIN_PRESENTATION_GROUPS } from '../plugin-presentations.ts'
 import { DofePluginCard } from './DofePluginItems.tsx'
 import { HubSetupSection } from './HubSetupSection.tsx'
 import type { DofeAccessLocaleKey } from './dofe-access.ts'
@@ -58,7 +58,7 @@ function HubPageContent({ kind, t, create, loadSkills, navigation, ...props }: H
   const currentTab = navigation ? externalTab : tab
   const selectTab = (value: 'catalog' | 'installed') => navigation ? navigation.select(value) : setTab(value)
   const selectedPlugin = useSyncExternalStore(navigation?.selectedPlugin.subscribe ?? noSubscribe, navigation?.selectedPlugin.getSnapshot ?? noSelectedPlugin, navigation?.selectedPlugin.getSnapshot ?? noSelectedPlugin)
-  const builtInPlugins = dofePluginsForBrand('sensteed').filter(plugin => !selectedPlugin || plugin.id === selectedPlugin)
+  const builtInPlugins = pluginPresentations('sensteed').filter(entry => !selectedPlugin || entry.key === selectedPlugin || selectedPlugin === 'tools' && entry.plugin.id === 'tools')
   const Icon = kind === 'plugin' ? Blocks : Sparkles
   const secondary = kind === 'plugin' ? 'builtInTab' : 'localSkillsTab'
   return <div className="dshHubPage"><div className="dshHubContent">
@@ -75,7 +75,13 @@ function HubPageContent({ kind, t, create, loadSkills, navigation, ...props }: H
     </div>
     <div hidden={currentTab !== 'catalog'}><HubSetupSection kind={kind} t={t} {...props} /></div>
     {currentTab === 'installed' && (kind === 'skill' ? <SkillLibrary loadSkills={loadSkills} t={t} />
-      : <><div className="dshHubToolbar">{selectedPlugin && <button type="button" className="dshHubSecondary" onClick={() => navigation?.select('installed')}>{t('catalogBackToAll')}</button>}</div><ul className="dshHubCatalog">{builtInPlugins.map(plugin => <li className="dshHubCard" key={plugin.id}><h3>{plugin.name}</h3><DofePluginCard plugin={plugin} settingsScope={props.settingsScope} t={t} view="page" /></li>)}</ul></>)}
+      : <><div className="dshHubToolbar">{selectedPlugin && <button type="button" className="dshHubSecondary" onClick={() => navigation?.select('installed')}>{t('catalogBackToAll')}</button>}</div>{PLUGIN_PRESENTATION_GROUPS.map(group => {
+          const entries = builtInPlugins.filter(entry => entry.group === group.id)
+          return entries.length > 0 && <section key={group.id} className="dshHubCapabilityGroup" aria-label={group.label}>
+            <h2>{group.label} <small>{entries.length}</small></h2>
+            <ul className="dshHubCatalog">{entries.map(entry => <li className="dshHubCard" key={entry.key}><h3>{entry.plugin.name}</h3><DofePluginCard plugin={entry.plugin} settingsScope={props.settingsScope} t={t} view={selectedPlugin && selectedPlugin !== 'tools' ? 'page' : 'summary'} />{(!selectedPlugin || selectedPlugin === 'tools') && <button type="button" className="dshHubSecondary" onClick={() => navigation?.openPlugin(entry.key)}>查看{entry.plugin.name}</button>}</li>)}</ul>
+          </section>
+        })}</>)}
   </div></div>
 }
 

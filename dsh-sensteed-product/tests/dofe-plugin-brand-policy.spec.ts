@@ -34,6 +34,6 @@ it('uses Tools authorization for supplier intelligence, without granting unrelat
 it('covers each Tools domain with task-oriented categories', () => {
   const items = dofeCapabilitiesForBrand('sensteed')
   expect(new Set(items.map(item => item.group))).toEqual(new Set(DOFE_CAPABILITY_GROUPS))
-  expect(items.filter(item => item.plugin === 'tools')).toHaveLength(8)
+  expect(items.filter(item => item.plugin === 'tools')).toHaveLength(10)
   expect(items.map(item => item.name)).toEqual(expect.arrayContaining(['人才发现', '客户线索发现与监测', '小红书与抖音运营', '文件上传与素材链接']))
 })
