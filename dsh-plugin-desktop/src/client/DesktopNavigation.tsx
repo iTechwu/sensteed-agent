@@ -1,7 +1,7 @@
 /** Desktop composition: persistent modules beside the existing context column. */
 import { createContext, createElement, useContext, useCallback, useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Home, PanelLeft, SquarePen } from 'lucide-react'
+import { Home, PanelLeft, SquarePen, Database, Gauge, ShieldCheck, Clock, Blocks, Sparkles } from 'lucide-react'
 import { Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsRenderSlots, SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
@@ -37,7 +37,14 @@ function RailButton({ label, active, onClick, children, hint = true }: {
 }
 
 /** Retain plugin permission checks while portalling help outside the scroll rail. */
-function PluginRailSeat({ children, beforeNavigate, hintEnabled = true }: { children: ReactNode; hintEnabled?: boolean; beforeNavigate?: ((action: () => void) => void) | undefined }) {
+function PluginRailSeat({ children, beforeNavigate, hintEnabled = true, icon, active }: { icon?: ReactNode; active?: boolean; children: ReactNode; hintEnabled?: boolean; beforeNavigate?: ((action: () => void) => void) | undefined }) {
+  const seat = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (active === undefined) return
+    const button = seat.current?.querySelector('button')
+    if (active) button?.setAttribute('aria-current', 'page')
+    else button?.removeAttribute('aria-current')
+  }, [active])
   const replaying = useRef(false)
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const [hint, setHint] = useState<{ label: string; top: number; left: number }>()
@@ -56,7 +63,7 @@ function PluginRailSeat({ children, beforeNavigate, hintEnabled = true }: { chil
     clearTimeout(timer.current)
     timer.current = setTimeout(() => { const box = button.getBoundingClientRect(); setHint({ label, top: box.top + box.height / 2, left: box.right + 8 }) }, 250)
   }
-  return <div className="sensteedPluginRailSeat" onClickCapture={event => {
+  return <div ref={seat} className="sensteedPluginRailSeat" data-module-icon={icon ? true : undefined} data-active={active || undefined} onClickCapture={event => {
     const button = event.target instanceof Element ? event.target.closest('button') : null
     if (!beforeNavigate || replaying.current || !(button instanceof HTMLButtonElement)) return
     event.preventDefault(); event.stopPropagation()
@@ -64,6 +71,7 @@ function PluginRailSeat({ children, beforeNavigate, hintEnabled = true }: { chil
   }} onPointerOver={event => show(event.target)} onPointerLeave={hide}
     onFocus={event => show(event.target)} onBlur={hide} onPointerDown={hide} onKeyDown={hide}>
     {children}
+    {icon && <span className="sensteedRailGlyph" aria-hidden="true">{icon}</span>}
     {hint && createPortal(<div role="tooltip" className="sensteedRailTooltip" style={{ top: Math.max(16, Math.min(window.innerHeight - 24, hint.top)), left: hint.left }}>{hint.label}</div>, document.body)}
   </div>
 }
@@ -118,15 +126,15 @@ export function DesktopNavigationSidebar({ collapsed, startSession, toggleSideba
           <RailButton label={homeLabel} hint={!collapsed} active={home} onClick={() => navigate(null)}><Home size={20} /></RailButton>
         </div>
         {extensions.includes('dofe-sensteed-knowledge') && <div className="sensteedKnowledgeModule" onPointerEnter={() => openPreview('sensteed-knowledge')} onPointerLeave={closePreview} onFocus={() => openPreview('sensteed-knowledge')} data-active={active === 'sensteed-knowledge' || undefined}>
-          <PluginRailSeat hintEnabled={!collapsed} beforeNavigate={action => { if (leaveGuard.current) leaveGuard.current(action); else action() }}>{renderSlot('sidebar.footer.action', { wide: false }, { only: 'dofe-sensteed-knowledge' })}</PluginRailSeat>
+          <PluginRailSeat icon={<Database size={20} />} active={active === 'sensteed-knowledge'} hintEnabled={!collapsed} beforeNavigate={action => { if (leaveGuard.current) leaveGuard.current(action); else action() }}>{renderSlot('sidebar.footer.action', { wide: false }, { only: 'dofe-sensteed-knowledge' })}</PluginRailSeat>
         </div>}
         {ordered.map(({ id, label }) => <div key={id} onPointerEnter={() => openPreview(id)} onPointerLeave={closePreview} onFocus={() => openPreview(id)}><RailButton label={label} hint={!collapsed} active={active === id} onClick={() => navigate(id)}>
-          {renderSlot('sidebar.panellist', { size: 20, active: active === id }, { only: id })}
+          {id === 'schedules' ? <Clock size={20} /> : id === 'plugins' ? <Blocks size={20} /> : id === 'sensteed-skill-manager' ? <Sparkles size={20} /> : renderSlot('sidebar.panellist', { size: 20, active: active === id }, { only: id })}
         </RailButton></div>)}
       </nav>
       <div className="sensteedModuleExtensions" aria-label={zh ? '业务与扩展' : 'Business and extensions'}>
         {extensions.filter(id => id !== 'dofe-sensteed-knowledge').map(id => <div key={id} className="sensteedExtensionModule" onPointerEnter={() => openPreview(id === 'dofe-sensteed-finance' ? 'sensteed-finance' : id === 'dofe-supplier-risk' ? 'supplier-risk' : id)} onPointerLeave={closePreview} onFocus={() => openPreview(id === 'dofe-sensteed-finance' ? 'sensteed-finance' : id === 'dofe-supplier-risk' ? 'supplier-risk' : id)} data-active={extensionActive(id) || undefined}>
-          <PluginRailSeat hintEnabled={!collapsed} beforeNavigate={action => { if (leaveGuard.current) leaveGuard.current(action); else action() }}>{renderSlot('sidebar.footer.action', { wide: false }, { only: id })}</PluginRailSeat>
+          <PluginRailSeat icon={id === 'dofe-sensteed-finance' ? <Gauge size={20} /> : id === 'supplier-risk' ? <ShieldCheck size={20} /> : undefined} active={extensionActive(id)} hintEnabled={!collapsed} beforeNavigate={action => { if (leaveGuard.current) leaveGuard.current(action); else action() }}>{renderSlot('sidebar.footer.action', { wide: false }, { only: id })}</PluginRailSeat>
         </div>)}
       </div>
     </div>

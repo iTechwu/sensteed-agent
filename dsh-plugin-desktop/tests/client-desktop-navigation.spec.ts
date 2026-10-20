@@ -56,7 +56,8 @@ describe('desktop navigation composition', () => {
       usePanelInfo: (select: (value: { activePanelId: string | null }) => unknown) => select({ activePanelId: active }),
       usePanels: (select: (value: unknown) => unknown) => select([{ id: 'plugins', label: '插件', order: 0 }, { id: 'schedules', label: '定时任务', order: 5 }]),
       t: (key: string) => key === 'session.new' ? '新聊天' : key,
-      renderSlot: (name: string, owner?: Record<string, unknown>) => {
+      renderSlot: (name: string, owner?: Record<string, unknown>, options?: { only?: string }) => {
+        if (name === 'sidebar.footer.action' && options?.only === 'dofe-sensteed-knowledge') return createElement('button', { 'aria-label': '知识与记忆' }, createElement('svg'))
         if (name === 'desktop.navigation.context') {
           const register = owner?.registerLeaveGuard as (guard: (action: () => void) => void) => () => void
           register(action => { pendingLeave = action })
@@ -92,8 +93,11 @@ describe('desktop navigation composition', () => {
       expect(selectPanel).toHaveBeenCalledWith(null)
       expect(container.querySelector<HTMLInputElement>('[aria-label="workspace search"]')?.value).toBe('retained')
       expect(mounts).toBeGreaterThan(0)
+      active = 'sensteed-knowledge'; await render()
+      expect(container.querySelector('[aria-label="知识与记忆"]')?.getAttribute('aria-current')).toBe('page')
+      expect(container.querySelector('[aria-label="插件"]')?.hasAttribute('aria-current')).toBe(false)
       const nav = container.querySelector('nav')!
-      expect([...nav.querySelectorAll('button')].map(button => button.getAttribute('aria-label'))).toEqual(['主页', '定时任务', '插件'])
+      expect([...nav.querySelectorAll('button')].map(button => button.getAttribute('aria-label'))).toEqual(['主页', '知识与记忆', '定时任务', '插件'])
       expect(container.querySelector('[data-slot="sidebar.settings"]')).not.toBeNull()
     } finally { await act(async () => root.unmount()); container.remove(); vi.unstubAllGlobals() }
   })
