@@ -309,3 +309,13 @@ it('cleans up rejected startup before retrying the same namespace on a later ren
     expect(f.ctx.logger.error).toHaveBeenCalledExactlyOnceWith('Hub MCP transport "supply-chain" could not activate')
   } finally { await f.dispose() }
 })
+
+it('resolves service/domain references only from the sealed gateway projection',async()=>{
+ const f=fixture();await apply(f.ctx)
+ try{
+  expect(()=>f.mcp().register({...tool,path:'tools/not-published'})).toThrow('INVALID')
+  expect(()=>f.mcp().registerEndpoint({capability:'tools',serverName:'test',timeoutMs:60000,endpointRef:{service:'tools',domain:'not-published'}})).toThrow('UNAVAILABLE')
+  const registration=f.mcp().registerEndpoint({capability:'tools',serverName:'test',timeoutMs:60000,endpointRef:{service:'tools',domain:'douyin_operation'}})
+  await settle();expect(f.clients[0]?.config.url).toBe('https://ai.hozonauto.com/mcp/tools/douyin-operation');await registration.dispose()
+ }finally{await f.dispose()}
+})

@@ -3,6 +3,7 @@ import{inspectSavedHubPlan}from'./hub-saved-plan.ts'
 import { HubSupervisorRequestSchema,provideHubSupervisor,type HubSupervisorRequest } from './hub-supervisor-protocol.ts'
 import { HubGenerationStore } from './hub-generation-store.ts'
 import { HubExecutionJournal } from './hub-execution-journal.ts'
+import { withDesktopMaintenance, confirmDesktopMaintenanceBuild, recoverCancelledDesktopInstallation } from './desktop-maintenance.ts'
 import { hubGenerationBootReference } from './hub-generation-boot.ts'
 import { verifyHubBootAuthorization } from './hub-boot-authorization.ts'
 import { readSealedHubReleaseTrust } from './hub-release-trust.ts'
@@ -852,6 +853,15 @@ async function start(): Promise<void> {
   })
   try {
     await app.whenReady()
+    const verifiedMaintenanceTarget=await readHubRuntimeTarget({isPackaged:app.isPackaged,appPath:app.getAppPath(),resourcesPath:process.resourcesPath,sensteedVersion:appVersion})
+    if(verifiedMaintenanceTarget){
+      try{await confirmDesktopMaintenanceBuild(verifiedMaintenanceTarget)}catch(error){
+        if(!(error instanceof Error)||error.message!=='DESKTOP_INSTALLATION_RECOVERY_REQUIRED')throw error
+        const choice=await dialog.showMessageBox({type:'warning',title:'安装恢复 / Installation recovery',message:'上次安装尚未确认完成。',detail:'请先关闭或取消所有安装器。确认已取消安装后，才能恢复当前版本；如仍需安装，请退出并完成安装。 / Close or cancel all installers before recovering the current version.',buttons:['退出 / Quit','已取消安装，恢复当前版本 / Recover current version'],defaultId:0,cancelId:0,noLink:true})
+        if(choice.response!==1){app.quit();return}
+        await recoverCancelledDesktopInstallation()
+      }
+    }
     startupStage = 'shell-environment'
     lifecycleRecorder.transitionStartupStage(startupStage)
     if (process.platform === 'win32') app.setAppUserModelId(DESKTOP_APP_ID)
@@ -1019,7 +1029,7 @@ async function start(): Promise<void> {
           selectable: profile.webCapable && profile.problem === undefined,
         }))
       },
-      switchProfile: (name, token) => {
+      switchProfile: (name, token) => withDesktopMaintenance('profile-switch',async()=>{
         if (token !== recoveryProfileToken) {
           throw new Error(`${BIN_NAME}: the Profile recovery action is no longer valid`)
         }
@@ -1034,7 +1044,7 @@ async function start(): Promise<void> {
         }
         selectDesktopProfile(selectionStatePath, homeDir, name)
         expectedRecoveryProfileName = name
-      },
+      }),
       openCreator: openStartupProfileCreator,
     }
     const profileStartup = beginDesktopProfileStartup(selectionStatePath, homeDir)
@@ -1335,7 +1345,7 @@ async function start(): Promise<void> {
           // plugin removal while a notice/blocking phase is active.
           const live = getCachedMandatoryPolicy()
           const persisted = live === undefined
-            ? readCachedMandatoryPolicyFromState(runtime.updates.statePath)
+            ? readCachedMandatoryPolicyFromState(runtime.updates.statePath,appVersion,runtime.updates.releaseChannel)
             : undefined
           const policy = live ?? persisted
           if (policy !== undefined && (policy.phase === 'notice' || policy.phase === 'blocking')) {
@@ -1812,7 +1822,7 @@ async function start(): Promise<void> {
     }
     hubBoot = prepared.hubGeneration === undefined ? undefined : prepareHubHostBoot(prepared.hubGeneration, prepared.profile.dir,
       prepared.patches)
-    const hubRuntimeTarget=await readHubRuntimeTarget({isPackaged:app.isPackaged,appPath:app.getAppPath(),resourcesPath:process.resourcesPath,sensteedVersion:appVersion})
+    const hubRuntimeTarget=verifiedMaintenanceTarget
     if(hubRuntimeTarget!==undefined){prepared=prepareSealedDesktopProfile(prepared);prepared.patches=hubBaseComposition(prepared.patches);hubBoot=undefined}
     const hostPatches = hubBoot === undefined ? prepared.patches : hubBoot.patches
     const profileBoot = createDesktopProfileBoot(prepared, desktopPnpmBootstrap, hubBoot?.selection, hubBoot === undefined ? [] : [hubBoot.patch],hubRuntimeTarget===undefined?undefined:hubBaseComposition,hubRuntimeTarget!==undefined,hubBoot?.compose)
@@ -1886,7 +1896,7 @@ async function start(): Promise<void> {
     }
     let hubSwitchTail: Promise<void> = Promise.resolve()
     const handleHubSwitch = (raw: HubSupervisorRequest): Promise<void> => {
-      const task = hubSwitchTail.then(() => performHubSwitch(raw))
+      const task = hubSwitchTail.then(() => withDesktopMaintenance('hub-generation', () => performHubSwitch(raw), marketUserDataDir))
       hubSwitchTail = task.catch(() => {})
       return task
     }
@@ -1897,6 +1907,7 @@ async function start(): Promise<void> {
       if(request.kind==='base'){hubRendererHealth.fail(new Error('Hub generation closed'));hubBoot=undefined;await hubSupervisor.replace(async()=>{},async bind=>{await bootSwitchedHost(hubBasePrepared,bind)});return}
       const store=new HubGenerationStore(marketUserDataDir,request.identity)
       if(request.kind==='activate'){
+        if(getCachedMandatoryPolicy()?.phase==='blocking')throw Error('HUB_DESKTOP_UPDATE_REQUIRED')
         const record=new HubExecutionJournal(store).read(),state=store.readState()
         if(!record||record.operationId!==request.operationId||record.phase!=='STAGED'||record.pendingReceipt!==null||state.phase!=='prepared'||state.pending?.descriptorDigest!==record.descriptorDigest)throw new Error('Hub staged restart mismatch')
         inspectSavedHubPlan(record,request.identity,hubRuntimeTarget,readSealedHubReleaseTrust())

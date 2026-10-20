@@ -1,5 +1,6 @@
 /** Mandatory update policy: contract parsing, phase evaluation, and the polling client. */
 
+import { BRAND_UPDATE_SERVICE } from './generated-product-identity.ts'
 import { readFileSync } from 'node:fs'
 import { writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 import { compareSemVerVersions, parseSemVer } from './desktop-version-semver.ts'
@@ -27,6 +28,8 @@ export interface DesktopMandatoryUpdateDirective {
   readonly deadline?: string
 }
 
+export interface DesktopMandatoryTarget {readonly os:'darwin'|'win32'|'linux';readonly arch:'x64'|'arm64';readonly format:'dmg'|'exe'|'zip'|'appimage'|'deb';readonly installationMode:'installed'|'portable'}
+
 export type DesktopMandatoryUpdatePhase = 'none' | 'notice' | 'blocking'
 
 /** What the policy row reports to the launcher for the current generation. */
@@ -36,6 +39,8 @@ export interface DesktopMandatoryUpdateSnapshot {
   readonly notice?: DesktopMandatoryUpdateNotice
   readonly deadline?: string
   readonly observedAt: string
+  readonly channel?: 'stable'|'beta'|'next'
+  readonly policyRevision?: number
 }
 
 /**
@@ -139,8 +144,11 @@ export function readDesktopMandatoryPolicyState(statePath: string): DesktopManda
     const parsed: unknown = JSON.parse(content)
     if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined
     const file = parsed as DesktopMandatoryPolicyStateFile
-    if (file.version !== 1 || file.snapshot === undefined || typeof file.snapshot.phase !== 'string') return undefined
-    return file.snapshot
+    if(file.version!==1||!file.snapshot||!['none','notice','blocking'].includes(file.snapshot.phase)||typeof file.snapshot.observedAt!=='string'||Number.isNaN(Date.parse(file.snapshot.observedAt)))return undefined
+    const snapshot=file.snapshot
+    if(snapshot.channel!==undefined&&!['stable','beta','next'].includes(snapshot.channel)||snapshot.policyRevision!==undefined&&(!Number.isSafeInteger(snapshot.policyRevision)||snapshot.policyRevision<0))return undefined
+    if(snapshot.phase!=='none'&&!parseDesktopMandatoryDirective(snapshot))return undefined
+    return snapshot
   } catch {
     return undefined
   }
@@ -173,6 +181,9 @@ export class DesktopMandatoryUpdatePolicyClient {
   constructor(private readonly options: {
     readonly endpoint: string
     readonly currentVersion: string
+    readonly channel?: 'stable' | 'beta' | 'next'
+    readonly target?: DesktopMandatoryTarget
+    readonly initialSnapshot?: DesktopMandatoryUpdateSnapshot
     readonly request: DesktopPolicyRequest
     readonly onSnapshot: (snapshot: DesktopMandatoryUpdateSnapshot) => void
     readonly onState?: (statePath: string, snapshot: DesktopMandatoryUpdateSnapshot) => void | Promise<void>
@@ -183,10 +194,16 @@ export class DesktopMandatoryUpdatePolicyClient {
     readonly timeoutMs?: number
     readonly now?: () => number
     readonly signal?: AbortSignal
-  }) {}
+  }) { if(options.initialSnapshot)this.lastSnapshot=options.initialSnapshot }
 
   get snapshot(): DesktopMandatoryUpdateSnapshot {
-    return this.lastSnapshot
+    return this.reconsiderSnapshot()
+  }
+
+  private reconsiderSnapshot():DesktopMandatoryUpdateSnapshot {
+    const previous=this.lastSnapshot
+    if(!previous.minVersion)return previous
+    return this.lastSnapshot={...previous,...evaluateDesktopMandatoryUpdate({directive:{minVersion:previous.minVersion,...(previous.deadline?{deadline:previous.deadline}:{}),...(previous.notice?{notice:previous.notice}:{})},currentVersion:this.options.currentVersion,...(this.options.now?{now:this.options.now()}:{})})}
   }
 
   start(): void {
@@ -215,9 +232,11 @@ export class DesktopMandatoryUpdatePolicyClient {
     if (this.disposed) return
     const intervalMs = this.options.intervalMs ?? 6 * 60 * 60 * 1000
     const maxBackoffMs = this.options.maxBackoffMs ?? 30 * 60 * 1000
-    const delay = this.failures === 0
+    let delay = this.failures === 0
       ? intervalMs
       : Math.min(maxBackoffMs, intervalMs * 2 ** Math.min(this.failures, 20))
+    const deadline=this.lastSnapshot.phase==='notice'&&this.lastSnapshot.deadline?Date.parse(this.lastSnapshot.deadline):NaN
+    if(Number.isFinite(deadline)&&deadline>(this.options.now?.()??Date.now()))delay=Math.min(delay,deadline-(this.options.now?.()??Date.now()))
     this.timer = setTimeout(() => { void this.runCheck() }, delay)
     this.timer.unref?.()
   }
@@ -226,11 +245,12 @@ export class DesktopMandatoryUpdatePolicyClient {
     let directive: DesktopMandatoryUpdateDirective | undefined
     try {
       directive = await this.fetchDirective()
-      const snapshot = evaluateDesktopMandatoryUpdate({
+      const evaluated = evaluateDesktopMandatoryUpdate({
         directive,
         currentVersion: this.options.currentVersion,
         ...(this.options.now === undefined ? {} : { now: this.options.now() }),
       })
+      const snapshot:DesktopMandatoryUpdateSnapshot={...evaluated,channel:this.options.channel??'stable',...(this.policyRevision===undefined?{}:{policyRevision:this.policyRevision})}
       this.failures = 0
       this.lastSnapshot = snapshot
       this.options.onSnapshot(snapshot)
@@ -241,6 +261,7 @@ export class DesktopMandatoryUpdatePolicyClient {
       // Network/parser failure: keep the last restrictive snapshot (never
       // clear a block because the policy service blinked), then back off.
       this.failures += 1
+      this.reconsiderSnapshot()
       if (this.lastSnapshot.phase !== 'none') this.options.onSnapshot(this.lastSnapshot)
       void cause
       this.scheduleNext()
@@ -248,28 +269,42 @@ export class DesktopMandatoryUpdatePolicyClient {
     }
   }
 
+  private policyRevision:number|undefined
   private async fetchDirective(): Promise<DesktopMandatoryUpdateDirective | undefined> {
     const timeoutMs = this.options.timeoutMs ?? 15_000
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), timeoutMs)
     timer.unref?.()
-    this.options.signal?.addEventListener('abort', () => controller.abort(), { once: true })
-    const response = await this.options.request(this.options.endpoint, {
-      method: 'GET',
-      cache: 'no-store',
-      redirect: 'error',
-      signal: controller.signal,
-      headers: { Accept: 'application/json' },
-    })
-    if (!response.ok) throw new Error(`mandatory policy endpoint returned ${String(response.status)}`)
-    const length = Number(response.headers.get('content-length') ?? '0')
-    if (length > MAX_POLICY_BODY_BYTES) throw new Error('mandatory policy response exceeded the body budget')
-    const body = (await response.text()).slice(0, MAX_POLICY_BODY_BYTES)
-    const parsed: unknown = JSON.parse(body)
-    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      throw new Error('mandatory policy response is not an object')
-    }
-    const directive = parseDesktopMandatoryDirective((parsed as Record<string, unknown>).mandatory)
-    return directive
+    const channel=this.options.channel??'stable'
+    const target=this.options.target
+    const v2=target!==undefined&&channel!=='next'
+    const url=v2?new URL('/api/desktop/v2/update-policy',this.options.endpoint):new URL(this.options.endpoint)
+    if(v2)url.search=new URLSearchParams({product:'hozonauto-agent',channel,currentVersion:this.options.currentVersion,releaseGeneration:this.options.currentVersion.startsWith('0.')?'harness-v1':'legacy-v1',...target}).toString()
+    const abort=()=>controller.abort()
+    this.options.signal?.addEventListener('abort',abort,{once:true})
+    if(this.options.signal?.aborted)controller.abort()
+    try {
+      const response=await this.options.request(url.href,{method:'GET',cache:'no-store',redirect:'error',signal:controller.signal,headers:{Accept:'application/json',[BRAND_UPDATE_SERVICE.channelHeader]:channel}})
+      if(!response.ok||!response.body)throw Error('Mandatory policy unavailable')
+      const reader=response.body.getReader(),chunks:Uint8Array[]=[];let bytes=0
+      try{while(true){const item=await reader.read();if(item.done)break;bytes+=item.value.byteLength;if(bytes>MAX_POLICY_BODY_BYTES)throw Error('Mandatory policy response too large');chunks.push(item.value)}}finally{await reader.cancel().catch(()=>{});reader.releaseLock()}
+      const parsed:unknown=JSON.parse(Buffer.concat(chunks).toString('utf8'))
+      if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))throw Error('Invalid mandatory policy')
+      const raw=parsed as Record<string,unknown>
+      if(!v2&&(typeof raw.version!=='string'||parseSemVer(raw.version)===null||raw.channel!==undefined&&raw.channel!==channel))throw Error('Invalid legacy policy binding')
+      const directive=parseDesktopMandatoryDirective(raw.mandatory)
+      if(raw.mandatory!==undefined&&raw.mandatory!==null&&!directive)throw Error('Invalid mandatory directive')
+      if(v2){
+        if(raw.schemaVersion!==2||raw.product!=='hozonauto-agent'||raw.channel!==channel||!Number.isSafeInteger(raw.policyRevision)||Number(raw.policyRevision)<0||!['update-available','up-to-date','unavailable','unsupported-target','manual-migration-required'].includes(String(raw.status)))throw Error('Invalid policy binding')
+        const floor=this.policyRevision??this.lastSnapshot.policyRevision??0
+        if(Number(raw.policyRevision)<floor)throw Error('Mandatory policy revision rollback')
+        if(directive){
+          const release=raw.release as Record<string,unknown>|null,artifact=raw.artifact as Record<string,unknown>|null
+          if(!['update-available','up-to-date'].includes(String(raw.status))||!release||!artifact||release.version!==directive.minVersion||release.releaseGeneration!==(this.options.currentVersion.startsWith('0.')?'harness-v1':'legacy-v1')||(['os','arch','format','installationMode'] as const).some(key=>artifact[key]!==target[key]))throw Error('Mandatory artifact target mismatch')
+        }
+        this.policyRevision=Number(raw.policyRevision)
+      }
+      return directive
+    } finally {clearTimeout(timer);this.options.signal?.removeEventListener('abort',abort)}
   }
 }

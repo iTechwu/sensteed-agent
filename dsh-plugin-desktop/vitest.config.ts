@@ -22,6 +22,7 @@ export default defineConfig({
         resolve: SHARED_RESOLVE,
         test: {
           name: 'unit',
+          setupFiles: ['tests/setup-maintenance.ts'],
           include: ['tests/**/*.spec.ts'],
           exclude: [...HOST_BOOT_SPECS],
           // Profile integration tests create a full package-junction closure; higher

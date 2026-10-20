@@ -1,3 +1,4 @@
+import { confirmDesktopMaintenanceBuild } from './desktop-maintenance.ts'
 import{join}from'node:path'
 import{registerHubGenerationRoutes}from'./hub-generation-routes.ts'
 import { hubBaseComposition } from './hub-base-composition.ts'
@@ -85,6 +86,7 @@ export async function bootDesktopHost(options: DesktopHostOptions, runtime: Desk
   const { prepared: suppliedPrepared, profilePreferences, homeDir, activeProfileName, pluginManagementStatePath,
     selectionStatePath, marketUserDataDir, releaseUserDataLocations, desktopLaunchEnvironment,
     desktopPnpmBootstrap } = options
+  if(options.hubRuntimeTarget)await confirmDesktopMaintenanceBuild(options.hubRuntimeTarget)
   const prepared = options.hubRuntimeTarget === undefined ? suppliedPrepared : prepareSealedDesktopProfile(suppliedPrepared)
   const createFreshDesktopProfile = (name: string) => {
     const created = createDesktopWebProfile(homeDir, name)

@@ -11,7 +11,7 @@ This repository owns the desktop product around an unmodified DeepSeek Harness c
 
 ## Prerequisites and setup
 
-- Use Node.js `^22.19.0` or `>=24.0.0` and the root pnpm `11.7.0` release through Corepack.
+- Use Node.js `^22.19.0` or `>=24.0.0` and the root pnpm `11.28.5` release through Corepack.
 - The DeepSeek Harness source is the user's fork at `../deepseek-harness` (branch `dev`), exposed in this repository through the `deepseek-harness` symlink. Ensure that checkout exists and its root version matches `sourceVersion` in `upstream.json` before running operations.
 - Install the combined root/sibling workspace with `corepack pnpm install --frozen-lockfile`.
 
@@ -59,3 +59,14 @@ This repository owns the desktop product around an unmodified DeepSeek Harness c
 
 - 修改插件源码（包括样式、页面和交互）时，必须同步修改其来源仓库中的源文件，例如 `../docker-helm.dofe.ai/plugins/<name>/`；不得仅修改本仓库的 `.ci` 快照、依赖副本或构建产物。
 - 先在来源仓库修改并通过对应构建/检查，再通过 `node scripts/sync-dofe-plugin-snapshot.mjs --write <name>` 同步桌面快照，确保重新打包和重载后仍包含修改。来源仓库的变更在其自身仓库提交、推送。
+
+## Hub 分发、MCP 与桌面发行边界（2026-10-21）
+
+- `../docker-helm.dofe.ai/plugins` / `skills` 是默认内容的开发/发布输入；`https://ai.hozonauto.com/plugins` 是企业插件、技能的目录、审批、不可变制品和渠道分发权威。已提交快照只服务 sealed base / 离线 bootstrap，不能代替 Hub 已发布状态或目标验证证据。
+- Hub 的 skill 1.2 / plugin 2.1 `requirements` 仅声明 Host/content/MCP 依赖。Host 在 staging 和每次 boot 检查整个启用集合，禁止单项卸载/禁用绕过依赖。Knowledge shared skill 迁移来源是签名时点证据，不是运行时授权。
+- 公共 MCP 路由唯一源仍是部署仓 `runtime/mcp-gateway/route-registry.yml`；本仓 `dsh-sensteed-product/src/public-mcp-capabilities.json` 是生成投影。插件优先调用 Host `hubMcp.registerEndpoint({endpointRef:{service,domain},...})`；旧 `path` 也必须在投影内。MCP 凭据、SSO、Models 计费和业务 ACL 不属于 Hub 元数据权限。
+- Models v2 按真实 `os/arch/format/installationMode` 选择固定 artifact ID，摘要和字节数必须验证。仅明确缺路由时允许旧协议过渡；不支持目标、未发布及跨 release generation 不能自动退回旧架构。Windows ZIP 与 Linux 制品保持手动安装。
+- 安装根的跨进程维护锁在 Profile/generation 锁之外；staging（含下载）、generation state/receipt 和 Profile 切换都遵循此顺序。installer handoff 必须先持久化再启动安装器。PID 退出绝不是安装成功；新 sealed build/目标版本确认或明确取消恢复才解除屏障。macOS 的 Finder 人工替换不宣称由应用控制全程。
+- 整包升级后，只能将旧签名计划用作同身份的已安装选择观察；新 Host 不能复用旧 execute/boot grant，必须用新 target 重新协商。历史非终态日志保持关闭，需恢复原版本完成回执；正常新流程会在升级前拒绝未完成 Hub 事务。
+- 强制更新由 Models 显式设置最低版本、通知和截止时间。Host 使用同渠道、同目标策略；网络/解析失败保留已知限制。blocking 阻止 Hub preview/execute/restart，观察、诊断与恢复继续可用。最低版本满足时重新计算解除限制，绝不从“有新版”推造 mandatory。
+- 架构与阶段证据见 `../docker-helm.dofe.ai/docs/1020/struct-opz/`。源码测试通过不等同于可信 target proof、平台安装验收或生产发布。

@@ -23,9 +23,10 @@ function fixture() {
 }
 
 
-it('requires complete signed manifest and exact aggregate locator coverage',async()=>{
+it.each(['1.1','1.2'])('requires complete signed manifest and exact aggregate locator coverage (%s)',async schemaVersion=>{
  const f=fixture(), keys=generateKeyPairSync('ed25519'),item=f.plan.items[0]!
- const manifest={schemaVersion:'1.1',fileManifestDigest:'a'.repeat(64),tenantId:f.plan.tenantId,skillId:item.itemId,releaseId:item.releaseId,kind:'skill',installName:'example',version:'1.0.0',artifact:{sha256:item.artifactDigest,bytes:20,format:'zip'},compatibility:{sensteed:'*',testedTargets:[]},accessDeclaration:{containsScripts:false,networkHosts:[],fileAccess:'none'},issuedAt:new Date().toISOString()}
+ if(schemaVersion==='1.2')f.plan.target.hostCapabilities.push('hub.requirements.v1')
+ const manifest={schemaVersion,...(schemaVersion==='1.2'?{requirements:{schemaVersion:'sensteed-requirements-v1',host:[],content:[],mcp:[]}}:{}),fileManifestDigest:'a'.repeat(64),tenantId:f.plan.tenantId,skillId:item.itemId,releaseId:item.releaseId,kind:'skill',installName:'example',version:'1.0.0',artifact:{sha256:item.artifactDigest,bytes:20,format:'zip'},compatibility:{sensteed:'*',testedTargets:[]},accessDeclaration:{containsScripts:false,networkHosts:[],fileAccess:'none'},issuedAt:new Date().toISOString()}
  const signManifest={manifest,signature:{algorithm:'Ed25519',canonicalization:'RFC8785',keyId:'artifact',payloadDigest:hubSyncDigest(manifest),signature:sign(null,Buffer.from(hubCanonicalJson(manifest)),keys.privateKey).toString('base64')}}
  const itemBound={...item,manifestDigest:hubSyncDigest(manifest)},plan={...f.plan,items:[itemBound],proposedGenerationDigest:hubGenerationContentDigest([itemBound])},cap=verifyHubGenerationPlan(f.signed(plan),f.trust,f.expected)
  const operationId=randomUUID(),client=new HubGenerationClient({assertCurrent(){},generationRequest:async()=>({planId:plan.planId,operationId,state:'consumed',authorized:true,executionGeneration:'1',executionExpiresAt:new Date(Date.now()+1800000).toISOString(),proposedGenerationDigest:plan.proposedGenerationDigest})} as never,{tenantId:plan.tenantId,actorRef:plan.actorRef} as never)

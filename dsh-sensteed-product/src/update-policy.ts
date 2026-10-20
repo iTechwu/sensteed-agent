@@ -7,6 +7,8 @@ import { productPackageVersion } from './package-version.ts'
 import {
   DESKTOP_MANDATORY_POLICY_STATE_FILENAME,
   DesktopMandatoryUpdatePolicyClient,
+  evaluateDesktopMandatoryUpdate,
+  type DesktopMandatoryTarget,
   readDesktopMandatoryPolicyState,
   writeDesktopMandatoryPolicyState,
   type DesktopMandatoryUpdateSnapshot,
@@ -15,7 +17,7 @@ import {
 /** Narrow launcher surface this row consumes (probed, never required). */
 interface PolicyLauncherRuntime {
   readonly platform: NodeJS.Platform
-  readonly updates?: { readonly statePath?: string; downloadAndOpen(version: string, signal?: AbortSignal): Promise<void> }
+  readonly updates?: { readonly target?: DesktopMandatoryTarget; readonly releaseChannel?: 'stable' | 'beta' | 'next'; readonly statePath?: string; downloadAndOpen(version: string, signal?: AbortSignal): Promise<void> }
   reportMandatoryUpdatePolicy(policy: DesktopMandatoryUpdateSnapshot | null): void
   registerTrayItem(item: {
     group: string
@@ -32,6 +34,7 @@ export interface SensteedMandatoryUpdatePolicy {
   snapshot(): { phase: 'none' | 'notice' | 'blocking'; minVersion?: string }
   /** Download the mandatory target release through the Host's own update adapter. */
   downloadLatest(): Promise<void>
+  ensureMutationAllowed(): Promise<void>
 }
 
 declare module '@deepseek-ai/cordis' {
@@ -90,23 +93,28 @@ export async function apply(ctx: Context): Promise<void> {
   const updatesStateDir = runtime.updates?.statePath === undefined ? undefined : dirname(runtime.updates.statePath)
   const statePath = updatesStateDir === undefined ? undefined : join(updatesStateDir, DESKTOP_MANDATORY_POLICY_STATE_FILENAME)
   const persisted = statePath === undefined ? undefined : readDesktopMandatoryPolicyState(statePath)
-  if (persisted !== undefined) {
-    snapshot = persisted
+  if (persisted !== undefined && (persisted.channel??'stable')===(runtime.updates?.releaseChannel??'stable')) {
+    snapshot = {...evaluateDesktopMandatoryUpdate({directive:persisted.minVersion?{minVersion:persisted.minVersion,...(persisted.deadline?{deadline:persisted.deadline}:{}),...(persisted.notice?{notice:persisted.notice}:{})}:undefined,currentVersion:productPackageVersion()}),channel:runtime.updates?.releaseChannel??'stable',...(persisted.policyRevision===undefined?{}:{policyRevision:persisted.policyRevision})}
     syncSurfaces()
   }
 
   ctx.provide('sensteedMandatoryUpdatePolicy', {
-    snapshot: () => ({ phase: snapshot.phase, minVersion: snapshot.minVersion }),
+    snapshot: () => ({phase:evaluateDesktopMandatoryUpdate({directive:snapshot.minVersion?{minVersion:snapshot.minVersion,...(snapshot.deadline?{deadline:snapshot.deadline}:{})}:undefined,currentVersion:productPackageVersion()}).phase,minVersion:snapshot.minVersion}),
+    ensureMutationAllowed:async()=>{await client.check();if(client.snapshot.phase==='blocking')throw Error('HUB_DESKTOP_UPDATE_REQUIRED')},
     downloadLatest: async () => {
       if (snapshot.minVersion === undefined) throw new Error('@dofe/dsh-sensteed-product: no mandatory target version to download')
       const updates = runtime.updates
       if (updates?.downloadAndOpen === undefined) throw new Error('@dofe/dsh-sensteed-product: launcher update adapter is unavailable')
-      await updates.downloadAndOpen(snapshot.minVersion, undefined)
+      await updates.downloadAndOpen(snapshot.minVersion, new AbortController().signal)
     },
   })
   const client = new DesktopMandatoryUpdatePolicyClient({
     endpoint: BRAND_UPDATE_SERVICE.endpoint,
     currentVersion: productPackageVersion(),
+    initialSnapshot:snapshot,
+    initialDelayMs:0,
+    ...(runtime.updates?.target?{target:runtime.updates.target}:{}),
+    channel: runtime.updates?.releaseChannel ?? 'stable',
     request: (url, init) => globalThis.fetch(url, init),
     onSnapshot: next => {
       snapshot = next

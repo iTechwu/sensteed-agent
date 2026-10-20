@@ -7,11 +7,11 @@ import {registerHubGenerationManager} from '../src/hub-generation-manager.ts'
 import {HubGenerationStore} from '../src/hub-generation-store.ts'
 import {HubExecutionJournal} from '../src/hub-execution-journal.ts'
 import {HubGenerationClient} from '../src/hub-generation-client.ts'
-import {inspectSavedHubPlan} from '../src/hub-saved-plan.ts'
+import {inspectSavedHubInventory} from '../src/hub-saved-plan.ts'
 import {resolveHubHostIdentity} from '../src/hub-host-identity.ts'
 import {readSealedHubReleaseTrust} from '../src/hub-release-trust.ts'
 import {hubCanonicalJson,hubSyncDigest,verifyHubSyncSnapshot,type HubSyncExpected} from '../src/hub-sync-verifier.ts'
-vi.mock('../src/hub-saved-plan.ts',()=>({inspectSavedHubPlan:vi.fn()}))
+vi.mock('../src/hub-saved-plan.ts',()=>({inspectSavedHubInventory:vi.fn()}))
 vi.mock('../src/hub-host-identity.ts',()=>({resolveHubHostIdentity:vi.fn()}))
 vi.mock('../src/hub-release-trust.ts',()=>({readSealedHubReleaseTrust:vi.fn()}))
 vi.mock('../src/hub-boot-authorization.ts',()=>({verifyHubBootAuthorization:vi.fn()}))
@@ -25,7 +25,7 @@ function fixture(active:boolean){
  vi.mocked(readSealedHubReleaseTrust).mockReturnValue(trust);vi.mocked(resolveHubHostIdentity).mockResolvedValue(identity)
  vi.spyOn(HubGenerationStore.prototype,'readState').mockReturnValue({active:active?{descriptorDigest:'a'.repeat(64)}:null} as never)
  vi.spyOn(HubExecutionJournal.prototype,'read').mockReturnValue(active?{phase:'ACTIVATED',descriptorDigest:'a'.repeat(64)} as never:undefined)
- vi.mocked(inspectSavedHubPlan).mockReturnValue({plan:{channel:'beta',proposedGenerationDigest:'c'.repeat(64),policyRevision:1,items:[]}} as never)
+ vi.mocked(inspectSavedHubInventory).mockReturnValue({plan:{channel:'beta',proposedGenerationDigest:'c'.repeat(64),policyRevision:1,items:[]}} as never)
  const check=vi.fn(async(_context:unknown,_request:unknown,expected:HubSyncExpected)=>{
   const {minimumPolicyRevision:_floor,...binding}=expected,now=Date.now()
   const snapshot={...binding,schemaVersion:'hub-sync-v1',snapshotId:randomUUID(),policyRevision:1,catalogDigest:'d'.repeat(64),entries:[],issuedAt:new Date(now).toISOString(),expiresAt:new Date(now+300000).toISOString()}
@@ -33,21 +33,22 @@ function fixture(active:boolean){
  })
  const client={context:async()=>({tenantId:identity.tenantId,actorRef:identity.actorRef}),check,bootAuthorization:vi.fn(async()=>({})),watchInvalidation:()=>()=>{},watchOfflineDenial:()=>()=>{}}
  let manager!:{check(input:unknown):Promise<{channel:'stable'|'beta'}>;preview(input:unknown):Promise<unknown>}
- const scope={hubHostClient:client,provide:(_name:string,value:unknown)=>{manager=value as typeof manager},effect:()=>{},inject:()=>{}}
+ const policy={snapshot:()=>({phase:'none' as 'none'|'notice'|'blocking'}),ensureMutationAllowed:vi.fn(async()=>{})}
+ const scope={get:()=>policy,hubHostClient:client,provide:(_name:string,value:unknown)=>{manager=value as typeof manager},effect:()=>{},inject:()=>{}}
  registerHubGenerationManager({inject:(_keys:string[],fn:(v:unknown)=>void)=>fn(scope)} as never,{target,userData:root,profileDirectory:root})
- return{manager,check,client}
+ return{manager,check,client,policy}
 }
 it.each([[true,{},'beta'],[false,{},'stable'],[true,{channel:'stable'},'stable'],[false,{channel:'beta'},'beta']]as const)('resolves channel from verified active inventory while preserving explicit intent (%s, %j)',async(active,input,expected)=>{
  const f=fixture(active),result=await f.manager.check(input)
  expect(result.channel).toBe(expected);expect(f.check.mock.calls[0]![2].channel).toBe(expected)
- expect(inspectSavedHubPlan).toHaveBeenCalledTimes(active?1:0)
+ expect(inspectSavedHubInventory).toHaveBeenCalledTimes(active?1:0)
 })
 it.each([{channel:'nightly'},{channel:null},{channel:1},{channel:'beta',target:{}},null])('rejects invalid channel intents before catalog access (%j)',async input=>{
  const f=fixture(true);await expect(f.manager.check(input)).rejects.toThrow();expect(f.check).not.toHaveBeenCalled()
 })
 it('requires a channel for preview and never guesses from invalid inventory',async()=>{
  const f=fixture(true);await expect(f.manager.preview({requested:[]})).rejects.toThrow()
- vi.mocked(inspectSavedHubPlan).mockImplementation(()=>{throw Error('invalid signed inventory')})
+ vi.mocked(inspectSavedHubInventory).mockImplementation(()=>{throw Error('invalid signed inventory')})
  await expect(f.manager.check({})).rejects.toThrow('invalid signed inventory');expect(f.check).not.toHaveBeenCalled()
 })
 it('keeps the repair check available when the old active boot lease is revoked',async()=>{
@@ -72,4 +73,11 @@ it.each([
  const prepare=vi.spyOn(HubGenerationClient.prototype,'prepare')
  await expect(f.manager.preview({channel:'stable',requested:[]})).rejects.toThrow('HUB_OPERATION_PENDING')
  expect(prepare).not.toHaveBeenCalled()
+})
+
+it('blocks aggregate mutation under mandatory policy while keeping catalog observation available',async()=>{
+ const f=fixture(false);f.policy.snapshot=()=>({phase:'blocking'})
+ await expect(f.manager.check({})).resolves.toMatchObject({channel:'stable'})
+ await expect(f.manager.preview({channel:'stable',requested:[]})).rejects.toThrow('HUB_DESKTOP_UPDATE_REQUIRED')
+ expect(f.policy.ensureMutationAllowed).toHaveBeenCalledOnce()
 })

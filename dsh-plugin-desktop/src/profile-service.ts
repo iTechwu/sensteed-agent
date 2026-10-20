@@ -1,5 +1,6 @@
 /** Generation-scoped desktop profile discovery and restart-safe selection service. */
 
+import { withDesktopMaintenance } from './desktop-maintenance.ts'
 import { type Context, Service } from '@deepseek-ai/cordis'
 import type { DesktopProfileSummary } from './profile-manager.ts'
 
@@ -84,6 +85,7 @@ export class DesktopProfileService extends Service implements DesktopProfiles {
   private committedSelection: DesktopProfileSelection | undefined
   private restartOperation: Promise<void> | undefined
   private restartCompleted = false
+  private selectionTail:Promise<void>=Promise.resolve()
   private readonly immediateSelections = new Map<string, Promise<void>>()
 
   /**
@@ -150,7 +152,7 @@ export class DesktopProfileService extends Service implements DesktopProfiles {
       }
 
       return this.runExclusive(name, async () => {
-        await this.bootstrap.persistSelection(name)
+        await withDesktopMaintenance('profile-switch',async()=>{await this.bootstrap.persistSelection(name)})
         this.committedName = name
         this.committedSelection = Object.freeze({
           restartRequired: true,
@@ -170,9 +172,11 @@ export class DesktopProfileService extends Service implements DesktopProfiles {
       this.assertActive()
       const running = this.immediateSelections.get(name)
       if (running !== undefined) return running
-      const promise = this.committedName === name && this.committedSelection !== undefined
-        ? this.committedSelection.restart()
-        : this.prepareSelection(name).then(selection => selection.restart())
+      const promise = this.selectionTail.then(()=>withDesktopMaintenance('profile-switch',async()=>{
+        const selection=this.committedName===name&&this.committedSelection!==undefined?this.committedSelection:await this.prepareSelection(name)
+        await selection.restart()
+      }))
+      this.selectionTail=promise.catch(()=>{})
       this.immediateSelections.set(name, promise)
       const release = (): void => {
         if (this.immediateSelections.get(name) === promise) this.immediateSelections.delete(name)
@@ -199,7 +203,7 @@ export class DesktopProfileService extends Service implements DesktopProfiles {
     if (this.bootstrap.delete === undefined) {
       throw new Error('dsh-plugin-desktop: profile deletion is unavailable')
     }
-    await this.bootstrap.delete(name)
+    await withDesktopMaintenance('profile-switch',async()=>{await this.bootstrap.delete!(name)})
     this.assertActive()
   }
 
@@ -225,7 +229,7 @@ export class DesktopProfileService extends Service implements DesktopProfiles {
       if (name !== this.committedName) return Promise.reject(this.committedSelectionError(name))
       if (this.restartCompleted) return Promise.resolve()
       if (this.restartOperation !== undefined) return this.restartOperation
-      const promise = Promise.resolve(this.bootstrap.requestRestart()).then(() => {
+      const promise = withDesktopMaintenance('profile-switch',async()=>{await this.bootstrap.requestRestart()}).then(() => {
         this.restartCompleted = true
       })
       this.restartOperation = promise
@@ -241,7 +245,7 @@ export class DesktopProfileService extends Service implements DesktopProfiles {
 
   /** Protect both an in-flight persistence target and the committed target. */
   private isSelectionTarget(name: string): boolean {
-    return this.operation?.name === name || this.committedName === name
+    return this.operation?.name === name || this.committedName === name || this.immediateSelections.has(name)
   }
 
   /** Reject a target that would overwrite the Profile already selected for restart. */

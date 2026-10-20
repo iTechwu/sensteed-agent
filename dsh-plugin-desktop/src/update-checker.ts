@@ -1,3 +1,4 @@
+import { desktopUpdatePolicyUrl, parseDesktopUpdatePolicy, type DesktopUpdateTarget, type DesktopV2Artifact } from './desktop-update-v2.ts'
 /** Headless version checks against the branded release service. */
 
 import type { DesktopUpdateFailure } from './update-status.ts'
@@ -35,6 +36,7 @@ export type UpdateRequest = (url: string, init: RequestInit) => Promise<Response
 export interface UpdateCheckOptions {
   /** Installed application version, expressed as canonical SemVer. */
   readonly currentVersion: string
+  readonly target?: DesktopUpdateTarget
   /** Release stream that must be returned by the service. */
   readonly channel: DesktopReleaseChannel
   /** Channel of the installed application when explicitly switching streams. */
@@ -54,6 +56,7 @@ export interface UpdateCheckOptions {
 export type UpdateCheckResult = {
   /** Whether the service reports a version newer than the installed application. */
   readonly status: 'up-to-date' | 'update-available'
+  readonly artifact?: DesktopV2Artifact
   /** Canonical installed version, including any prerelease identifiers. */
   readonly currentVersion: string
   /** Canonical latest stable version returned by the service. */
@@ -95,6 +98,25 @@ export async function checkForDesktopUpdate(
 
   let response: Response
   try {
+    if(options.target!==undefined&&options.channel!=='next'){
+      response=await request(desktopUpdatePolicyUrl(current.version,options.channel,options.target),init)
+      // Only an explicitly missing route permits legacy fallback during rollout.
+      if(response.status===404||response.status===405){
+        const error:unknown=JSON.parse(await readLimitedBody(response))
+        if(!isRecord(error)||!isRecord(error.error)||!['ROUTE_NOT_FOUND','METHOD_NOT_ALLOWED','NOT_FOUND'].includes(String(error.error.code)))return fail('service')
+      }else{
+        if(response.status!==200)return fail('service')
+        let policy:ReturnType<typeof parseDesktopUpdatePolicy>
+        try{policy=parseDesktopUpdatePolicy(JSON.parse(await readLimitedBody(response)),current.version,options.channel,options.target)}catch{return fail('invalid-response')}
+        if(policy.status==='unavailable')return fail('unpublished')
+        if(policy.status==='unsupported-target'||policy.status==='manual-migration-required')return fail(policy.status)
+        const latest=policy.release?parseCanonicalSupportedVersion(policy.release.version):current
+        if(!latest)return fail('invalid-response')
+        const newer=compareParsedSemVer(latest,current)>0
+        if(policy.status==='update-available'&&!newer&&options.allowDowngrade!==true)return {status:'up-to-date',currentVersion:current.version,latestVersion:latest.version}
+        return {status:policy.status,currentVersion:current.version,latestVersion:latest.version,...(policy.artifact===null?{}:{artifact:policy.artifact})}
+      }
+    }
     response = await request(DESKTOP_VERSION_ENDPOINT, init)
   } catch {
     return fail(options.signal?.aborted ? 'timeout' : 'network')

@@ -1,5 +1,6 @@
+import type {} from '@dofe/dsh-sensteed-product/update-policy'
 /** Host-only UI intents. All identities, targets, paths and grants remain below this boundary. */
-import{inspectSavedHubPlan}from'./hub-saved-plan.ts'
+import{inspectSavedHubPlan,inspectSavedHubInventory}from'./hub-saved-plan.ts'
 import{verifyHubBootAuthorization}from'./hub-boot-authorization.ts'
 import{randomUUID}from'node:crypto'
 import type{Context}from'@deepseek-ai/cordis'
@@ -22,7 +23,7 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
   let lastStore:HubGenerationStore|undefined
   let closing=false
   async function closeManaged(){if(!options.managed||closing)return;closing=true;await scope.hubGenerationSupervisor.request({kind:'base'})}
-  const unwatch=client.watchInvalidation(()=>{intents.clear();if(options.managed){void closeManaged().catch(()=>{})}else{setImmediate(()=>{void resume().catch(()=>{})})}})
+  const unwatch=client.watchInvalidation(()=>{intents.clear();if(options.managed){void closeManaged().catch(()=>{})}else{const pending=recovery;setImmediate(()=>{void (pending??Promise.resolve()).catch(()=>{}).then(()=>resume()).catch(()=>{})})}})
   scope.effect(()=>()=>unwatch(),'Hub identity fence')
   const undeny=client.watchOfflineDenial(()=>{intents.clear();clearHubOfflineBoot(options);void closeManaged().catch(()=>{})})
   scope.effect(()=>()=>undeny(),'Hub explicit refusal fence')
@@ -35,7 +36,7 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
    let installed:Parameters<HubHostClient['check']>[1]['installed']=[]
    if(state.active!==null){
     if(!record||record.phase!=='ACTIVATED'&&record.phase!=='COMMITTED')throw new Error('HUB_ACTIVE_INVENTORY_RECOVERY_REQUIRED')
-    const saved=inspectSavedHubPlan(record,identity,options.target,trust)
+    const saved=inspectSavedHubInventory(record,identity,options.target,trust)
     channel=requestedChannel??saved.plan.channel
     // An old active generation is inventory evidence for planning, not a
     // prerequisite for querying or repairing it. Its boot lease may have been
@@ -48,12 +49,14 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
    return{context,identity,store,expected,snapshot,activeGenerationDigest,installed}
 
   }
+  async function requireMutationAllowed(){const policy=scope.get('sensteedMandatoryUpdatePolicy');await policy?.ensureMutationAllowed?.();if(policy?.snapshot().phase==='blocking')throw new Error('HUB_DESKTOP_UPDATE_REQUIRED')}
   const manager={
    async check(input:unknown){
     const{channel}=z.strictObject({channel:z.enum(['stable','beta']).optional()}).parse(input),env=await environment(channel)
     return{channel:env.snapshot.channel,profileId:env.identity.profileId,activeGenerationDigest:env.activeGenerationDigest,entries:env.snapshot.entries,activeItems:env.installed.filter(i=>!i.userRemoved).map(i=>({kind:i.kind,itemId:i.itemId,enabled:i.enabled})),operation:summary(env.store)}
    },
    async preview(input:unknown){
+    await requireMutationAllowed()
     const{channel,requested}=z.strictObject({channel:z.enum(['stable','beta']),requested:requestedSchema}).parse(input),env=await environment(channel,true)
     const pending=new HubExecutionJournal(env.store).read()
     if(!hubExecutionCanBegin(pending))throw new Error('HUB_OPERATION_PENDING')
@@ -63,6 +66,7 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
     return{intentId,confirmationNonce,profileId:env.identity.profileId,planDigest:plan.planDigest,expiresAt:plan.expiresAt,totalBytes:plan.totalBytes,items:plan.items.map(i=>({kind:i.kind,itemId:i.itemId,action:i.action,enabled:i.enabled,releaseId:i.releaseId,displayName:env.snapshot.entries.find(e=>e.kind===i.kind&&e.itemId===i.itemId)?.displayName,version:env.snapshot.entries.find(e=>e.kind===i.kind&&e.itemId===i.itemId)?.version,accessDeclaration:env.snapshot.entries.find(e=>e.kind===i.kind&&e.itemId===i.itemId)?.accessDeclaration??null,compatibility:env.snapshot.entries.find(e=>e.kind===i.kind&&e.itemId===i.itemId)?.disposition,evidence:env.snapshot.entries.find(e=>e.kind===i.kind&&e.itemId===i.itemId)?.reason}))}
    },
    async execute(input:unknown){
+    await requireMutationAllowed()
     const{intentId,confirmationNonce}=z.strictObject({intentId:z.uuid(),confirmationNonce:z.uuid()}).parse(input),intent=intents.get(intentId)
     intents.delete(intentId)
     if(!intent||intent.nonce!==confirmationNonce)throw new Error('HUB_INTENT_EXPIRED')
@@ -70,6 +74,7 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
     return{operationId:record.operationId,state:'STAGED',phase:record.phase,restartRequired:true,restartReady:false}
    },
    async restart(input:unknown){
+    await requireMutationAllowed()
     const{operationId}=z.strictObject({operationId:z.uuid()}).parse(input),context=await client.context(),identity=await resolveHubHostIdentity(options.userData,options.profileDirectory,client,context)
     const store=new HubGenerationStore(options.userData,identity),record=new HubExecutionJournal(store).read()
     if(!record||record.operationId!==operationId||record.phase!=='STAGED'||record.pendingReceipt!==null)throw new Error('HUB_RESTART_NOT_READY')
@@ -106,6 +111,12 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
   async function resumeOnce(){
    const context=await client.context(),identity=await resolveHubHostIdentity(options.userData,options.profileDirectory,client,context),store=new HubGenerationStore(options.userData,identity),journal=new HubExecutionJournal(store)
    let record=journal.read();if(!record)return
+   // A new sealed Host can observe prior choices but cannot reuse old execution or boot grants.
+   if(record.signedPlan&&inspectSavedHubInventory(record,identity,options.target,trust).hostTargetChanged){
+    clearHubOfflineBoot(options)
+    await closeManaged()
+    return
+   }
    const state=store.readState(),active=state.active
    // A prepared candidate is still awaiting restart consent. Otherwise an
    // offline-restored checkpoint must reconcile the failed execution first.

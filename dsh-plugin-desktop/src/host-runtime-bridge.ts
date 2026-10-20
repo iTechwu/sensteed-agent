@@ -7,9 +7,9 @@ export type RuntimeSnapshot = Pick<DesktopRuntime, 'platform' | 'locale'> & {
   updates: Omit<DesktopUpdateAdapter, 'request' | 'confirmDownload' | 'showManualCheckResult' | 'downloadAndOpen' | 'notify' | 'reportMandatoryUpdatePolicy'>
 }
 export function runtimeSnapshot(runtime: DesktopRuntime): RuntimeSnapshot {
-  const { isPackaged, canDownload, currentVersion, releaseChannel, statePath, installationId } = runtime.updates
+  const { isPackaged, canDownload, currentVersion, releaseChannel, statePath, installationId, target } = runtime.updates
   return { platform: runtime.platform, locale: runtime.locale,
-    updates: { isPackaged, canDownload, currentVersion, statePath,
+    updates: { isPackaged, canDownload, currentVersion, statePath, ...(target ? { target } : {}),
       ...(releaseChannel ? { releaseChannel } : {}), ...(installationId ? { installationId } : {}) } }
 }
 
@@ -59,7 +59,7 @@ export function createHostRuntime(rpc: HostRpc, snapshot: RuntimeSnapshot): Desk
       },
       confirmDownload: (version, channel) => send('update:confirmDownload', [version, channel]),
       showManualCheckResult: result => send('update:showManualCheckResult', [result]),
-      downloadAndOpen: (version, signal, channel, digests) => send('update:downloadAndOpen', [version, channel, digests], signal),
+      downloadAndOpen: (version, signal, channel, digests, artifact) => send('update:downloadAndOpen', [version, channel, digests, artifact], signal),
       notify: notification => { void send('update:notify', [notification]) },
     },
     reportMandatoryUpdatePolicy(policy) { void send('native:reportMandatoryUpdatePolicy', [policy]) },
@@ -233,7 +233,7 @@ export function bindNativeRuntime(rpc: HostRpc, runtime: DesktopRuntime): () => 
   })
   handle('update:confirmDownload', ([version, channel]) => runtime.updates.confirmDownload(version, channel))
   handle('update:showManualCheckResult', ([result]) => runtime.updates.showManualCheckResult(result))
-  handle('update:downloadAndOpen', ([version, channel, digests], signal) => runtime.updates.downloadAndOpen(version, signal, channel, digests))
+  handle('update:downloadAndOpen', ([version, channel, digests, artifact], signal) => runtime.updates.downloadAndOpen(version, signal, channel, digests, artifact))
   handle('update:notify', ([value]) => runtime.updates.notify(value))
   return async () => {
     trays.forEach(tray => tray.dispose()); trays.clear()

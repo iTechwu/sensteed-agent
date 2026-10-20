@@ -1,3 +1,4 @@
+import { verifyHubManifestRequirements } from './hub-manifest-requirements.ts'
 /** Bind extracted files and activation rows back to signed release evidence on every boot. */
 import { readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
@@ -57,5 +58,6 @@ export function verifyHubGenerationContent(store:HubGenerationStore,plan:Readonl
    }
   }
  }
+ verifyHubManifestRequirements(evidence.manifests,plan)
  if([...covered].sort().join('\0')!==Object.keys(descriptor.files).sort().join('\0')||hubSyncDigest(packages)!==hubSyncDigest(descriptor.packages)||hubSyncDigest({entries,skills})!==hubSyncDigest(descriptor.verifiedComposition))throw new Error('Hub boot unsigned layout or activation mismatch')
 }

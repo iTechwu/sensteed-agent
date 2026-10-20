@@ -127,3 +127,28 @@ describe('mandatory update policy client', () => {
     expect(file.snapshot.phase).toBe('notice')
   })
 })
+
+it('sends the selected channel without inventing a mandatory directive', async () => {
+  const request=vi.fn(async(_url: string, _init: RequestInit)=>response({version:'0.2.1-rc.2-beta.202610202356',channel:'beta'}))
+  const target=new DesktopMandatoryUpdatePolicyClient({endpoint:'https://ai.hozonauto.com/api/desktop/version',currentVersion:'0.2.1-rc.2-beta.202610202356',channel:'beta',request,onSnapshot:()=>{}})
+  try { await target.check(); expect(new Headers(request.mock.calls[0]?.[1]?.headers).get('X-Sensteed-Agent-Channel')).toBe('beta'); expect(target.snapshot.phase).toBe('none') } finally { target.dispose() }
+})
+
+it('binds mandatory v2 to channel and exact artifact, preserves restriction on malformed/rollback responses, and clears only newer policy',async()=>{
+ const exact={os:'darwin' as const,arch:'arm64' as const,format:'dmg' as const,installationMode:'installed' as const}
+ const release={version:'0.2.1-beta.2',releaseGeneration:'harness-v1'}
+ let body:any={schemaVersion:2,product:'hozonauto-agent',channel:'beta',policyRevision:2,status:'update-available',release,artifact:exact,mandatory:{minVersion:release.version,deadline:'2026-10-01T00:00:00Z'}}
+ const request=vi.fn(async(_url:string,_init:RequestInit)=>response(body))
+ const client=new DesktopMandatoryUpdatePolicyClient({endpoint:'https://ai.hozonauto.com/api/desktop/version',currentVersion:'0.2.1-beta.1',channel:'beta',target:exact,request,onSnapshot:()=>{},now:()=>NOW})
+ try{
+  await client.check();expect(client.snapshot.phase).toBe('blocking');expect(request.mock.calls[0]?.[0]).toContain('/api/desktop/v2/update-policy?')
+  body={...body,mandatory:{minVersion:'bad'}};await client.check();expect(client.snapshot.phase).toBe('blocking')
+  body={...body,mandatory:null,policyRevision:1};await client.check();expect(client.snapshot.phase).toBe('blocking')
+  body={...body,policyRevision:3};await client.check();expect(client.snapshot.phase).toBe('none')
+ }finally{client.dispose()}
+})
+it('a persisted notice becomes blocking at its deadline even during network failure',async()=>{
+ let now=NOW
+ const client=new DesktopMandatoryUpdatePolicyClient({endpoint:'https://ai.hozonauto.com/api/desktop/version',currentVersion:'2.0.0',initialSnapshot:{phase:'notice',minVersion:DIRECTIVE.minVersion,deadline:DIRECTIVE.deadline!,observedAt:new Date(NOW).toISOString()},request:async()=>{throw Error('offline')},onSnapshot:()=>{},now:()=>now})
+ try{expect(client.snapshot.phase).toBe('notice');now=Date.parse('2026-10-16T00:00:00Z');await client.check();expect(client.snapshot.phase).toBe('blocking')}finally{client.dispose()}
+})

@@ -1,3 +1,12 @@
+import { checkForDesktopUpdate, compareSemVerVersions } from './update-checker.ts'
+import { resolveDesktopUpdateTarget, DesktopV2ArtifactSchema, type DesktopV2Artifact } from './desktop-update-v2.ts'
+import { downloadDesktopV2Artifact } from './desktop-update-v2-download.ts'
+import { withDesktopMaintenance, recordDesktopInstallerHandoff } from './desktop-maintenance.ts'
+function nativeUpdateTarget() {
+  let windowsInstalled=false
+  if(process.platform==='win32')try { windowsInstalled=readFileSync(join(dirname(process.execPath),'.sensteed-installation'),'utf8').trim()==='nsis-v1' } catch {}
+  return resolveDesktopUpdateTarget(process.platform,process.arch,process.env,windowsInstalled)
+}
 /** Electron implementation of the launcher-provided desktop runtime capability. */
 
 import {
@@ -16,7 +25,7 @@ import { spawn } from 'node:child_process'
 import { NextTransitionNotice } from './next-transition-notice.ts'
 import { RemoteControlOffer, remoteControlOfferCopy } from './remote-control-offer.ts'
 import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { Readable } from 'node:stream'
 import { fileURLToPath } from 'node:url'
 import { desktopTerminalStateDirectory, openDesktopTerminal } from './desktop-terminal.ts'
@@ -241,15 +250,16 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
     })
     this.updates = {
       get isPackaged() { return app.isPackaged },
-      get canDownload() { return app.isPackaged && platformStrategy.updateDownloadPlatform !== undefined },
+      get canDownload() { return app.isPackaged && nativeUpdateTarget() !== undefined },
       get currentVersion() { return PRODUCT_VERSION },
       get releaseChannel() { return DESKTOP_RELEASE_CHANNEL },
       get statePath() { return join(app.getPath('userData'), 'updates', 'state.json') },
+      ...(nativeUpdateTarget() ? { target: nativeUpdateTarget()! } : {}),
       ...(installationId === undefined ? {} : { installationId }),
       request: (url, init) => net.fetch(url, init),
       confirmDownload: (version, channel) => this.confirmUpdateDownload(version, channel),
       showManualCheckResult: result => this.showManualUpdateCheckResult(result),
-      downloadAndOpen: (version, signal, channel, installerSha256) => this.downloadAndOpenUpdate(version, signal, channel, installerSha256),
+      downloadAndOpen: (version, signal, channel, installerSha256, artifact) => this.downloadAndOpenUpdate(version, signal, channel, installerSha256, artifact),
       notify: notification => { this.showNotification(notification) },
     }
   }
@@ -1023,12 +1033,23 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
     signal: AbortSignal,
     channel: DesktopReleaseChannel = 'stable',
     installerSha256?: Readonly<Partial<Record<'win32' | 'darwin', string>>>,
+    exactArtifact?: DesktopV2Artifact,
   ): Promise<void> {
     const copy = desktopNativeCopy(this.currentLocale)
+    if(!exactArtifact&&!installerSha256){
+      const target=nativeUpdateTarget();if(!target)throw Error('No supported update target')
+      const checked=await checkForDesktopUpdate({currentVersion:PRODUCT_VERSION,channel,target,request:(url,init)=>net.fetch(url,init),signal})
+      const comparison=checked?compareSemVerVersions(checked.latestVersion,version):null
+      if(!checked||comparison===null||comparison<0)throw Error('Mandatory update target is unavailable')
+      version=checked.latestVersion;exactArtifact=checked.artifact;installerSha256=checked.installerSha256
+    }
+    if(exactArtifact){await this.downloadExactUpdate(version,signal,exactArtifact);return}
     const platform = this.platformStrategy.updateDownloadPlatform
+    if (nativeUpdateTarget()?.installationMode === 'portable') throw new Error('Portable updates require the exact artifact protocol')
     if (platform === undefined) {
       throw new Error(`dsh-plugin-desktop: updates are unavailable on ${this.platform}`)
     }
+    if(!installerSha256?.[platform])throw new Error('Verified SHA-256 is required for a legacy update')
     const destinationPath = await this.chooseUpdateDestination(version, channel)
     if (destinationPath === undefined) return
     signal.throwIfAborted()
@@ -1050,18 +1071,10 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
     }
 
     if (platform === 'darwin') {
-      const openError = await shell.openPath(artifactPath)
-      if (openError !== '') throw new Error(`dsh-plugin-desktop: failed to open update disk image: ${openError}`)
-      signal.throwIfAborted()
-      await this.showUpdateMessageBox({
-        type: 'info',
-        title: copy.updateDownloadedTitle,
-        message: copy.updateReady(version),
-        detail: parseCanonicalChannelVersion(version, 'next') !== null ? copy.macNextInstallInstructions : copy.macInstallInstructions,
-        buttons: [copy.ok],
-        defaultId: 0,
-        noLink: true,
-      })
+      const choice=await this.showUpdateMessageBox({type:'info',title:copy.updateDownloadedTitle,message:copy.updateReady(version),detail:copy.macInstallInstructions,buttons:[copy.restartAndInstall,copy.later],defaultId:1,cancelId:1,noLink:true})
+      if(choice.response!==0)return
+      const spec=this.scheduled;if(!spec)throw Error('No active shell for installation')
+      await withDesktopMaintenance('installer',async()=>{signal.throwIfAborted();await recordDesktopInstallerHandoff(version);const error=await shell.openPath(artifactPath);if(error)throw Error(`Could not open verified disk image: ${error}`);signal.throwIfAborted();this.quitting=true;spec.requestQuit(0)},app.getPath('userData'))
       return
     }
 
@@ -1080,9 +1093,32 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
     const spec = this.scheduled
     if (spec === undefined) throw new Error('dsh-plugin-desktop: no active shell can exit for update installation')
     signal.throwIfAborted()
-    await this.launchWindowsUpdateInstaller(artifactPath)
-    this.quitting = true
-    spec.requestQuit(0)
+    await withDesktopMaintenance('installer',async()=>{await recordDesktopInstallerHandoff(version);const installerPid=await this.launchWindowsUpdateInstaller(artifactPath);await recordDesktopInstallerHandoff(version,installerPid);this.quitting=true;spec.requestQuit(0)},app.getPath('userData'))
+  }
+
+  private async downloadExactUpdate(version:string,signal:AbortSignal,raw:DesktopV2Artifact):Promise<void>{
+    const artifact=DesktopV2ArtifactSchema.parse(raw),target=nativeUpdateTarget()
+    if(!target||(['os','arch','format','installationMode'] as const).some(key=>target[key]!==artifact[key]))throw Error('Installer target mismatch')
+    const copy=desktopNativeCopy(this.currentLocale)
+    const chosen=await this.showUpdateSaveDialog({title:copy.saveInstallerTitle,defaultPath:join(app.getPath('downloads'),`hozonauto-agent-${version}-${artifact.arch}.${artifact.format}`),buttonLabel:copy.saveAndDownload,filters:[{name:artifact.format,extensions:[artifact.format]}],properties:['createDirectory','showOverwriteConfirmation','dontAddToRecent']})
+    if(chosen.canceled||!chosen.filePath)return
+    const path=await downloadDesktopV2Artifact({artifact,destinationPath:chosen.filePath,request:requestDesktopArtifact,signal})
+    if(artifact.format==='zip'||artifact.os==='linux'){
+      shell.showItemInFolder(path)
+      await this.showUpdateMessageBox({type:'info',title:copy.updateDownloadedTitle,message:copy.updateReady(version),detail:this.currentLocale==='zh'?'安装包已校验。请退出应用后按官方说明手动安装，保留现有用户数据。':'Package verified. Quit the app and follow the official manual installation instructions, preserving your user data.',buttons:[copy.ok],defaultId:0,noLink:true})
+      return
+    }
+    if(artifact.os==='darwin'){
+      const choice=await this.showUpdateMessageBox({type:'info',title:copy.updateDownloadedTitle,message:copy.updateReady(version),detail:copy.macInstallInstructions,buttons:[copy.restartAndInstall,copy.later],defaultId:1,cancelId:1,noLink:true})
+      if(choice.response!==0)return
+      const spec=this.scheduled;if(!spec)throw Error('No active shell for installation')
+      await withDesktopMaintenance('installer',async()=>{signal.throwIfAborted();await recordDesktopInstallerHandoff(version);const error=await shell.openPath(path);if(error)throw Error(`Could not open verified disk image: ${error}`);signal.throwIfAborted();this.quitting=true;spec.requestQuit(0)},app.getPath('userData'))
+      return
+    }
+    const choice=await this.showUpdateMessageBox({type:'info',title:copy.updateDownloadedTitle,message:copy.updateReady(version),detail:copy.windowsInstallQuestion,buttons:[copy.restartAndInstall,copy.later],defaultId:1,cancelId:1,noLink:true})
+    if(choice.response!==0)return
+    const spec=this.scheduled;if(!spec)throw Error('No active shell for installation')
+    await withDesktopMaintenance('installer',async()=>{signal.throwIfAborted();await recordDesktopInstallerHandoff(version);const installerPid=await this.launchWindowsUpdateInstaller(path);await recordDesktopInstallerHandoff(version,installerPid);this.quitting=true;spec.requestQuit(0)},app.getPath('userData'))
   }
 
   private async chooseUpdateDestination(
@@ -1137,8 +1173,8 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
   }
 
   /** Start the downloaded NSIS installer visibly before releasing the current process. */
-  private async launchWindowsUpdateInstaller(installerPath: string): Promise<void> {
-    await new Promise<void>((resolve, reject) => {
+  private async launchWindowsUpdateInstaller(installerPath: string): Promise<number> {
+    return await new Promise<number>((resolve, reject) => {
       let child: ReturnType<typeof spawn>
       try {
         child = spawn(installerPath, ['--updated', '--force-run'], {
@@ -1161,7 +1197,8 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
           this.logError(`dsh-plugin-desktop: update installer failed after launch: ${cause.message}`)
         })
         child.unref()
-        resolve()
+        if(child.pid===undefined){reject(new Error('Installer PID unavailable'));return}
+        resolve(child.pid)
       })
     })
   }

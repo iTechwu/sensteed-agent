@@ -1,3 +1,4 @@
+import { PUBLIC_MCP_CAPABILITIES, publicMcpEndpoint } from './public-mcp-capabilities.ts'
 /** Business artifacts declare routes; only this Host owns transports and credentials. */
 import type { Context } from '@deepseek-ai/cordis'
 import { apply as applyMcpClient, name as mcpClientName, inject as mcpClientInject, type Config as McpConfig } from '@deepseek-ai/dsh-mcp-client'
@@ -12,7 +13,7 @@ export const name = 'dofe-host-capabilities'
 export const inject = ['credentials', 'dofeAccessSettings', ...(BRAND_VARIANT === 'sensteed' ? ['dofeAuth'] : [])]
 export interface HubMcpDeclaration { readonly capability: DofePluginId; readonly serverName: string; readonly path: string; readonly timeoutMs: number }
 export interface HubMcpRegistration { dispose(): Promise<void> }
-export interface HubMcpService { register(input: HubMcpDeclaration): HubMcpRegistration }
+export interface HubMcpService { register(input: HubMcpDeclaration): HubMcpRegistration; registerEndpoint(input:Omit<HubMcpDeclaration,'path'>&{readonly endpointRef:{readonly service:string;readonly domain:string}}):HubMcpRegistration }
 declare module '@deepseek-ai/cordis' { interface Context { hubMcp: HubMcpService } }
 
 const McpClient = { name: mcpClientName, inject: mcpClientInject, apply: applyMcpClient }
@@ -25,6 +26,7 @@ function declaration(input: HubMcpDeclaration): Readonly<HubMcpDeclaration> {
     || !DEFAULT_DOFE_PLUGIN_IDS.includes(input.capability)
     || !/^[-a-z0-9]{1,32}$/u.test(input.serverName)
     || !/^[a-z][a-z0-9-]{0,79}(?:\/[a-z][a-z0-9-]{0,79}){0,3}$/u.test(input.path)
+    || !PUBLIC_MCP_CAPABILITIES.some(endpoint=>endpoint.route===`/mcp/${input.path}`)
     || !Number.isSafeInteger(input.timeoutMs) || input.timeoutMs < 1000 || input.timeoutMs > 600000
     || input.capability === 'finance' && (input.path !== 'finance' || input.serverName !== 'finance')
     || input.capability !== 'finance' && (input.path === 'finance' || input.serverName === 'finance')) {
@@ -220,7 +222,12 @@ export async function apply(ctx: Context): Promise<void> {
       } finally { running = false }
     })
   }
-  ctx.provide('hubMcp', {
+  const service:HubMcpService={
+    registerEndpoint(input){
+      if(!input||Object.keys(input).sort().join(',')!=='capability,endpointRef,serverName,timeoutMs'||!input.endpointRef||Object.keys(input.endpointRef).sort().join(',')!=='domain,service')throw Error('HUB_MCP_INVALID_DECLARATION')
+      const endpoint=publicMcpEndpoint(input.endpointRef)
+      return service.register({capability:input.capability,serverName:input.serverName,timeoutMs:input.timeoutMs,path:endpoint.route.slice('/mcp/'.length)})
+    },
     register(input) {
       if (disposed) throw new Error('HUB_MCP_DISPOSED')
       const route = declaration(input)
@@ -239,7 +246,8 @@ export async function apply(ctx: Context): Promise<void> {
         })
       } }
     },
-  } satisfies HubMcpService)
+  }
+  ctx.provide('hubMcp',service)
   ctx.on('credentials/reference-updated', ref => { if (ref === 'MODELS_API_KEY') schedule() })
   ctx.effect(() => access.watch(() => schedule()), 'Hub MCP settings lifetime')
   if (auth) {

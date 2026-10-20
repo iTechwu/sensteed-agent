@@ -208,6 +208,7 @@ class DesktopUpdateLifecycleOwner implements DesktopUpdateLifecycle {
         return await checkForDesktopUpdate({
           onFailure: failure => { this.lastFailure = failure },
           currentVersion: this.options.adapter.currentVersion,
+          ...(this.options.adapter.target ? { target: this.options.adapter.target } : {}),
           channel,
           currentChannel: this.options.adapter.releaseChannel ?? 'stable',
           allowDowngrade,
@@ -274,11 +275,13 @@ class DesktopUpdateLifecycleOwner implements DesktopUpdateLifecycle {
       try {
         // An omitted digest must not surface as a trailing undefined argument:
         // the beta variant's spec pins the exact call shape.
-        const digestArguments = confirmedDigests === undefined ? [] : [confirmedDigests] as const
-        if (this.options.adapter.releaseChannel === undefined && channel === 'stable') {
-          await this.options.adapter.downloadAndOpen(version, controller.signal, undefined, ...digestArguments)
+        const selectedChannel = this.options.adapter.releaseChannel === undefined && channel === 'stable' ? undefined : channel
+        if (confirmedResult?.artifact) {
+          await this.options.adapter.downloadAndOpen(version, controller.signal, selectedChannel, confirmedDigests, confirmedResult.artifact)
+        } else if (confirmedDigests) {
+          await this.options.adapter.downloadAndOpen(version, controller.signal, selectedChannel, confirmedDigests)
         } else {
-          await this.options.adapter.downloadAndOpen(version, controller.signal, channel, ...digestArguments)
+          await this.options.adapter.downloadAndOpen(version, controller.signal, selectedChannel)
         }
       } catch {
         if (!this.disposed && !controller.signal.aborted) {

@@ -1,6 +1,7 @@
 /** Desktop L0 trust boundary. A verified catalog snapshot is NOT an execution grant. */
 import { createHash, createPublicKey, verify } from 'node:crypto'
 import { z } from 'zod'
+import { HubRequirementsSchema, HubHostCapabilitySchema } from './hub-requirements.ts'
 import type { HubGenerationIdentity } from './hub-generation-store.ts'
 
 export const HUB_SYNC_ORIGIN = 'https://ai.hozonauto.com/plugins/api' as const
@@ -11,7 +12,7 @@ export const HubSyncTargetSchema = z.strictObject({
   arch: z.enum(['x64', 'arm64']), nodeVersion: version, cordisVersion: version,
   libc: z.enum(['glibc', 'musl']).nullable(), nodeAbi: z.string().regex(/^\d{1,4}$/u),
   hostBuildDigest: digest,
-  hostCapabilities: z.array(z.string().regex(/^[a-z][a-z0-9.-]{0,79}$/u)).max(128),
+  hostCapabilities: z.array(HubHostCapabilitySchema).max(256),
 })
 const entry = z.strictObject({
   kind: z.enum(['skill', 'plugin']), itemId: z.uuid(), displayName: z.string().max(160), identity: z.string().max(214),
@@ -21,6 +22,7 @@ const entry = z.strictObject({
   disposition: z.enum(['CURRENT', 'INSTALL', 'UPDATE', 'AVAILABLE', 'USER_REMOVED', 'UNPUBLISHED',
     'INCOMPATIBLE', 'UNVERIFIED_TARGET', 'ACCESS_DENIED', 'REVOKED', 'EVIDENCE_UNAVAILABLE', 'CHANNEL_ROLLBACK_BLOCKED']),
   reason: z.string().max(500).nullable(),
+  requirements: HubRequirementsSchema.optional(),
   accessDeclaration: z.strictObject({ containsScripts: z.boolean(), networkHosts: z.array(z.string().max(253)).max(50), fileAccess: z.enum(['none', 'user-selected', 'workspace', 'system']), localPreview: z.strictObject({ scope: z.enum(['loopback', 'private-lan']), protocols: z.array(z.enum(['http', 'https'])).min(1).max(2).refine(values => new Set(values).size === values.length) }).optional() }).nullable().optional(),
 })
 export const HubSyncSnapshotSchema = z.strictObject({

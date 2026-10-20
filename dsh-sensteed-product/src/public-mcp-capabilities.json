@@ -1,0 +1,115 @@
+{
+  "version": 1,
+  "publicBase": "https://ai.hozonauto.com/mcp",
+  "endpoints": [
+    {
+      "service": "datasource",
+      "domain": "finance",
+      "route": "/mcp/finance",
+      "publicUrl": "https://ai.hozonauto.com/mcp/finance"
+    },
+    {
+      "service": "exa",
+      "domain": "search",
+      "route": "/mcp/exa",
+      "publicUrl": "https://ai.hozonauto.com/mcp/exa"
+    },
+    {
+      "service": "knowledge",
+      "domain": "knowledge",
+      "route": "/mcp/knowledge",
+      "publicUrl": "https://ai.hozonauto.com/mcp/knowledge"
+    },
+    {
+      "service": "models",
+      "domain": "media",
+      "route": "/mcp/media",
+      "publicUrl": "https://ai.hozonauto.com/mcp/media"
+    },
+    {
+      "service": "openmontage",
+      "domain": "montage",
+      "route": "/mcp/montage",
+      "publicUrl": "https://ai.hozonauto.com/mcp/montage"
+    },
+    {
+      "service": "tools",
+      "domain": "browser-intelligence",
+      "route": "/mcp/tools/browser-intelligence",
+      "publicUrl": "https://ai.hozonauto.com/mcp/tools/browser-intelligence"
+    },
+    {
+      "service": "tools",
+      "domain": "custom-car-monitoring",
+      "route": "/mcp/tools/custom-car-monitoring",
+      "publicUrl": "https://ai.hozonauto.com/mcp/tools/custom-car-monitoring"
+    },
+    {
+      "service": "tools",
+      "domain": "douyin_operation",
+      "route": "/mcp/tools/douyin-operation",
+      "publicUrl": "https://ai.hozonauto.com/mcp/tools/douyin-operation"
+    },
+    {
+      "service": "tools",
+      "domain": "hotspot-discovery",
+      "route": "/mcp/tools/hotspot-discovery",
+      "publicUrl": "https://ai.hozonauto.com/mcp/tools/hotspot-discovery"
+    },
+    {
+      "service": "tools",
+      "domain": "lead-discovery",
+      "route": "/mcp/tools/lead-discovery",
+      "publicUrl": "https://ai.hozonauto.com/mcp/tools/lead-discovery"
+    },
+    {
+      "service": "tools",
+      "domain": "lead-monitor",
+      "route": "/mcp/tools/lead-monitor",
+      "publicUrl": "https://ai.hozonauto.com/mcp/tools/lead-monitor"
+    },
+    {
+      "service": "tools",
+      "domain": "platform",
+      "route": "/mcp/tools/platform",
+      "publicUrl": "https://ai.hozonauto.com/mcp/tools/platform"
+    },
+    {
+      "service": "tools",
+      "domain": "supply-chain",
+      "route": "/mcp/tools/supply-chain",
+      "publicUrl": "https://ai.hozonauto.com/mcp/tools/supply-chain"
+    },
+    {
+      "service": "tools",
+      "domain": "talent-discovery",
+      "route": "/mcp/tools/talent-discovery",
+      "publicUrl": "https://ai.hozonauto.com/mcp/tools/talent-discovery"
+    },
+    {
+      "service": "tools",
+      "domain": "tos-upload",
+      "route": "/mcp/tools/tos-upload",
+      "publicUrl": "https://ai.hozonauto.com/mcp/tools/tos-upload"
+    },
+    {
+      "service": "tools",
+      "domain": "video-processing",
+      "route": "/mcp/tools/video-processing",
+      "publicUrl": "https://ai.hozonauto.com/mcp/tools/video-processing"
+    },
+    {
+      "service": "tools",
+      "domain": "viral-video",
+      "route": "/mcp/tools/viral-video",
+      "publicUrl": "https://ai.hozonauto.com/mcp/tools/viral-video"
+    },
+    {
+      "service": "tools",
+      "domain": "xhs_operation",
+      "route": "/mcp/tools/xhs-operation",
+      "publicUrl": "https://ai.hozonauto.com/mcp/tools/xhs-operation"
+    }
+  ],
+  "registryVersion": "d9c0281032fd0afd"
+}

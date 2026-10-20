@@ -1,5 +1,6 @@
 /** Host-owned aggregate transaction: consume once, materialize privately, then stage for a safe restart. */
 import { randomUUID } from 'node:crypto'
+import { withDesktopMaintenance } from './desktop-maintenance.ts'
 import { HubExecutionJournal, type HubExecutionRecord } from './hub-execution-journal.ts'
 import { HubGenerationClient, generationPlanEnvelope, hubGenerationConsumptionData, type VerifiedHubGenerationConsumption } from './hub-generation-client.ts'
 import { generationPlanData, type VerifiedHubGenerationPlan } from './hub-generation-verifier.ts'
@@ -13,6 +14,9 @@ export class HubGenerationExecution {
   private readonly client:HubHostClient,private readonly context:HubHostContext,private readonly trust:HubReleaseTrust){}
  /** Leaves active generation untouched. Launcher must stop old writers before separate activation. */
  async stage(cap:VerifiedHubGenerationPlan):Promise<HubExecutionRecord>{
+  return withDesktopMaintenance('hub-stage',()=>this.stageLocked(cap),this.store.root)
+ }
+ private async stageLocked(cap:VerifiedHubGenerationPlan):Promise<HubExecutionRecord>{
   const journal=new HubExecutionJournal(this.store),plan=generationPlanData(cap)
   let record=await journal.begin(cap,randomUUID(),generationPlanEnvelope(cap) as Record<string,unknown>),proof:VerifiedHubGenerationConsumption|undefined
   try{

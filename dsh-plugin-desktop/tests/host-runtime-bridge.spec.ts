@@ -193,6 +193,6 @@ it('preserves installer digests across the native update bridge', async () => {
     const runtime = createHostRuntime(child, runtimeSnapshot(native))
     const digests = { darwin: 'a'.repeat(64) }
     await runtime.updates.downloadAndOpen('0.2.1-rc.2-beta.202610201320', new AbortController().signal, 'beta', digests)
-    expect(downloadAndOpen).toHaveBeenCalledWith('0.2.1-rc.2-beta.202610201320', expect.any(AbortSignal), 'beta', digests)
+    expect(downloadAndOpen).toHaveBeenCalledWith('0.2.1-rc.2-beta.202610201320', expect.any(AbortSignal), 'beta', digests, undefined)
   } finally { await release(); parent.close(); child.close(); port1.close(); port2.close() }
 })

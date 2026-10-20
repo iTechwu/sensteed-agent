@@ -44,7 +44,8 @@
     "./yootun-recruiter-tools": "./lib/yootun-recruiter-tools.js",
     "./yootun-route-security": "./lib/yootun-route-security.js",
     "./yootun-sales-route": "./lib/yootun-sales-route.js",
-    "./yootun-supply-watch-route": "./lib/yootun-supply-watch-route.js"
+    "./yootun-supply-watch-route": "./lib/yootun-supply-watch-route.js",
+    "./public-mcp-capabilities": "./lib/public-mcp-capabilities.js"
   },
   "files": [
     "lib",

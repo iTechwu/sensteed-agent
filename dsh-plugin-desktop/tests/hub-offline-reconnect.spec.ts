@@ -105,7 +105,7 @@ async function fixture(phase:'STAGED'|'COMMITTED'|'ACTIVATED',prepared=false,pen
  failed=record
  vi.mocked(readSealedHubReleaseTrust).mockReturnValue(trust)
  let ready=()=>{},manager!:{restart(input:unknown):Promise<unknown>;preview(input:unknown):Promise<unknown>};const cleanup:(()=>void)[]=[],request=vi.fn()
- const scope={hubHostClient:client,hubGenerationSupervisor:{request},provide:(_key:string,value:unknown)=>{manager=value as typeof manager},effect:(fn:()=>()=>void)=>cleanup.push(fn()),inject:(_keys:string[],fn:(v:unknown)=>void)=>fn({appReady:{onReady:(fn:()=>void)=>{ready=fn}}}),logger:()=>({warn:()=>{}})}
+ const scope={get:()=>undefined,hubHostClient:client,hubGenerationSupervisor:{request},provide:(_key:string,value:unknown)=>{manager=value as typeof manager},effect:(fn:()=>()=>void)=>cleanup.push(fn()),inject:(_keys:string[],fn:(v:unknown)=>void)=>fn({appReady:{onReady:(fn:()=>void)=>{ready=fn}}}),logger:()=>({warn:()=>{}})}
  registerHubGenerationManager({inject:(_keys:string[],fn:(v:unknown)=>void)=>fn(scope)} as never,options)
  return{a,b,failed,store,journal,options,request,calls,receipts,transportErrors,fetcher,ready,now,get manager(){return manager},get ambiguousRollback(){return ambiguousRollback},positiveReceived(received:boolean){serverActive=received?b.plan.proposedGenerationDigest:a.plan.proposedGenerationDigest},failRollback(){failRollback=true},reconnect(notify=true){session={...owner,accessToken:'unit-test-session'};if(notify)onBinding()},dispose(){cleanup.forEach(fn=>fn());client.dispose()}}
 }

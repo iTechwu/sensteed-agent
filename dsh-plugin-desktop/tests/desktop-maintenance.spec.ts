@@ -1,0 +1,29 @@
+import {afterEach,describe,expect,it} from 'vitest'
+import {mkdtemp,mkdir,readdir,readFile,rm,writeFile} from 'node:fs/promises'
+import {spawn,type ChildProcessWithoutNullStreams} from 'node:child_process'
+import {once} from 'node:events'
+import {join} from 'node:path'
+import {tmpdir} from 'node:os'
+import {DesktopMaintenanceCoordinator,recordDesktopInstallerHandoff} from '../src/desktop-maintenance.ts'
+const roots:string[]=[],children:ChildProcessWithoutNullStreams[]=[]
+afterEach(async()=>{for(const child of children.splice(0)){if(child.exitCode===null&&child.signalCode===null){child.kill('SIGKILL');await once(child,'exit')}}for(const root of roots.splice(0))await rm(root,{recursive:true,force:true})})
+const oldBuild={hostBuildDigest:'a'.repeat(64),sensteedVersion:'0.2.1-beta.1'},newBuild={hostBuildDigest:'b'.repeat(64),sensteedVersion:'0.2.1-beta.2'}
+async function fixture(){const root=await mkdtemp(join(tmpdir(),'maintenance-proof-'));roots.push(root);const state=join(root,'state'),coordinator=new DesktopMaintenanceCoordinator(root,state);return{root,state,coordinator}}
+async function journal(state:string){const dirs=await readdir(state);return JSON.parse(await readFile(join(state,dirs[0]!,'journal.json'),'utf8'))}
+async function childWorker(root:string,state:string,mode:'hold'|'handoff'){
+ const url=new URL('../src/desktop-maintenance.ts',import.meta.url).href
+ const script=`import {DesktopMaintenanceCoordinator,recordDesktopInstallerHandoff} from ${JSON.stringify(url)};const c=new DesktopMaintenanceCoordinator(${JSON.stringify(root)},${JSON.stringify(state)});await c.confirmBuild(${JSON.stringify(oldBuild)});await c.run(${JSON.stringify(mode==='hold'?'hub-generation':'installer')},async()=>{${mode==='handoff'?`await recordDesktopInstallerHandoff(${JSON.stringify(newBuild.sensteedVersion)});`:`process.stdout.write('entered');await new Promise(r=>process.stdin.once('data',r));`}});process.stdout.write('done');`
+ const child=spawn(process.execPath,['--input-type=module','--eval',script],{stdio:'pipe'});children.push(child)
+ let output='',error='';child.stdout.on('data',b=>{output+=b});child.stderr.on('data',b=>{error+=b})
+ for(let i=0;i<200&&!output.includes(mode==='hold'?'entered':'done');i++){if(child.exitCode!==null)throw Error(error||'child exited');await new Promise(r=>setTimeout(r,10))}
+ if(!output.includes(mode==='hold'?'entered':'done'))throw Error('child startup timed out: '+error)
+ return child
+}
+describe('installation maintenance transaction',()=>{
+ it('serializes two real processes and two Profile roots',async()=>{const f=await fixture(),profile1=join(f.root,'one'),profile2=join(f.root,'two');await mkdir(profile1);await mkdir(profile2);await f.coordinator.run('hub-generation',async()=>{},profile1);const child=await childWorker(f.root,f.state,'hold');let entered=false;const second=f.coordinator.run('profile-switch',async()=>{entered=true},profile2);await new Promise(r=>setTimeout(r,60));expect(entered).toBe(false);child.stdin.write('release');await second;expect(entered).toBe(true);expect((await journal(f.state)).hubRoots).toHaveLength(2)})
+ it('recovers a dead ordinary writer and records its interrupted operation',async()=>{const f=await fixture(),child=await childWorker(f.root,f.state,'hold');child.kill('SIGKILL');await once(child,'exit');await f.coordinator.run('profile-switch',async()=>{});const result=await journal(f.state);expect(result.recoveredOperation.phase).toBe('running');expect(result.operation.phase).toBe('completed')})
+ it('retains handoff after launcher exit and rejects the old or wrong new build',async()=>{const f=await fixture(),child=await childWorker(f.root,f.state,'handoff');if(child.exitCode===null)await once(child,'exit');await expect(f.coordinator.run('hub-generation',async()=>{})).rejects.toThrow('RECOVERY_REQUIRED');await expect(f.coordinator.confirmBuild(oldBuild)).rejects.toThrow('RECOVERY_REQUIRED');await expect(f.coordinator.confirmBuild({...newBuild,sensteedVersion:'0.2.1-beta.3'})).rejects.toThrow('RECOVERY_REQUIRED');await f.coordinator.confirmBuild(newBuild);await expect(f.coordinator.run('hub-generation',async()=>{})).resolves.toBeUndefined()})
+ it('requires explicit cancellation to resume the same build',async()=>{const f=await fixture();await f.coordinator.confirmBuild(oldBuild);await f.coordinator.run('installer',()=>recordDesktopInstallerHandoff(newBuild.sensteedVersion));await expect(f.coordinator.run('profile-switch',async()=>{})).rejects.toThrow('RECOVERY_REQUIRED');await f.coordinator.recoverCancelledInstallation();await expect(f.coordinator.run('profile-switch',async()=>{})).resolves.toBeUndefined()})
+ it('blocks installation while any registered Profile has pending Hub state or receipts',async()=>{const f=await fixture(),profile=join(f.root,'profile'),scope=join(profile,'hub-managed','a'.repeat(64));await mkdir(scope,{recursive:true,mode:0o700});await writeFile(join(scope,'state.json'),JSON.stringify({phase:'prepared'}),{mode:0o600});await f.coordinator.run('hub-generation',async()=>{},profile);await expect(f.coordinator.run('installer',async()=>{})).rejects.toThrow('HUB_RECOVERY_REQUIRED');await writeFile(join(scope,'state.json'),JSON.stringify({phase:'stable'}),{mode:0o600});await writeFile(join(scope,'execution.json'),JSON.stringify({phase:'ACTIVATED',pendingReceipt:{seq:1}}),{mode:0o600});await expect(f.coordinator.run('installer',async()=>{})).rejects.toThrow('HUB_RECOVERY_REQUIRED');await writeFile(join(scope,'execution.json'),JSON.stringify({phase:'ACTIVATED',pendingReceipt:null}),{mode:0o600});await expect(f.coordinator.run('installer',async()=>{})).resolves.toBeUndefined()})
+ it('permits nested inner operations without deadlocking',async()=>{const f=await fixture();await expect(f.coordinator.run('hub-stage',()=>f.coordinator.run('hub-generation',async()=>42))).resolves.toBe(42)})
+})

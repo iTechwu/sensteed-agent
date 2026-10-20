@@ -1,3 +1,4 @@
+import { verifyHubManifestRequirements } from './hub-manifest-requirements.ts'
 import{verifyHubPluginGraph}from'./hub-plugin-graph.ts'
 /** Verify complete signed manifest/locator coverage before any archive is downloaded. */
 import { HubGenerationDownloadsSchema } from './hub-artifact-schemas.ts'
@@ -42,5 +43,6 @@ export function verifyHubGenerationDownloads(value:unknown, plan:Readonly<HubGen
   for(const d of locators){if(downloads.has(d.downloadId))throw new Error('Duplicate Hub download locator');downloads.add(d.downloadId)}
  }
  if(downloads.size!==result.descriptors.length)throw new Error('Hub downloads contains foreign locator')
+ verifyHubManifestRequirements(result.manifests,plan)
  return result
 }

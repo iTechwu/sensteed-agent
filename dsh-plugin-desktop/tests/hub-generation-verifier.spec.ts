@@ -1,3 +1,5 @@
+import { inspectSavedHubInventory, inspectSavedHubPlan } from '../src/hub-saved-plan.ts'
+import type { HubExecutionRecord } from '../src/hub-execution-journal.ts'
 import { generateKeyPairSync, randomUUID, sign } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import { generationPlanData, hubGenerationContentDigest, inspectHubGenerationPlanForRecovery, verifyHubGenerationPlan, type HubGenerationPlan, type HubGenerationPlanExpected } from '../src/hub-generation-verifier.ts'
@@ -65,4 +67,16 @@ describe('aggregate signed execution plan', () => {
     expect(() => generationPlanData(observation as never)).toThrow('invalid plan capability')
     expect(() => inspectHubGenerationPlanForRecovery(f.signed(), f.trust, { ...f.expected, deviceId: randomUUID() }, later)).toThrow('binding mismatch')
   })
+})
+
+it('retains signed historical choices after a Host upgrade without granting old-target execution', () => {
+ const f=fixture(), signed=f.signed(), p=signed.plan
+ const record:HubExecutionRecord={schemaVersion:1,scope:'a'.repeat(64),planId:p.planId,planDigest:p.planDigest,operationId:randomUUID(),previousGenerationDigest:null,generationDigest:p.proposedGenerationDigest,phase:'ACTIVATED',revision:1,receiptSeq:3,executionGeneration:'1',executionExpiresAt:p.expiresAt,consumptionStarted:true,signedPlan:signed,descriptorDigest:'b'.repeat(64),pendingReceipt:null}
+ const newTarget={...f.expected.target,hostBuildDigest:'f'.repeat(64)}
+ expect(inspectSavedHubInventory(record,f.expected,newTarget,f.trust).hostTargetChanged).toBe(true)
+ expect(inspectSavedHubInventory(record,f.expected,newTarget,f.trust).plan.items).toEqual(p.items)
+ expect(()=>inspectSavedHubPlan(record,f.expected,newTarget,f.trust)).toThrow('target')
+ expect(()=>inspectSavedHubInventory(record,{...f.expected,actorRef:'someone-else'},newTarget,f.trust)).toThrow('binding')
+ const tampered={...record,signedPlan:{...signed,plan:{...p,target:newTarget}}}
+ expect(()=>inspectSavedHubInventory(tampered,f.expected,newTarget,f.trust)).toThrow()
 })

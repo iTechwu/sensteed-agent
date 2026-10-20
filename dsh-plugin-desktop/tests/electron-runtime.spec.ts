@@ -2,6 +2,13 @@ import { readFileSync, unlinkSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { Readable } from 'node:stream'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+const legacyDigests = { darwin: 'a'.repeat(64), win32: 'b'.repeat(64) }
+
+vi.mock('node:fs', async importOriginal => {
+  const original = await importOriginal<typeof import('node:fs')>()
+  return { ...original, readFileSync: (...args: Parameters<typeof original.readFileSync>) => String(args[0]).endsWith('.sensteed-installation') ? 'nsis-v1' : original.readFileSync(...args) }
+})
+
 import type { DesktopShellSpec } from '../src/runtime.ts'
 import { desktopTrayLabel } from '../src/tray-locale.ts'
 import { DESKTOP_FRAME_HEIGHT } from '../src/window-chrome.ts'
@@ -26,6 +33,7 @@ const childProcess = vi.hoisted(() => {
   type Listener = (...args: unknown[]) => void
   const listeners = new Map<string, Listener[]>()
   const child = {
+    pid: 987654321,
     once: vi.fn((event: string, listener: Listener) => {
       listeners.set(event, [...(listeners.get(event) ?? []), listener])
       return child
@@ -932,7 +940,7 @@ describe('Electron desktop runtime', () => {
 
     expect(runtime.platform).toBe('linux')
     expect(electron.contentViews).toHaveLength(0)
-    expect(runtime.updates.canDownload).toBe(false)
+    expect(runtime.updates.canDownload).toBe(true)
     await expect(runtime.pickDirectory()).rejects.toThrow('native workspace picker is unavailable on linux')
     expect(electron.app.dock.setIcon).not.toHaveBeenCalled()
     expect(electron.Menu.setApplicationMenu).not.toHaveBeenCalled()
@@ -2820,7 +2828,7 @@ describe('Electron desktop runtime', () => {
       canceled: false,
       filePath: '/tmp/Downloads/哪吒Agent-2.1.0-mac.dmg',
     })
-    await runtime.updates.downloadAndOpen('2.1.0', controller.signal)
+    await runtime.updates.downloadAndOpen('2.1.0', controller.signal, 'stable', legacyDigests)
     expect(electron.dialog.showSaveDialog).toHaveBeenCalledWith(
       activeWindow,
       expect.objectContaining({
@@ -2834,6 +2842,7 @@ describe('Electron desktop runtime', () => {
       destinationPath: '/tmp/Downloads/哪吒Agent-2.1.0-mac.dmg',
       request: expect.any(Function),
       signal: controller.signal,
+      expectedSha256: legacyDigests.darwin,
     })
     expect(electron.shell.openPath).toHaveBeenCalledWith('/tmp/哪吒Agent-2.1.0-mac.dmg')
     expect(updater.record).toHaveBeenCalledWith('/tmp/sensteed-agent-user-data', {
@@ -2845,7 +2854,7 @@ describe('Electron desktop runtime', () => {
       activeWindow,
       expect.objectContaining({
         title: '哪吒Agent Update Downloaded',
-        buttons: ['OK'],
+        buttons: ['Restart and Install', 'Later'],
       }),
     )
 
@@ -2880,7 +2889,7 @@ describe('Electron desktop runtime', () => {
       filePath: 'C:\\Updates\\哪吒Agent-2.1.0-windows.exe',
     })
 
-    const pending = runtime.updates.downloadAndOpen('2.1.0', new AbortController().signal)
+    const pending = runtime.updates.downloadAndOpen('2.1.0', new AbortController().signal, 'stable', legacyDigests)
     await vi.waitFor(() => { expect(childProcess.spawn).toHaveBeenCalledOnce() })
     expect(childProcess.spawn).toHaveBeenCalledWith(
       'C:\\Updates\\哪吒Agent-2.1.0-windows.exe',
@@ -2917,7 +2926,7 @@ describe('Electron desktop runtime', () => {
       filePath: 'C:\\Updates\\哪吒Agent-2.1.0-windows.exe',
     })
 
-    const pending = runtime.updates.downloadAndOpen('2.1.0', new AbortController().signal)
+    const pending = runtime.updates.downloadAndOpen('2.1.0', new AbortController().signal, 'stable', legacyDigests)
     await vi.waitFor(() => { expect(childProcess.spawn).toHaveBeenCalledOnce() })
     childProcess.emit('error', new Error('blocked'))
 
@@ -2943,7 +2952,7 @@ describe('Electron desktop runtime', () => {
       filePath: 'C:\\Updates\\哪吒Agent-2.1.0-windows.exe',
     })
 
-    await runtime.updates.downloadAndOpen('2.1.0', new AbortController().signal)
+    await runtime.updates.downloadAndOpen('2.1.0', new AbortController().signal, 'stable', legacyDigests)
 
     expect(childProcess.spawn).not.toHaveBeenCalled()
     expect(updater.record).toHaveBeenCalledOnce()
@@ -2962,7 +2971,7 @@ describe('Electron desktop runtime', () => {
     const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
     const runtime = new ElectronDesktopRuntime(async () => {}, undefined, logger)
 
-    await expect(runtime.updates.downloadAndOpen('2.1.0', new AbortController().signal))
+    await expect(runtime.updates.downloadAndOpen('2.1.0', new AbortController().signal, 'stable', legacyDigests))
       .resolves.toBeUndefined()
 
     expect(logger.error).toHaveBeenCalledWith(
@@ -2976,7 +2985,7 @@ describe('Electron desktop runtime', () => {
     const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
     const runtime = new ElectronDesktopRuntime(async () => {})
 
-    await runtime.updates.downloadAndOpen('2.1.0', new AbortController().signal)
+    await runtime.updates.downloadAndOpen('2.1.0', new AbortController().signal, 'stable', legacyDigests)
 
     expect(electron.dialog.showSaveDialog).toHaveBeenCalledOnce()
     expect(updater.download).not.toHaveBeenCalled()
@@ -3018,14 +3027,15 @@ describe('Electron desktop runtime', () => {
     electron.shell.openPath.mockResolvedValueOnce('Launch Services rejected the image')
     const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
     const runtime = new ElectronDesktopRuntime(async () => {})
+    runtime.schedule(spec)
     electron.dialog.showSaveDialog.mockResolvedValueOnce({
       canceled: false,
       filePath: '/tmp/哪吒Agent-2.1.0-mac.dmg',
     })
 
-    await expect(runtime.updates.downloadAndOpen('2.1.0', new AbortController().signal))
+    await expect(runtime.updates.downloadAndOpen('2.1.0', new AbortController().signal, 'stable', legacyDigests))
       .rejects.toThrow('Launch Services rejected the image')
-    expect(electron.dialog.showMessageBox).not.toHaveBeenCalled()
+    expect(electron.dialog.showMessageBox).toHaveBeenCalledOnce()
   })
 
   it('does not show macOS completion after the update generation is cancelled', async () => {
@@ -3037,19 +3047,20 @@ describe('Electron desktop runtime', () => {
     }))
     const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
     const runtime = new ElectronDesktopRuntime(async () => {})
+    runtime.schedule(spec)
     const controller = new AbortController()
     electron.dialog.showSaveDialog.mockResolvedValueOnce({
       canceled: false,
       filePath: '/tmp/哪吒Agent-2.1.0-mac.dmg',
     })
 
-    const pending = runtime.updates.downloadAndOpen('2.1.0', controller.signal)
+    const pending = runtime.updates.downloadAndOpen('2.1.0', controller.signal, 'stable', legacyDigests)
     await vi.waitFor(() => { expect(electron.shell.openPath).toHaveBeenCalledOnce() })
     controller.abort()
     finishOpen('')
 
     await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
-    expect(electron.dialog.showMessageBox).not.toHaveBeenCalled()
+    expect(electron.dialog.showMessageBox).toHaveBeenCalledOnce()
   })
 
   it('uses advanced macOS material options and offers compatibility mode', async () => {

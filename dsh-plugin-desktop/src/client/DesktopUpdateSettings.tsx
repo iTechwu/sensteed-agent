@@ -40,6 +40,7 @@ export function DesktopUpdateSettings({ api, version, t }: {
     network: 'updateNetworkError', timeout: 'updateTimeoutError', unpublished: 'updateUnpublished',
     service: 'updateServiceError', 'invalid-response': 'updateProtocolError',
     'invalid-version': 'updateVersionError', download: 'updateDownloadError',
+    'unsupported-target': 'updateUnsupportedTarget', 'manual-migration-required': 'updateManualMigration',
   } as const
   const message = failed ? t('checkForUpdatesError')
     : busy === 'installing' ? t('updateInstalling')

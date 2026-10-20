@@ -1,3 +1,4 @@
+import type { DesktopUpdateTarget, DesktopV2Artifact } from './desktop-update-v2.ts'
 import type { Context } from '@deepseek-ai/cordis'
 import type { DesktopRendererAccessHeader } from './desktop-browser-access.ts'
 import type { RendererBootReport } from './renderer-boot-contract.ts'
@@ -106,6 +107,7 @@ export interface DesktopUpdateAdapter {
   readonly isPackaged: boolean
   /** Whether this platform has a fixed installer download endpoint. */
   readonly canDownload: boolean
+  readonly target?: DesktopUpdateTarget
   /** Installed desktop product version. */
   readonly currentVersion: string
   /** Release stream selected by this packaged product. Legacy adapters default to stable. */
@@ -130,6 +132,7 @@ export interface DesktopUpdateAdapter {
     signal: AbortSignal,
     channel?: DesktopReleaseChannel,
     installerSha256?: Readonly<Partial<Record<'win32' | 'darwin', string>>>,
+    artifact?: DesktopV2Artifact,
   ): Promise<void>
   /** Present a native status notification without blocking the Host tree. */
   notify(notification: DesktopNotification): void

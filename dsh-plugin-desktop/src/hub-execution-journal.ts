@@ -1,3 +1,4 @@
+import { withDesktopMaintenance } from './desktop-maintenance.ts'
 /** Durable local bookkeeping, never proof of Hub authorization. No bearer or execution grant is persisted. */
 import { z } from 'zod'
 import { closeSync, constants, existsSync, fstatSync, fsyncSync, lstatSync, openSync, readFileSync, realpathSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
@@ -46,6 +47,7 @@ function privateEntry(path: string, directory: boolean): void {
 export class HubExecutionJournal {
   private readonly path: string
   constructor(private readonly store: HubGenerationStore) { this.path = join(store.directory, 'execution.json'); this.check() }
+  private withLock<T>(action:()=>Promise<T>):Promise<T>{return withDesktopMaintenance('hub-generation',()=>withFileLock(this.path,action),this.store.root)}
   private check(): void {
     if (realpathSync(this.store.directory) !== this.store.directory) throw new Error('Unsafe Hub execution journal root')
     privateEntry(this.store.directory, true)
@@ -78,7 +80,7 @@ export class HubExecutionJournal {
     for (const key of ['origin', 'tenantId', 'actorRef', 'deviceId', 'profileId'] as const) {
       if (plan[key] !== this.store.identity[key]) throw new Error('Hub execution plan identity mismatch')
     }
-    return await withFileLock(this.path, async () => {
+    return await this.withLock( async () => {
       const old = this.read()
       if (!hubExecutionCanBegin(old)) throw new Error('Hub execution is already pending')
       const value = recordSchema.parse({ schemaVersion: 1, scope: this.store.scope, planId: plan.planId, planDigest: plan.planDigest,
@@ -96,7 +98,7 @@ export class HubExecutionJournal {
   }
   async saveHealthyInventory():Promise<void>{
     this.check()
-    await withFileLock(this.path,async()=>{
+    await this.withLock(async()=>{
       const record=this.read(),active=this.store.readState().active
       if(!record||record.phase!=='ACTIVATED'||record.pendingReceipt!==null||!active||active.descriptorDigest!==record.descriptorDigest)throw new Error('Hub inventory is not healthy')
       this.write(record,join(this.store.directory,'healthy-inventory.json'))
@@ -105,7 +107,7 @@ export class HubExecutionJournal {
   /** Restore only the observation for an already recovered active checkpoint. */
   async restoreHealthyInventory(input:unknown):Promise<void>{
     const value=parseHubHealthyInventory(input,this.store.scope)
-    await withFileLock(this.path,async()=>{
+    await this.withLock(async()=>{
       this.check()
       if(this.store.readState().active?.descriptorDigest!==value.descriptorDigest)throw new Error('Hub recovered inventory is not active')
       this.write(value,join(this.store.directory,'healthy-inventory.json'))
@@ -114,7 +116,7 @@ export class HubExecutionJournal {
   /** Atomically terminalize and persist failure; expired positive sends may be superseded only by failure. */
   async queueRollbackReceipt(expected: Pick<HubExecutionRecord, 'operationId'|'revision'>, receipt: Omit<z.infer<typeof receiptSchema>, 'seq'|'previousGenerationDigest'|'phase'>, supersedePending=false): Promise<HubExecutionRecord> {
     this.check()
-    return await withFileLock(this.path, async () => {
+    return await this.withLock( async () => {
       const old=this.read()
       if(!old || old.operationId!==expected.operationId || old.revision!==expected.revision) throw new Error('Stale Hub execution worker')
       if(old.pendingReceipt!==null&&(!supersedePending||!['STAGED','COMMITTED','ACTIVATED'].includes(old.pendingReceipt.phase))) throw new Error('Hub receipt acknowledgment is pending')
@@ -128,7 +130,7 @@ export class HubExecutionJournal {
   /** Persist the exact timestamp and payload before sending; ambiguous sends retry byte-equivalent data. */
   async queueReceipt(expected: Pick<HubExecutionRecord, 'operationId'|'revision'>, receipt: Omit<z.infer<typeof receiptSchema>, 'seq'|'previousGenerationDigest'>): Promise<HubExecutionRecord> {
     this.check()
-    return await withFileLock(this.path, async () => {
+    return await this.withLock( async () => {
       const old=this.read()
       if(!old || old.operationId!==expected.operationId || old.revision!==expected.revision) throw new Error('Stale Hub execution worker')
       if(old.pendingReceipt!==null) throw new Error('Hub receipt is already pending')
@@ -139,7 +141,7 @@ export class HubExecutionJournal {
   }
   async acknowledgeReceipt(expected: Pick<HubExecutionRecord, 'operationId'|'revision'>): Promise<HubExecutionRecord> {
     this.check()
-    return await withFileLock(this.path, async () => {
+    return await this.withLock( async () => {
       const old=this.read()
       if(!old || old.operationId!==expected.operationId || old.revision!==expected.revision || old.pendingReceipt===null) throw new Error('Stale Hub receipt acknowledgment')
       const value=recordSchema.parse({...old,revision:old.revision+1,receiptSeq:old.receiptSeq+1,pendingReceipt:null})
@@ -151,7 +153,7 @@ export class HubExecutionJournal {
     readonly executionGeneration?: string; readonly executionExpiresAt?: string; readonly descriptorDigest?: string
   } = {}): Promise<HubExecutionRecord> {
     this.check()
-    return await withFileLock(this.path, async () => {
+    return await this.withLock( async () => {
       const old = this.read()
       if (!old || old.operationId !== expected.operationId || old.revision !== expected.revision) throw new Error('Stale Hub execution worker')
       if (old.pendingReceipt!==null) throw new Error('Hub receipt acknowledgment is pending')

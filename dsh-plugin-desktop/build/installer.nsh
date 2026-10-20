@@ -102,6 +102,9 @@ Var pid
 ; the updated application and close the installer as soon as extraction finishes
 ; without stopping on the Finish wizard page.
 !macro customInstall
+  FileOpen $0 "$INSTDIR\.sensteed-installation" w
+  FileWrite $0 "nsis-v1"
+  FileClose $0
   ${if} ${isUpdated}
   ${andIf} ${isForceRun}
   ${andIfNot} ${Silent}

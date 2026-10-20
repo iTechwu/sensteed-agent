@@ -175,7 +175,7 @@ describe('desktop profile service', () => {
 
     const first = service.select('work')
     const second = service.select('other')
-    expect(events).toEqual(['persist:work'])
+    await vi.waitFor(()=>expect(events).toEqual(['persist:work']))
     firstPersist.resolve(undefined)
     await vi.waitFor(() => { expect(events).toEqual(['persist:work', 'restart']) })
     firstRestart.resolve(undefined)
@@ -219,6 +219,7 @@ describe('desktop profile service', () => {
 
     const broken = service.select('broken')
     const work = service.select('work')
+    await vi.waitFor(()=>expect(persistSelection).toHaveBeenCalledWith('broken'))
     firstPersist.reject(new Error('profile is unavailable'))
 
     await expect(broken).rejects.toThrow('profile is unavailable')
@@ -240,7 +241,7 @@ describe('desktop profile service', () => {
     const retry = service.select('work')
     const duplicateRetry = service.select('work')
     expect(duplicateRetry).toBe(retry)
-    expect(requestRestart).toHaveBeenCalledTimes(2)
+    await vi.waitFor(()=>expect(requestRestart).toHaveBeenCalledTimes(2))
     retryRestart.resolve(undefined)
     await expect(retry).resolves.toBeUndefined()
     await expect(duplicateRetry).resolves.toBeUndefined()

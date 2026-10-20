@@ -402,7 +402,7 @@ export function createDesktopSettingsApi(
         || !['stable', 'beta', 'next'].includes(String(value.channel))
         || typeof value.checkedAt !== 'string' || !Number.isFinite(Date.parse(value.checkedAt))
         || (value.latestVersion !== undefined && (typeof value.latestVersion !== 'string' || value.latestVersion.length > 128))
-        || (value.status === 'failed' && !['network', 'timeout', 'unpublished', 'service', 'invalid-response', 'invalid-version', 'download'].includes(String(value.failure)))) {
+        || (value.status === 'failed' && !['network', 'timeout', 'unpublished', 'service', 'invalid-response', 'invalid-version', 'download', 'unsupported-target', 'manual-migration-required'].includes(String(value.failure)))) {
         throw new Error('Invalid update status')
       }
       return value as unknown as import('../update-status.ts').DesktopUpdateStatus

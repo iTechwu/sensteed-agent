@@ -1,5 +1,7 @@
+import { SharedSkillMigrationSourceSchema } from './shared-skill-migration.ts'
 /** L0-owned strict wire mirrors; no application/Hub runtime dependency. Keep in sync with contracts. */
 import { z } from 'zod'
+import { HubRequirementsSchema } from './hub-requirements.ts'
 import { HubReleaseSignatureSchema } from './hub-sync-verifier.ts'
 const HubDigestSchema=z.string().regex(/^[a-f0-9]{64}$/u)
 const AccessDeclarationSchema=z.strictObject({containsScripts:z.boolean(),networkHosts:z.array(z.string().max(253)).max(50),fileAccess:z.enum(['none','user-selected','workspace','system']), localPreview: z.strictObject({ scope: z.enum(['loopback', 'private-lan']), protocols: z.array(z.enum(['http', 'https'])).min(1).max(2).refine(values => new Set(values).size === values.length) }).optional()})
@@ -150,7 +152,7 @@ export const PluginArtifactIndexEntrySchema = z.strictObject({
   bytes: z.number().int().positive(),
   fileManifestDigest: HubDigestSchema,
 });
-export const PluginManifestV2Schema = z.strictObject({
+const PluginManifestV20Schema = z.strictObject({
   sourceLockGraphDigest: HubDigestSchema,
   packSetDigest: HubDigestSchema,
   schemaVersion: z.literal('2.0'),
@@ -172,7 +174,7 @@ export const PluginManifestV2Schema = z.strictObject({
   compatibility: CompatibilitySchema,
   issuedAt: z.iso.datetime(),
 });
-export const SkillManifestSchema = z.strictObject({
+const SkillManifestV11Schema = z.strictObject({
   schemaVersion: z.literal('1.1'),
   fileManifestDigest: HubDigestSchema,
   tenantId: z.uuid(),
@@ -198,6 +200,14 @@ export const SkillManifestSchema = z.strictObject({
     .optional(),
   issuedAt: z.iso.datetime(),
 });
+export const PluginManifestV2Schema=z.discriminatedUnion('schemaVersion',[
+ PluginManifestV20Schema,
+ PluginManifestV20Schema.extend({schemaVersion:z.literal('2.1'),requirements:HubRequirementsSchema}),
+])
+export const SkillManifestSchema=z.discriminatedUnion('schemaVersion',[
+ SkillManifestV11Schema,
+ SkillManifestV11Schema.extend({schemaVersion:z.literal('1.2'),requirements:HubRequirementsSchema,source:z.union([SkillManifestV11Schema.shape.source.unwrap().strict(),SharedSkillMigrationSourceSchema]).optional()}),
+])
 export const HubGenerationDownloadsSchema = z.strictObject({
   manifests: z
     .array(

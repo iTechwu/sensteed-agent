@@ -3,6 +3,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { closeSync, constants, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { withFileLock } from '@deepseek-ai/dsh-atomic-write'
+import { withDesktopMaintenance } from './desktop-maintenance.ts'
 import { hubPackageIsHostOwned } from './hub-base-ownership.ts'
 
 export const HUB_GENERATION_ORIGIN = 'https://ai.hozonauto.com/plugins/api' as const
@@ -334,12 +335,12 @@ export class HubGenerationStore {
     this.checkDirectories()
     const path = join(this.directory, 'state.json')
     if (present(`${path}.lock`)) privateStat(`${path}.lock`, false)
-    return await withFileLock(path, async () => {
+    return await withDesktopMaintenance('hub-generation', () => withFileLock(path, async () => {
       this.checkDirectories()
       const state = this.readState(), next = { ...action(state), revision: state.revision + 1 }
       durableWrite(path, next)
       return next
-    })
+    }), this.root)
   }
   /** Caller asserts external release, closure, target and authorization checks already succeeded. */
   async prepare(validatedDescriptor: HubGenerationDescriptor): Promise<HubGenerationState> {

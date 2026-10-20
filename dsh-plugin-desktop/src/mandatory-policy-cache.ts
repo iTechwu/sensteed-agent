@@ -1,12 +1,13 @@
 /** Launcher-side cache of the Host-reported mandatory update policy snapshot. */
 
-import { readFileSync } from 'node:fs'
+import { readDesktopMandatoryPolicyState, evaluateDesktopMandatoryUpdate } from '@dofe/dsh-sensteed-product/desktop-mandatory-policy'
 import { join } from 'node:path'
 
 export interface CachedMandatoryUpdatePolicy {
   readonly phase: 'none' | 'notice' | 'blocking'
   readonly minVersion?: string
   readonly deadline?: string
+  readonly channel?:'stable'|'beta'|'next'
   readonly observedAt: string
 }
 
@@ -32,16 +33,10 @@ export function getCachedMandatoryPolicy(): CachedMandatoryUpdatePolicy | undefi
  * the policy row wrote next to the shell's update state. A missing or
  * malformed file means no block.
  */
-export function readCachedMandatoryPolicyFromState(statePath: string | undefined): CachedMandatoryUpdatePolicy | undefined {
-  if (statePath === undefined) return undefined
-  const policyPath = join(statePath, '..', 'mandatory-policy-state.json')
-  try {
-    const parsed: unknown = JSON.parse(readFileSync(policyPath, 'utf8'))
-    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined
-    const file = parsed as { version?: unknown; snapshot?: CachedMandatoryUpdatePolicy }
-    if (file.version !== 1 || file.snapshot === undefined || typeof file.snapshot.phase !== 'string') return undefined
-    return file.snapshot
-  } catch {
-    return undefined
-  }
+export function readCachedMandatoryPolicyFromState(statePath: string | undefined,currentVersion?:string,channel:'stable'|'beta'|'next'='stable'): CachedMandatoryUpdatePolicy | undefined {
+  if(statePath===undefined)return undefined
+  const snapshot=readDesktopMandatoryPolicyState(join(statePath,'..','mandatory-policy-state.json'))
+  if(!snapshot||(snapshot.channel??'stable')!==channel)return undefined
+  if(currentVersion===undefined)return snapshot
+  return {...snapshot,...evaluateDesktopMandatoryUpdate({directive:snapshot.minVersion?{minVersion:snapshot.minVersion,...(snapshot.deadline?{deadline:snapshot.deadline}:{})}:undefined,currentVersion})}
 }

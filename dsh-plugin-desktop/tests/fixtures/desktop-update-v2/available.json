@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 2,
+  "product": "hozonauto-agent",
+  "channel": "beta",
+  "policyRevision": 1,
+  "status": "update-available",
+  "release": {
+    "id": "00000000-0000-4000-8000-000000000001",
+    "version": "0.2.1-beta.202610210900",
+    "releaseGeneration": "harness-v1"
+  },
+  "artifact": {
+    "id": "00000000-0000-4000-8000-000000000002",
+    "os": "darwin",
+    "arch": "arm64",
+    "format": "dmg",
+    "installationMode": "installed",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "bytes": 1024,
+    "downloadPath": "/api/desktop/v2/artifacts/00000000-0000-4000-8000-000000000002/download"
+  }
+}
