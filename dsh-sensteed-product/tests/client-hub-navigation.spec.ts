@@ -62,12 +62,12 @@ it('exposes Tools categories as individual routes with a shared package entitlem
   const container = document.createElement('div'), root = createRoot(container)
   try {
     await act(async () => root.render(createElement(HubContext, { kind: 'plugin', navigation, settingsScope: { getSnapshot: () => snapshot, subscribe: () => () => {} } as never, selectPanel: vi.fn(), create: async () => {} })))
-    const choice = [...container.querySelectorAll('button')].find(button => button.textContent === '热点发现与事件跟踪')!
+    const choice = [...container.querySelectorAll('button')].find(button => button.textContent === '热点检索与事件')!
     expect(choice).toBeDefined()
     expect(container.textContent).toContain('供应链与企业')
     expect([...container.querySelectorAll('button')].some(button => button.textContent === 'DoFe Tools')).toBe(false)
     await act(async () => choice.click())
-    expect(navigation.selectedPlugin.getSnapshot()).toBe('tools-hotspot-discovery')
+    expect(navigation.selectedPlugin.getSnapshot()).toBe('tools-svc-research-hotspots')
     expect(choice.getAttribute('aria-current')).toBe('page')
   } finally { await act(async () => root.unmount()); vi.unstubAllGlobals() }
 })

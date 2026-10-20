@@ -1,59 +1,27 @@
 # 哪吒Agent 品牌配置
 
-当前品牌为 `hozonauto-agent`，产品名为“哪吒Agent”，唯一配置为 `brand/brand.config.json`。官方 Logo 来源、数据兼容边界见 [迁移说明](hozonauto/README.md)。历史 `sensteed` 组合键用于协议兼容。
+当前产品名称为 **哪吒Agent**，产品标识为 **hozonauto-agent**。唯一配置为 `brand/brand.config.json`。官方 Logo 来源与历史数据兼容边界见 [品牌迁移说明](hozonauto/README.md)。
 
-## 换牌流程
+## 生成与检查
 
-1. 替换素材(放入 `brand/assets/`):
-   - `app-icon-source.jpg` — 应用图标唯一源头(正方形 JPEG,≥1024px)
-   - `sidebar-mark.png` — 侧栏 lockup 的方形图标部分(≥ lockup 高度)
-   - `wordmark.png` — 预渲染透明文字标(宽度 = lockup 宽 − lockup 高)
-   - `hero-mark.png` — 会话头像(正方形,`artwork.heroSize`,默认 204px)
-2. 编辑 `brand.config.json`:双通道身份、显示名、更新服务、文档站点、快捷方式名等。
-3. 重新生成并入库存档:
-
-```bash
-corepack pnpm --filter dsh-plugin-desktop generate:brand   # 图像 + 身份模块 + electron-builder.json
-BRAND=sensteed corepack pnpm --filter dsh-plugin-desktop generate:brand # 生成山子高科品牌
-corepack pnpm brand:docs                                   # 文档围栏区域 + i18n hash 重录
-corepack pnpm check                                        # 全量门禁(含 verify:brand / brand:check)
+```sh
+corepack pnpm --filter @dofe/dsh-sensteed-product generate:brand
+corepack pnpm --filter dsh-plugin-desktop generate:brand
+corepack pnpm brand:docs
+corepack pnpm check
 ```
 
-打包时同样通过环境变量选择品牌：`BRAND=yootun corepack pnpm --filter dsh-plugin-desktop package:dir`（默认）或 `BRAND=sensteed corepack pnpm --filter dsh-plugin-desktop package:dir`。每次切换品牌都应从干净构建开始，避免上一品牌的生成物混入包内。
+品牌素材位于 `brand/hozonauto/assets/`：原始官方 SVG、应用 JPEG 母版、透明侧栏图、会话头像及文字标。既有生成脚本派生各平台图标、客户端素材、产品身份模块、electron-builder 配置和文档围栏，生成物应提交，不手工修改。
 
-当前使用哪吒汽车官网官方 Logo，已替换历史山子高科图形。山子构建当前保留公共的插件市场、企业知识、模型与预算及视频生产能力；优惠豚企业看板、招聘、销售、供应链、线索和运营页面不会装载，待山子专属页面完成后再进入组合。
+## 身份与兼容
 
-## 字段说明
+- Beta：`哪吒Agent.app`，`com.hozonauto.agent.beta`，产物前缀 `hozonauto-agent-beta`。
+- Stable：`哪吒Agent Stable`，`com.hozonauto.agent`，产物前缀 `hozonauto-agent`。
+- 新安装使用新的 home 和用户数据目录；存在历史数据时沿用旧通道数据。Electron 自动创建的空缓存目录不视为已迁移数据。
+- `hozonauto-agent` 为新的命令入口；`sensteed-agent` 仅作历史兼容别名。
+- `sensteed` 组合键、插件包 ID、租户 UUID、OIDC client ID、更新协议头及仓库地址保持兼容，不代表可见产品品牌。不以字符串替换的方式更换授权租户。
+- `packageName` 为内部工作区与 Profile 准入契约，不随显示品牌变更。
 
-| 字段 | 用途 | 注意 |
-| --- | --- | --- |
-| `activeChannel` | 生成的身份模块暴露哪个通道(`stable`/`beta`) | 必须是 `channels` 的键 |
-| `channels.*.productName` | 安装包名、`.app` 名、exe 名、托盘标签 | 变更后需重跑 `generate:brand` |
-| `channels.*.appId` | macOS bundle id / Windows AppUserModelID | 反向 DNS 格式 |
-| `channels.*.artifactPrefix` | Setup/Portable/DMG 文件名前缀 | 文件名安全字符 |
-| `packageName` | **勿改**:工作区名、用户数据目录键、profile 准入令牌 | 改它属于数据迁移,不是换牌 |
-| `displayName.titlebar` | 标题栏产品名(与通道无关) | |
-| `artwork.*` | 图标源、白阈值、画布尺寸 | 生成脚本读取 |
-| `wordmark.image` | 预渲染文字标(热路径,跨平台) | 推荐始终提供 |
-| `wordmark.text` + `color` + `fontFile` | 文字标一次性再生成 | 需要 macOS/对应字体环境 |
-| `updates.*` | 更新服务端点与 `X-*` 请求头 | 必须与服务端约定一致 |
-| `docs.*` | README/PRIVACY/赞助位等站点字符串 | 围栏区域自动渲染 |
-| `nsis.shortcutName` | Windows 开始菜单/桌面快捷方式名 | |
+## 打包
 
-## 生成物(提交入库,勿手改)
-
-- `dsh-plugin-desktop/src/generated-product-identity.ts` — 运行时身份/更新契约
-- `dsh-plugin-desktop/electron-builder.json` — 打包配置(静态模板 + 品牌字段)
-- `dsh-plugin-desktop/src/client/generated-brand-assets.ts` — 渲染层 base64 图
-- `dsh-plugin-desktop/build/*.{png,ico}` — 各平台图标与托盘图
-- README/PRIVACY 的 `<!-- brand:... -->` 围栏区域
-
-一致性由 `verify:brand`(plugin)与 `brand:check`(root)在 `pnpm check` / `check:layout` 中强制;改了配置忘记重新生成会直接构建失败。
-
-## 发版
-
-```bash
-corepack pnpm brand:version 2.0.10-beta.3
-```
-
-一条命令完成:双 package.json 版本号 + 文档中的产物路径围栏 + 双语 hash 重录。
+从干净且已推送的 dev 执行 `corepack pnpm release:prepare --execute`，再在其生成的 tagged main 上执行 `corepack pnpm package:dir` 或相应平台打包命令。内置内容在 dev 更新并提交，tagged 打包仅离线校验。
