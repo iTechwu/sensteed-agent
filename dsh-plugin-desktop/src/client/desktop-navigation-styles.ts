@@ -18,14 +18,25 @@ export function installDesktopNavigationStyles(): () => void {
 .sensteedModuleButton { position:relative; display:flex; align-items:center; justify-content:center; width:40px; height:40px; padding:0; border:0; border-radius:8px; background:transparent; color:var(--dsw-alias-label-secondary); cursor:pointer; flex:none; }
 .sensteedModuleButton:hover { background:var(--dsw-alias-bg-layer-2); }
 .sensteedModuleButton[aria-current="page"] { background:var(--dsw-alias-bg-layer-3,var(--dsw-alias-bg-layer-2)); color:var(--dsw-alias-label-primary); }
+/* Rail owns module glyphs; plugin buttons retain their permission and navigation handlers. */
+.sensteedPluginRailSeat[data-module-icon] { position:relative; width:40px; height:40px; }
+.sensteedRailGlyph { position:absolute; inset:0; display:grid; place-items:center; pointer-events:none; color:var(--dsw-alias-label-secondary); }
+.sensteedPluginRailSeat[data-module-icon] button svg { visibility:hidden; }
+.sensteedModuleRail .sensteedModuleScroll button { display:flex; align-items:center; justify-content:center; box-sizing:border-box; width:40px; height:40px; border:0; border-radius:10px; padding:0; background:transparent; color:var(--dsw-alias-label-secondary); }
+.sensteedModuleRail .sensteedModuleScroll svg { width:20px; height:20px; stroke-width:1.8; }
+.sensteedModuleRail .sensteedModuleScroll button:hover { background:var(--dsw-alias-bg-layer-2); }
+.sensteedModuleRail .sensteedModuleScroll button[aria-current="page"],
+.sensteedModuleRail .sensteedModuleScroll [data-active] button { background:color-mix(in srgb,var(--dsw-alias-label-primary) 11%,var(--dsw-alias-bg-layer-1)); color:var(--dsw-alias-label-primary); }
+.sensteedModuleRail .sensteedModuleScroll button[aria-current="page"] svg,
+.sensteedModuleRail .sensteedModuleScroll [data-active] .sensteedRailGlyph { color:var(--dsw-alias-label-primary); stroke-width:2.4; }
+.sensteedModuleRail .sensteedModuleScroll [data-active] .sensteedRailGlyph svg { stroke-width:2.4; }
 .sensteedNavigationFrame button:focus-visible { outline:2px solid var(--dsw-alias-brand-primary); outline-offset:-2px; }
 .sensteedModuleFoot { width:40px; display:flex; flex-direction:column; align-items:center; gap:8px; padding-top:8px; }
 .sensteedKnowledgeModule { margin-bottom:8px; }
-.sensteedKnowledgeModule[data-active] button,.sensteedExtensionModule[data-active] button { background:var(--dsw-alias-bg-layer-2); color:var(--dsw-alias-label-primary); }
 .sensteedModuleExtensions:not(:has(button)) { display:none; }
 .sensteedModuleExtensions { margin-top:16px; padding-top:12px; border-top:1px solid var(--dsw-alias-border-l1); }
 body .sensteedNavigationFrame .sensteedModuleRail [data-slot="sidebar.footer.action"] { max-height:none; overflow:visible; scrollbar-gutter:auto; width:40px; margin:0; padding:0; gap:8px; }
-body .sensteedNavigationFrame .sensteedModuleRail [data-slot="sidebar.footer.action"] button { box-sizing:border-box; width:40px; min-width:0; height:40px; margin:0; padding:0; justify-content:center; gap:0; border-radius:8px; }
+body .sensteedNavigationFrame .sensteedModuleRail [data-slot="sidebar.footer.action"] button { box-sizing:border-box; width:40px; min-width:0; height:40px; margin:0; padding:0; justify-content:center; gap:0; border-radius:10px; }
 body .sensteedNavigationFrame .sensteedModuleRail [data-slot="sidebar.footer.action"] button::after { content:none !important; }
 .sensteedModuleRail [data-slot="sidebar.settings"] { width:40px; }
 .sensteedModuleRail [data-slot="sidebar.settings"] > div:first-child { width:40px; }

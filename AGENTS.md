@@ -54,3 +54,8 @@ This repository owns the desktop product around an unmodified DeepSeek Harness c
 - Sibling 边界：插件唯一源仍是 `../docker-helm.dofe.ai/plugins`。GitHub 源插件（当前为 `dsh-soup`）由刷新脚本自动回写 sibling，再用 `scripts/sync-dofe-plugin-snapshot.mjs --write <name>` 重同步 `.ci` 快照；sibling 脏树时跳过回写（`--force` 例外）。sibling 仓库的改动在其自身仓库提交，本仓库不代提交。
 - 运行时挂载：宿主进程通过 `DSH_BUNDLED_SKILL_DIR`（见 `src/bundled-skill-root.ts`）把 `bundled/skills` 挂为 harness 的 'bundled' provider 根；打包冒烟断言清单中每个 skill 可发现。
 - 新增条目：skill = 在 `../docker-helm.dofe.ai/skills/<name>/` vendored 上游源 + 在 `bundled.json` 追加一条（`source: "sibling"` + `siblingDir` + vendored 基准 `resolvedSha`）+ `bundled:refresh` + 提交快照；plugin = sibling 建包 + 桌面包 `file:` 依赖 + `cordis.patch.yml` insert + 快照同步 + 清单记录（`tests/bundled-manifest.spec.ts` 强制一致性）。
+
+## 插件源码同步要求
+
+- 修改插件源码（包括样式、页面和交互）时，必须同步修改其来源仓库中的源文件，例如 `../docker-helm.dofe.ai/plugins/<name>/`；不得仅修改本仓库的 `.ci` 快照、依赖副本或构建产物。
+- 先在来源仓库修改并通过对应构建/检查，再通过 `node scripts/sync-dofe-plugin-snapshot.mjs --write <name>` 同步桌面快照，确保重新打包和重载后仍包含修改。来源仓库的变更在其自身仓库提交、推送。
