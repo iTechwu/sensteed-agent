@@ -50,7 +50,7 @@
     "dsh-plugin-desktop/scripts/electron-builder-base.mjs": 3,
     "dsh-plugin-desktop/src/client/brand.tsx": 9,
     "dsh-plugin-desktop/src/index.ts": 0,
-    "dsh-plugin-desktop/src/update-download.ts": 4,
+    "dsh-plugin-desktop/src/update-download.ts": 2,
     "dsh-plugin-desktop/tests/browser/yootun-theme-actions.visual.mjs": 1,
     "dsh-plugin-desktop/tests/client-dofe-access-gate.spec.ts": 1,
     "dsh-plugin-desktop/tests/electron-runtime.spec.ts": 8,
@@ -95,6 +95,7 @@
     "dsh-sensteed-product/src/dofe-auth-audit.ts": 4,
     "dsh-sensteed-product/tests/dofe-opencli.spec.ts": 2,
     "dsh-sensteed-product/tests/dofe-auth-audit.spec.ts": 2,
-    "dsh-sensteed-product/src/routes.ts": 10
+    "dsh-sensteed-product/src/routes.ts": 10,
+    "dsh-plugin-desktop/src/update-checker.ts": 1
   }
 }
