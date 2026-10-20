@@ -28,31 +28,35 @@ try {
   await button.evaluate(element => element.remove())
   assert.equal(await seat.isVisible(), false, 'revoking access must hide the glyph again')
   await page.locator('.sensteedModuleScroll').evaluate(element => {
-    const button = document.createElement('button')
-    button.className = 'sensteedModuleButton'
-    button.setAttribute('aria-label', 'Home')
-    button.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 10 12 3 21 10V21H3Z" /></svg>'
-    element.prepend(button)
+    for (const label of ['Home', '自动化任务', '插件', '技能']) {
+      const button = document.createElement('button')
+      button.className = 'sensteedModuleButton'
+      button.setAttribute('aria-label', label)
+      button.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 10 12 3 21 10V21H3Z" /></svg>'
+      element.prepend(button)
+    }
   })
-  const home = page.getByRole('button', { name: 'Home', exact: true })
-  for (const primary of ['rgb(20, 20, 20)', 'rgb(240, 240, 240)']) {
-    await page.evaluate(color => {
-      document.documentElement.style.setProperty('--dsw-alias-label-primary', color)
-      document.documentElement.style.setProperty('--dsw-alias-label-secondary', 'rgb(120, 120, 120)')
-      document.documentElement.style.setProperty('--dsw-alias-bg-layer-1', color === 'rgb(20, 20, 20)' ? 'white' : 'black')
-    }, primary)
-    for (const active of [false, true, false]) {
-      await home.evaluate((element, selected) => {
-        if (selected) element.setAttribute('aria-current', 'page')
-        else element.removeAttribute('aria-current')
-      }, active)
-      await home.hover()
-      assert.equal(await home.locator('svg').isVisible(), true, `Home icon must remain visible when active=${active}`)
-      await page.waitForFunction(expected => getComputedStyle(document.querySelector('[aria-label="Home"] svg')).color === expected, active ? primary : 'rgb(120, 120, 120)')
-      assert.equal(await home.locator('svg').evaluate(element => getComputedStyle(element).strokeWidth), active ? '2.4px' : '1.8px')
+  for (const label of ['Home', '自动化任务', '插件', '技能']) {
+    const moduleButton = page.getByRole('button', { name: label, exact: true })
+    for (const primary of ['rgb(20, 20, 20)', 'rgb(240, 240, 240)']) {
+      await page.evaluate(color => {
+        document.documentElement.style.setProperty('--dsw-alias-label-primary', color)
+        document.documentElement.style.setProperty('--dsw-alias-label-secondary', 'rgb(120, 120, 120)')
+        document.documentElement.style.setProperty('--dsw-alias-bg-layer-1', color === 'rgb(20, 20, 20)' ? 'white' : 'black')
+      }, primary)
+      for (const active of [false, true, false]) {
+        await moduleButton.evaluate((element, selected) => {
+          if (selected) element.setAttribute('aria-current', 'page')
+          else element.removeAttribute('aria-current')
+        }, active)
+        await moduleButton.hover()
+        assert.equal(await moduleButton.locator('svg').isVisible(), true, `${label} icon must remain visible when active=${active}`)
+        await page.waitForFunction(({ label, expected }) => getComputedStyle([...document.querySelectorAll('button')].find(element => element.getAttribute('aria-label') === label).querySelector('svg')).color === expected, { label, expected: active ? primary : 'rgb(120, 120, 120)' })
+        assert.equal(await moduleButton.locator('svg').evaluate(element => getComputedStyle(element).strokeWidth), active ? '2.4px' : '1.8px')
+      }
     }
   }
-  console.log('PASS: gated launcher and Home active icon visibility, colors, stroke, hover and click')
+  console.log('PASS: gated launcher and all built-in module icons in active/inactive light/dark states')
 } finally {
   await browser.close()
 }
