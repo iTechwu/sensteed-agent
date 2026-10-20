@@ -522,6 +522,18 @@ describe('desktop update Host plugin', () => {
     expect(harness.tray.label()).toBe('Check for Updates…')
   })
 
+  it('retains Harness-prefixed beta notification state across restarts', async () => {
+    const version = '0.2.1-rc.2-beta.202610201500'
+    const request = vi.fn(async () => versionResponse(version))
+    const harness = await createHarness({
+      packaged: true,
+      state: JSON.stringify({ version: 3, lastNotifiedVersion: version }),
+      request,
+    })
+    await vi.waitFor(() => { expect(request).toHaveBeenCalled() })
+    expect(JSON.parse(await readFile(harness.statePath, 'utf8'))).toEqual({ version: 3, lastNotifiedVersion: version })
+  })
+
   it('silently resets invalid legacy state before announcing the available version', async () => {
     vi.useFakeTimers()
     const harness = await createHarness({

@@ -309,7 +309,7 @@ function post(fetcher: FetchLike, path: string, body: object): Promise<Response>
     credentials: 'same-origin',
     redirect: 'error',
     // The update flow includes user-paced native confirmation and installer handoff.
-    ...(path === UPDATE_CHECK_PATH ? {} : { signal: AbortSignal.timeout(DESKTOP_REQUEST_TIMEOUT_MS) }),
+    ...(path === UPDATE_CHECK_PATH && !('inspect' in body) ? {} : { signal: AbortSignal.timeout(DESKTOP_REQUEST_TIMEOUT_MS) }),
     headers: {
       'Accept': 'application/json',
       'Content-Type': 'application/json',
