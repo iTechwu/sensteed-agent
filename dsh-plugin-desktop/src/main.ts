@@ -33,7 +33,7 @@ import { app, crashReporter, dialog, safeStorage, session, shell } from 'electro
 import { legacyBrandUserData } from './legacy-brand-data.ts'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { randomUUID } from 'node:crypto'
-import { existsSync } from 'node:fs'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
@@ -2277,7 +2277,13 @@ async function start(): Promise<void> {
 
 async function run(): Promise<void> {
   app.setName(PRODUCT_NAME)
-  app.setPath('userData', legacyBrandUserData(app.getPath('userData'), app.getPath('appData'), DESKTOP_RELEASE_CHANNEL))
+  const nativeUserData = app.getPath('userData')
+  const selectedUserData = legacyBrandUserData(nativeUserData, app.getPath('appData'), DESKTOP_RELEASE_CHANNEL)
+  app.setPath('userData', selectedUserData)
+  if (selectedUserData === nativeUserData) {
+    mkdirSync(nativeUserData, { recursive: true })
+    writeFileSync(join(nativeUserData, '.hozonauto-native-data'), '1\n', { mode: 0o600 })
+  }
   if (process.argv.includes('--export-diagnostics')) {
     try {
       await app.whenReady()

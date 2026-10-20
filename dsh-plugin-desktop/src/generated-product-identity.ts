@@ -47,8 +47,8 @@ export const BRAND_DISPLAY_NAME = Object.freeze({
 
 /** Brand mission shown by the client brand surfaces. */
 export const BRAND_MISSION = Object.freeze({
-  zh: "成就中国智造的全球竞争力",
-  en: "Serve and advance the global competitiveness of Chinese intelligent manufacturing",
+  zh: "哪吒Agent",
+  en: "hozonauto-agent",
 })
 
 /** Update service contract served by the release infrastructure. */
