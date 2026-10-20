@@ -194,8 +194,9 @@ export class DofeAuthService {
       // A new login must not retain offline authority from the previous account.
       await this.credentials.modifyRecord(DOFE_AUTH_GRANT_KEY, async record => {
         if (record?.kind !== 'grant') return undefined
-        const payload = record.payload as { refreshToken?: unknown }
-        return { kind: 'grant', payload: { refreshToken: payload.refreshToken } }
+        const payload = record.payload as { refreshToken?: unknown } | null
+        const refreshToken = asString(payload?.refreshToken)
+        return { kind: 'grant', payload: refreshToken ? { refreshToken } : {} }
       })
     }
     if (!interactive) {

@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "views": [
+    {
+      "capabilityId": "tools-market-research",
+      "servers": [
+        "tools-platform",
+        "tools-browser-intelligence"
+      ]
+    },
+    {
+      "capabilityId": "tools-public-social-research",
+      "servers": [
+        "tools-platform"
+      ]
+    },
+    {
+      "capabilityId": "tools-hotspot-discovery",
+      "servers": [
+        "tools-hotspot-discovery"
+      ]
+    },
+    {
+      "capabilityId": "tools-talent-discovery",
+      "servers": [
+        "tools-talent-discovery"
+      ]
+    },
+    {
+      "capabilityId": "tools-lead-discovery",
+      "servers": [
+        "tools-lead-discovery",
+        "tools-lead-monitor"
+      ]
+    },
+    {
+      "capabilityId": "tools-custom-car-monitoring",
+      "servers": [
+        "tools-custom-car-monitoring"
+      ]
+    },
+    {
+      "capabilityId": "tools-viral-video",
+      "servers": [
+        "tools-viral-video"
+      ]
+    },
+    {
+      "capabilityId": "tools-social-operation",
+      "servers": [
+        "tools-xhs-operation",
+        "tools-douyin-operation"
+      ]
+    },
+    {
+      "capabilityId": "tools-tos-upload",
+      "servers": [
+        "tools-tos-upload"
+      ]
+    },
+    {
+      "capabilityId": "tools-supply-chain",
+      "servers": [
+        "tools-supply-chain"
+      ]
+    }
+  ]
+}

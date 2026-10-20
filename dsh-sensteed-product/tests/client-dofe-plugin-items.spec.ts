@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client'
 import { expect, it, vi } from 'vitest'
 import { DofePluginCard, dofePluginCardState, registerDofePluginItems } from '../src/client/DofePluginItems.tsx'
 import { dofePluginsForBrand, DOFE_ACCESS_VALIDATION_VERSION, type DofeAccessSettings } from '@dofe/dsh-sensteed-product/dofe-plugins'
+import { pluginPresentations } from '../src/plugin-presentations.ts'
 import { DOFE_ACCESS_COPY } from '../src/client/dofe-access.ts'
 
 vi.mock('../src/generated-product-identity.ts', async importOriginal => ({
@@ -80,9 +81,9 @@ it('registers one read-only card per brand capability after the upstream officia
     },
   }
   registerDofePluginItems(ctx as never, scopeFixture(settingsFixture()) as never, t)
-  const sensteed = dofePluginsForBrand('sensteed')
+  const sensteed = pluginPresentations('sensteed')
   expect(registered).toHaveLength(sensteed.length)
-  expect(registered.map(entry => entry.options.id)).toEqual(sensteed.map(plugin => `dofe-${plugin.id}`))
+  expect(registered.map(entry => entry.options.id)).toEqual(sensteed.map(plugin => `dofe-${plugin.key}`))
   for (const entry of registered) {
     expect(entry.options.order).toBeGreaterThanOrEqual(100)
     expect(entry.options.label()).toBeTypeOf('string')

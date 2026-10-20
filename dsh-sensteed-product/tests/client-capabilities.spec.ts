@@ -63,7 +63,7 @@ it('shows task groups, refreshes effective grants and saves independently chosen
     expect([...container.querySelectorAll('h4')].map(node => node.textContent)).toEqual(['检索与调研', '内容创作', '协作与素材', '知识与经营分析'])
     const filter = (name: string) => [...container.querySelectorAll('.dshDofeAccessFilters button')].find(button => button.textContent === name) as HTMLButtonElement
     await act(async () => filter('知识与经营分析').click())
-    expect(container.querySelectorAll('.dshDofeAccessCapability')).toHaveLength(3)
+    expect(container.querySelectorAll('.dshDofeAccessCapability')).toHaveLength(4)
     expect(container.textContent).not.toContain('人才发现')
     await act(async () => filter('全部能力').click())
     const search = container.querySelector('input[type="search"]') as HTMLInputElement
@@ -72,7 +72,8 @@ it('shows task groups, refreshes effective grants and saves independently chosen
       search.dispatchEvent(new Event('input', { bubbles: true }))
     })
     await searchFor('供应商')
-    expect(container.querySelectorAll('.dshDofeAccessCapability')).toHaveLength(1)
+    expect(container.querySelectorAll('.dshDofeAccessCapability')).toHaveLength(2)
+    expect(container.textContent).toContain('供应链数据检索')
     await searchFor('不存在的能力')
     expect(container.textContent).toContain('没有找到匹配的能力')
     await searchFor('')

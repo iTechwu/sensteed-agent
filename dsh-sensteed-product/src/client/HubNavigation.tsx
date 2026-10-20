@@ -1,9 +1,10 @@
 /** Shared selection lets the context column drive the existing catalog page. */
 import { useCallback, useState, useSyncExternalStore } from 'react'
 import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
-import { dofePluginsForBrand, type DofeAccessSettings } from '../dofe-plugins.ts'
+import { type DofeAccessSettings } from '../dofe-plugins.ts'
 import { BRAND_VARIANT } from '../generated-product-identity.ts'
 import { dofePluginCardState } from './DofePluginItems.tsx'
+import { pluginPresentations, PLUGIN_PRESENTATION_GROUPS } from '../plugin-presentations.ts'
 import { Blocks, Sparkles } from 'lucide-react'
 
 export function createHubNavigation() {
@@ -33,14 +34,17 @@ export function HubContext({ kind, navigation, selectPanel, create, settingsScop
   const subscribeSettings = useCallback((listener: () => void) => settingsScope.subscribe(listener), [settingsScope])
   const readSettings = useCallback(() => settingsScope.getSnapshot(), [settingsScope])
   const settings = useSyncExternalStore(subscribeSettings, readSettings, readSettings).value
-  const installed = settings?.identity?.ssoSub ? dofePluginsForBrand(BRAND_VARIANT).filter(plugin => ['built-in', 'enabled'].includes(dofePluginCardState(plugin, settings))) : []
+  const installed = settings?.identity?.ssoSub ? pluginPresentations(BRAND_VARIANT).filter(entry => ['built-in', 'enabled'].includes(dofePluginCardState(entry.plugin, settings))) : []
   return <nav className="sensteedBusinessNavigation" aria-label="自定义导航">
     <button type="button" aria-current={kind === 'plugin' ? 'page' : undefined} onClick={() => selectPanel('plugins')}><Blocks size={16} /> 插件</button>
     <button type="button" aria-current={kind === 'skill' ? 'page' : undefined} onClick={() => selectPanel('sensteed-skill-manager')}><Sparkles size={16} /> 技能</button>
     <p className="sensteedContextGroup">{kind === 'plugin' ? '插件管理' : '技能管理'}</p>
     <button type="button" aria-current={tab === 'catalog' ? 'page' : undefined} onClick={() => navigation.select('catalog')}>发现与安装</button>
     <button type="button" aria-current={tab === 'installed' ? 'page' : undefined} onClick={() => navigation.select('installed')}>{kind === 'plugin' ? '内置与已启用' : '本地技能'}</button>
-    {kind === 'plugin' && installed.length > 0 && <><p className="sensteedContextGroup">内置与已启用</p>{installed.map(plugin => <button key={plugin.id} type="button" aria-current={selectedPlugin === plugin.id ? 'page' : undefined} onClick={() => navigation.openPlugin(plugin.id)}>{plugin.name}</button>)}</>}
+    {kind === 'plugin' && PLUGIN_PRESENTATION_GROUPS.map(group => {
+      const entries = installed.filter(entry => entry.group === group.id)
+      return entries.length > 0 && <section key={group.id} aria-label={group.label}><p className="sensteedContextGroup">{group.label}</p>{entries.map(entry => <button key={entry.key} type="button" aria-current={selectedPlugin === entry.key ? 'page' : undefined} onClick={() => navigation.openPlugin(entry.key)}>{entry.plugin.name}</button>)}</section>
+    })}
     <CreateAction create={create} label={kind === 'plugin' ? '创建插件' : '创建技能'} />
   </nav>
 }

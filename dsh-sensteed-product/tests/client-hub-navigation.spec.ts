@@ -53,3 +53,21 @@ it('selects a specific built-in capability rather than opening the whole install
   native.openPlugin('knowledge')
   expect(setView).toHaveBeenCalledWith({ kind: 'item', id: 'dofe-knowledge' })
 })
+
+it('exposes Tools categories as individual routes with a shared package entitlement', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+  const { DOFE_ACCESS_VALIDATION_VERSION } = await import('../src/dofe-plugins.ts')
+  const navigation = createHubNavigation()
+  const snapshot = { value: { identity: { ssoSub: 'review' }, setupComplete: true, validationVersion: DOFE_ACCESS_VALIDATION_VERSION, enabledPlugins: ['tools'], entitlements: { plugins: ['tools'] } } }
+  const container = document.createElement('div'), root = createRoot(container)
+  try {
+    await act(async () => root.render(createElement(HubContext, { kind: 'plugin', navigation, settingsScope: { getSnapshot: () => snapshot, subscribe: () => () => {} } as never, selectPanel: vi.fn(), create: async () => {} })))
+    const choice = [...container.querySelectorAll('button')].find(button => button.textContent === '热点发现与事件跟踪')!
+    expect(choice).toBeDefined()
+    expect(container.textContent).toContain('供应链与企业')
+    expect([...container.querySelectorAll('button')].some(button => button.textContent === 'DoFe Tools')).toBe(false)
+    await act(async () => choice.click())
+    expect(navigation.selectedPlugin.getSnapshot()).toBe('tools-hotspot-discovery')
+    expect(choice.getAttribute('aria-current')).toBe('page')
+  } finally { await act(async () => root.unmount()); vi.unstubAllGlobals() }
+})

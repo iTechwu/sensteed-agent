@@ -97,7 +97,9 @@ export type DofePluginId = typeof DOFE_PLUGIN_CATALOG[number]['id']
 export const DOFE_CAPABILITY_GROUPS = ['research', 'creation', 'collaboration', 'business'] as const
 export const DOFE_CAPABILITY_CATALOG = [
   { id: 'opencli-research', plugin: 'opencli', kind: 'basic', group: 'research', name: '互联网检索与网页阅读', description: '搜索公开信息、阅读网页、提取来源，整理可追溯的研究结论。' },
+  { id: 'tools-supply-chain', plugin: 'tools', kind: 'business', group: 'business', name: '供应链数据检索', description: '读取供应商与企业数据，核对已保存的台账和证据。' },
   { id: 'tools-market-research', plugin: 'tools', kind: 'business', group: 'research', name: '行业与竞品调研', description: '发现行业和竞品信息，结合网页证据生成结构化调研。' },
+  { id: 'tools-public-social-research', plugin: 'tools', kind: 'business', group: 'research', name: '微信头条与西瓜公开资料', description: '检索微信公开内容，读取公众号、视频号、头条与西瓜资料；缓存未命中可能消耗采集额度。' },
   { id: 'tools-hotspot-discovery', plugin: 'tools', kind: 'business', group: 'research', name: '热点发现与事件跟踪', description: '发现热点话题、读取事件详情，跟踪热点任务与进展。' },
   { id: 'tools-talent-discovery', plugin: 'tools', kind: 'business', group: 'research', name: '人才发现', description: '按招聘需求发现人才，整理候选人信息与匹配线索。' },
   { id: 'tools-lead-discovery', plugin: 'tools', kind: 'business', group: 'research', name: '客户线索发现与监测', description: '发现潜在客户，持续监测线索变化并读取跟进结果。' },
