@@ -178,3 +178,21 @@ it('bridges the restricted native file chooser to Host plugins without the RPC d
     expect(pickFile).toHaveBeenLastCalledWith({})
   } finally { await release(); parent.close(); child.close(); port1.close(); port2.close() }
 })
+
+
+it('preserves installer digests across the native update bridge', async () => {
+  const { port1, port2 } = new MessageChannel()
+  const [parent, child] = [port1, port2].map(port => new HostRpc({
+    send: value => port.postMessage(value),
+    listen: receive => { port.on('message', receive); return () => { port.off('message', receive) } },
+  })) as [HostRpc, HostRpc]
+  const downloadAndOpen = vi.fn(async () => {})
+  const native = { platform: 'darwin', locale: 'zh', updates: { downloadAndOpen } } as unknown as DesktopRuntime
+  const release = bindNativeRuntime(parent, native)
+  try {
+    const runtime = createHostRuntime(child, runtimeSnapshot(native))
+    const digests = { darwin: 'a'.repeat(64) }
+    await runtime.updates.downloadAndOpen('0.2.1-rc.2-beta.202610201320', new AbortController().signal, 'beta', digests)
+    expect(downloadAndOpen).toHaveBeenCalledWith('0.2.1-rc.2-beta.202610201320', expect.any(AbortSignal), 'beta', digests)
+  } finally { await release(); parent.close(); child.close(); port1.close(); port2.close() }
+})

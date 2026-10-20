@@ -139,6 +139,9 @@ export function desktopVersionRequestHeaders(
   channel?: DesktopReleaseChannel,
 ): Readonly<Record<string, string>> {
   const headers: Record<string, string> = { Accept: 'application/json' }
+  // The deployed release API retains these wire aliases during its brand migration.
+  // They select the same channel on this fixed first-party endpoint only.
+  if (channel !== undefined) headers['X-Yootun-Agent-Channel'] = channel
   if (channel !== undefined) headers[DESKTOP_RELEASE_CHANNEL_HEADER] = channel
   if (currentVersion !== undefined) {
     const parsed = channel === undefined

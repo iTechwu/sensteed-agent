@@ -1,5 +1,6 @@
 /** Headless, confirmation-gated downloads for Sensteed-Agent installers. */
 
+import { BRAND_UPDATE_SERVICE } from './generated-product-identity.ts'
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto'
 import { chmod, lstat, mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
 import { basename, dirname, extname, isAbsolute, join, resolve } from 'node:path'
@@ -17,8 +18,8 @@ export type DesktopDownloadPlatform = 'darwin' | 'win32'
 
 /** Fixed download endpoints that record one user-confirmed installer download. */
 export const DESKTOP_DOWNLOAD_URLS: Readonly<Record<DesktopDownloadPlatform, string>> = {
-  darwin: 'https://www.dshdesktop.cn/api/downloads/mac',
-  win32: 'https://www.dshdesktop.cn/api/downloads/windows',
+  darwin: new URL('downloads/mac', BRAND_UPDATE_SERVICE.endpoint).href,
+  win32: new URL('downloads/windows', BRAND_UPDATE_SERVICE.endpoint).href,
 }
 
 /** Header pinning a download request and response to the checked release. */
@@ -145,6 +146,9 @@ export async function downloadDesktopUpdate(options: DownloadDesktopUpdateOption
       headers: {
         [DESKTOP_RELEASE_CHANNEL_HEADER]: channel,
         [DESKTOP_TARGET_VERSION_HEADER]: options.version,
+        // Wire compatibility with the deployed first-party release API.
+        'X-Yootun-Agent-Channel': channel,
+        'X-Yootun-Agent-Target-Version': options.version,
       },
       cache: 'no-store',
       redirect: 'follow',
