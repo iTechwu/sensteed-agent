@@ -5,7 +5,7 @@ import { type DofeAccessSettings } from '../dofe-plugins.ts'
 import { BRAND_VARIANT } from '../generated-product-identity.ts'
 import { dofePluginCardState } from './DofePluginItems.tsx'
 import { pluginPresentations, PLUGIN_PRESENTATION_GROUPS } from '../plugin-presentations.ts'
-import { Blocks, Sparkles } from 'lucide-react'
+import { Blocks, Sparkles, Plus } from 'lucide-react'
 
 export function createHubNavigation() {
   let tab: 'catalog' | 'installed' = 'catalog'
@@ -36,6 +36,7 @@ export function HubContext({ kind, navigation, selectPanel, create, settingsScop
   const settings = useSyncExternalStore(subscribeSettings, readSettings, readSettings).value
   const installed = settings?.identity?.ssoSub ? pluginPresentations(BRAND_VARIANT).filter(entry => ['built-in', 'enabled'].includes(dofePluginCardState(entry.plugin, settings))) : []
   return <nav className="sensteedBusinessNavigation" aria-label="自定义导航">
+    <CreateAction create={create} label={kind === 'plugin' ? '创建插件' : '创建技能'} />
     <button type="button" aria-current={kind === 'plugin' ? 'page' : undefined} onClick={() => selectPanel('plugins')}><Blocks size={16} /> 插件</button>
     <button type="button" aria-current={kind === 'skill' ? 'page' : undefined} onClick={() => selectPanel('sensteed-skill-manager')}><Sparkles size={16} /> 技能</button>
     <p className="sensteedContextGroup">{kind === 'plugin' ? '插件管理' : '技能管理'}</p>
@@ -45,13 +46,12 @@ export function HubContext({ kind, navigation, selectPanel, create, settingsScop
       const entries = installed.filter(entry => entry.group === group.id)
       return entries.length > 0 && <section key={group.id} aria-label={group.label}><p className="sensteedContextGroup">{group.label}</p>{entries.map(entry => <button key={entry.key} type="button" aria-current={selectedPlugin === entry.key ? 'page' : undefined} onClick={() => navigation.openPlugin(entry.key)}>{entry.plugin.name}</button>)}</section>
     })}
-    <CreateAction create={create} label={kind === 'plugin' ? '创建插件' : '创建技能'} />
   </nav>
 }
 function CreateAction({ create, label }: { create: () => Promise<void>; label: string }) {
   // Creation remains owned by the same conversation flow as the main page.
   const [state, setState] = useState<'idle' | 'pending' | 'error'>('idle')
-  return <><button type="button" disabled={state === 'pending'} onClick={() => { setState('pending'); void create().then(() => setState('idle'), () => setState('error')) }}>＋ {label}</button>{state === 'error' && <p role="alert">创建失败，请重试</p>}</>
+  return <><button type="button" disabled={state === 'pending'} aria-busy={state === 'pending'} onClick={() => { setState('pending'); void create().then(() => setState('idle'), () => setState('error')) }}><Plus size={16} aria-hidden="true" /><span>{state === 'pending' ? '正在创建…' : label}</span></button>{state === 'error' && <p role="alert">创建失败，请重试</p>}</>
 }
 
 /** Adapt the native manager's pinned registration store without replacing its page. */
