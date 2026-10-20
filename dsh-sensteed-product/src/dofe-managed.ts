@@ -14,9 +14,8 @@ import {
 import { BRAND_TENANT, BRAND_VARIANT } from './generated-product-identity.ts'
 import { managedCapabilitiesPrompt } from './managed-capabilities.ts'
 import type { DofeAuthService } from './dofe-auth-service.ts'
-import { observeLauncherRuntime, type DofeLauncherRuntime } from './dofe-host-auth.ts'
+import { observeLauncherRuntime } from './dofe-host-auth.ts'
 export type { DofeLauncherRuntime } from './dofe-host-auth.ts'
-import { financeMcpConfig } from './finance-mcp.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context { dofeAuth: DofeAuthService; dofeAccess: () => DofeAccessGate }
@@ -37,11 +36,8 @@ export interface DofeAccessGate {
   readonly entitlements?: DofeAccessSettings['entitlements']
   readonly enabledPlugins?: readonly DofePluginId[]
 }
-const DATASOURCE_FINANCE_WORKSPACE_ACCESS_URL = 'https://ds.hozonauto.com/api/finance/permissions/workspace-access'
-
 type ManagedMcpRoute = {
-  /** Omitted for required platform capabilities that were already always-on. */
-  plugin?: Exclude<DofePluginId, 'opencli'>
+  plugin: 'knowledge' | 'openmontage' | 'media'
   serverName: string
   path: string
   timeoutMs: number
@@ -53,12 +49,6 @@ const ROUTES: readonly ManagedMcpRoute[] = [
   // Models 媒体直连生成：create 是普通 API 调用（60s），轮询由 Agent 显式调用
   // get_generation_task，不持有长连接等待生成完成。
   { plugin: 'media', serverName: 'media', path: 'media', timeoutMs: 60_000 },
-  ...[
-    'platform', 'supply-chain', 'talent-discovery', 'lead-discovery', 'lead-monitor',
-    'hotspot-discovery', 'custom-car-monitoring', 'viral-video', 'browser-intelligence', 'tos-upload', 'xhs-operation',
-    'douyin-operation',
-  ].map(path => ({ plugin: 'tools' as const, serverName: `tools-${path}`, path: `tools/${path}`, timeoutMs: 60_000 })),
-  { plugin: 'supplier-intelligence', serverName: 'supply-chain', path: 'tools/supply-chain', timeoutMs: 120_000 },
 ]
 
 /**
@@ -67,12 +57,7 @@ const ROUTES: readonly ManagedMcpRoute[] = [
  * is the narrowest way to keep its transport aligned with the credential seam.
  */
 export async function apply(ctx: Context): Promise<void> {
-  // Restore may issue requests before the tray/MCP setup below. Observe the
-  // launcher first so both silent renewal and interactive login use its transport.
-  let launcher: DofeLauncherRuntime | undefined
-  observeLauncherRuntime(ctx, runtime => { launcher = runtime })
   const access = ctx.dofeAccessSettings
-  let financeAuthorized = false
   // A starting Host owner already reserves this service. Availability remains
   // strict for consumers; this lookup only avoids registering a second owner.
   if(!ctx.get?.('dofeAccess', false))ctx.provide('dofeAccess', () => {
@@ -80,7 +65,7 @@ export async function apply(ctx: Context): Promise<void> {
     const granted = current.entitlements?.plugins.includes('knowledge') === true
     return {
       ready: current.setupComplete && current.validationVersion === DOFE_ACCESS_VALIDATION_VERSION && current.authMode === 'feishu' && Boolean(current.identity?.ssoSub),
-      financeAllowed: financeAuthorized,
+      financeAllowed: false,
       enabledPlugins: normalizeDofeEnabledPluginIds(current.enabledPlugins, BRAND_VARIANT, current.entitlements?.plugins),
       entitlements: current.entitlements === undefined ? undefined : {
         ...current.entitlements,
@@ -88,27 +73,29 @@ export async function apply(ctx: Context): Promise<void> {
       },
     }
   })
-  const financeAuth: DofeAuthService | undefined = BRAND_VARIANT === 'sensteed' ? ctx.dofeAuth : undefined
   ctx.systemPrompt.section({
     name: 'dofe:managed-access',
     order: 4,
-    text: context => managedCapabilitiesPrompt({
-      ready: accessReady(access.get()),
-      enabled: enabledPlugins(access.get()),
-      financeAllowed: financeAuthorized,
-      toolNames: ctx.tools.schemas(context.scope).map(tool => tool.name),
-    }),
+    text: context => {
+      const gate = ctx.get?.('dofeAccess')?.()
+      return managedCapabilitiesPrompt({
+        ready: gate?.ready ?? accessReady(access.get()),
+        enabled: enabledPlugins(access.get()),
+        financeAllowed: gate?.financeAllowed === true,
+        toolNames: ctx.tools.schemas(context.scope).map(tool => tool.name),
+      })
+    },
   })
+  // Business plugins declare finance, supplier and tools routes through hubMcp.
+  // Only the remaining built-in routes are owned here.
   let routeClients: { dispose(): void | Promise<void> }[] = []
-  let financeClient: { dispose(): void | Promise<void> } | undefined
   let routeSignature: string | undefined
-  let financeSignature: string | undefined
-  let financeAccessCache: { token: string; allowed: boolean; expiresAt: number } | undefined
+  let disposed = false
+  let revision = 0
   let activeKey: string | undefined
   let tray: { refresh(): void; dispose(): void } | undefined
   let reload: Promise<void> = Promise.resolve()
   observeLauncherRuntime(ctx, runtime => {
-    launcher = runtime
     tray = runtime.registerTrayItem({
       group: 'tools',
       order: 5,
@@ -142,7 +129,9 @@ export async function apply(ctx: Context): Promise<void> {
   })
 
   const reconcileRoutes = async (): Promise<void> => {
+    const epoch = revision
     const resolved = await ctx.credentials.resolve(MODELS_API_KEY_REF)
+    if (disposed || epoch !== revision) return
     const next = resolved?.value
     const accessSettings = access.get()
     const enabled = enabledPlugins(accessSettings)
@@ -151,7 +140,7 @@ export async function apply(ctx: Context): Promise<void> {
       ? JSON.stringify({
           key: next,
           identity: accessSettings.identity?.ssoSub,
-          enabled: [...enabled].sort(),
+          enabled: ROUTES.filter(route => enabled.has(route.plugin)).map(route => route.plugin),
         })
       : `inactive:${accessSettings.authMode}:${accessSettings.identity?.ssoSub ?? ''}`
 
@@ -163,6 +152,7 @@ export async function apply(ctx: Context): Promise<void> {
     routeClients = []
     routeSignature = undefined
     await Promise.all(old.map(client => client.dispose()))
+    if (disposed || epoch !== revision) return
     if (!ready || !next) {
       routeSignature = nextSignature
       tray?.refresh()
@@ -172,7 +162,7 @@ export async function apply(ctx: Context): Promise<void> {
     const created: { dispose(): void | Promise<void> }[] = []
     try {
       for (const route of ROUTES) {
-        if (route.plugin !== undefined && !enabled.has(route.plugin)) continue
+        if (!enabled.has(route.plugin)) continue
         const config: McpConfig = {
           transport: 'streamable-http',
           serverName: route.serverName,
@@ -183,6 +173,10 @@ export async function apply(ctx: Context): Promise<void> {
           reconnect: { enabled: true, initialDelayMs: 500, maxDelayMs: 30_000, maxAttempts: 10 },
         }
         created.push(await ctx.plugin(McpClient, config))
+        if (disposed || epoch !== revision) {
+          await Promise.all(created.map(client => client.dispose()))
+          return
+        }
       }
       routeClients = created
       routeSignature = nextSignature
@@ -195,103 +189,27 @@ export async function apply(ctx: Context): Promise<void> {
     }
   }
 
-  const reconcileFinance = async (): Promise<void> => {
-    financeAuthorized = false
-    const resolved = await ctx.credentials.resolve(MODELS_API_KEY_REF)
-    const next = resolved?.value
-    const accessSettings = access.get()
-    const session = financeAuth?.getDatasourceSession()
-    const baseReady = BRAND_VARIANT === 'sensteed' && Boolean(next) && accessReady(accessSettings) && session !== undefined
-    let financeAllowed = false
-    if (baseReady && session !== undefined) {
-      if (financeAccessCache?.token === session.accessToken && financeAccessCache.expiresAt > Date.now()) {
-        financeAllowed = financeAccessCache.allowed
-      } else {
-        try {
-          const request = launcher?.requestDofeAuth?.bind(launcher) ?? globalThis.fetch
-          const response = await request(DATASOURCE_FINANCE_WORKSPACE_ACCESS_URL, {
-            method: 'GET',
-            headers: {
-              Accept: 'application/json',
-              Authorization: `Bearer ${session.accessToken}`,
-              'X-Company-Code': BRAND_TENANT,
-            },
-            redirect: 'error',
-            signal: AbortSignal.timeout(30_000),
-          })
-          const payload = await response.json().catch(() => null) as { data?: { allowed?: boolean } } | null
-          financeAllowed = response.ok && payload?.data?.allowed === true
-          financeAccessCache = { token: session.accessToken, allowed: financeAllowed, expiresAt: Date.now() + 5000 }
-        } catch {
-          financeAccessCache = { token: session.accessToken, allowed: false, expiresAt: Date.now() + 1000 }
-        }
-      }
-    }
-    const ready = baseReady && financeAllowed && enabledPlugins(accessSettings).has('finance')
-    financeAuthorized = ready
-    const nextSignature = ready
-      ? `${next}\0${session!.accessToken}`
-      : session === undefined ? undefined : `finance-denied:${accessSettings.identity?.ssoSub ?? ''}`
-    if (financeSignature === nextSignature) return
-
-    const old = financeClient
-    financeClient = undefined
-    financeSignature = undefined
-    if (old !== undefined) await old.dispose()
-    if (!ready || !next || session === undefined) return
-
-    try {
-      financeClient = await ctx.plugin(McpClient, financeMcpConfig(next, session.accessToken))
-      financeSignature = nextSignature
-    } catch (error) {
-      ctx.logger.error('dofe-managed: failed to activate the finance MCP client')
-      void error
-    }
-  }
-
-  const scheduleFinance = (): void => {
-    financeAuthorized = false
-    ctx.emit?.('dofe/access-changed')
-    const reconcile = async () => {
-      await reconcileFinance()
-      ctx.emit?.('dofe/access-changed')
-    }
-    reload = reload.then(reconcile, reconcile)
-  }
-
   const scheduleAll = (): void => {
-    financeAuthorized = false
-    ctx.emit?.('dofe/access-changed')
-    reload = reload.then(async () => {
-      await reconcileRoutes()
-      await reconcileFinance()
-      ctx.emit?.('dofe/access-changed')
-    }, async () => {
-      await reconcileRoutes()
-      await reconcileFinance()
-      ctx.emit?.('dofe/access-changed')
-    })
+    if (disposed) return
+    revision++
+    reload = reload.then(reconcileRoutes, reconcileRoutes)
   }
 
-  let observingFinance = false
-  if (financeAuth) ctx.effect(() => financeAuth.watchBinding(() => { if (observingFinance) scheduleFinance() }), 'dofe-managed: finance SSO renewal')
-  observingFinance = true
   scheduleAll()
   ctx.on('credentials/reference-updated', ref => {
     if (ref === MODELS_API_KEY) scheduleAll()
   })
-  access.watch(() => scheduleAll())
-  ctx.effect(() => () => {
+  ctx.effect(() => access.watch(scheduleAll), 'dofe-managed: access settings lifetime')
+  ctx.effect(() => async () => {
+    disposed = true
+    revision++
+    activeKey = undefined
     tray?.dispose()
     tray = undefined
+    await reload
     const currentRoutes = routeClients
     routeClients = []
-    const currentFinance = financeClient
-    financeClient = undefined
-    void Promise.all([
-      ...currentRoutes.map(client => client.dispose()),
-      ...(currentFinance === undefined ? [] : [currentFinance.dispose()]),
-    ])
+    await Promise.all(currentRoutes.map(client => client.dispose()))
   }, 'dofe-managed: dispose MCP clients')
   await reload
 }

@@ -4,12 +4,13 @@ import { apply as applyAuth } from '../src/dofe-host-auth.ts'
 import { DOFE_ACCESS_VALIDATION_VERSION, DEFAULT_DOFE_PLUGIN_IDS, normalizeDofePluginIds, type DofeAccessSettings } from '../src/dofe-plugins.ts'
 import { BRAND_VARIANT } from '../src/generated-product-identity.ts'
 
-// The first three clients created before the simulated fourth route failure.
-const BRAND_LEADING_SERVER_NAMES = ['knowledge', 'openmontage', 'media']
+// The first two clients created before the simulated media route failure.
+const BRAND_LEADING_SERVER_NAMES = ['knowledge', 'openmontage']
 
 function createHarness(settings: DofeAccessSettings, failAt = Number.POSITIVE_INFINITY) {
   const clients: Array<{ config: Record<string, unknown>; dispose: ReturnType<typeof vi.fn> }> = []
   const errors: unknown[][] = []
+  const cleanups: Array<() => unknown> = []
   let pluginCalls = 0
   const access = {
     get: () => settings,
@@ -35,14 +36,19 @@ function createHarness(settings: DofeAccessSettings, failAt = Number.POSITIVE_IN
       return client
     }),
     on: vi.fn(),
-    effect: vi.fn(),
+    effect: vi.fn((effect: () => void | (() => unknown)) => {
+      const cleanup = effect()
+      if (cleanup) cleanups.push(cleanup)
+    }),
     // The sensteed brand branch provides the SSO auth service; production
     // hands it to the Host plugin through this seam.
     provide: vi.fn((name: string, value: unknown) => { services[name] = value; Object.assign(ctx, { [name]: value }) }),
     logger: { error: vi.fn((...args: unknown[]) => errors.push(args)) },
   }
   Object.assign(ctx, { dofeAccessSettings: access, dofeAuth: { getDatasourceSession: () => undefined, watchBinding: () => () => {} } })
-  return { ctx, access, clients, errors }
+  return { ctx, access, clients, errors, dispose: async () => {
+    for (const cleanup of cleanups.splice(0).reverse()) await cleanup()
+  } }
 }
 
 describe('dofe-managed MCP runtime', () => {
@@ -131,14 +137,73 @@ describe('dofe-managed MCP runtime', () => {
       authMode: 'feishu',
       identity: { ssoSub: 'test-user', name: 'Test User' },
       entitlements: { plugins: normalizeDofePluginIds(DEFAULT_DOFE_PLUGIN_IDS, BRAND_VARIANT), defaultModel: 'deepseek-chat', allowedProtocols: ['chat-completions'] },
-    }, 4)
+    }, 3)
 
     await applyManaged(harness.ctx as never)
 
-    expect(harness.clients).toHaveLength(3)
-    // A failure on the fourth route must release all three earlier clients.
+    expect(harness.clients).toHaveLength(2)
+    // A failure on media must release both earlier clients.
     expect(harness.clients.map(client => client.config.serverName)).toEqual(BRAND_LEADING_SERVER_NAMES)
     expect(harness.errors).toEqual([['dofe-managed: failed to activate one or more MCP clients']])
     for (const client of harness.clients) expect(client.dispose).toHaveBeenCalledOnce()
+  })
+
+  it('uses the live Host finance gate without creating business transports or requesting permissions', async () => {
+    const harness = createHarness({
+      setupComplete: true, validationVersion: DOFE_ACCESS_VALIDATION_VERSION,
+      enabledPlugins: ['tools', 'finance', 'supplier-intelligence'], modelId: '', protocol: 'messages',
+      authMode: 'feishu', identity: { ssoSub: 'test-user', name: 'Test User' },
+      entitlements: { plugins: ['tools', 'finance', 'supplier-intelligence'], defaultModel: '', allowedProtocols: ['messages'] },
+    })
+    let financeAllowed = true
+    harness.ctx.provide('dofeAccess', () => ({ ready: true, financeAllowed }))
+    Object.assign(harness.ctx, { tools: { schemas: () => [{ name: 'mcp__finance__query' }] } })
+    const request = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('managed must not check business permissions'))
+    try {
+      await applyManaged(harness.ctx as never)
+      expect(harness.clients.map(client => client.config.serverName)).toEqual(['openmontage', 'media'])
+      expect(request).not.toHaveBeenCalled()
+      const section = harness.ctx.systemPrompt.section.mock.calls[0]?.[0] as unknown as { text(context: unknown): string }
+      expect(section.text({})).toContain('财务管理')
+      financeAllowed = false
+      expect(section.text({})).not.toContain('财务管理')
+    } finally { request.mockRestore() }
+  })
+
+  it('keeps built-in transports when only Hub capability selections change', async () => {
+    const settings: DofeAccessSettings = {
+      setupComplete: true, validationVersion: DOFE_ACCESS_VALIDATION_VERSION,
+      enabledPlugins: ['tools'], modelId: '', protocol: 'messages',
+      authMode: 'feishu', identity: { ssoSub: 'test-user', name: 'Test User' },
+      entitlements: { plugins: ['tools', 'supplier-intelligence'], defaultModel: '', allowedProtocols: ['messages'] },
+    }
+    const harness = createHarness(settings)
+    try {
+      await applyManaged(harness.ctx as never)
+      settings.enabledPlugins = ['tools', 'supplier-intelligence']
+      const watcher = harness.access.watch.mock.calls[0]?.[0] as () => void
+      watcher()
+      for (let i = 0; i < 10; i++) await Promise.resolve()
+      expect(harness.ctx.plugin).toHaveBeenCalledTimes(2)
+      for (const client of harness.clients) expect(client.dispose).not.toHaveBeenCalled()
+    } finally { await harness.dispose() }
+  })
+
+  it('drains an in-flight activation on shutdown without starting later routes', async () => {
+    const harness = createHarness({
+      setupComplete: true, validationVersion: DOFE_ACCESS_VALIDATION_VERSION,
+      enabledPlugins: ['openmontage', 'media'], modelId: '', protocol: 'messages',
+      authMode: 'feishu', identity: { ssoSub: 'test-user', name: 'Test User' },
+    })
+    const client = { config: {}, dispose: vi.fn() }
+    let finish!: (value: typeof client) => void
+    harness.ctx.plugin.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    const applying = applyManaged(harness.ctx as never)
+    await vi.waitFor(() => expect(harness.ctx.plugin).toHaveBeenCalledOnce())
+    const disposing = harness.dispose()
+    finish(client)
+    await Promise.all([applying, disposing])
+    expect(harness.ctx.plugin).toHaveBeenCalledOnce()
+    expect(client.dispose).toHaveBeenCalledOnce()
   })
 })
