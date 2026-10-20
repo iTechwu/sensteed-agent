@@ -1,4 +1,4 @@
-# Sensteed Agent repository rules
+# 哪吒Agent（hozonauto-agent）repository rules
 
 This repository owns the desktop product around an unmodified DeepSeek Harness checkout.
 
