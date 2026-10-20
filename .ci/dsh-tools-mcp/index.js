@@ -2,6 +2,13 @@ export const name = 'tools-guidance'
 export const inject = ['systemPrompt', 'hubMcp']
 export const capabilities = Object.freeze([
   {
+    "id": "tools-business-discovery",
+    "kind": "business",
+    "group": "business",
+    "name": "业务能力分类与契约发现",
+    "description": "按业务目标发现类别、服务与工具，核对参数、费用和可用条件；目录读取不触发采集或模型。"
+  },
+  {
     "id": "tools-market-research",
     "kind": "business",
     "group": "research",
@@ -79,7 +86,7 @@ export function apply(ctx) {
   const guidance = ctx.systemPrompt.section({
     name: 'tools:guidance',
     order: 7,
-    text: '企业调研使用 mcp__tools-platform__* 做能力发现，使用 mcp__tools-hotspot-discovery__* 做热点运行与事件读取，必要时使用 mcp__tools-browser-intelligence__* 补充网页证据。需要公网文件 URL 时先调 mcp__tools-tos-upload__tos_upload_authorize 取预签名 PUT URL，再用 Bash 按原始字节直传。先 preview/读取再运行；任何 Tools 写操作必须带 confirm=true 和稳定 idempotencyKey，不确定响应必须读取回执对账。 微信/公众号/视频号/头条/西瓜公开资料先调用 mcp__tools-platform__getoneapi_social_capabilities_get 获取目录、参数与 workflows；可用 getoneapi_social_read_prepare 零成本校验，再用 getoneapi_social_read 单页读取。缓存未命中可能计费，保留来源、retrievedAt、observedAt、cacheHit、charged、externalCallMade；不自动重试或翻页，不猜测账号标识或续页游标。遇到 ONEAPI_DEADLINE_EXCEEDED 或 ONEAPI_BUDGET_EXHAUSTED 时停止本次外部读取，报告稳定错误码；不得改参数、换接口或切换直连来自动重放。相同请求并发成功时由服务端复用缓存，但网络未知结果不保证只计费一次。头条/西瓜没有目录内关键词搜索接口；读取结果是临时研究资料，不自动成为供应商、人才、线索或改装案例。长文用 dataPointer/textOffset 分段读取同一缓存，短期视频 URL/decode_key 不作为永久素材链接。供应商正式入库使用经授权来源的 supply_chain_social_monitoring_collect，微信来源 platform=wechat-search，confirm=true 并使用稳定 idempotencyKey；普通业务列表仍只读数据库。',
+    text: '通用业务任务先调 mcp__tools-platform__business_service_categories_list 浏览 8 个业务分类（categoryId），选定服务组（serviceId）后用 business_tools_search 按 query、categoryId、serviceId、operationKind 与政策过滤，最后用 business_tool_contract_get 读取所选工具的实际输入 schema、政策与可用条件。已有事实查询优先传 externalCallsAllowed=false、chargeAllowed=false；只读不自动表示免费，unknown 政策不能当作零成本，false 过滤会排除 unknown 而不是放行。目录只说明注册与源码条件，不能据此宣称部署健康、设备已连接或付费执行可用。endpointRef 只由已注册的公共网关连接解析：xhs_operation 对应 tools-xhs-operation，douyin_operation 对应 tools-douyin-operation；video-processing 与 media.upload/sources/transcripts/frames/jobs 属视频笔记插件的既有连接，本插件未激活时如实告知缺少接入，不能拼内部地址。找不到目录工具时回退 tools/list 与已存在领域目录，不猜参数或自动执行。工具名称、分类、schema、费用及工作流以 Tools 服务端实时目录为准，客户端不维护第二套工具清单。企业调研用 mcp__tools-platform__* 做能力发现，mcp__tools-hotspot-discovery__* 读热点运行与事件，必要时用 mcp__tools-browser-intelligence__* 补网页证据。需要公网文件 URL 时先调 mcp__tools-tos-upload__tos_upload_authorize 取预签名 PUT URL，再用 Bash 按原始字节直传。先 preview/读取再运行；确认、幂等、版本校验与个人身份按各工具实际契约执行；只在 schema 支持时传 confirm/idempotencyKey，不给普通读取添写参数。不确定响应继续读取原 runId/jobId 或回执，不换幂等键重提。微信/公众号/视频号/头条/西瓜公开资料先调 mcp__tools-platform__getoneapi_social_capabilities_get 取目录、参数与 workflows；getoneapi_social_read_prepare 零成本校验，getoneapi_social_read 单页读取。缓存未命中可能计费，保留来源、retrievedAt、observedAt、cacheHit、charged、externalCallMade；不自动重试或翻页，不猜账号标识或续页游标。ONEAPI_DEADLINE_EXCEEDED 或 ONEAPI_BUDGET_EXHAUSTED 时停止本次外部读取并报告稳定错误码；不改参数、换接口或直连自动重放。相同请求并发成功由服务端复用缓存，网络未知结果不保证只计费一次。头条/西瓜无目录内关键词搜索接口；读取结果是临时研究资料，不自动成为供应商、人才、线索或改装案例。长文用 dataPointer/textOffset 分段读同一缓存，短期视频 URL/decode_key 不作永久素材链接。供应商正式入库用经授权来源的 supply_chain_social_monitoring_collect，微信来源 platform=wechat-search，confirm=true 并用稳定 idempotencyKey；正式客户线索先查目录内正式线索池的只读能力，不拿发现候选冒充事实池。人才后续操作沿用服务返回的 collectionRef，不猜内部 taskId。公共供应商事实与个人/团队业务状态保持各自作用域；客户端不传租户或身份覆盖服务端上下文。',
   })
   return async () => { guidance?.(); await Promise.all(registrations.map(r => r.dispose())) }
 }

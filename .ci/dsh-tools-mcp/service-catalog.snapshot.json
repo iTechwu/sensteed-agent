@@ -1,0 +1,3107 @@
+{
+  "catalogVersion": "2b7d96d9a1b396a4e28ee400e64c52fb3c85b94a7cedf9bd6f8c2ae4d9efb194",
+  "categories": [
+    {
+      "id": "platform",
+      "intent": "找到工具、理解契约、处理通用文本与回执",
+      "name": "能力发现与通用支撑"
+    },
+    {
+      "id": "public-research",
+      "intent": "查询社媒、发现热点、采集受控网页证据",
+      "name": "公开信息研究与证据采集"
+    },
+    {
+      "id": "enterprise-risk",
+      "intent": "识别企业、管理供应商、核验证据、处理风险",
+      "name": "企业与供应链风险"
+    },
+    {
+      "id": "customer-growth",
+      "intent": "发现潜客、读取线索、监测账号与跟踪效果",
+      "name": "客户线索与持续监测"
+    },
+    {
+      "id": "talent",
+      "intent": "发现候选人才、完善画像、准备触达与评估效果",
+      "name": "人才发现与评估"
+    },
+    {
+      "id": "vehicle-intelligence",
+      "intent": "查询案例、管理监测资产、补充证据与分析趋势",
+      "name": "车辆改装情报"
+    },
+    {
+      "id": "content-operations",
+      "intent": "研究爆款、生成内容、运营小红书与分析抖音账号",
+      "name": "内容创作与账号运营"
+    },
+    {
+      "id": "media-assets",
+      "intent": "上传素材、获取字幕、抽取画面与读取任务产物",
+      "name": "视频处理与素材"
+    }
+  ],
+  "generatedFrom": "local MCP registration; taxonomy is authoritative; not a deployment health claim",
+  "schemaVersion": 1,
+  "services": [
+    {
+      "categoryId": "content-operations",
+      "domain": "douyin_operation",
+      "id": "content.douyin-ai",
+      "name": "抖音账号 AI 表现分析",
+      "servers": [
+        "tools-douyin-operation"
+      ],
+      "tools": [
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "douyin_account_ai_analysis_get"
+        },
+        {
+          "costPolicy": "possible",
+          "declaredEffect": "write",
+          "executionMode": "async",
+          "externalCallPolicy": "explicit",
+          "modelUsage": "possible",
+          "operationKind": "analyze",
+          "requiresConfirm": false,
+          "risk": "medium",
+          "toolName": "douyin_account_ai_analysis_start"
+        }
+      ]
+    },
+    {
+      "categoryId": "content-operations",
+      "domain": "douyin_operation",
+      "id": "content.douyin-analytics",
+      "name": "抖音作品与账号指标",
+      "servers": [
+        "tools-douyin-operation"
+      ],
+      "tools": [
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "douyin_account_analysis"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "read",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "douyin_account_analysis_export"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "douyin_account_list"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "douyin_account_overview"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "douyin_account_trend"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "read",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "douyin_export"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "douyin_hot_work_list"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "read",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "douyin_overview_export"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "douyin_work_get"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "douyin_work_list"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "douyin_work_trend"
+        }
+      ]
+    },
+    {
+      "categoryId": "content-operations",
+      "domain": "douyin_operation",
+      "id": "content.douyin-ingestion",
+      "name": "抖音账号、设备状态与采集入库",
+      "servers": [
+        "tools-douyin-operation"
+      ],
+      "tools": [
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "douyin_account_remove"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "douyin_account_save"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "write",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "ingest",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "douyin_collect_ingest_batch"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "write",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "ingest",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "douyin_collect_ingest_daily"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "write",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "ingest",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "douyin_collect_run_cancel"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "write",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "ingest",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "douyin_collect_run_finish"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "douyin_collect_run_get"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "write",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "ingest",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "douyin_collect_run_heartbeat"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "write",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "ingest",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "douyin_collect_run_set_list_meta"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "write",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "ingest",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "douyin_collect_run_start"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "write",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "ingest",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "douyin_session_status_report"
+        }
+      ]
+    },
+    {
+      "categoryId": "content-operations",
+      "domain": "viral-video",
+      "id": "content.viral-assets",
+      "name": "爆款素材与媒体链接",
+      "servers": [
+        "tools-viral-video"
+      ],
+      "tools": [
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "viral_video_asset_url_refresh"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "viral_video_assets_list"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "high",
+          "toolName": "viral_video_assets_process"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "read",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "viral_video_douyin_download_url"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "viral_video_douyin_tos_url"
+        }
+      ]
+    },
+    {
+      "categoryId": "content-operations",
+      "domain": "viral-video",
+      "id": "content.viral-discovery",
+      "name": "爆款发现、候选归档与检索",
+      "servers": [
+        "tools-viral-video"
+      ],
+      "tools": [
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "viral_video_archive_submit"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "viral_video_async_submit_get"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "high",
+          "toolName": "viral_video_candidate_advance"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "viral_video_candidates_export"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "viral_video_candidates_list"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "high",
+          "toolName": "viral_video_discovery_run"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "viral_video_export_get"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": false,
+          "risk": "medium",
+          "toolName": "viral_video_search_submit"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "read",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "viral_video_sources_list"
+        }
+      ]
+    },
+    {
+      "categoryId": "content-operations",
+      "domain": "viral-video",
+      "id": "content.viral-monitoring",
+      "name": "爆款种子、计划与看板",
+      "servers": [
+        "tools-viral-video"
+      ],
+      "tools": [
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "viral_video_account_seeds_upsert"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "viral_video_dashboard_get"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "viral_video_keyword_seeds_upsert"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "viral_video_scheduled_plan_get"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "viral_video_seeds_list"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "viral_video_status_get"
+        }
+      ]
+    },
+    {
+      "categoryId": "content-operations",
+      "domain": "viral-video",
+      "id": "content.viral-workflows",
+      "name": "爆款拆解、仿写规则与故事板",
+      "servers": [
+        "tools-viral-video"
+      ],
+      "tools": [
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "high",
+          "toolName": "viral_video_analysis_run"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "viral_video_analysis_status_get"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "discover",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "viral_video_rewrite_rules_list"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "read",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "viral_video_storyboard_export"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "high",
+          "toolName": "viral_video_storyboard_generate"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "viral_video_storyboards_list"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "viral_video_workflow_get"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "high",
+          "toolName": "viral_video_workflow_start"
+        }
+      ]
+    },
+    {
+      "categoryId": "content-operations",
+      "domain": "xhs_operation",
+      "id": "content.xhs-creation",
+      "name": "小红书对标与内容创作",
+      "servers": [
+        "tools-xhs-operation"
+      ],
+      "tools": [
+        {
+          "costPolicy": "possible",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "cache_miss",
+          "modelUsage": "never",
+          "operationKind": "external_read",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "xhs_operation_account_search"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "xhs_operation_feedback_save"
+        },
+        {
+          "costPolicy": "possible",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "cache_miss",
+          "modelUsage": "never",
+          "operationKind": "external_read",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "xhs_operation_reference_search"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "prepare",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "xhs_operation_reference_select"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "xhs_operation_result_get"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "discover",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "xhs_operation_style_get"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "xhs_operation_task_cancel"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "xhs_operation_task_create"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "xhs_operation_task_get"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": false,
+          "risk": "medium",
+          "toolName": "xhs_operation_task_retry"
+        }
+      ]
+    },
+    {
+      "categoryId": "content-operations",
+      "domain": "xhs_operation",
+      "id": "content.xhs-hotboard",
+      "name": "小红书爆款看板与人工审核",
+      "servers": [
+        "tools-xhs-operation"
+      ],
+      "tools": [
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "xhs_operation_hotboard_candidate_review"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "xhs_operation_hotboard_candidates_list"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "xhs_operation_hotboard_keyword_save"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "xhs_operation_hotboard_keywords_list"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "xhs_operation_hotboard_label_review"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "xhs_operation_hotboard_label_save"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "xhs_operation_hotboard_labels_list"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "xhs_operation_hotboard_note_detail"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "xhs_operation_hotboard_note_exclude"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "xhs_operation_hotboard_note_tag_update"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "xhs_operation_hotboard_overview"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "xhs_operation_hotboard_run_get"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "high",
+          "toolName": "xhs_operation_hotboard_run_start"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "xhs_operation_hotboard_settings_get"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "xhs_operation_hotboard_settings_update"
+        }
+      ]
+    },
+    {
+      "categoryId": "enterprise-risk",
+      "domain": "supply-chain",
+      "id": "enterprise.business-context",
+      "name": "业务背景与人工分析",
+      "servers": [
+        "tools-supply-chain"
+      ],
+      "tools": [
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "supply_chain_business_analysis_list"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "supply_chain_business_analysis_save"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "supply_chain_business_context_get"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "supply_chain_business_context_save"
+        }
+      ]
+    },
+    {
+      "categoryId": "enterprise-risk",
+      "domain": "supply-chain",
+      "id": "enterprise.collection",
+      "name": "企业与媒体证据摄取",
+      "servers": [
+        "tools-supply-chain"
+      ],
+      "tools": [
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "supply_chain_aiqicha_company_profile_collect"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "supply_chain_aiqicha_mobile_snapshot_collect"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "supply_chain_aiqicha_mobile_source_authorize"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "supply_chain_company_profile_sync"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "supply_chain_getone_social_source_authorize"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "supply_chain_news_snapshot_ingest"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": false,
+          "risk": "medium",
+          "toolName": "supply_chain_run_cancel"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "supply_chain_run_get"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "supply_chain_social_monitoring_collect"
+        }
+      ]
+    },
+    {
+      "categoryId": "enterprise-risk",
+      "domain": "supply-chain",
+      "id": "enterprise.company-data",
+      "name": "企业识别与企查查数据",
+      "servers": [
+        "tools-supply-chain"
+      ],
+      "tools": [
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "discover",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "supply_chain_qcc_capabilities_get"
+        },
+        {
+          "costPolicy": "possible",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "cache_miss",
+          "modelUsage": "never",
+          "operationKind": "external_read",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "supply_chain_qcc_company_data_get"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "supply_chain_qcc_company_data_list"
+        },
+        {
+          "costPolicy": "possible",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "cache_miss",
+          "modelUsage": "never",
+          "operationKind": "external_read",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "supply_chain_qcc_company_search"
+        }
+      ]
+    },
+    {
+      "categoryId": "enterprise-risk",
+      "domain": "supply-chain",
+      "id": "enterprise.intelligence",
+      "name": "情报报告与时间线",
+      "servers": [
+        "tools-supply-chain"
+      ],
+      "tools": [
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "supply_chain_intelligence_report_get"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "high",
+          "toolName": "supply_chain_intelligence_summary_run"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "supply_chain_monitoring_timeline_get"
+        }
+      ]
+    },
+    {
+      "categoryId": "enterprise-risk",
+      "domain": "supply-chain",
+      "id": "enterprise.relationships",
+      "name": "企业关系核验",
+      "servers": [
+        "tools-supply-chain"
+      ],
+      "tools": [
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "supply_chain_relationship_review_submit"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "supply_chain_relationships_list"
+        }
+      ]
+    },
+    {
+      "categoryId": "enterprise-risk",
+      "domain": "supply-chain",
+      "id": "enterprise.risk",
+      "name": "风险事件、预测与告警处置",
+      "servers": [
+        "tools-supply-chain"
+      ],
+      "tools": [
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "supply_chain_alert_assign"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "supply_chain_alert_create"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "supply_chain_alert_resolve"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "supply_chain_alerts_list"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "high",
+          "toolName": "supply_chain_event_analysis_run"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "supply_chain_risk_event_review"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "supply_chain_risk_events_list"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "high",
+          "toolName": "supply_chain_risk_forecast_run"
+        }
+      ]
+    },
+    {
+      "categoryId": "enterprise-risk",
+      "domain": "supply-chain",
+      "id": "enterprise.suppliers",
+      "name": "供应商主数据",
+      "servers": [
+        "tools-supply-chain"
+      ],
+      "tools": [
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "read",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "supply_chain_capabilities_get"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "supply_chain_supplier_archive"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "supply_chain_supplier_create"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "supply_chain_supplier_get"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "supply_chain_supplier_import"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "supply_chain_supplier_update"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "supply_chain_supplier_verify"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "supply_chain_suppliers_list"
+        }
+      ]
+    },
+    {
+      "categoryId": "enterprise-risk",
+      "domain": "supply-chain",
+      "id": "enterprise.weekly-reports",
+      "name": "周报计划、阅读与恢复",
+      "servers": [
+        "tools-supply-chain"
+      ],
+      "tools": [
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "supply_chain_weekly_report_get"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "supply_chain_weekly_report_mark_read"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "supply_chain_weekly_report_plan_get"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "supply_chain_weekly_report_plan_save"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "supply_chain_weekly_report_retry"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "supply_chain_weekly_reports_list"
+        }
+      ]
+    },
+    {
+      "categoryId": "enterprise-risk",
+      "domain": "supply-chain",
+      "id": "enterprise.workbench",
+      "name": "风险工作台与证据阅读",
+      "servers": [
+        "tools-supply-chain"
+      ],
+      "tools": [
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "supply_chain_workbench_evidence_get"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "supply_chain_workbench_evidence_list"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "supply_chain_workbench_overview_get"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "supply_chain_workbench_suppliers_list"
+        }
+      ]
+    },
+    {
+      "categoryId": "customer-growth",
+      "domain": "lead-discovery",
+      "id": "growth.discovery",
+      "name": "线索发现与导入",
+      "servers": [
+        "tools-lead-discovery"
+      ],
+      "tools": [
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "lead_discovery_batch_discover"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "lead_discovery_discover"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "lead_discovery_manual_import"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "read",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "lead_discovery_result_page_get"
+        }
+      ]
+    },
+    {
+      "categoryId": "customer-growth",
+      "domain": "lead-discovery",
+      "id": "growth.enrichment",
+      "name": "反馈、账号内容与评论补充",
+      "servers": [
+        "tools-lead-discovery"
+      ],
+      "tools": [
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "lead_discovery_account_content_plan_get"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "lead_discovery_account_content_run"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "lead_discovery_account_verification_import"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "lead_discovery_comment_fetch_plan_get"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "lead_discovery_comment_fetch_report_get"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "high",
+          "toolName": "lead_discovery_comment_fetch_run"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "lead_discovery_feedback_persist"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "read",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "lead_discovery_feedback_validate"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "lead_discovery_llm_analysis_run"
+        }
+      ]
+    },
+    {
+      "categoryId": "customer-growth",
+      "domain": "lead-discovery",
+      "id": "growth.lead-pool",
+      "name": "正式业务线索池与关联证据",
+      "servers": [
+        "tools-lead-discovery"
+      ],
+      "tools": [
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "lead_pool_entries_list"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "lead_pool_entry_evidence_list"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "lead_pool_entry_get"
+        }
+      ]
+    },
+    {
+      "categoryId": "customer-growth",
+      "domain": "lead-discovery",
+      "id": "growth.lead-query",
+      "name": "线索候选与洞察查询",
+      "servers": [
+        "tools-lead-discovery"
+      ],
+      "tools": [
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "lead_discovery_candidates_list"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "lead_discovery_daily_report_get"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "lead_discovery_database_search"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "lead_discovery_insights_get"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "lead_discovery_keyword_report_get"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "lead_discovery_periodic_runs_list"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "lead_discovery_status_get"
+        }
+      ]
+    },
+    {
+      "categoryId": "customer-growth",
+      "domain": "lead-monitor",
+      "id": "growth.monitoring-config",
+      "name": "监测来源、栏目、账号与关键词",
+      "servers": [
+        "tools-lead-monitor"
+      ],
+      "tools": [
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "lead_monitor_account_upsert"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "lead_monitor_accounts_list"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "lead_monitor_keyword_publish"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "lead_monitor_keyword_upsert"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "lead_monitor_keywords_list"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "lead_monitor_source_section_upsert"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "lead_monitor_source_sections_list"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "lead_monitor_source_upsert"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "lead_monitor_sources_list"
+        }
+      ]
+    },
+    {
+      "categoryId": "customer-growth",
+      "domain": "lead-monitor",
+      "id": "growth.monitoring-results",
+      "name": "监测计划、运行、结果与效果",
+      "servers": [
+        "tools-lead-monitor"
+      ],
+      "tools": [
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "lead_monitor_effectiveness_get"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "lead_monitor_periodic_runs_list"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "prepare",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "lead_monitor_plan_preview"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "read",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "lead_monitor_result_page_get"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "lead_monitor_results_list"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "lead_monitor_run_get"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "high",
+          "toolName": "lead_monitor_run_start"
+        }
+      ]
+    },
+    {
+      "categoryId": "customer-growth",
+      "domain": "lead-discovery",
+      "id": "growth.schedule-budget",
+      "name": "调度计划、恢复与预算通知",
+      "servers": [
+        "tools-lead-discovery"
+      ],
+      "tools": [
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "high",
+          "toolName": "lead_discovery_budget_notification_execute"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "lead_discovery_budget_notification_get"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "lead_discovery_scheduled_plan_get"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "lead_discovery_scheduled_retry_plan_get"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "lead_discovery_scheduled_retry_run"
+        }
+      ]
+    },
+    {
+      "categoryId": "media-assets",
+      "domain": "video-processing",
+      "id": "media.frames",
+      "name": "视频抽帧与帧集",
+      "servers": [
+        "tools-video-processing"
+      ],
+      "tools": [
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": false,
+          "risk": "medium",
+          "toolName": "video_frames_extract_start"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "video_frames_list"
+        }
+      ]
+    },
+    {
+      "categoryId": "media-assets",
+      "domain": "tos-upload",
+      "id": "media.generic-upload",
+      "name": "通用 TOS 上传授权",
+      "servers": [
+        "tools-tos-upload"
+      ],
+      "tools": [
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": false,
+          "risk": "medium",
+          "toolName": "tos_upload_authorize"
+        }
+      ]
+    },
+    {
+      "categoryId": "media-assets",
+      "domain": "video-processing",
+      "id": "media.jobs",
+      "name": "视频任务与素材下载授权",
+      "servers": [
+        "tools-video-processing"
+      ],
+      "tools": [
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "video_asset_download_authorize"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "video_job_cancel"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "video_job_get"
+        }
+      ]
+    },
+    {
+      "categoryId": "media-assets",
+      "domain": "video-processing",
+      "id": "media.sources",
+      "name": "视频能力、来源与媒体准备",
+      "servers": [
+        "tools-video-processing"
+      ],
+      "tools": [
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "discover",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "video_capabilities_get"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "video_media_prepare_start"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "video_source_get"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "video_source_resolve_start"
+        }
+      ]
+    },
+    {
+      "categoryId": "media-assets",
+      "domain": "video-processing",
+      "id": "media.transcripts",
+      "name": "字幕与 ASR 转录",
+      "servers": [
+        "tools-video-processing"
+      ],
+      "tools": [
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "video_subtitles_read_start"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "video_transcript_get"
+        },
+        {
+          "costPolicy": "possible",
+          "declaredEffect": "write",
+          "executionMode": "async",
+          "externalCallPolicy": "explicit",
+          "modelUsage": "possible",
+          "operationKind": "analyze",
+          "requiresConfirm": true,
+          "risk": "high",
+          "toolName": "video_transcription_start"
+        }
+      ]
+    },
+    {
+      "categoryId": "media-assets",
+      "domain": "video-processing",
+      "id": "media.upload",
+      "name": "视频私有素材上传与校验",
+      "servers": [
+        "tools-video-processing"
+      ],
+      "tools": [
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "video_upload_authorize"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "video_upload_complete"
+        }
+      ]
+    },
+    {
+      "categoryId": "platform",
+      "domain": "platform",
+      "id": "platform.discovery",
+      "name": "能力目录",
+      "servers": [
+        "tools-platform"
+      ],
+      "tools": [
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "discover",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "business_capabilities_list"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "discover",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "business_capability_get"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "discover",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "business_service_categories_list"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "discover",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "business_tool_contract_get"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "discover",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "business_tools_search"
+        }
+      ]
+    },
+    {
+      "categoryId": "platform",
+      "domain": "platform",
+      "id": "platform.receipts",
+      "name": "通用运行与变更回执",
+      "servers": [
+        "tools-platform"
+      ],
+      "tools": [
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "platform_mutation_receipts_get"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": false,
+          "risk": "medium",
+          "toolName": "platform_run_cancel"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "platform_run_get"
+        }
+      ]
+    },
+    {
+      "categoryId": "platform",
+      "domain": "platform",
+      "id": "platform.text",
+      "name": "文本摘要",
+      "servers": [
+        "tools-platform"
+      ],
+      "tools": [
+        {
+          "costPolicy": "possible",
+          "declaredEffect": "write",
+          "executionMode": "async",
+          "externalCallPolicy": "explicit",
+          "modelUsage": "possible",
+          "operationKind": "analyze",
+          "requiresConfirm": false,
+          "risk": "medium",
+          "toolName": "text_summarize"
+        }
+      ]
+    },
+    {
+      "categoryId": "public-research",
+      "domain": "browser-intelligence",
+      "id": "research.browser",
+      "name": "受控浏览器证据",
+      "servers": [
+        "tools-browser-intelligence"
+      ],
+      "tools": [
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "browser_intelligence_evidence_list"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "prepare",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "browser_intelligence_plan_preview"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "browser_intelligence_run_get"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "high",
+          "toolName": "browser_intelligence_run_start"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "browser_intelligence_session_get"
+        }
+      ]
+    },
+    {
+      "categoryId": "public-research",
+      "domain": "hotspot-discovery",
+      "id": "research.hotspots",
+      "name": "热点检索与事件",
+      "servers": [
+        "tools-hotspot-discovery"
+      ],
+      "tools": [
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "hotspot_discovery_event_get"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "hotspot_discovery_events_list"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "read",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "hotspot_discovery_plan_preview"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "hotspot_discovery_run_get"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "high",
+          "toolName": "hotspot_discovery_run_start"
+        }
+      ]
+    },
+    {
+      "categoryId": "public-research",
+      "domain": "platform",
+      "id": "research.social",
+      "name": "社媒公开读取目录与执行",
+      "servers": [
+        "tools-platform"
+      ],
+      "tools": [
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "discover",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "getoneapi_social_capabilities_get"
+        },
+        {
+          "costPolicy": "possible",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "cache_miss",
+          "modelUsage": "never",
+          "operationKind": "external_read",
+          "requiresConfirm": false,
+          "risk": "medium",
+          "toolName": "getoneapi_social_read"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "prepare",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "getoneapi_social_read_prepare"
+        }
+      ]
+    },
+    {
+      "categoryId": "talent",
+      "domain": "talent-discovery",
+      "id": "talent.discovery",
+      "name": "人才发现与候选查询",
+      "servers": [
+        "tools-talent-discovery"
+      ],
+      "tools": [
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "talent_candidate_briefs_get"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "talent_candidate_evidence_list"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "talent_candidate_get"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "talent_candidates_list"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "talent_discovery_discover"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "read",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "talent_discovery_result_page_get"
+        }
+      ]
+    },
+    {
+      "categoryId": "talent",
+      "domain": "talent-discovery",
+      "id": "talent.evaluation",
+      "name": "人才画像、反馈与评分",
+      "servers": [
+        "tools-talent-discovery"
+      ],
+      "tools": [
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "talent_analysis_readiness_get"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "talent_candidate_profile_get"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "talent_feedback_import"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "talent_feedback_scores_get"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "talent_profiles_build"
+        }
+      ]
+    },
+    {
+      "categoryId": "talent",
+      "domain": "talent-discovery",
+      "id": "talent.outreach",
+      "name": "触达草稿、状态与成效",
+      "servers": [
+        "tools-talent-discovery"
+      ],
+      "tools": [
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "talent_metrics_snapshot_create"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "talent_metrics_summary_get"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "talent_outreach_drafts_build"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "talent_outreach_report_get"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "talent_outreach_status_import"
+        }
+      ]
+    },
+    {
+      "categoryId": "vehicle-intelligence",
+      "domain": "custom-car-monitoring",
+      "id": "vehicle.browser-intake",
+      "name": "改装浏览器证据交接",
+      "servers": [
+        "tools-custom-car-monitoring"
+      ],
+      "tools": [
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "custom_car_monitoring_browser_evidence_intake"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "high",
+          "toolName": "custom_car_monitoring_browser_run_start"
+        }
+      ]
+    },
+    {
+      "categoryId": "vehicle-intelligence",
+      "domain": "custom-car-monitoring",
+      "id": "vehicle.cases",
+      "name": "改装案例、分析与趋势",
+      "servers": [
+        "tools-custom-car-monitoring"
+      ],
+      "tools": [
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "custom_car_monitoring_analysis_run"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "custom_car_monitoring_contents_list"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "read",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "custom_car_monitoring_result_page_get"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "custom_car_monitoring_search"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "custom_car_monitoring_trends_list"
+        }
+      ]
+    },
+    {
+      "categoryId": "vehicle-intelligence",
+      "domain": "custom-car-monitoring",
+      "id": "vehicle.monitoring",
+      "name": "改装监测资产与运行",
+      "servers": [
+        "tools-custom-car-monitoring"
+      ],
+      "tools": [
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "medium",
+          "toolName": "custom_car_monitoring_asset_upsert"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "custom_car_monitoring_assets_list"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "custom_car_monitoring_periodic_runs_list"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "custom_car_monitoring_plan_get"
+        },
+        {
+          "costPolicy": "none",
+          "declaredEffect": "read",
+          "executionMode": "sync",
+          "externalCallPolicy": "never",
+          "modelUsage": "never",
+          "operationKind": "query",
+          "requiresConfirm": false,
+          "risk": "low",
+          "toolName": "custom_car_monitoring_run_get"
+        },
+        {
+          "costPolicy": "unknown",
+          "declaredEffect": "write",
+          "executionMode": "unknown",
+          "externalCallPolicy": "unknown",
+          "modelUsage": "unknown",
+          "operationKind": "unknown",
+          "requiresConfirm": true,
+          "risk": "high",
+          "toolName": "custom_car_monitoring_run_start"
+        }
+      ]
+    }
+  ]
+}
