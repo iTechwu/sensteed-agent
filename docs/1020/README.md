@@ -5,6 +5,7 @@
 - [三轮本地安装体验审查与最终版本](installed-ux-cycles.md)
 - [逐页巡检、问题分级与优化落实](page-audit.md)
 - [布局与交互规范](experience-spec.md)
+- [Host MCP 注册冲突审查与生命周期修复](host-mcp-registration-review.md)
 
 首轮本地包：`0.2.1-rc.2-beta.202610200033`，macOS arm64，增强模式，使用现有企业身份。真实业务截图与可访问性树仅保留在本机 `/tmp/sensteed-page-audit`，不纳入 Git。本文不包含企业账户、财务明细、聊天正文或凭据。
 

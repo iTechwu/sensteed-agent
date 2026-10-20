@@ -1,7 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { apply as applyManaged } from '../src/dofe-managed.ts'
 import { apply as applyAuth } from '../src/dofe-host-auth.ts'
-async function apply(ctx: Parameters<typeof applyAuth>[0]) { await applyAuth(ctx); await applyManaged(ctx) }
+import { apply as applyHost } from '../src/dofe-host-capabilities.ts'
+async function apply(ctx: Parameters<typeof applyAuth>[0]) {
+  await applyAuth(ctx)
+  await applyHost(ctx)
+  ctx.hubMcp.register({ capability: 'finance', serverName: 'finance', path: 'finance', timeoutMs: 60_000 })
+  await applyManaged(ctx)
+  // The fixture uses immediate network and transport responses; drain the
+  // registration reconciliation before asserting the combined composition.
+  for (let i = 0; i < 30; i++) await Promise.resolve()
+}
 import { DOFE_ACCESS_VALIDATION_VERSION } from '../src/dofe-plugins.ts'
 
 vi.mock('../src/generated-product-identity.ts', () => ({ BRAND_VARIANT: 'sensteed', BRAND_TENANT: 'sensteed' }))
@@ -40,14 +49,17 @@ function harness(overrides = {}) {
     ]) },
     plugin: vi.fn(async () => ({ dispose() {} })),
     on: vi.fn(), emit: vi.fn(), provide: vi.fn((name: string, value: unknown) => { services[name] = value; Object.assign(ctx, { [name]: value }) }), logger: { error: vi.fn(), info: vi.fn() },
-    effect: (effect: () => (() => unknown)) => { effects.push(effect()) },
+    effect: (effect: () => void | (() => unknown)) => {
+      const cleanup = effect()
+      if (cleanup) effects.push(cleanup)
+    },
   }
   return {
     ctx,
     tray,
     getSettings: () => settings,
     forgetGrant: () => { grant = undefined },
-    dispose: async () => { for (const effect of effects) await effect() },
+    dispose: async () => { for (const effect of effects.splice(0).reverse()) await effect() },
   }
 }
 
@@ -113,7 +125,7 @@ describe('Sensteed startup authorization', () => {
     expect(h.getSettings().setupComplete).toBe(true)
     expect(h.getSettings().enabledPlugins).toEqual(['openmontage', 'media', 'opencli', 'connect-im', 'finance'])
     expect(h.ctx.plugin).toHaveBeenCalledTimes(3)
-    expect(h.ctx.plugin).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({
+    expect(h.ctx.plugin).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       serverName: 'finance', url: 'https://ai.hozonauto.com/mcp/finance',
       headers: { Authorization: 'Bearer model-key', 'X-Sensteed-SSO-Authorization': 'Bearer access-new' },
     }))
