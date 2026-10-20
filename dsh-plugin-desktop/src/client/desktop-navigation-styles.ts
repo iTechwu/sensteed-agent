@@ -30,9 +30,7 @@ export function installDesktopNavigationStyles(): () => void {
 .sensteedModuleRail .sensteedModuleScroll button[aria-current="page"],
 .sensteedModuleRail .sensteedModuleScroll [data-active] button { background:color-mix(in srgb,var(--dsw-alias-label-primary) 11%,var(--dsw-alias-bg-layer-1)); color:var(--dsw-alias-label-primary); }
 .sensteedModuleRail .sensteedModuleScroll button[aria-current="page"] svg,
-.sensteedModuleRail .sensteedModuleScroll [data-active] /* A permission-gated launcher may render null; never leave its decorative glyph behind. */
-.sensteedPluginRailSeat[data-module-icon]:not(:has(button)) { display:none; }
-.sensteedRailGlyph { color:var(--dsw-alias-label-primary); stroke-width:2.4; }
+.sensteedModuleRail .sensteedModuleScroll [data-active] .sensteedRailGlyph { color:var(--dsw-alias-label-primary); stroke-width:2.4; }
 .sensteedModuleRail .sensteedModuleScroll [data-active] .sensteedRailGlyph svg { stroke-width:2.4; }
 .sensteedNavigationFrame button:focus-visible { outline:2px solid var(--dsw-alias-brand-primary); outline-offset:-2px; }
 .sensteedModuleFoot { width:40px; display:flex; flex-direction:column; align-items:center; gap:8px; padding-top:8px; }
