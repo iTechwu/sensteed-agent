@@ -365,11 +365,14 @@ body [data-slot="sidebar.footer.action"] button[aria-label="Mobile connection"] 
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 13px 14px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
   border: 1px solid var(--dsw-alias-border-l1);
   border-radius: 10px;
   background: var(--dsw-alias-bg-layer-1);
 }
+.sensteedAgentSettingsUpdateRow .sensteedAgentSettingsChoiceCopy { min-width: 0; flex: 1 1 200px; overflow-wrap: anywhere; }
+.sensteedAgentSettingsUpdateRow .sensteedAgentSettingsButton { flex-shrink: 0; }
 .sensteedAgentSettingsLanStatus {
   display: grid;
   gap: 3px;

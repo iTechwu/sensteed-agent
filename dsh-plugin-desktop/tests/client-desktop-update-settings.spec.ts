@@ -16,6 +16,7 @@ function scope(value: unknown) {
 async function mount(
   checkForUpdates: () => Promise<void>,
   capabilities?: { updates?: boolean },
+  inspectUpdates?: () => Promise<import('../src/update-status.ts').DesktopUpdateStatus>,
 ): Promise<HTMLDivElement> {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   container = document.createElement('div')
@@ -30,6 +31,7 @@ async function mount(
         web: { localUrl: '', lanUrls: [], lanState: 'inactive', lanError: null, lanCaFingerprint: null, lanCaUrls: [] },
       }),
       checkForUpdates,
+      inspectUpdates,
     },
     platform: 'darwin', version: '2.0.3', initialMode: 'compatibility', setMode: async () => {},
     desktopSettings: scope({ mode: 'compatibility', openBrowser: false, networkExposure: 'loopback', macosMaterial: 'off', windowsMaterial: 'off' }),
@@ -82,6 +84,38 @@ describe('Desktop settings update controls', () => {
 
     expect(section.querySelector('[role="alert"]')?.textContent).toBe(zh.checkForUpdatesError)
     expect(section.textContent).toContain('v2.0.3')
+  })
+
+  it('shows unpublished channel inline and retries without native dialogs', async () => {
+    const check = vi.fn(async () => {})
+    const inspect = vi.fn(async () => ({ status: 'failed' as const, channel: 'beta' as const,
+      failure: 'unpublished' as const, checkedAt: '2026-10-20T06:00:00Z' }))
+    const node = await mount(check, undefined, inspect)
+    await act(async () => { updateButton(updateSection(node)!).click() })
+    expect(node.textContent).toContain(zh.updateUnpublished)
+    expect(node.textContent).toContain(zh.updateBeta)
+    expect(node.querySelector('time')?.dateTime).toBe('2026-10-20T06:00:00Z')
+    expect(check).not.toHaveBeenCalled()
+    expect(node.querySelector('[role="alert"]')).toBeNull()
+    await act(async () => { updateButton(updateSection(node)!).click() })
+    expect(inspect).toHaveBeenCalledTimes(2)
+  })
+
+  it('offers download only after discovery and prevents duplicate pending checks', async () => {
+    const check = vi.fn(async () => {})
+    let complete!: (value: import('../src/update-status.ts').DesktopUpdateStatus) => void
+    const inspect = vi.fn(() => new Promise<import('../src/update-status.ts').DesktopUpdateStatus>(resolve => { complete = resolve }))
+    const node = await mount(check, undefined, inspect)
+    const section = updateSection(node)!
+    await act(async () => { updateButton(section).click(); updateButton(section).click() })
+    expect(inspect).toHaveBeenCalledOnce()
+    expect(updateButton(section).disabled).toBe(true)
+    await act(async () => { complete({ status: 'update-available', channel: 'beta', latestVersion: '0.2.1-rc.2-beta.202610201500', checkedAt: '2026-10-20T06:00:00Z' }) })
+    expect(section.textContent).toContain('0.2.1-rc.2-beta.202610201500')
+    const download = [...section.querySelectorAll('button')].find(button => button.textContent === zh.updateDownload)!
+    expect(check).not.toHaveBeenCalled()
+    await act(async () => { download.click() })
+    expect(check).toHaveBeenCalledOnce()
   })
 
   it('omits the update section where the Host cannot update itself', async () => {

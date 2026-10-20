@@ -1,3 +1,4 @@
+import { DesktopUpdateSettings } from './DesktopUpdateSettings.tsx'
 /** Desktop-owned settings section registered into the official Settings shell. */
 
 import {
@@ -382,7 +383,6 @@ export function DesktopSettingsSection({
   const [restart, setRestart] = useState<RestartState>('none')
   const [pendingProfileDelete, setPendingProfileDelete] = useState<string>()
   const [confirmLan, setConfirmLan] = useState(false)
-  const [updateCheck, setUpdateCheck] = useState<'idle' | 'checking' | 'failed'>('idle')
   const lanPoll = useRef<AbortController>()
 
   const refreshView = useCallback(async () => {
@@ -540,15 +540,6 @@ export function DesktopSettingsSection({
 
   const setNotification = (field: keyof DesktopNotificationSettings, checked: boolean): void => {
     void run('notification', async () => { await notificationSettings.set(field, checked) })
-  }
-
-  // The interactive update flow owns its own native dialogs and downloads, so it
-  // stays outside the settings-scope busy state and reports only its own failures.
-  const runUpdateCheck = (): void => {
-    setUpdateCheck('checking')
-    void api.checkForUpdates()
-      .then(() => { setUpdateCheck('idle') })
-      .catch(() => { setUpdateCheck('failed') })
   }
 
   const setBrowserAccess = (checked: boolean): void => {
@@ -917,31 +908,7 @@ export function DesktopSettingsSection({
         )}
       </section>
 
-      {capabilities?.updates !== false && (
-        <section className="sensteedAgentSettingsGroup" aria-labelledby="dsh-desktop-updates-title">
-          <div>
-            <h3 id="dsh-desktop-updates-title">{t('updatesTitle')}</h3>
-            <p className="sensteedAgentSettingsGroupIntro">{t('updatesIntro')}</p>
-          </div>
-          <div className="sensteedAgentSettingsUpdateRow">
-            <span className="sensteedAgentSettingsChoiceCopy">
-              <span className="sensteedAgentSettingsChoiceTitle">{t('currentVersion')}</span>
-              <span className="sensteedAgentSettingsChoiceBody">{`v${version}`}</span>
-            </span>
-            <button
-              type="button"
-              className="sensteedAgentSettingsButton"
-              disabled={updateCheck === 'checking'}
-              onClick={runUpdateCheck}
-            >
-              {t(updateCheck === 'checking' ? 'checkingForUpdates' : 'checkForUpdates')}
-            </button>
-          </div>
-          {updateCheck === 'failed' && (
-            <p className="sensteedAgentSettingsError" role="alert">{t('checkForUpdatesError')}</p>
-          )}
-        </section>
-      )}
+      {capabilities?.updates !== false && <DesktopUpdateSettings api={api} version={version} t={t} />}
 
       {capabilities?.logging !== false && <section className="sensteedAgentSettingsGroup" aria-labelledby="dsh-desktop-logging-title">
         <h3 id="dsh-desktop-logging-title">{t('loggingTitle')}</h3>
