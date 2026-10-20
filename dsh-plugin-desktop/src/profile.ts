@@ -1952,7 +1952,7 @@ export function prepareDesktopProfile(
     { id: 'account-controller', disabled: true },
   )
   // Upstream mounts its Desktop product analytics for every Profile named
-  // `desktop` and reports to DeepSeek's collector by default. Sensteed Agent
+  // `desktop` and reports to DeepSeek's collector by default. 哪吒Agent
   // does not take part in that collection, so both rows stay off after every
   // bundle and user layer. The exporter also requires the upstream Electron
   // shell's DSH_CLIENT_VERSION, which this launcher never provides.

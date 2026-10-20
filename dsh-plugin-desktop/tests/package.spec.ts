@@ -232,6 +232,7 @@ describe('published package surface', () => {
   it('registers both npm launcher names', () => {
     expect(manifest.name).toBe('dsh-plugin-desktop')
     expect(manifest.bin).toEqual({
+      'hozonauto-agent': 'lib/bin.js',
       'dsh-plugin-desktop': 'lib/bin.js',
       'sensteed-agent': 'lib/bin.js',
     })
@@ -1136,12 +1137,12 @@ describe('published package surface', () => {
 
     expect(metadata).toEqual(expect.objectContaining({
       format: 'png',
-      width: 2537,
-      height: 457,
+      width: 1556,
+      height: 500,
       channels: 4,
       hasAlpha: true,
     }))
-    expect(metadata.width! / metadata.height!).toBeCloseTo(200 / 36, 2)
+    expect(metadata.width! / metadata.height!).toBeCloseTo(187 / 60, 2)
   })
 
   it('generates a centered macOS icon with at least a 100-pixel visual inset', async () => {

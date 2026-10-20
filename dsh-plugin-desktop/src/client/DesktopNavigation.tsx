@@ -119,7 +119,7 @@ export function DesktopNavigationSidebar({ collapsed, startSession, toggleSideba
     return rank(a.id) - rank(b.id) || a.order - b.order
   })
   const rail = <>
-    <div className="sensteedModuleBrand"><img src={sidebarBrandMarkDataUrl} alt="" /></div>
+    <div className="sensteedModuleBrand"><span aria-hidden="true" style={{ maskImage: `url(${sidebarBrandMarkDataUrl})`, WebkitMaskImage: `url(${sidebarBrandMarkDataUrl})` }} /></div>
     <div className="sensteedModuleScroll">
       <nav aria-label={zh ? '功能模块' : 'Modules'}>
         <div onPointerEnter={() => openPreview('home')} onPointerLeave={closePreview} onFocus={() => openPreview('home')}>

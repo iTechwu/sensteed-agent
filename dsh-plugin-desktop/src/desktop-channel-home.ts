@@ -29,6 +29,7 @@ export type DesktopChannelHomeStatus =
   | 'channel'
   /** The pre-split shared home is in use because it already holds real data. */
   | 'legacy-shared'
+  | 'legacy-brand'
 
 export interface DesktopChannelHomeResolution {
   /** Home to use when Desktop has no recorded data directory of its own. */
@@ -76,6 +77,10 @@ export function resolveDesktopChannelHome(
       legacyHome,
       status: 'explicit',
     })
+  }
+  const previousHome = resolve(join(homeDirectory, identity.releaseChannel === 'beta' ? '.sensteed-agent-beta' : '.sensteed-agent'))
+  if (!homeInUse(channelHome) && homeInUse(previousHome)) {
+    return Object.freeze({ homeDir: previousHome, channelHome, legacyHome: previousHome, status: 'legacy-brand' })
   }
   // The channel that owns the shared home has nothing to decide.
   if (channelHome === legacyHome) {

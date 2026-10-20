@@ -239,7 +239,7 @@
       }
     ],
     "icon": "build/app-icon.ico",
-    "artifactName": "Sensteed-Agent-Beta-${version}-${arch}-Portable.${ext}"
+    "artifactName": "hozonauto-agent-beta-${version}-${arch}-Portable.${ext}"
   },
   "nsis": {
     "include": "installer.nsh",
@@ -253,8 +253,8 @@
     "createStartMenuShortcut": true,
     "differentialPackage": false,
     "useZip": false,
-    "shortcutName": "Sensteed-Agent Beta",
-    "artifactName": "Sensteed-Agent-Beta-${version}-${arch}-Setup.${ext}"
+    "shortcutName": "哪吒Agent",
+    "artifactName": "hozonauto-agent-beta-${version}-${arch}-Setup.${ext}"
   },
   "linux": {
     "files": [
@@ -322,14 +322,14 @@
       "build/tray-icon-blue@1.5x.png",
       "build/tray-icon-blue@2x.png"
     ],
-    "artifactName": "Sensteed-Agent-Beta-${version}-${arch}.${ext}",
-    "executableName": "sensteed-agent-beta"
+    "artifactName": "hozonauto-agent-beta-${version}-${arch}.${ext}",
+    "executableName": "hozonauto-agent-beta"
   },
   "deb": {
     "packageCategory": "devel",
     "priority": "optional",
-    "packageName": "sensteed-agent-beta"
+    "packageName": "hozonauto-agent-beta"
   },
-  "appId": "com.sensteed.agent.beta",
-  "productName": "Sensteed-Agent Beta"
+  "appId": "com.hozonauto.agent.beta",
+  "productName": "哪吒Agent"
 }

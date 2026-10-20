@@ -492,8 +492,8 @@ describe('desktop Host plugin', () => {
       mode: 'compatibility',
       url: 'http://127.0.0.1:43120/?sensteed-agent-mode=compatibility&sensteed-agent-platform=darwin&sensteed-agent-version=2.0.0&sensteed-agent-material=transparent&sensteed-agent-titlebar-inset=36',
       authenticationUrl: 'http://127.0.0.1:43120/?token=test-token',
-      productName: 'Sensteed-Agent Beta',
-      windowTitle: 'Sensteed-Agent Beta',
+      productName: '哪吒Agent',
+      windowTitle: '哪吒Agent',
       rendererAccessHeader: {
         name: 'x-sensteed-agent-renderer',
         value: Buffer.alloc(32, 6).toString('base64url'),

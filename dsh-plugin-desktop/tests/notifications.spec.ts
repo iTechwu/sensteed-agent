@@ -256,7 +256,7 @@ describe('desktop notifications Host plugin', () => {
 
     expect(harness.notifyAttention.mock.calls).toEqual([
       [{ title: 'Background Job Completed', body: 'A background job has finished.' }],
-      [{ title: 'Background Job Failed', body: 'A background job could not finish. Open Sensteed-Agent for details.' }],
+      [{ title: 'Background Job Failed', body: 'A background job could not finish. Open 哪吒Agent for details.' }],
     ])
     expect(JSON.stringify(harness.notifyAttention.mock.calls)).not.toMatch(/Users|private|secret|session-123/u)
   })
@@ -286,7 +286,7 @@ describe('desktop notifications Host plugin', () => {
 
     expect(harness.notifyAttention.mock.calls).toEqual([
       [{ title: 'Background Job Completed', body: 'A background job has finished.' }],
-      [{ title: 'Background Job Failed', body: 'A background job could not finish. Open Sensteed-Agent for details.' }],
+      [{ title: 'Background Job Failed', body: 'A background job could not finish. Open 哪吒Agent for details.' }],
     ])
   })
 
@@ -336,8 +336,8 @@ describe('desktop notifications Host plugin', () => {
     }, 6))
 
     expect(harness.notifyAttention.mock.calls).toEqual([
-      [{ title: 'Background Job Failed', body: 'A background job could not finish. Open Sensteed-Agent for details.' }],
-      [{ title: 'User Turn Failed', body: 'A user-initiated turn could not finish. Open Sensteed-Agent for details.' }],
+      [{ title: 'Background Job Failed', body: 'A background job could not finish. Open 哪吒Agent for details.' }],
+      [{ title: 'User Turn Failed', body: 'A user-initiated turn could not finish. Open 哪吒Agent for details.' }],
     ])
   })
 
@@ -407,7 +407,7 @@ describe('desktop notifications Host plugin', () => {
     await harness.sessionEvent(active, userMessage('schedule', 8))
     await harness.sessionEvent(active, event('turn/end', { turn: 3, reason: { kind: 'error', error: { code: 'UNKNOWN', message: 'private error' } } }, 9))
     expect(harness.notifyAttention.mock.calls).toEqual([[
-      { title: 'Automation Task Failed', body: 'An automation task could not finish. Open Sensteed-Agent for details.' },
+      { title: 'Automation Task Failed', body: 'An automation task could not finish. Open 哪吒Agent for details.' },
     ]])
     harness.notifyAttention.mockClear()
     await harness.updateSettings({ ...DesktopNotificationSettingsSchema({} as DesktopNotificationSettings), notifyOnScheduleFailure: false })
@@ -437,7 +437,7 @@ describe('desktop notifications Host plugin', () => {
     expect(harness.notifyAttention).toHaveBeenCalledOnce()
     expect(harness.notifyAttention).toHaveBeenCalledWith({
       title: 'User Turn Failed',
-      body: 'A user-initiated turn could not finish. Open Sensteed-Agent for details.',
+      body: 'A user-initiated turn could not finish. Open 哪吒Agent for details.',
     })
   })
 

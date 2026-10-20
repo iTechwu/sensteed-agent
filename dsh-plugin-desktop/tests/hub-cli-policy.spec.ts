@@ -11,7 +11,7 @@ it('blocks all business and mutation entrypoints regardless of selected Profile'
 it('serves only standalone static help/version after installed base verification', async () => {
  for (const flag of ['--help', '-h', 'help', '--version', '-V']) {
   const verify = vi.fn(async () => ({}))
-  expect(await policy({ ...base, args: [flag], verify })).toContain('Sensteed Agent')
+  expect(await policy({ ...base, args: [flag], verify })).toContain('哪吒Agent')
   expect(verify).toHaveBeenCalledWith('/opt/app/resources/app.asar', base.resourcesPath)
  }
 })

@@ -1,7 +1,7 @@
 {
   "name": "dsh-plugin-desktop",
   "version": "0.2.1-rc.2-beta.202610201426",
-  "description": "Yootun-Agent: an Electron shell composed as a DeepSeek Harness Cordis plugin",
+  "description": "哪吒Agent (hozonauto-agent): an Electron desktop product built on DeepSeek Harness",
   "license": "MIT",
   "publishConfig": {
     "registry": "https://registry.npmjs.org"
@@ -15,6 +15,7 @@
   "main": "lib/main.js",
   "types": "lib/types/index.d.ts",
   "bin": {
+    "hozonauto-agent": "lib/bin.js",
     "sensteed-agent": "lib/bin.js",
     "dsh-plugin-desktop": "lib/bin.js"
   },

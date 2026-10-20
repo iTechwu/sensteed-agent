@@ -55,7 +55,7 @@ export const DOFE_PLUGIN_CATALOG = [
   },
   {
     id: 'connect-im',
-    name: 'Sensteed Agent Connect IM',
+    name: '哪吒Agent Connect IM',
     description: '企业消息与协作连接',
     variants: ['sensteed'],
     servers: [],

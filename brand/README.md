@@ -1,6 +1,6 @@
-# 品牌配置(白标换牌指南)
+# 哪吒Agent 品牌配置
 
-`brand/brand.config.json` 是默认的 Yootun 品牌源；`brand/sensteed/brand.config.json` 是山子高科品牌源。构建默认使用 Yootun，也可以用 `BRAND=sensteed` 选择山子高科。`BRAND_CONFIG=<path>` 仍可用于自定义白标配置。
+当前品牌为 `hozonauto-agent`，产品名为“哪吒Agent”，唯一配置为 `brand/brand.config.json`。官方 Logo 来源、数据兼容边界见 [迁移说明](hozonauto/README.md)。历史 `sensteed` 组合键用于协议兼容。
 
 ## 换牌流程
 
@@ -21,7 +21,7 @@ corepack pnpm check                                        # 全量门禁(含 ve
 
 打包时同样通过环境变量选择品牌：`BRAND=yootun corepack pnpm --filter dsh-plugin-desktop package:dir`（默认）或 `BRAND=sensteed corepack pnpm --filter dsh-plugin-desktop package:dir`。每次切换品牌都应从干净构建开始，避免上一品牌的生成物混入包内。
 
-山子高科配置采用其官网公开的品牌信息：使命为“成就中国智造的全球竞争力”。Logo 素材来自山子高科官网的 Logo 资源（`https://www.sensteed.com/templates/default/static/images/logo.png`），仅用于本项目的品牌展示构建。山子构建当前保留公共的插件市场、企业知识、模型与预算及视频生产能力；优惠豚企业看板、招聘、销售、供应链、线索和运营页面不会装载，待山子专属页面完成后再进入组合。
+当前使用哪吒汽车官网官方 Logo，已替换历史山子高科图形。山子构建当前保留公共的插件市场、企业知识、模型与预算及视频生产能力；优惠豚企业看板、招聘、销售、供应链、线索和运营页面不会装载，待山子专属页面完成后再进入组合。
 
 ## 字段说明
 

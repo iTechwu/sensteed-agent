@@ -40,7 +40,7 @@ function callbackPage(res: ServerResponse, message: string): void {
   res.statusCode = 200
   res.setHeader('content-type', 'text/html; charset=utf-8')
   res.setHeader('cache-control', 'no-store')
-  res.end(`<!doctype html><meta charset="utf-8"><title>Sensteed Agent</title><p>${message}</p><script>window.close()</script>`)
+  res.end(`<!doctype html><meta charset="utf-8"><title>哪吒Agent</title><p>${message}</p><script>window.close()</script>`)
 }
 
 function asString(value: unknown): string | undefined {
@@ -312,7 +312,7 @@ export class DofeAuthService {
     if (req.method !== 'GET' || req.url === undefined) { callbackPage(res, '请求无效'); return }
     const url = new URL(req.url, 'http://127.0.0.1')
     if (url.pathname !== '/callback') { callbackPage(res, '路径无效'); return }
-    callbackPage(res, '登录回调已收到，可以返回 Sensteed Agent')
+    callbackPage(res, '登录回调已收到，可以返回 哪吒Agent')
     this.server?.emit('dofe-callback', url)
   }
 

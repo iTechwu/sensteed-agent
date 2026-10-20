@@ -1,3 +1,5 @@
+import { DESKTOP_PRODUCT_NAME, DESKTOP_RELEASE_CHANNEL } from './product-identity.ts'
+import { legacyBrandUserData } from './legacy-brand-data.ts'
 /** Headless-safe npm launcher for the Sensteed-Agent Electron executable. */
 
 import { spawn } from 'node:child_process'
@@ -23,7 +25,7 @@ export interface DesktopCliRequest {
 /** Human-readable launcher help. */
 export const DESKTOP_CLI_HELP = `Usage: dsh-plugin-desktop [options] [folder]
 
-Launch Sensteed-Agent with the selected Web-capable profile.
+Launch 哪吒Agent with the selected Web-capable profile.
 
 Arguments:
   folder                register the folder as a workspace and open it
@@ -80,13 +82,14 @@ export function defaultDesktopUserDataDirectory(
   if (platform === 'win32') {
     const appData = environment.APPDATA
     if (appData === undefined || appData.length === 0) {
-      throw new Error('APPDATA is unavailable; cannot locate Sensteed-Agent diagnostics')
+      throw new Error('APPDATA is unavailable; cannot locate 哪吒Agent diagnostics')
     }
-    return path.join(appData, 'Sensteed-Agent')
+    return legacyBrandUserData(path.join(appData, DESKTOP_PRODUCT_NAME), appData, DESKTOP_RELEASE_CHANNEL)
   }
-  if (platform === 'darwin') return path.join(homeDirectory, 'Library', 'Application Support', 'Sensteed-Agent')
+  if (platform === 'darwin') { const base = path.join(homeDirectory, 'Library', 'Application Support'); return legacyBrandUserData(path.join(base, DESKTOP_PRODUCT_NAME), base, DESKTOP_RELEASE_CHANNEL) }
   const config = environment.XDG_CONFIG_HOME
-  return path.join(config === undefined || config.length === 0 ? path.join(homeDirectory, '.config') : config, 'Sensteed-Agent')
+  const base = config === undefined || config.length === 0 ? path.join(homeDirectory, '.config') : config
+  return legacyBrandUserData(path.join(base, DESKTOP_PRODUCT_NAME), base, DESKTOP_RELEASE_CHANNEL)
 }
 
 export interface DesktopCliOptions {
@@ -114,7 +117,7 @@ async function launchElectron(workspacePath?: string): Promise<number> {
       + `  npm install -g ${DESKTOP_PACKAGE_NAME}\n`
       + 'Or add electron to the profile before launching:\n'
       + '  dsh plugin --profile <name> add electron\n'
-      + 'Or use the packaged Sensteed-Agent application.\n',
+      + 'Or use the packaged 哪吒Agent application.\n',
     )
     return 1
   }
