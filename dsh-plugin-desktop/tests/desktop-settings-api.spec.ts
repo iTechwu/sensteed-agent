@@ -667,6 +667,22 @@ describe('desktop settings HTTP boundary', () => {
     expect(checkNow).toHaveBeenCalledOnce()
   })
 
+  it('returns inline inspection without opening the native update flow', async () => {
+    const checkNow = vi.fn(async () => {})
+    const status = { status: 'failed' as const, channel: 'beta' as const,
+      checkedAt: '2026-10-20T06:00:00.000Z', failure: 'unpublished' as const }
+    const inspect = vi.fn(async () => status)
+    const accepted = response()
+    await handleDesktopUpdateCheckRequest(jsonRequest({ inspect: true }), accepted, ORIGIN, checkNow, undefined, inspect)
+    expect(JSON.parse(accepted.body)).toEqual(status)
+    expect(inspect).toHaveBeenCalledOnce()
+    expect(checkNow).not.toHaveBeenCalled()
+    const rejected = response()
+    await handleDesktopUpdateCheckRequest(jsonRequest({ inspect: true, channel: 'stable' }), rejected, ORIGIN, checkNow, undefined, inspect)
+    expect(rejected.statusCode).toBe(400)
+    expect(inspect).toHaveBeenCalledOnce()
+  })
+
   it('queues an explicit restart only after an exact request has been acknowledged', async () => {
     const scheduleRestart = vi.fn()
     const controller = new DesktopSettingsController(bootstrap({ scheduleRestart }))

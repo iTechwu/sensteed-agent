@@ -93,6 +93,7 @@ export interface DesktopSettingsApi {
   reloadRenderer(): Promise<void>
   toggleDeveloperTools(): Promise<void>
   checkForUpdates(): Promise<void>
+  inspectUpdates?(): Promise<import('../update-status.ts').DesktopUpdateStatus>
   exportDiagnostics(): Promise<void>
 }
 
@@ -308,7 +309,7 @@ function post(fetcher: FetchLike, path: string, body: object): Promise<Response>
     credentials: 'same-origin',
     redirect: 'error',
     // The update flow includes user-paced native confirmation and installer handoff.
-    ...(path === UPDATE_CHECK_PATH ? {} : { signal: AbortSignal.timeout(DESKTOP_REQUEST_TIMEOUT_MS) }),
+    ...(path === UPDATE_CHECK_PATH && !('inspect' in body) ? {} : { signal: AbortSignal.timeout(DESKTOP_REQUEST_TIMEOUT_MS) }),
     headers: {
       'Accept': 'application/json',
       'Content-Type': 'application/json',
@@ -394,6 +395,17 @@ export function createDesktopSettingsApi(
     },
     async toggleDeveloperTools() {
       await native('developer', () => post(fetcher, DEVELOPER_TOOLS_TOGGLE_PATH, {}))
+    },
+    async inspectUpdates() {
+      const value = await readResponse(await post(fetcher, UPDATE_CHECK_PATH, { inspect: true }))
+      if (!isObject(value) || !['up-to-date', 'update-available', 'failed'].includes(String(value.status))
+        || !['stable', 'beta', 'next'].includes(String(value.channel))
+        || typeof value.checkedAt !== 'string' || !Number.isFinite(Date.parse(value.checkedAt))
+        || (value.latestVersion !== undefined && (typeof value.latestVersion !== 'string' || value.latestVersion.length > 128))
+        || (value.status === 'failed' && !['network', 'timeout', 'unpublished', 'service', 'invalid-response', 'invalid-version', 'download'].includes(String(value.failure)))) {
+        throw new Error('Invalid update status')
+      }
+      return value as unknown as import('../update-status.ts').DesktopUpdateStatus
     },
     async checkForUpdates() {
       await native('check-for-updates', () => post(fetcher, UPDATE_CHECK_PATH, {}))

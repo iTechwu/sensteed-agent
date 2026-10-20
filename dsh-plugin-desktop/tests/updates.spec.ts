@@ -522,6 +522,18 @@ describe('desktop update Host plugin', () => {
     expect(harness.tray.label()).toBe('Check for Updates…')
   })
 
+  it('retains Harness-prefixed beta notification state across restarts', async () => {
+    const version = '0.2.1-rc.2-beta.202610201500'
+    const request = vi.fn(async () => versionResponse(version))
+    const harness = await createHarness({
+      packaged: true,
+      state: JSON.stringify({ version: 3, lastNotifiedVersion: version }),
+      request,
+    })
+    await vi.waitFor(() => { expect(request).toHaveBeenCalled() })
+    expect(JSON.parse(await readFile(harness.statePath, 'utf8'))).toEqual({ version: 3, lastNotifiedVersion: version })
+  })
+
   it('silently resets invalid legacy state before announcing the available version', async () => {
     vi.useFakeTimers()
     const harness = await createHarness({
@@ -592,7 +604,7 @@ describe('desktop update Host plugin', () => {
     expect(harness.tray.label()).toBe('Check for Updates…')
   })
 
-  it('shares one pending download and silently restores availability after failure', async () => {
+  it('shares one pending download and reports failure while restoring availability', async () => {
     let rejectDownload!: (cause: Error) => void
     const download = new Promise<void>((_resolve, reject) => { rejectDownload = reject })
     const harness = await createHarness({
@@ -610,7 +622,7 @@ describe('desktop update Host plugin', () => {
     await Promise.all([first, second])
 
     expect(harness.downloadAndOpen).toHaveBeenCalledOnce()
-    expect(harness.notifications).toEqual([])
+    expect(harness.notifications).toEqual([expect.objectContaining({ title: 'Update download failed' })])
     expect(harness.warnings).toEqual([])
     expect(harness.tray.label()).toBe('哪吒Agent 2.1.0 Available')
   })

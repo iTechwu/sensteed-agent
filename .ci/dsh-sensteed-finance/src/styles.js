@@ -88,4 +88,21 @@ const css = `
 .sf-assistant-question{display:flex;flex-wrap:wrap;gap:8px;width:100%}.sf-assistant-question input{flex:1;min-width:min(220px,100%);max-width:100%;min-height:36px;padding:8px 10px;border:1px solid var(--sf-line2);border-radius:6px;background:var(--sf-card);color:inherit;font:inherit}.sf-assistant-answer{display:grid;gap:12px;min-width:0;font-size:12px;line-height:1.6;overflow-wrap:anywhere}.sf-assistant-answer>p,.sf-assistant-answer>ul{margin:0}.sf-assistant-answer>ul{padding-left:20px}.sf-assistant-answer>.sf-btn{justify-self:start}
 `
 
+const financeNavigationCss = `
+.sf-navigation-groups{display:grid;gap:4px;min-width:0}
+.sf-navigation-search{display:grid;gap:6px;padding:4px 8px 8px;font-size:12px;color:var(--dsw-alias-label-secondary)}
+.sf-navigation-search input{box-sizing:border-box;width:100%;min-width:0;min-height:32px;padding:6px 8px;border:1px solid var(--dsw-alias-border-l1);border-radius:6px;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font:inherit}
+.sf-navigation-actions{display:flex;gap:4px;padding:0 4px 8px}
+.sf-navigation-actions button{width:auto!important;min-height:28px!important;height:auto!important;padding:4px 8px!important;font-size:11px!important;color:var(--dsw-alias-label-secondary)!important}
+.sf-navigation-group{border-bottom:1px solid var(--dsw-alias-border-l1);padding:4px 0}
+.sf-navigation-group summary{display:flex;align-items:center;gap:8px;min-height:36px;padding:0 8px;cursor:pointer;list-style:none;font-size:12px;font-weight:600;color:var(--dsw-alias-label-secondary)}
+.sf-navigation-group summary::-webkit-details-marker{display:none}
+.sf-navigation-group summary:before{content:'›';font-size:16px;transform:rotate(0deg)}
+.sf-navigation-group[open]>summary:before{transform:rotate(90deg)}
+.sf-navigation-group summary small{margin:0!important;font-size:11px;font-weight:400}
+.sf-navigation-group summary .sf-navigation-current{margin-left:auto;font-size:10px;font-weight:400}
+.sf-navigation-group>button{padding-left:24px!important}
+.sf-navigation-group summary:focus-visible,.sf-navigation-groups input:focus-visible{outline:2px solid var(--dsw-alias-label-primary);outline-offset:2px}
+`
+
 const desktopContextCss = '.sf-root[data-desktop-context-active] .sf-tabs,.sf-root[data-desktop-context-active] .sf-sidebar-brand,.sf-root[data-desktop-context-active] .sf-mobile-nav{display:none}.sf-root[data-desktop-context-active] .sf-shell{grid-template-columns:minmax(0,1fr)}.sf-root[data-desktop-context-active] .sf-header,.sf-root[data-desktop-context-active] .sf-content{grid-column:1}'

@@ -1,5 +1,6 @@
 /** Generation-scoped ownership for update polling, prompts, downloads, and disposal. */
 
+import type { DesktopUpdateStatus, DesktopUpdateFailure } from './update-status.ts'
 import { open } from 'node:fs/promises'
 import { writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 import type {
@@ -13,8 +14,7 @@ import { desktopTrayLabel } from './tray-locale.ts'
 import { BRAND_DISPLAY_NAME } from './generated-product-identity.ts'
 import {
   checkForDesktopUpdate,
-  parseSemVer,
-  parseCanonicalChannelVersion,
+  parseCanonicalSupportedVersion,
   type DesktopReleaseChannel,
   type UpdateCheckResult,
 } from './update-checker.ts'
@@ -41,6 +41,7 @@ export interface DesktopUpdateLifecycleOptions {
 export interface DesktopUpdateLifecycle {
   /** Run the same interactive update flow exposed by the native tray. */
   checkNow(): Promise<void>
+  inspectNow(): Promise<DesktopUpdateStatus>
   dispose(): Promise<void>
 }
 
@@ -67,6 +68,7 @@ class DesktopUpdateLifecycleOwner implements DesktopUpdateLifecycle {
   private disposed = false
   private disposeTask: Promise<void> | undefined
   private checking = false
+  private lastFailure: DesktopUpdateFailure | undefined
   private availableVersion: string | undefined
   private downloadingVersion: string | undefined
   private state: UpdateStateV3 = EMPTY_STATE
@@ -124,6 +126,17 @@ class DesktopUpdateLifecycleOwner implements DesktopUpdateLifecycle {
     return this.runManualCheck()
   }
 
+  async inspectNow(): Promise<DesktopUpdateStatus> {
+    const result = await this.startCheck()
+    if (result !== null) this.observeResult(result)
+    return {
+      status: result?.status ?? 'failed',
+      checkedAt: new Date().toISOString(),
+      channel: this.options.adapter.releaseChannel ?? 'stable',
+      ...(result ? { latestVersion: result.latestVersion } : { failure: this.lastFailure ?? 'service' }),
+    }
+  }
+
   private installStable(): Promise<void> {
     if (this.options.adapter.releaseChannel !== 'beta') return Promise.resolve()
     this.manualTask ??= (async () => {
@@ -179,6 +192,8 @@ class DesktopUpdateLifecycleOwner implements DesktopUpdateLifecycle {
       if (this.checkChannel === channel) return this.checkTask
       return this.checkTask.then(() => this.startCheck(channel, allowDowngrade))
     }
+    if (this.disposed) return Promise.resolve(null)
+    this.lastFailure = undefined
     this.checking = true
     this.checkChannel = channel
     this.registration.refresh()
@@ -191,6 +206,7 @@ class DesktopUpdateLifecycleOwner implements DesktopUpdateLifecycle {
       }, this.options.policy.requestTimeoutMs)
       try {
         return await checkForDesktopUpdate({
+          onFailure: failure => { this.lastFailure = failure },
           currentVersion: this.options.adapter.currentVersion,
           channel,
           currentChannel: this.options.adapter.releaseChannel ?? 'stable',
@@ -265,7 +281,11 @@ class DesktopUpdateLifecycleOwner implements DesktopUpdateLifecycle {
           await this.options.adapter.downloadAndOpen(version, controller.signal, channel, ...digestArguments)
         }
       } catch {
-        // Network, filesystem, and installer-opening failures are deliberately silent.
+        if (!this.disposed && !controller.signal.aborted) {
+          this.options.adapter.notify(this.options.locale() === 'zh'
+            ? { title: '更新下载未完成', body: '请检查网络和磁盘空间，然后在版本与更新中重试。当前版本仍可继续使用。' }
+            : { title: 'Update download failed', body: 'Check your connection and disk space, then retry from Version and updates. You can keep using this version.' })
+        }
       } finally {
         if (this.downloadController === controller) this.downloadController = undefined
         this.downloadingVersion = undefined
@@ -383,13 +403,7 @@ function renderState(state: UpdateStateV3): string {
 }
 
 function isSupportedVersion(value: unknown): value is string {
-  if (typeof value !== 'string') return false
-  const parsed = parseSemVer(value)
-  const supportedPrerelease = parsed?.prerelease.length === 0
-    || (parsed?.prerelease.length === 2
-      && parsed.prerelease[0] === 'beta'
-      && /^[0-9]+$/u.test(parsed.prerelease[1]!))
-  return parsed !== null && (supportedPrerelease || parseCanonicalChannelVersion(value, 'next') !== null) && parsed.version === value
+  return typeof value === 'string' && parseCanonicalSupportedVersion(value) !== null
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

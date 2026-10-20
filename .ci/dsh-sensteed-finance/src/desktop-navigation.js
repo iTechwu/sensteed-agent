@@ -91,12 +91,8 @@ function createDesktopNavigationBridge(React) {
       React.useEffect(() => { if (current.status === 'denied') onAccessDenied() }, [current.status, onAccessDenied])
       const h = React.createElement
       if (current.status !== 'ready') return h('p', { role: 'status', className: 'sensteedBusinessNavigationStatus' }, current.status === 'denied' ? '当前模块不可访问' : current.status === 'unavailable' ? '暂时无法加载导航，请在工作区重新连接。' : '正在加载导航…')
-      let group
-      return h('nav', { ref: menu, onScroll: event => { menuScroll = event.currentTarget.scrollTop }, className: 'sensteedBusinessNavigation', 'aria-label': '业务导航' }, ...current.items.flatMap(item => {
-        const heading = item.group && item.group !== group ? h('h3', { key: `group-${item.group}` }, item.group) : null
-        group = item.group
-        return [heading, h('button', { key: item.id, type: 'button', 'aria-current': current.activeId === item.id ? 'page' : undefined, onClick: () => bridge.select(item.id) }, item.label)].filter(Boolean)
-      }))
+      return h('nav', { ref: menu, onScroll: event => { menuScroll = event.currentTarget.scrollTop }, className: 'sensteedBusinessNavigation', 'aria-label': '业务导航' },
+        h(FinanceNavigationGroups, { items: current.items, activeId: current.activeId, onSelect: id => bridge.select(id) }))
     },
   }
   return bridge

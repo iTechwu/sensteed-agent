@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dofePluginsForBrand, normalizeDofePluginIds, dofePluginCanEnable, dofeCapabilitiesForBrand, DOFE_CAPABILITY_GROUPS } from '../src/dofe-plugins.ts'
+import { dofePluginsForBrand, normalizeDofePluginIds, dofePluginCanEnable, dofeCapabilitiesForBrand, DOFE_CAPABILITY_GROUPS, supplierCapabilityUpgrade } from '../src/dofe-plugins.ts'
 
 describe('DoFe brand capability policy', () => {
   it('keeps retired GEO capabilities out of the desktop catalog', () => {
@@ -36,4 +36,14 @@ it('covers each Tools domain with task-oriented categories', () => {
   expect(new Set(items.map(item => item.group))).toEqual(new Set(DOFE_CAPABILITY_GROUPS))
   expect(items.filter(item => item.plugin === 'tools')).toHaveLength(10)
   expect(items.map(item => item.name)).toEqual(expect.arrayContaining(['人才发现', '客户线索发现与监测', '小红书与抖音运营', '文件上传与素材链接']))
+})
+
+it('enables an authorized supplier capability once and preserves later opt-out', () => {
+  for (const plugins of [['tools'], ['supplier-intelligence']]) {
+    expect(supplierCapabilityUpgrade({ enabledPlugins: ['tools'], entitlements: { plugins } }, 'sensteed'))
+      .toEqual({ enabledPlugins: expect.arrayContaining(['supplier-intelligence']), supplierCapabilityInitialized: true })
+  }
+  expect(supplierCapabilityUpgrade({ enabledPlugins: ['tools'], entitlements: { plugins: ['tools'] }, supplierCapabilityInitialized: true }, 'sensteed')).toBeUndefined()
+  expect(supplierCapabilityUpgrade({ enabledPlugins: [], entitlements: { plugins: [] } }, 'sensteed')).toBeUndefined()
+  expect(supplierCapabilityUpgrade({ enabledPlugins: ['tools'], entitlements: { plugins: ['tools'] } }, 'yootun')).toBeUndefined()
 })

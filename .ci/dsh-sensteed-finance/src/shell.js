@@ -1,6 +1,23 @@
 // 片段 6/7：外壳（tab 导航/全局筛选/上下文加载）、入口按钮、样式注入与插件挂载点
 
-const sfAnalysisGrid = '.sf-analysis-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}.sf-analysis-card{display:grid;gap:10px;align-content:start;padding:16px}.sf-analysis-head{display:flex;align-items:center;gap:8px}.sf-analysis-head h2{margin:0;font-size:13px}.sf-analysis-card>p{margin:0;color:var(--sf-ink2);font-size:12px;line-height:1.55}.sf-analysis-card>div:last-child{justify-self:start}'
+const sfAnalysisGrid = `
+.sf-analysis-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.sf-analysis-card{display:grid;gap:12px;align-content:start;padding:16px}
+.sf-analysis-head{display:flex;align-items:center;gap:8px}
+.sf-analysis-head h2,.sf-analysis-head h3{margin:0;font-size:14px;font-weight:600}
+.sf-analysis-card>p{margin:0;color:var(--sf-ink2);font-size:12px;line-height:1.6}
+.sf-analysis-card>div:last-child{justify-self:start}
+.sf-analysis-intro{display:grid;gap:8px}.sf-analysis-intro h2{margin:0;font-size:16px}.sf-analysis-intro p{margin:0}
+.sf-analysis-categories{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.sf-analysis-categories button{min-height:32px;padding:4px 12px;border:1px solid var(--sf-line);border-radius:6px;background:var(--sf-card);color:var(--sf-ink2);font:inherit;font-size:12px;cursor:pointer}
+.sf-analysis-categories button[aria-pressed=true]{border-color:var(--sf-brand);background:color-mix(in srgb,var(--sf-brand) 8%,var(--sf-card));color:var(--sf-ink);font-weight:600}
+.sf-analysis-categories button:focus-visible{outline:2px solid var(--sf-brand);outline-offset:2px}
+.sf-analysis-grid .sf-analysis-card{grid-template-columns:minmax(0,1fr) auto;gap:8px 16px}
+.sf-analysis-grid .sf-analysis-card>p{grid-column:1;grid-row:2}
+.sf-analysis-grid .sf-analysis-card>div:last-child{grid-column:2;grid-row:1/3;align-self:center}
+@media(max-width:1100px){.sf-analysis-grid{grid-template-columns:1fr}}
+@media(max-width:480px){.sf-analysis-grid .sf-analysis-card{grid-template-columns:1fr}.sf-analysis-grid .sf-analysis-card>div:last-child{grid-column:1;grid-row:auto}.sf-assistant-question{flex-wrap:wrap}.sf-assistant-question>input{width:100%}}
+`
 
 // 版块元数据对齐 datasource 网页端 sectionCopy：标题 + 描述随页签切换
 const SECTION_META = {
@@ -131,6 +148,7 @@ function Dashboard({ t, embedded = false, onClose = closeOverlay }) {
   }
   useEffect(() => restoreFinanceScroll(contentRef.current, navigation.current.scrollTop), [navigation.current.id])
   const briefProps = { brief, t, onDrill, orgId }
+  const briefLoading = ['overview', 'operations'].includes(tab) && briefState === 'loading' && !brief
 
   // 各 tab 的错误/空态由视图内部处理；这里只处理 brief 类视图的加载与失败
   const body = !canOpen(tab) ? h('p', { role: 'alert' }, '当前账号没有此页面权限') : (tab === 'overview' || tab === 'operations') && briefState === 'loading' && !brief
@@ -176,10 +194,12 @@ function Dashboard({ t, embedded = false, onClose = closeOverlay }) {
           h('div', { className: 'sf-header-buttons' },
             h(Tooltip, { label: t('refresh') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('refresh'), onClick: refreshSafely }, h(IconRefreshOutlineRegular, { size: 16 }))),
             h(Tooltip, { label: t('close') }, h('button', { type: 'button', className: 'sf-icon-button', 'aria-label': t('close'), onClick: closeSafely }, h(IconCloseOutlineRegular, { size: 16 })))))),
-      h('nav', { className: 'sf-tabs', 'aria-label': t('title') }, ...FINANCE_NAVIGATION.map(([label, items]) => {
-        const visible = items.filter(item => financeNavigationAllowed(item, identity))
-        return visible.length ? h('section', { key: label, className: 'sf-nav-group', 'aria-label': label },
-          h('h2', null, label), ...visible.map(item => h('button', { type: 'button', key: item[0], 'aria-current': activeItem?.[0] === item[0] ? 'page' : undefined, onClick: () => onDrill(item[2], financeSidebarParams(item, tab, drillParams, year)) }, item[1]))) : null
+      h('nav', { className: 'sf-tabs', 'aria-label': t('title') }, h(FinanceNavigationGroups, {
+        items: FINANCE_NAVIGATION.flatMap(([group, items]) => items.filter(item => financeNavigationAllowed(item, identity)).map(item => ({ id: item[0], label: item[1], group }))),
+        activeId: activeItem?.[0], onSelect: id => {
+          const item = FINANCE_NAVIGATION.flatMap(([, items]) => items).find(item => item[0] === id)
+          if (item) onDrill(item[2], financeSidebarParams(item, tab, drillParams, year))
+        },
       })),
       h('label', { className: 'sf-mobile-nav' }, h('span', null, '前往页面'),
         h('select', { value: activeItem?.[0] || 'overview', onChange: event => {
@@ -189,7 +209,7 @@ function Dashboard({ t, embedded = false, onClose = closeOverlay }) {
           const visible = items.filter(item => financeNavigationAllowed(item, identity))
           return visible.length ? h('optgroup', { key: label, label }, ...visible.map(item => h('option', { key: item[0], value: item[0] }, item[1]))) : null
         }))),
-      h('div', { ref: contentRef, className: `sf-content${briefState === 'loading' && !brief ? ' sf-refreshing' : ''}`, 'aria-busy': briefState === 'loading' && !brief }, body), leaveGuard.prompt))
+      h('div', { ref: contentRef, className: `sf-content${briefLoading ? ' sf-refreshing' : ''}`, 'aria-busy': briefLoading }, body), leaveGuard.prompt))
 }
 
 function Button({ wide, t, onOpen = openOverlay }) {
@@ -207,7 +227,7 @@ function apply(ctx) {
   ctx.slots.inject('desktop.navigation.context', () => ctx.slots.register({ name: 'desktop.navigation.context', key: 'sensteed-finance' }, financeDesktopNavigation().Menu))
   ctx.effect(() => ctx.locale.register(NS, copy), 'dofe-sensteed-finance: dictionaries')
   ctx.effect(() => { window.addEventListener(OVERLAY_EVENT, closeOtherOverlay); return () => window.removeEventListener(OVERLAY_EVENT, closeOtherOverlay) }, 'dofe-sensteed-finance: exclusive-overlay')
-  ctx.effect(() => { const style = document.createElement('style'); style.dataset.plugin = '@dofe/dsh-sensteed-finance'; style.textContent = css + sfAnalysisGrid + desktopContextCss; document.head.appendChild(style); return () => style.remove() }, 'dofe-sensteed-finance: styles')
+  ctx.effect(() => { const style = document.createElement('style'); style.dataset.plugin = '@dofe/dsh-sensteed-finance'; style.textContent = css + sfAnalysisGrid + desktopContextCss + financeNavigationCss; document.head.appendChild(style); return () => style.remove() }, 'dofe-sensteed-finance: styles')
   // 深度分析入口走宿主 conversation 服务（由 desktop 宿主在浏览器侧注册）；
   // 通过惰性 getter 注入，避免插件客户端与宿主模块产生编译期耦合。
   ctx.effect(() => {

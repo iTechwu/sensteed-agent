@@ -60,6 +60,7 @@ import {
   rendererRecoveryCopy,
 } from './tray-locale.ts'
 import {
+  assertSecureDownloadUrl,
   desktopUpdateFilename,
   downloadDesktopUpdate,
   pendingDesktopUpdateArtifact,
@@ -121,7 +122,8 @@ const NULL_BODY_STATUSES = new Set([204, 205, 304])
  */
 export function requestDesktopArtifact(url: string, init: RequestInit): Promise<UpdateArtifactResponse> {
   return new Promise((resolve, reject) => {
-    let finalUrl = url
+    let finalUrl = assertSecureDownloadUrl(url).href
+    let redirects = 0
     let settled = false
     const request = net.request({
       url,
@@ -135,8 +137,15 @@ export function requestDesktopArtifact(url: string, init: RequestInit): Promise<
       else if (value !== undefined) resolve(value)
     }
     request.on('redirect', (_status: number, _method: string, redirectUrl: string) => {
-      finalUrl = redirectUrl
-      request.followRedirect()
+      if (settled) return
+      try {
+        if (++redirects > 8) throw new Error('Too many update download redirects')
+        finalUrl = assertSecureDownloadUrl(new URL(redirectUrl, finalUrl).href).href
+        request.followRedirect()
+      } catch (cause) {
+        finish(cause)
+        request.abort()
+      }
     })
     request.on('response', incoming => {
       const headers = new Headers()

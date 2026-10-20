@@ -141,6 +141,20 @@ export function normalizeDofeEnabledPluginIds(ids: readonly string[] | undefined
   return [...new Set([...required, ...requested])].filter(plugin => dofePluginCanEnable(plugin, variant, entitledPlugins))
 }
 
+/** Backfill the supplier UI for older authorized profiles, once per account. */
+export function supplierCapabilityUpgrade(settings: {
+  enabledPlugins: readonly string[]
+  entitlements?: { plugins: readonly string[] }
+  supplierCapabilityInitialized?: boolean
+}, variant: DofeBrandVariant): { enabledPlugins: DofePluginId[]; supplierCapabilityInitialized: true } | undefined {
+  if (settings.supplierCapabilityInitialized || variant !== 'sensteed'
+    || !dofePluginCanEnable('supplier-intelligence', variant, settings.entitlements?.plugins)) return undefined
+  return {
+    enabledPlugins: normalizeDofeEnabledPluginIds([...settings.enabledPlugins, 'supplier-intelligence'], variant, settings.entitlements?.plugins),
+    supplierCapabilityInitialized: true,
+  }
+}
+
 /** Remove stale or cross-brand capability ids before they reach settings or MCP. */
 export function normalizeDofePluginIds(ids: readonly string[] | undefined, variant: DofeBrandVariant): DofePluginId[] {
   const available = new Set<string>(dofePluginsForBrand(variant).map(plugin => plugin.id))
@@ -152,6 +166,8 @@ export interface DofeAccessSettings {
   setupComplete: boolean
   /** Version of the Host-validated model_api_key gate. */
   validationVersion: number
+  /** Whether the authorized supplier default has already been applied for this account. */
+  supplierCapabilityInitialized?: boolean
   /** Built-in capabilities selected by the user. */
   enabledPlugins: string[]
   /** Model id selected from the validated DoFe catalog. */
