@@ -402,7 +402,10 @@ for (const name of clientPlugins) {
   const isMainPageOnly = /name:\s*['"]main['"]/.test(source) && !/name:\s*['"]shell\.overlay['"]/.test(source)
   const hasDialog = /role:\s*['"]dialog['"]/.test(source)
   const hasAccessibleName = /aria-label/.test(source) || /aria-labelledby/.test(source)
-  const hasClientBuild = manifest.exports?.['./client'] === './lib/client.js'
+  // Classic plugins wire the client artifact at lib/client.js; sealed thin-host
+  // plugins (dsh-sensteed-skill-manager) expose their client entry from thin/.
+  const clientExport = manifest.exports?.['./client']
+  const hasClientBuild = clientExport === './lib/client.js' || clientExport === './thin/client.js'
   const hasCheckScript = typeof manifest.scripts?.check === 'string'
   const isMandatoryAccessGate = name === 'dsh-yootun-ui'
   const hasEscapeClose = /event\.key\s*===\s*['"]Escape['"]/.test(source)
