@@ -2,5 +2,8 @@
 patches/*.patch text eol=lf whitespace=-space-before-tab,-blank-at-eol
 .yarn/patches/*.patch text eol=lf whitespace=-space-before-tab,-blank-at-eol
 # Imported snapshots retain upstream bytes; their snapshot hashes verify integrity.
-.ci/** whitespace=-blank-at-eol,-blank-at-eof
+# 快照目录关闭文本规范化（-text）：上游字节（含 CRLF）必须原样入库，
+# 否则 macOS 检出与 Linux 检出字节不一致，CI 快照 verify 会假阳性漂移。
+.ci/** -text whitespace=-blank-at-eol,-blank-at-eof
+scripts/ci-snapshots/** -text whitespace=-blank-at-eol,-blank-at-eof
 dsh-plugin-desktop/bundled/skills/** whitespace=-blank-at-eol,-blank-at-eof
