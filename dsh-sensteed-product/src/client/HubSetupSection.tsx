@@ -5,6 +5,7 @@ import type { DofeAccessLocaleKey } from './dofe-access.ts'
 import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { DofeAccessSettings } from '../dofe-plugins.ts'
 import { hubCheckRequest, hubBlocked, hubInitialSelections, hubKey, hubSetupRequest, hubTerminal, type HubKind, type HubCheck, type HubOperation, type HubPreview, type HubSelection } from './hub-setup-state.ts'
+import { trackHubTemplate } from './hub-analytics.ts'
 type Props={kind?:HubKind;t:(key:DofeAccessLocaleKey)=>string;settingsScope?:ConfigForm<DofeAccessSettings>;subscribeReconnect?:(listener:()=>void)=>()=>void}
 const noSubscribe=()=>()=>{}
 const standaloneAccount=()=>'standalone'
@@ -19,7 +20,7 @@ export function HubSetupSection({t,settingsScope,subscribeReconnect,kind}:Props)
 function HubSetupEditor({t,kind}:Pick<Props,'t'|'kind'>){
  const titleId=useId()
  const [check,setCheck]=useState<HubCheck>(),[selection,setSelection]=useState<HubSelection[]>([]),[preview,setPreview]=useState<HubPreview>(),[operation,setOperation]=useState<HubOperation>(),[busy,setBusy]=useState(false),[error,setError]=useState<string>(),[recovering,setRecovering]=useState(false),[clock,setClock]=useState(Date.now())
- const lock=useRef(false),intent=useRef<HubPreview>(),mounted=useRef(true),sequence=useRef(0)
+ const lock=useRef(false),intent=useRef<HubPreview>(),mounted=useRef(true),sequence=useRef(0),reportedFailure=useRef('')
  const message=(e:unknown)=>!(e instanceof Error)?t('hubRequestFailed'):e.message==='BASE_VERSION_NOT_ENABLED'?t('hubUnavailable'):e.message==='HUB_UNAVAILABLE'?t('hubServiceUnreachable'):e.message==='HUB_SSO_REQUIRED'?t('settingsLoginRequired'):t('hubRequestFailed')
  const refresh=useCallback(async(signal?:AbortSignal)=>{
   const epoch=++sequence.current
@@ -37,7 +38,15 @@ function HubSetupEditor({t,kind}:Pick<Props,'t'|'kind'>){
   const controller=new AbortController();let polling=false;const timer=setInterval(()=>{if(lock.current||polling)return
    polling=true
    if(recovering){void refresh(controller.signal).catch(()=>{}).finally(()=>{polling=false});return}
-   void hubSetupRequest<HubOperation>('status',{operationId:operation?.operationId},controller.signal).then(value=>{if(mounted.current&&!controller.signal.aborted){setOperation(value);setError(undefined)}}).catch(()=>{if(!controller.signal.aborted){setRecovering(true);setError(t('hubConnectionRecovering'))}}).finally(()=>{polling=false})
+   void hubSetupRequest<HubOperation>('status',{operationId:operation?.operationId},controller.signal).then(value=>{
+    if(mounted.current&&!controller.signal.aborted){
+     setOperation(value);setError(undefined)
+     // docs/1022 §7：应用终态失败一次性上报（回滚或需人工介入且不可重试）
+     const failedPhase=value.phase==='ROLLED_BACK'?'install':value.phase==='NEEDS_ATTENTION'&&value.retryAllowed===false?'load':null
+     const key=`${value.operationId}:${failedPhase??''}`
+     if(failedPhase&&reportedFailure.current!==key){reportedFailure.current=key;trackHubTemplate({event:'PROFILE_APPLY_FAILED',properties:{phase:failedPhase,errorClass:'error'}})}
+    }
+   }).catch(()=>{if(!controller.signal.aborted){setRecovering(true);setError(t('hubConnectionRecovering'))}}).finally(()=>{polling=false})
   },3000)
   return()=>{clearInterval(timer);controller.abort()}
  },[operation?.operationId,operation?.state,operation?.phase,recovering,refresh])

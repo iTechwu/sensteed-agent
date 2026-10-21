@@ -1,6 +1,7 @@
 /** Sidebar foot Profile switcher (docs/1022 §6.1). Intents only; storage and scoping stay in the Host. */
 import { useEffect, useState } from 'react'
 import { MoreVertical, Plus } from 'lucide-react'
+import { trackHubSwitch } from './hub-analytics.ts'
 
 interface ContentProfileView {
   id: string
@@ -46,8 +47,12 @@ export function ProfileSwitcher({ wide, t, openPlugins }: ProfileSwitcherProps) 
     // 期望集切换后需重新应用：确认后仅改注册，物化经企业目录页的既有检查/安装管线。
     if (!window.confirm(`${t('switchHint')}「${profile.name}」`)) return
     void request({ action: 'set-active', id: profile.id }).then(() => {
+      trackHubSwitch({ event: 'PROFILE_SWITCHED', properties: { itemCount: profile.summary.skills + profile.summary.plugins } })
       setActiveId(profile.id); setNotice(t('switched'))
-    }).catch(() => setNotice(t('loadFailed')))
+    }).catch(() => {
+      trackHubSwitch({ event: 'PROFILE_APPLY_FAILED', properties: { phase: 'resolve', errorClass: 'error' } })
+      setNotice(t('loadFailed'))
+    })
   }
 
   return (

@@ -4,6 +4,7 @@ import { HUB_GENERATION_ORIGIN } from '../../../dsh-plugin-desktop/src/hub-gener
 export type HubTemplateEvent =
   | { event: 'PROFILE_TEMPLATE_VIEWED'; properties: { surface: 'list' } }
   | { event: 'PROFILE_TEMPLATE_INSTANTIATED'; properties: { planCount: number; skippedCount: number; errorClass?: 'conflict' | 'validation' | 'forbidden' | 'error' } }
+  | { event: 'PROFILE_APPLY_FAILED'; properties: { phase: 'unload' | 'resolve' | 'install' | 'load'; errorClass: 'conflict' | 'validation' | 'forbidden' | 'error' } }
 
 /** 失败静默：产品分析不产生用户可见错误，也不重试。 */
 export function trackHubTemplate(event: HubTemplateEvent): void {
