@@ -197,7 +197,6 @@ describe('published package surface', () => {
       ['dsh-opencli', 'index.js'],
       ['dsh-plugin-console', 'lib/index.js'], ['dsh-tools-mcp', 'index.js'],
       ['dsh-sensteed-finance', 'index.js'],
-      ['dsh-sensteed-skill-manager', 'thin/index.js'],
       ['dsh-sensteed-supplier-intelligence', 'index.js'],
       ['dsh-sensteed-video-notes', 'index.js'],
       ['dsh-sensteed-skill-manager', 'thin/index.js'],
