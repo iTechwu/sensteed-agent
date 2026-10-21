@@ -129,10 +129,14 @@ export class DesktopMaintenanceCoordinator {
     }, { waitMs: 30_000 })
   }
 }
-const defaultCoordinator = new DesktopMaintenanceCoordinator(dirname(fileURLToPath(new URL('../package.json', import.meta.url))), join(homedir(), '.sensteed', 'maintenance'))
-export function withDesktopMaintenance<T>(kind: DesktopMaintenanceKind, action: () => Promise<T>, hubRoot?: string) { return defaultCoordinator.run(kind, action, hubRoot) }
-export function confirmDesktopMaintenanceBuild(build: Build) { return defaultCoordinator.confirmBuild(build) }
-export function recoverCancelledDesktopInstallation() { return defaultCoordinator.recoverCancelledInstallation() }
+/** Created on first use: module import must stay side-effect-free for unit tests (vitest serves a web-style import.meta.url). */
+let defaultCoordinator: DesktopMaintenanceCoordinator | undefined
+function coordinator(): DesktopMaintenanceCoordinator {
+  return defaultCoordinator ??= new DesktopMaintenanceCoordinator(dirname(fileURLToPath(new URL('../package.json', import.meta.url))), join(homedir(), '.sensteed', 'maintenance'))
+}
+export function withDesktopMaintenance<T>(kind: DesktopMaintenanceKind, action: () => Promise<T>, hubRoot?: string) { return coordinator().run(kind, action, hubRoot) }
+export function confirmDesktopMaintenanceBuild(build: Build) { return coordinator().confirmBuild(build) }
+export function recoverCancelledDesktopInstallation() { return coordinator().recoverCancelledInstallation() }
 /** Persist handoff before the launcher exits; only verified new-build startup or explicit cancellation clears it. */
 export async function recordDesktopInstallerHandoff(targetVersion: string, installerPid?: number): Promise<void> {
   const context = held.getStore()
