@@ -1,5 +1,5 @@
 {
-  "catalogVersion": "2b7d96d9a1b396a4e28ee400e64c52fb3c85b94a7cedf9bd6f8c2ae4d9efb194",
+  "catalogVersion": "7ddf36ab1d8b999c41dd25d30403d5c270f22f46fad37d182ae43b7e4d1ced70",
   "categories": [
     {
       "id": "platform",
@@ -42,6 +42,295 @@
       "name": "视频处理与素材"
     }
   ],
+  "facets": [
+    {
+      "parameter": "domain",
+      "values": [
+        {
+          "toolCount": 5,
+          "value": "browser-intelligence"
+        },
+        {
+          "toolCount": 13,
+          "value": "custom-car-monitoring"
+        },
+        {
+          "toolCount": 24,
+          "value": "douyin_operation"
+        },
+        {
+          "toolCount": 5,
+          "value": "hotspot-discovery"
+        },
+        {
+          "toolCount": 28,
+          "value": "lead-discovery"
+        },
+        {
+          "toolCount": 16,
+          "value": "lead-monitor"
+        },
+        {
+          "toolCount": 12,
+          "value": "platform"
+        },
+        {
+          "toolCount": 48,
+          "value": "supply-chain"
+        },
+        {
+          "toolCount": 16,
+          "value": "talent-discovery"
+        },
+        {
+          "toolCount": 1,
+          "value": "tos-upload"
+        },
+        {
+          "toolCount": 14,
+          "value": "video-processing"
+        },
+        {
+          "toolCount": 28,
+          "value": "viral-video"
+        },
+        {
+          "toolCount": 25,
+          "value": "xhs_operation"
+        }
+      ]
+    },
+    {
+      "parameter": "operationKind",
+      "values": [
+        {
+          "toolCount": 10,
+          "value": "discover"
+        },
+        {
+          "toolCount": 100,
+          "value": "query"
+        },
+        {
+          "toolCount": 4,
+          "value": "prepare"
+        },
+        {
+          "toolCount": 5,
+          "value": "external_read"
+        },
+        {
+          "toolCount": 8,
+          "value": "ingest"
+        },
+        {
+          "toolCount": 3,
+          "value": "analyze"
+        },
+        {
+          "toolCount": 0,
+          "value": "generate"
+        },
+        {
+          "toolCount": 0,
+          "value": "manage"
+        },
+        {
+          "toolCount": 0,
+          "value": "observe"
+        },
+        {
+          "toolCount": 0,
+          "value": "deliver"
+        },
+        {
+          "toolCount": 105,
+          "value": "unknown"
+        }
+      ]
+    },
+    {
+      "parameter": "externalCallPolicy",
+      "values": [
+        {
+          "toolCount": 122,
+          "value": "never"
+        },
+        {
+          "toolCount": 5,
+          "value": "cache_miss"
+        },
+        {
+          "toolCount": 3,
+          "value": "explicit"
+        },
+        {
+          "toolCount": 105,
+          "value": "unknown"
+        }
+      ]
+    },
+    {
+      "parameter": "costPolicy",
+      "values": [
+        {
+          "toolCount": 122,
+          "value": "none"
+        },
+        {
+          "toolCount": 8,
+          "value": "possible"
+        },
+        {
+          "toolCount": 105,
+          "value": "unknown"
+        }
+      ]
+    },
+    {
+      "parameter": "modelUsage",
+      "values": [
+        {
+          "toolCount": 127,
+          "value": "never"
+        },
+        {
+          "toolCount": 3,
+          "value": "possible"
+        },
+        {
+          "toolCount": 105,
+          "value": "unknown"
+        }
+      ]
+    },
+    {
+      "parameter": "businessPersistence",
+      "values": [
+        {
+          "toolCount": 117,
+          "value": "none"
+        },
+        {
+          "toolCount": 11,
+          "value": "write"
+        },
+        {
+          "toolCount": 2,
+          "value": "cache"
+        },
+        {
+          "toolCount": 105,
+          "value": "unknown"
+        }
+      ]
+    },
+    {
+      "parameter": "controlPersistence",
+      "values": [
+        {
+          "toolCount": 112,
+          "value": "none"
+        },
+        {
+          "toolCount": 2,
+          "value": "plan_binding"
+        },
+        {
+          "toolCount": 11,
+          "value": "receipt"
+        },
+        {
+          "toolCount": 5,
+          "value": "audit"
+        },
+        {
+          "toolCount": 105,
+          "value": "unknown"
+        }
+      ]
+    },
+    {
+      "parameter": "dataSourcePolicy",
+      "values": [
+        {
+          "toolCount": 102,
+          "value": "database"
+        },
+        {
+          "toolCount": 11,
+          "value": "local_configuration"
+        },
+        {
+          "toolCount": 1,
+          "value": "caller_input"
+        },
+        {
+          "toolCount": 8,
+          "value": "device_report"
+        },
+        {
+          "toolCount": 3,
+          "value": "getoneapi"
+        },
+        {
+          "toolCount": 2,
+          "value": "qcc_mcp"
+        },
+        {
+          "toolCount": 3,
+          "value": "model_derived"
+        },
+        {
+          "toolCount": 105,
+          "value": "unknown"
+        }
+      ]
+    },
+    {
+      "parameter": "executionMode",
+      "values": [
+        {
+          "toolCount": 127,
+          "value": "sync"
+        },
+        {
+          "toolCount": 3,
+          "value": "async"
+        },
+        {
+          "toolCount": 105,
+          "value": "unknown"
+        }
+      ]
+    },
+    {
+      "parameter": "policyReview",
+      "values": [
+        {
+          "toolCount": 130,
+          "value": "reviewed"
+        },
+        {
+          "toolCount": 105,
+          "value": "unreviewed"
+        }
+      ]
+    },
+    {
+      "parameter": "outputContractStatus",
+      "values": [
+        {
+          "toolCount": 3,
+          "value": "typed"
+        },
+        {
+          "toolCount": 232,
+          "value": "untyped"
+        }
+      ]
+    }
+  ],
   "generatedFrom": "local MCP registration; taxonomy is authoritative; not a deployment health claim",
   "schemaVersion": 1,
   "services": [
@@ -55,26 +344,42 @@
       ],
       "tools": [
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "douyin_account_ai_analysis_get"
+          "toolName": "douyin_account_ai_analysis_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "write",
+          "cachePolicy": null,
+          "controlPersistence": "receipt",
           "costPolicy": "possible",
+          "dataSourcePolicy": "model_derived",
           "declaredEffect": "write",
           "executionMode": "async",
           "externalCallPolicy": "explicit",
           "modelUsage": "possible",
           "operationKind": "analyze",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "douyin_account_ai_analysis_start"
+          "toolName": "douyin_account_ai_analysis_start",
+          "versionPrecondition": false
         }
       ]
     },
@@ -88,125 +393,213 @@
       ],
       "tools": [
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "douyin_account_analysis"
+          "toolName": "douyin_account_analysis",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "read",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "douyin_account_analysis_export"
+          "toolName": "douyin_account_analysis_export",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "douyin_account_list"
+          "toolName": "douyin_account_list",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "douyin_account_overview"
+          "toolName": "douyin_account_overview",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "douyin_account_trend"
+          "toolName": "douyin_account_trend",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "read",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "douyin_export"
+          "toolName": "douyin_export",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "douyin_hot_work_list"
+          "toolName": "douyin_hot_work_list",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "read",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "douyin_overview_export"
+          "toolName": "douyin_overview_export",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "douyin_work_get"
+          "toolName": "douyin_work_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "douyin_work_list"
+          "toolName": "douyin_work_list",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "douyin_work_trend"
+          "toolName": "douyin_work_trend",
+          "versionPrecondition": false
         }
       ]
     },
@@ -220,125 +613,213 @@
       ],
       "tools": [
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "douyin_account_remove"
+          "toolName": "douyin_account_remove",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": true,
           "risk": "low",
-          "toolName": "douyin_account_save"
+          "toolName": "douyin_account_save",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "write",
+          "cachePolicy": null,
+          "controlPersistence": "receipt",
           "costPolicy": "none",
+          "dataSourcePolicy": "device_report",
           "declaredEffect": "write",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "ingest",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": true,
           "risk": "low",
-          "toolName": "douyin_collect_ingest_batch"
+          "toolName": "douyin_collect_ingest_batch",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "write",
+          "cachePolicy": null,
+          "controlPersistence": "receipt",
           "costPolicy": "none",
+          "dataSourcePolicy": "device_report",
           "declaredEffect": "write",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "ingest",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": true,
           "risk": "low",
-          "toolName": "douyin_collect_ingest_daily"
+          "toolName": "douyin_collect_ingest_daily",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "write",
+          "cachePolicy": null,
+          "controlPersistence": "receipt",
           "costPolicy": "none",
+          "dataSourcePolicy": "device_report",
           "declaredEffect": "write",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "ingest",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": true,
           "risk": "low",
-          "toolName": "douyin_collect_run_cancel"
+          "toolName": "douyin_collect_run_cancel",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "write",
+          "cachePolicy": null,
+          "controlPersistence": "receipt",
           "costPolicy": "none",
+          "dataSourcePolicy": "device_report",
           "declaredEffect": "write",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "ingest",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": true,
           "risk": "low",
-          "toolName": "douyin_collect_run_finish"
+          "toolName": "douyin_collect_run_finish",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "douyin_collect_run_get"
+          "toolName": "douyin_collect_run_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "write",
+          "cachePolicy": null,
+          "controlPersistence": "receipt",
           "costPolicy": "none",
+          "dataSourcePolicy": "device_report",
           "declaredEffect": "write",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "ingest",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": true,
           "risk": "low",
-          "toolName": "douyin_collect_run_heartbeat"
+          "toolName": "douyin_collect_run_heartbeat",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "write",
+          "cachePolicy": null,
+          "controlPersistence": "receipt",
           "costPolicy": "none",
+          "dataSourcePolicy": "device_report",
           "declaredEffect": "write",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "ingest",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": true,
           "risk": "low",
-          "toolName": "douyin_collect_run_set_list_meta"
+          "toolName": "douyin_collect_run_set_list_meta",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "write",
+          "cachePolicy": null,
+          "controlPersistence": "receipt",
           "costPolicy": "none",
+          "dataSourcePolicy": "device_report",
           "declaredEffect": "write",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "ingest",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": true,
           "risk": "low",
-          "toolName": "douyin_collect_run_start"
+          "toolName": "douyin_collect_run_start",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "write",
+          "cachePolicy": null,
+          "controlPersistence": "receipt",
           "costPolicy": "none",
+          "dataSourcePolicy": "device_report",
           "declaredEffect": "write",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "ingest",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": true,
           "risk": "low",
-          "toolName": "douyin_session_status_report"
+          "toolName": "douyin_session_status_report",
+          "versionPrecondition": false
         }
       ]
     },
@@ -352,59 +833,99 @@
       ],
       "tools": [
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "viral_video_asset_url_refresh"
+          "toolName": "viral_video_asset_url_refresh",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "viral_video_assets_list"
+          "toolName": "viral_video_assets_list",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "high",
-          "toolName": "viral_video_assets_process"
+          "toolName": "viral_video_assets_process",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "read",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "viral_video_douyin_download_url"
+          "toolName": "viral_video_douyin_download_url",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": true,
           "risk": "low",
-          "toolName": "viral_video_douyin_tos_url"
+          "toolName": "viral_video_douyin_tos_url",
+          "versionPrecondition": false
         }
       ]
     },
@@ -418,103 +939,175 @@
       ],
       "tools": [
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "viral_video_archive_submit"
+          "toolName": "viral_video_archive_submit",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "viral_video_async_submit_get"
+          "toolName": "viral_video_async_submit_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "high",
-          "toolName": "viral_video_candidate_advance"
+          "toolName": "viral_video_candidate_advance",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "viral_video_candidates_export"
+          "toolName": "viral_video_candidates_export",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "viral_video_candidates_list"
+          "toolName": "viral_video_candidates_list",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "high",
-          "toolName": "viral_video_discovery_run"
+          "toolName": "viral_video_discovery_run",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "viral_video_export_get"
+          "toolName": "viral_video_export_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "viral_video_search_submit"
+          "toolName": "viral_video_search_submit",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "read",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "viral_video_sources_list"
+          "toolName": "viral_video_sources_list",
+          "versionPrecondition": false
         }
       ]
     },
@@ -528,70 +1121,118 @@
       ],
       "tools": [
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "viral_video_account_seeds_upsert"
+          "toolName": "viral_video_account_seeds_upsert",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "viral_video_dashboard_get"
+          "toolName": "viral_video_dashboard_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "viral_video_keyword_seeds_upsert"
+          "toolName": "viral_video_keyword_seeds_upsert",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "viral_video_scheduled_plan_get"
+          "toolName": "viral_video_scheduled_plan_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "viral_video_seeds_list"
+          "toolName": "viral_video_seeds_list",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "viral_video_status_get"
+          "toolName": "viral_video_status_get",
+          "versionPrecondition": false
         }
       ]
     },
@@ -605,92 +1246,156 @@
       ],
       "tools": [
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "high",
-          "toolName": "viral_video_analysis_run"
+          "toolName": "viral_video_analysis_run",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "viral_video_analysis_status_get"
+          "toolName": "viral_video_analysis_status_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "local_configuration",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "discover",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "viral_video_rewrite_rules_list"
+          "toolName": "viral_video_rewrite_rules_list",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "read",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "viral_video_storyboard_export"
+          "toolName": "viral_video_storyboard_export",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "high",
-          "toolName": "viral_video_storyboard_generate"
+          "toolName": "viral_video_storyboard_generate",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "viral_video_storyboards_list"
+          "toolName": "viral_video_storyboards_list",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "viral_video_workflow_get"
+          "toolName": "viral_video_workflow_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "high",
-          "toolName": "viral_video_workflow_start"
+          "toolName": "viral_video_workflow_start",
+          "versionPrecondition": false
         }
       ]
     },
@@ -704,114 +1409,194 @@
       ],
       "tools": [
         {
+          "businessPersistence": "none",
+          "cachePolicy": "reuse_success",
+          "controlPersistence": "audit",
           "costPolicy": "possible",
+          "dataSourcePolicy": "getoneapi",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "cache_miss",
           "modelUsage": "never",
           "operationKind": "external_read",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "xhs_operation_account_search"
+          "toolName": "xhs_operation_account_search",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": true,
           "risk": "low",
-          "toolName": "xhs_operation_feedback_save"
+          "toolName": "xhs_operation_feedback_save",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": "reuse_success",
+          "controlPersistence": "audit",
           "costPolicy": "possible",
+          "dataSourcePolicy": "getoneapi",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "cache_miss",
           "modelUsage": "never",
           "operationKind": "external_read",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "xhs_operation_reference_search"
+          "toolName": "xhs_operation_reference_search",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "caller_input",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "prepare",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "xhs_operation_reference_select"
+          "toolName": "xhs_operation_reference_select",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "xhs_operation_result_get"
+          "toolName": "xhs_operation_result_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "local_configuration",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "discover",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "xhs_operation_style_get"
+          "toolName": "xhs_operation_style_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "xhs_operation_task_cancel"
+          "toolName": "xhs_operation_task_cancel",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "xhs_operation_task_create"
+          "toolName": "xhs_operation_task_create",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "xhs_operation_task_get"
+          "toolName": "xhs_operation_task_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "xhs_operation_task_retry"
+          "toolName": "xhs_operation_task_retry",
+          "versionPrecondition": false
         }
       ]
     },
@@ -825,169 +1610,289 @@
       ],
       "tools": [
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "xhs_operation_hotboard_candidate_review"
+          "toolName": "xhs_operation_hotboard_candidate_review",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "xhs_operation_hotboard_candidates_list"
+          "toolName": "xhs_operation_hotboard_candidates_list",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "xhs_operation_hotboard_keyword_save"
+          "toolName": "xhs_operation_hotboard_keyword_save",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "xhs_operation_hotboard_keywords_list"
+          "toolName": "xhs_operation_hotboard_keywords_list",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "xhs_operation_hotboard_label_review"
+          "toolName": "xhs_operation_hotboard_label_review",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "xhs_operation_hotboard_label_save"
+          "toolName": "xhs_operation_hotboard_label_save",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "xhs_operation_hotboard_labels_list"
+          "toolName": "xhs_operation_hotboard_labels_list",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "xhs_operation_hotboard_note_detail"
+          "toolName": "xhs_operation_hotboard_note_detail",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "xhs_operation_hotboard_note_exclude"
+          "toolName": "xhs_operation_hotboard_note_exclude",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "xhs_operation_hotboard_note_tag_update"
+          "toolName": "xhs_operation_hotboard_note_tag_update",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "xhs_operation_hotboard_overview"
+          "toolName": "xhs_operation_hotboard_overview",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "xhs_operation_hotboard_run_get"
+          "toolName": "xhs_operation_hotboard_run_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "high",
-          "toolName": "xhs_operation_hotboard_run_start"
+          "toolName": "xhs_operation_hotboard_run_start",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "xhs_operation_hotboard_settings_get"
+          "toolName": "xhs_operation_hotboard_settings_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "xhs_operation_hotboard_settings_update"
+          "toolName": "xhs_operation_hotboard_settings_update",
+          "versionPrecondition": false
         }
       ]
     },
@@ -1001,48 +1906,80 @@
       ],
       "tools": [
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "supply_chain_business_analysis_list"
+          "toolName": "supply_chain_business_analysis_list",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "supply_chain_business_analysis_save"
+          "toolName": "supply_chain_business_analysis_save",
+          "versionPrecondition": true
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "supply_chain_business_context_get"
+          "toolName": "supply_chain_business_context_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "supply_chain_business_context_save"
+          "toolName": "supply_chain_business_context_save",
+          "versionPrecondition": true
         }
       ]
     },
@@ -1056,103 +1993,175 @@
       ],
       "tools": [
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "supply_chain_aiqicha_company_profile_collect"
+          "toolName": "supply_chain_aiqicha_company_profile_collect",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "supply_chain_aiqicha_mobile_snapshot_collect"
+          "toolName": "supply_chain_aiqicha_mobile_snapshot_collect",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "supply_chain_aiqicha_mobile_source_authorize"
+          "toolName": "supply_chain_aiqicha_mobile_source_authorize",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "supply_chain_company_profile_sync"
+          "toolName": "supply_chain_company_profile_sync",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "supply_chain_getone_social_source_authorize"
+          "toolName": "supply_chain_getone_social_source_authorize",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "supply_chain_news_snapshot_ingest"
+          "toolName": "supply_chain_news_snapshot_ingest",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "medium",
-          "toolName": "supply_chain_run_cancel"
+          "toolName": "supply_chain_run_cancel",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "supply_chain_run_get"
+          "toolName": "supply_chain_run_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "supply_chain_social_monitoring_collect"
+          "toolName": "supply_chain_social_monitoring_collect",
+          "versionPrecondition": false
         }
       ]
     },
@@ -1166,48 +2175,80 @@
       ],
       "tools": [
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "local_configuration",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "discover",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "supply_chain_qcc_capabilities_get"
+          "toolName": "supply_chain_qcc_capabilities_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "cache",
+          "cachePolicy": "success_cache_30_minutes",
+          "controlPersistence": "audit",
           "costPolicy": "possible",
+          "dataSourcePolicy": "qcc_mcp",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "cache_miss",
           "modelUsage": "never",
           "operationKind": "external_read",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "supply_chain_qcc_company_data_get"
+          "toolName": "supply_chain_qcc_company_data_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "supply_chain_qcc_company_data_list"
+          "toolName": "supply_chain_qcc_company_data_list",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "cache",
+          "cachePolicy": "success_cache_30_minutes",
+          "controlPersistence": "audit",
           "costPolicy": "possible",
+          "dataSourcePolicy": "qcc_mcp",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "cache_miss",
           "modelUsage": "never",
           "operationKind": "external_read",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "supply_chain_qcc_company_search"
+          "toolName": "supply_chain_qcc_company_search",
+          "versionPrecondition": false
         }
       ]
     },
@@ -1221,37 +2262,61 @@
       ],
       "tools": [
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "supply_chain_intelligence_report_get"
+          "toolName": "supply_chain_intelligence_report_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "high",
-          "toolName": "supply_chain_intelligence_summary_run"
+          "toolName": "supply_chain_intelligence_summary_run",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "supply_chain_monitoring_timeline_get"
+          "toolName": "supply_chain_monitoring_timeline_get",
+          "versionPrecondition": false
         }
       ]
     },
@@ -1265,26 +2330,42 @@
       ],
       "tools": [
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "supply_chain_relationship_review_submit"
+          "toolName": "supply_chain_relationship_review_submit",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "supply_chain_relationships_list"
+          "toolName": "supply_chain_relationships_list",
+          "versionPrecondition": false
         }
       ]
     },
@@ -1298,92 +2379,156 @@
       ],
       "tools": [
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "supply_chain_alert_assign"
+          "toolName": "supply_chain_alert_assign",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "supply_chain_alert_create"
+          "toolName": "supply_chain_alert_create",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "supply_chain_alert_resolve"
+          "toolName": "supply_chain_alert_resolve",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "supply_chain_alerts_list"
+          "toolName": "supply_chain_alerts_list",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "high",
-          "toolName": "supply_chain_event_analysis_run"
+          "toolName": "supply_chain_event_analysis_run",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "supply_chain_risk_event_review"
+          "toolName": "supply_chain_risk_event_review",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "supply_chain_risk_events_list"
+          "toolName": "supply_chain_risk_events_list",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "high",
-          "toolName": "supply_chain_risk_forecast_run"
+          "toolName": "supply_chain_risk_forecast_run",
+          "versionPrecondition": false
         }
       ]
     },
@@ -1397,92 +2542,156 @@
       ],
       "tools": [
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "read",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "supply_chain_capabilities_get"
+          "toolName": "supply_chain_capabilities_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "supply_chain_supplier_archive"
+          "toolName": "supply_chain_supplier_archive",
+          "versionPrecondition": true
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "supply_chain_supplier_create"
+          "toolName": "supply_chain_supplier_create",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "supply_chain_supplier_get"
+          "toolName": "supply_chain_supplier_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "supply_chain_supplier_import"
+          "toolName": "supply_chain_supplier_import",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "supply_chain_supplier_update"
+          "toolName": "supply_chain_supplier_update",
+          "versionPrecondition": true
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "supply_chain_supplier_verify"
+          "toolName": "supply_chain_supplier_verify",
+          "versionPrecondition": true
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "supply_chain_suppliers_list"
+          "toolName": "supply_chain_suppliers_list",
+          "versionPrecondition": false
         }
       ]
     },
@@ -1496,70 +2705,118 @@
       ],
       "tools": [
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "supply_chain_weekly_report_get"
+          "toolName": "supply_chain_weekly_report_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": false,
           "risk": "medium",
-          "toolName": "supply_chain_weekly_report_mark_read"
+          "toolName": "supply_chain_weekly_report_mark_read",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "supply_chain_weekly_report_plan_get"
+          "toolName": "supply_chain_weekly_report_plan_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "supply_chain_weekly_report_plan_save"
+          "toolName": "supply_chain_weekly_report_plan_save",
+          "versionPrecondition": true
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": false,
           "risk": "medium",
-          "toolName": "supply_chain_weekly_report_retry"
+          "toolName": "supply_chain_weekly_report_retry",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "supply_chain_weekly_reports_list"
+          "toolName": "supply_chain_weekly_reports_list",
+          "versionPrecondition": false
         }
       ]
     },
@@ -1573,48 +2830,80 @@
       ],
       "tools": [
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "supply_chain_workbench_evidence_get"
+          "toolName": "supply_chain_workbench_evidence_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "supply_chain_workbench_evidence_list"
+          "toolName": "supply_chain_workbench_evidence_list",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "supply_chain_workbench_overview_get"
+          "toolName": "supply_chain_workbench_overview_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "supply_chain_workbench_suppliers_list"
+          "toolName": "supply_chain_workbench_suppliers_list",
+          "versionPrecondition": false
         }
       ]
     },
@@ -1628,48 +2917,80 @@
       ],
       "tools": [
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": true,
           "risk": "low",
-          "toolName": "lead_discovery_batch_discover"
+          "toolName": "lead_discovery_batch_discover",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": true,
           "risk": "low",
-          "toolName": "lead_discovery_discover"
+          "toolName": "lead_discovery_discover",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "lead_discovery_manual_import"
+          "toolName": "lead_discovery_manual_import",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "read",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "lead_discovery_result_page_get"
+          "toolName": "lead_discovery_result_page_get",
+          "versionPrecondition": false
         }
       ]
     },
@@ -1683,103 +3004,175 @@
       ],
       "tools": [
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "lead_discovery_account_content_plan_get"
+          "toolName": "lead_discovery_account_content_plan_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "lead_discovery_account_content_run"
+          "toolName": "lead_discovery_account_content_run",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "lead_discovery_account_verification_import"
+          "toolName": "lead_discovery_account_verification_import",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "lead_discovery_comment_fetch_plan_get"
+          "toolName": "lead_discovery_comment_fetch_plan_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "lead_discovery_comment_fetch_report_get"
+          "toolName": "lead_discovery_comment_fetch_report_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "high",
-          "toolName": "lead_discovery_comment_fetch_run"
+          "toolName": "lead_discovery_comment_fetch_run",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "lead_discovery_feedback_persist"
+          "toolName": "lead_discovery_feedback_persist",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "read",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "lead_discovery_feedback_validate"
+          "toolName": "lead_discovery_feedback_validate",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "lead_discovery_llm_analysis_run"
+          "toolName": "lead_discovery_llm_analysis_run",
+          "versionPrecondition": false
         }
       ]
     },
@@ -1793,37 +3186,61 @@
       ],
       "tools": [
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "lead_pool_entries_list"
+          "toolName": "lead_pool_entries_list",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "lead_pool_entry_evidence_list"
+          "toolName": "lead_pool_entry_evidence_list",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "lead_pool_entry_get"
+          "toolName": "lead_pool_entry_get",
+          "versionPrecondition": false
         }
       ]
     },
@@ -1837,81 +3254,137 @@
       ],
       "tools": [
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "lead_discovery_candidates_list"
+          "toolName": "lead_discovery_candidates_list",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "lead_discovery_daily_report_get"
+          "toolName": "lead_discovery_daily_report_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "lead_discovery_database_search"
+          "toolName": "lead_discovery_database_search",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "lead_discovery_insights_get"
+          "toolName": "lead_discovery_insights_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "lead_discovery_keyword_report_get"
+          "toolName": "lead_discovery_keyword_report_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "lead_discovery_periodic_runs_list"
+          "toolName": "lead_discovery_periodic_runs_list",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "lead_discovery_status_get"
+          "toolName": "lead_discovery_status_get",
+          "versionPrecondition": false
         }
       ]
     },
@@ -1925,103 +3398,175 @@
       ],
       "tools": [
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "lead_monitor_account_upsert"
+          "toolName": "lead_monitor_account_upsert",
+          "versionPrecondition": true
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "lead_monitor_accounts_list"
+          "toolName": "lead_monitor_accounts_list",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "lead_monitor_keyword_publish"
+          "toolName": "lead_monitor_keyword_publish",
+          "versionPrecondition": true
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "lead_monitor_keyword_upsert"
+          "toolName": "lead_monitor_keyword_upsert",
+          "versionPrecondition": true
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "lead_monitor_keywords_list"
+          "toolName": "lead_monitor_keywords_list",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "lead_monitor_source_section_upsert"
+          "toolName": "lead_monitor_source_section_upsert",
+          "versionPrecondition": true
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "lead_monitor_source_sections_list"
+          "toolName": "lead_monitor_source_sections_list",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "lead_monitor_source_upsert"
+          "toolName": "lead_monitor_source_upsert",
+          "versionPrecondition": true
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "lead_monitor_sources_list"
+          "toolName": "lead_monitor_sources_list",
+          "versionPrecondition": false
         }
       ]
     },
@@ -2035,81 +3580,137 @@
       ],
       "tools": [
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "lead_monitor_effectiveness_get"
+          "toolName": "lead_monitor_effectiveness_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "lead_monitor_periodic_runs_list"
+          "toolName": "lead_monitor_periodic_runs_list",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "plan_binding",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "prepare",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "lead_monitor_plan_preview"
+          "toolName": "lead_monitor_plan_preview",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "read",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "lead_monitor_result_page_get"
+          "toolName": "lead_monitor_result_page_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "lead_monitor_results_list"
+          "toolName": "lead_monitor_results_list",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "lead_monitor_run_get"
+          "toolName": "lead_monitor_run_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "high",
-          "toolName": "lead_monitor_run_start"
+          "toolName": "lead_monitor_run_start",
+          "versionPrecondition": false
         }
       ]
     },
@@ -2123,59 +3724,99 @@
       ],
       "tools": [
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "high",
-          "toolName": "lead_discovery_budget_notification_execute"
+          "toolName": "lead_discovery_budget_notification_execute",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "lead_discovery_budget_notification_get"
+          "toolName": "lead_discovery_budget_notification_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "lead_discovery_scheduled_plan_get"
+          "toolName": "lead_discovery_scheduled_plan_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "lead_discovery_scheduled_retry_plan_get"
+          "toolName": "lead_discovery_scheduled_retry_plan_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "lead_discovery_scheduled_retry_run"
+          "toolName": "lead_discovery_scheduled_retry_run",
+          "versionPrecondition": false
         }
       ]
     },
@@ -2189,26 +3830,42 @@
       ],
       "tools": [
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "video_frames_extract_start"
+          "toolName": "video_frames_extract_start",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "video_frames_list"
+          "toolName": "video_frames_list",
+          "versionPrecondition": false
         }
       ]
     },
@@ -2222,15 +3879,23 @@
       ],
       "tools": [
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "medium",
-          "toolName": "tos_upload_authorize"
+          "toolName": "tos_upload_authorize",
+          "versionPrecondition": false
         }
       ]
     },
@@ -2244,37 +3909,61 @@
       ],
       "tools": [
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": true,
           "risk": "low",
-          "toolName": "video_asset_download_authorize"
+          "toolName": "video_asset_download_authorize",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "video_job_cancel"
+          "toolName": "video_job_cancel",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "video_job_get"
+          "toolName": "video_job_get",
+          "versionPrecondition": false
         }
       ]
     },
@@ -2288,48 +3977,80 @@
       ],
       "tools": [
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "local_configuration",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "discover",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "video_capabilities_get"
+          "toolName": "video_capabilities_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": true,
           "risk": "low",
-          "toolName": "video_media_prepare_start"
+          "toolName": "video_media_prepare_start",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "video_source_get"
+          "toolName": "video_source_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": true,
           "risk": "low",
-          "toolName": "video_source_resolve_start"
+          "toolName": "video_source_resolve_start",
+          "versionPrecondition": false
         }
       ]
     },
@@ -2343,37 +4064,61 @@
       ],
       "tools": [
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": true,
           "risk": "low",
-          "toolName": "video_subtitles_read_start"
+          "toolName": "video_subtitles_read_start",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "video_transcript_get"
+          "toolName": "video_transcript_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "write",
+          "cachePolicy": null,
+          "controlPersistence": "receipt",
           "costPolicy": "possible",
+          "dataSourcePolicy": "model_derived",
           "declaredEffect": "write",
           "executionMode": "async",
           "externalCallPolicy": "explicit",
           "modelUsage": "possible",
           "operationKind": "analyze",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "high",
-          "toolName": "video_transcription_start"
+          "toolName": "video_transcription_start",
+          "versionPrecondition": false
         }
       ]
     },
@@ -2387,26 +4132,42 @@
       ],
       "tools": [
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": true,
           "risk": "low",
-          "toolName": "video_upload_authorize"
+          "toolName": "video_upload_authorize",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": true,
           "risk": "low",
-          "toolName": "video_upload_complete"
+          "toolName": "video_upload_complete",
+          "versionPrecondition": false
         }
       ]
     },
@@ -2420,59 +4181,99 @@
       ],
       "tools": [
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "local_configuration",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "discover",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "business_capabilities_list"
+          "toolName": "business_capabilities_list",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "local_configuration",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "discover",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "business_capability_get"
+          "toolName": "business_capability_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "local_configuration",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "discover",
+          "outputContractStatus": "typed",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "business_service_categories_list"
+          "toolName": "business_service_categories_list",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "local_configuration",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "discover",
+          "outputContractStatus": "typed",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "business_tool_contract_get"
+          "toolName": "business_tool_contract_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "local_configuration",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "discover",
+          "outputContractStatus": "typed",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "business_tools_search"
+          "toolName": "business_tools_search",
+          "versionPrecondition": false
         }
       ]
     },
@@ -2486,37 +4287,61 @@
       ],
       "tools": [
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "platform_mutation_receipts_get"
+          "toolName": "platform_mutation_receipts_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "medium",
-          "toolName": "platform_run_cancel"
+          "toolName": "platform_run_cancel",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "platform_run_get"
+          "toolName": "platform_run_get",
+          "versionPrecondition": false
         }
       ]
     },
@@ -2530,15 +4355,23 @@
       ],
       "tools": [
         {
+          "businessPersistence": "write",
+          "cachePolicy": null,
+          "controlPersistence": "receipt",
           "costPolicy": "possible",
+          "dataSourcePolicy": "model_derived",
           "declaredEffect": "write",
           "executionMode": "async",
           "externalCallPolicy": "explicit",
           "modelUsage": "possible",
           "operationKind": "analyze",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "text_summarize"
+          "toolName": "text_summarize",
+          "versionPrecondition": false
         }
       ]
     },
@@ -2552,59 +4385,99 @@
       ],
       "tools": [
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "browser_intelligence_evidence_list"
+          "toolName": "browser_intelligence_evidence_list",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "plan_binding",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "prepare",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "browser_intelligence_plan_preview"
+          "toolName": "browser_intelligence_plan_preview",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "browser_intelligence_run_get"
+          "toolName": "browser_intelligence_run_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "high",
-          "toolName": "browser_intelligence_run_start"
+          "toolName": "browser_intelligence_run_start",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "browser_intelligence_session_get"
+          "toolName": "browser_intelligence_session_get",
+          "versionPrecondition": false
         }
       ]
     },
@@ -2618,59 +4491,99 @@
       ],
       "tools": [
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "hotspot_discovery_event_get"
+          "toolName": "hotspot_discovery_event_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "hotspot_discovery_events_list"
+          "toolName": "hotspot_discovery_events_list",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "read",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "hotspot_discovery_plan_preview"
+          "toolName": "hotspot_discovery_plan_preview",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "hotspot_discovery_run_get"
+          "toolName": "hotspot_discovery_run_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "high",
-          "toolName": "hotspot_discovery_run_start"
+          "toolName": "hotspot_discovery_run_start",
+          "versionPrecondition": false
         }
       ]
     },
@@ -2684,37 +4597,61 @@
       ],
       "tools": [
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "local_configuration",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "discover",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "getoneapi_social_capabilities_get"
+          "toolName": "getoneapi_social_capabilities_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": "reuse_success",
+          "controlPersistence": "audit",
           "costPolicy": "possible",
+          "dataSourcePolicy": "getoneapi",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "cache_miss",
           "modelUsage": "never",
           "operationKind": "external_read",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "medium",
-          "toolName": "getoneapi_social_read"
+          "toolName": "getoneapi_social_read",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "local_configuration",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "prepare",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "getoneapi_social_read_prepare"
+          "toolName": "getoneapi_social_read_prepare",
+          "versionPrecondition": false
         }
       ]
     },
@@ -2728,70 +4665,118 @@
       ],
       "tools": [
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "talent_candidate_briefs_get"
+          "toolName": "talent_candidate_briefs_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "talent_candidate_evidence_list"
+          "toolName": "talent_candidate_evidence_list",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "talent_candidate_get"
+          "toolName": "talent_candidate_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "talent_candidates_list"
+          "toolName": "talent_candidates_list",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": true,
           "risk": "low",
-          "toolName": "talent_discovery_discover"
+          "toolName": "talent_discovery_discover",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "read",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "talent_discovery_result_page_get"
+          "toolName": "talent_discovery_result_page_get",
+          "versionPrecondition": false
         }
       ]
     },
@@ -2805,59 +4790,99 @@
       ],
       "tools": [
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "talent_analysis_readiness_get"
+          "toolName": "talent_analysis_readiness_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "talent_candidate_profile_get"
+          "toolName": "talent_candidate_profile_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "talent_feedback_import"
+          "toolName": "talent_feedback_import",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "talent_feedback_scores_get"
+          "toolName": "talent_feedback_scores_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "talent_profiles_build"
+          "toolName": "talent_profiles_build",
+          "versionPrecondition": false
         }
       ]
     },
@@ -2871,59 +4896,99 @@
       ],
       "tools": [
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "talent_metrics_snapshot_create"
+          "toolName": "talent_metrics_snapshot_create",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "talent_metrics_summary_get"
+          "toolName": "talent_metrics_summary_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "talent_outreach_drafts_build"
+          "toolName": "talent_outreach_drafts_build",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "talent_outreach_report_get"
+          "toolName": "talent_outreach_report_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "talent_outreach_status_import"
+          "toolName": "talent_outreach_status_import",
+          "versionPrecondition": false
         }
       ]
     },
@@ -2937,26 +5002,42 @@
       ],
       "tools": [
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "custom_car_monitoring_browser_evidence_intake"
+          "toolName": "custom_car_monitoring_browser_evidence_intake",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "high",
-          "toolName": "custom_car_monitoring_browser_run_start"
+          "toolName": "custom_car_monitoring_browser_run_start",
+          "versionPrecondition": false
         }
       ]
     },
@@ -2970,59 +5051,99 @@
       ],
       "tools": [
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "custom_car_monitoring_analysis_run"
+          "toolName": "custom_car_monitoring_analysis_run",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "custom_car_monitoring_contents_list"
+          "toolName": "custom_car_monitoring_contents_list",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "read",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "custom_car_monitoring_result_page_get"
+          "toolName": "custom_car_monitoring_result_page_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "custom_car_monitoring_search"
+          "toolName": "custom_car_monitoring_search",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "custom_car_monitoring_trends_list"
+          "toolName": "custom_car_monitoring_trends_list",
+          "versionPrecondition": false
         }
       ]
     },
@@ -3036,70 +5157,118 @@
       ],
       "tools": [
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "medium",
-          "toolName": "custom_car_monitoring_asset_upsert"
+          "toolName": "custom_car_monitoring_asset_upsert",
+          "versionPrecondition": true
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "custom_car_monitoring_assets_list"
+          "toolName": "custom_car_monitoring_assets_list",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "custom_car_monitoring_periodic_runs_list"
+          "toolName": "custom_car_monitoring_periodic_runs_list",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "custom_car_monitoring_plan_get"
+          "toolName": "custom_car_monitoring_plan_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "none",
+          "cachePolicy": null,
+          "controlPersistence": "none",
           "costPolicy": "none",
+          "dataSourcePolicy": "database",
           "declaredEffect": "read",
           "executionMode": "sync",
           "externalCallPolicy": "never",
           "modelUsage": "never",
           "operationKind": "query",
+          "outputContractStatus": "untyped",
+          "policyReview": "reviewed",
           "requiresConfirm": false,
+          "requiresIdempotencyKey": false,
           "risk": "low",
-          "toolName": "custom_car_monitoring_run_get"
+          "toolName": "custom_car_monitoring_run_get",
+          "versionPrecondition": false
         },
         {
+          "businessPersistence": "unknown",
+          "cachePolicy": null,
+          "controlPersistence": "unknown",
           "costPolicy": "unknown",
+          "dataSourcePolicy": "unknown",
           "declaredEffect": "write",
           "executionMode": "unknown",
           "externalCallPolicy": "unknown",
           "modelUsage": "unknown",
           "operationKind": "unknown",
+          "outputContractStatus": "untyped",
+          "policyReview": "unreviewed",
           "requiresConfirm": true,
+          "requiresIdempotencyKey": true,
           "risk": "high",
-          "toolName": "custom_car_monitoring_run_start"
+          "toolName": "custom_car_monitoring_run_start",
+          "versionPrecondition": false
         }
       ]
     }

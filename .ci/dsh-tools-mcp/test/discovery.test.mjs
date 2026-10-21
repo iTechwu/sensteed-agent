@@ -39,8 +39,27 @@ test('snapshot is a faithful compact service catalog', () => {
       assert.ok(['read', 'write'].includes(tool.declaredEffect))
       assert.ok(['never', 'cache_miss', 'explicit', 'unknown'].includes(tool.externalCallPolicy))
       assert.ok(['none', 'possible', 'unknown'].includes(tool.costPolicy))
+      for (const field of ['businessPersistence', 'controlPersistence', 'dataSourcePolicy', 'policyReview', 'outputContractStatus']) {
+        assert.equal(typeof tool[field], 'string', `${tool.toolName}: missing ${field}`)
+      }
+      assert.equal(typeof tool.requiresIdempotencyKey, 'boolean')
+      assert.equal(typeof tool.versionPrecondition, 'boolean')
     }
   }
+})
+
+test('snapshot facets preserve every tool policy and do not hide unknown values', () => {
+  const rows = snapshot.services.flatMap(service => service.tools.map(tool => ({ ...tool, domain: service.domain })))
+  const expected = ['domain', 'operationKind', 'externalCallPolicy', 'costPolicy', 'modelUsage', 'businessPersistence', 'controlPersistence', 'dataSourcePolicy', 'executionMode', 'policyReview', 'outputContractStatus']
+  assert.deepEqual(snapshot.facets.map(facet => facet.parameter).sort(), expected.sort())
+  for (const facet of snapshot.facets) {
+    assert.equal(new Set(facet.values.map(value => value.value)).size, facet.values.length)
+    assert.equal(facet.values.reduce((sum, value) => sum + value.toolCount, 0), rows.length)
+    for (const value of facet.values) {
+      assert.equal(value.toolCount, rows.filter(row => row[facet.parameter] === value.value).length)
+    }
+  }
+  assert(rows.some(row => row.policyReview === 'unreviewed' && row.modelUsage === 'unknown'))
 })
 
 test('views cover every service group except the video-notes plugin domains', () => {
@@ -109,6 +128,9 @@ test('guidance uses live discovery without claiming broad free reads or universa
   assert.match(guidance, /unknown/u)
   assert.match(guidance, /只在 schema 支持时/u)
   assert.match(guidance, /collectionRef/u)
+  for (const field of ['facets', 'domain', 'modelUsage', 'businessPersistence', 'controlPersistence', 'dataSourcePolicy', 'executionMode', 'outputContractStatus']) assert(guidance.includes(field))
+  assert.match(guidance, /交集/u)
+  assert.match(guidance, /输入 schema/u)
   assert.doesNotMatch(guidance, /任何 Tools 写操作必须带/u)
 })
 

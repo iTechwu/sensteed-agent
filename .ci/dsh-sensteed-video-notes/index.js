@@ -20,10 +20,12 @@ const REQUIRED_TOOLS = [
   'video_asset_download_authorize',
 ]
 
-export const inject = ['tools', 'systemPrompt', 'attachments']
+export const inject = ['tools', 'systemPrompt', 'attachments', 'hubMcp']
 
 export function apply(ctx) {
-  const disposers = []
+  if (!ctx.hubMcp?.register) throw new Error('HUB_MCP_SERVICE_REQUIRED')
+  const registration = ctx.hubMcp.register({ capability: 'tools', serverName: 'video-processing', path: 'tools/video-processing', timeoutMs: 120000 })
+  const disposers = [() => registration.dispose()]
   disposers.push(registerHostUpload(ctx))
   disposers.push(redactHostAuthorizations(ctx))
   if (ctx.systemPrompt?.section) {

@@ -6,6 +6,18 @@
 Tools 的本地注册目录提供；本插件只给导航，不复制逐工具契约。
 
 搜索已有事实时可传 `externalCallsAllowed=false`、`chargeAllowed=false`；
+先从类别目录的 `facets` 读取当前支持的维度和值，再组合 `domain`、
+`dataSourcePolicy`、`modelUsage`、`businessPersistence`、`controlPersistence`、
+`executionMode`、`policyReview`、`outputContractStatus`。所有条件取交集，
+精确 `externalCallPolicy` / `costPolicy` 与两个布尔限制同时生效。
+例如只查数据库且不调模型/不写业务状态，可加 `dataSourcePolicy=database`、
+`modelUsage=never`、`businessPersistence=none`；要求无控制状态写入再加
+`controlPersistence=none`。后者单独区分审计、收据与计划绑定。
+异步模型分析入口可用 `modelUsage=possible` + `executionMode=async`；
+分析结果读取工具仍独立筛选。`facets` 统计分页前全部命中集，保留 unknown
+和零数量值；空结果不自动放宽筛选。旧版目录须先核对搜索的输入 schema，
+不向尚不支持新参数的部署发送这些参数。
+
 未知政策不能当作免费。只读动作可能访问外部或计费，写动作的确认、幂等与
 版本字段按实际 schema 传入。目录读取为零业务外呼，注册成功不代表部署、
 设备、身份或 worker 条件已经满足。旧 Tools 未发布新目录时回退 `tools/list`
@@ -28,6 +40,18 @@ version 2：38 张服务组级卡片，来自 Tools 仓
 
 `scripts/test_mcp_discovery.py` 的 `PluginCatalogSnapshotTests` 离线校验
 快照、视图与网关注册表三方一致性；快照源新鲜度由 tools 仓 `--check` 负责。
+快照保留全部持久化/来源/审核政策、确认/幂等/版本要求、输出类型状态与
+`facets`，不包含业务记录或凭据。既有路由门禁会校验逐工具政策与维度计数。
+跨仓比对应检查完整内容，不能只比较 `catalogVersion`：
+
+```bash
+python3 scripts/mcp_route_contract.py --tools-service-snapshot ../tools.dofe.ai/docs/superpowers/catalogs/service-catalog-snapshot.json
+../tools.dofe.ai/.venv/bin/python scripts/check_tools_discovery_inprocess.py --tools-root ../tools.dofe.ai
+```
+
+公开发现验收仍只调用三个目录工具；搜索调用携带多维交集，校验返回政策、
+字段 schema 与统计总数。Tools 兼容版本发布后再启用 `MCP_VERIFY_TOOLS_DISCOVERY=1`；
+新增字段缺失或条件不生效会拒绝通过，不能拿业务采集做探活。
 
 客户端只通过 Host `hubMcp` 注册 allowlist 路径，Host 从凭据系统取得 Models
 身份并连接 `https://ai.hozonauto.com/mcp`。Tools 返回的 `endpointRef` 使用

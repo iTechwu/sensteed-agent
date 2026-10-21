@@ -9,6 +9,7 @@ function loadHost(names = []) {
   const sections = []
   return import('../index.js').then(({ apply }) => {
     apply({
+      hubMcp: { register(route) { assert.deepEqual(route, { capability: 'tools', serverName: 'video-processing', path: 'tools/video-processing', timeoutMs: 120000 }); return { dispose: async () => {} } } },
       tools: {
         schemas: () => names.map(name => ({ name })),
         register(value) { tools.set(value.name, value); return () => {} },
@@ -24,11 +25,8 @@ test('package registers the video-processing MCP patch', async () => {
   const patch = await readFile(new URL('cordis.patch.yml', root), 'utf8')
   assert.equal(manifest.name, '@dofe/dsh-sensteed-video-notes')
   assert.equal(manifest.dsh.bundle.patch, './cordis.patch.yml')
-  assert.match(patch, /serverName: video-processing/u)
-  assert.match(patch, /https:\/\/ai\.hozonauto\.com\/mcp\/tools\/video-processing/u)
-  // 凭据只来自 Host 环境变量，不写死任何 key 字面量。
-  assert.match(patch, /process\.env\.MODELS_API_KEY/u)
-  assert.doesNotMatch(patch, /Bearer\s+[A-Za-z0-9_-]{8}/u)
+  assert.match(patch, /name: '@dofe\/dsh-sensteed-video-notes'/u)
+  assert.doesNotMatch(patch, /@deepseek-ai|!!js|MODELS_API_KEY|Authorization/u)
 })
 
 test('loads the skill as system guidance and registers a read-only bootstrap', async () => {
@@ -257,4 +255,9 @@ test('render CLI refuses to overwrite an existing output directory', async () =>
     assert.notEqual(spawnSync(process.execPath, [script, '--input', input, '--out-dir', output]).status, 0)
     assert.equal(await readFile(join(output, 'course.md'), 'utf8'), 'user-edited')
   } finally { await rm(dir, { recursive: true, force: true }) }
+})
+
+test('requires the sealed authenticated MCP service instead of an environment-key fallback', async () => {
+  const { apply } = await import('../index.js')
+  assert.throws(() => apply({}), /HUB_MCP_SERVICE_REQUIRED/)
 })
