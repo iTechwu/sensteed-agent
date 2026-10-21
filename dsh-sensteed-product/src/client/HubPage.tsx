@@ -54,6 +54,8 @@ export function HubPage(props: HubPageProps) {
 }
 
 function HubPageContent({ kind, t, create, loadSkills, navigation, ...props }: HubPageProps) {
+  // docs/1022：模板注册成功后重挂安装区，自动 check 已裁剪快照并勾选初始项
+  const [setupEpoch, setSetupEpoch] = useState(0)
   const [tab, setTab] = useState<'catalog' | 'installed'>('catalog'), [creating, setCreating] = useState(false), [failed, setFailed] = useState(false)
   const externalTab = useSyncExternalStore(navigation?.subscribe ?? noSubscribe, navigation?.getSnapshot ?? defaultTab, navigation?.getSnapshot ?? defaultTab)
   const currentTab = navigation ? externalTab : tab
@@ -76,8 +78,8 @@ function HubPageContent({ kind, t, create, loadSkills, navigation, ...props }: H
     </div>
     <div hidden={currentTab !== 'catalog'}>
       {/* docs/1022：模板仅对技能目录面暴露（插件面沿用既有目录） */}
-      {kind === 'skill' ? <ProfileTemplatesSection t={t} /> : null}
-      <HubSetupSection kind={kind} t={t} {...props} />
+      {kind === 'skill' ? <ProfileTemplatesSection t={t} onRegistered={() => setSetupEpoch(value => value + 1)} /> : null}
+      <HubSetupSection key={`setup-${setupEpoch}`} kind={kind} t={t} {...props} />
     </div>
     {currentTab === 'installed' && (kind === 'skill' ? <SkillLibrary loadSkills={loadSkills} t={t} />
       : <><div className="dshHubToolbar">{selectedPlugin && <button type="button" className="dshHubSecondary" onClick={() => navigation?.select('installed')}>{t('catalogBackToAll')}</button>}</div>{PLUGIN_PRESENTATION_GROUPS.map(group => {
