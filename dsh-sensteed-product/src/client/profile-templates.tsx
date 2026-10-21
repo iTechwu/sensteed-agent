@@ -21,6 +21,7 @@ export function ProfileTemplatesSection({ disabled, t, onRegistered }: {
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
+  const [registered, setRegistered] = useState<HubInstantiateResult | null>(null)
 
   useEffect(() => {
     if (disabled) return
@@ -59,6 +60,9 @@ export function ProfileTemplatesSection({ disabled, t, onRegistered }: {
         event: 'PROFILE_TEMPLATE_INSTANTIATED',
         properties: { planCount: result.items.length, skippedCount: result.skippedItems.length },
       })
+      // 阻断项显式呈现，禁止静默跳过（docs/1022 §2/§6.3）
+      setRegistered(result.skippedItems.length > 0 ? result : null)
+      if (result.skippedItems.length > 0) trackHubTemplate({ event: 'PROFILE_TEMPLATE_BLOCKED_ITEM_SHOWN', properties: { itemCount: result.skippedItems.length } })
       setNotice(t('templateRegistered'))
       setName('')
       onRegistered?.(result)
@@ -82,7 +86,10 @@ export function ProfileTemplatesSection({ disabled, t, onRegistered }: {
               type="button"
               className="dshHubCardHeading"
               aria-expanded={selected === template.id}
-              onClick={() => { setSelected(selected === template.id ? null : template.id); setNotice('') }}
+              onClick={() => {
+                if (selected !== template.id) trackHubTemplate({ event: 'PROFILE_TEMPLATE_SELECTED', properties: { source: 'template' } })
+                setSelected(selected === template.id ? null : template.id); setNotice('')
+              }}
             >
               <span className="dshHubGlyph" aria-hidden="true">{template.displayName.slice(0, 1)}</span>
               <h3>{template.displayName}</h3>
@@ -112,6 +119,18 @@ export function ProfileTemplatesSection({ disabled, t, onRegistered }: {
           </li>
         ))}
       </ul>
+      {registered ? (
+        <div role="alert" className="dshHubSkipped">
+          <p>{t('templateSkippedTitle')}</p>
+          <ul>
+            {registered.skippedItems.map((skipped, index) => {
+              const item = skipped.item as { kind?: string; identity?: string; service?: string; domain?: string }
+              const symbol = item.kind === 'mcp.endpoint' ? `${item.service}/${item.domain}` : item.identity ?? ''
+              return <li key={`${symbol}-${index}`}><code>{symbol}</code> — {skipped.reason}</li>
+            })}
+          </ul>
+        </div>
+      ) : null}
       <p role="status" className="dshHubHint">{notice}</p>
     </section>
   )

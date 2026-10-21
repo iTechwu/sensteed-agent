@@ -62,7 +62,7 @@ describe('ProfileTemplatesSection', () => {
         expect(JSON.parse(String(init?.body))).toEqual({ templateId: template.id, profileName: '内容创作' })
         return jsonResponse({
           profileId: '55555555-5555-4555-8555-555555555555', templateId: template.id, revision: 3,
-          profileName: '内容创作', items: [], mcpEndpoints: [], skippedItems: [], entries: [],
+          profileName: '内容创作', items: [], mcpEndpoints: [], skippedItems: [{ item: { kind: 'plugin', identity: '@x/y', version: '1.0.0', enabled: true }, reason: '未发布到 stable 渠道' }], entries: [],
         })
       }
       return jsonResponse({ list: [template], total: 1 })
@@ -81,6 +81,12 @@ describe('ProfileTemplatesSection', () => {
     await act(async () => { host.querySelector<HTMLButtonElement>('.dshHubSecondary')!.click() })
     await flush()
     expect(host.textContent).toContain(t('templateRegistered'))
+    // 阻断项显式呈现 + 埋点：INSTANTIATED、BLOCKED_ITEM_SHOWN、SELECTED（展开时）
+    expect(host.textContent).toContain('未发布到 stable 渠道')
+    const bodies = fetcher.mock.calls.map(([, init]) => String(init?.body ?? ''))
+    expect(bodies.some(body => body.includes('PROFILE_TEMPLATE_SELECTED'))).toBe(true)
+    expect(bodies.some(body => body.includes('PROFILE_TEMPLATE_INSTANTIATED'))).toBe(true)
+    expect(bodies.some(body => body.includes('PROFILE_TEMPLATE_BLOCKED_ITEM_SHOWN'))).toBe(true)
     expect(onRegistered).toHaveBeenCalledOnce()
   })
 })
