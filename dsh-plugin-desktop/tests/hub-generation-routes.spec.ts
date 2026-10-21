@@ -5,7 +5,7 @@ import { handleHubGenerationIntent, type HubGenerationIntentService } from '../s
 
 async function endpoint(run: (url: string, origin: string) => Promise<void>, implementation = async (_input: unknown): Promise<unknown> => ({ state: 'STAGED' })) {
   const execute = vi.fn(implementation)
-  const service = { check: execute, instantiate: execute, preview: execute, execute, status: execute, restart: execute } satisfies HubGenerationIntentService
+  const service = { check: execute, templates: execute, instantiate: execute, preview: execute, execute, status: execute, restart: execute } satisfies HubGenerationIntentService
   let origin = ''
   const server = createServer((req: IncomingMessage, res: ServerResponse) => { void handleHubGenerationIntent('execute', req, res, origin, service) })
   server.listen(0, '127.0.0.1')

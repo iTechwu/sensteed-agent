@@ -55,6 +55,10 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
     const{channel}=z.strictObject({channel:z.enum(['stable','beta']).optional()}).parse(input),env=await environment(channel)
     return{channel:env.snapshot.channel,profileId:env.identity.profileId,activeGenerationDigest:env.activeGenerationDigest,entries:env.snapshot.entries,activeItems:env.installed.filter(i=>!i.userRemoved).map(i=>({kind:i.kind,itemId:i.itemId,enabled:i.enabled})),operation:summary(env.store)}
    },
+   async templates(input:unknown){
+    const{channel}=z.strictObject({channel:z.enum(['stable','beta']).optional()}).parse(input??{}),env=await environment(channel)
+    return await client.profileTemplates(env.context)
+   },
    async instantiate(input:unknown){
     await requireMutationAllowed()
     const{channel,templateId,profileName}=z.strictObject({channel:z.enum(['stable','beta']).optional(),templateId:z.uuid(),profileName:z.string().min(1).max(24)}).parse(input)

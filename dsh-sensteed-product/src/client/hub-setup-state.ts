@@ -20,7 +20,10 @@ export function hubInitialSelections(check:HubCheck):HubSelection[]{
   if(entry.required||entry.initialInstall&&!hubBlocked(entry))result.push({kind:entry.kind,itemId:entry.itemId,action:'install',enabled:true})
  }return result
 }
-export async function hubSetupRequest<T>(action:'check'|'preview'|'execute'|'status'|'restart',body:unknown,signal?:AbortSignal):Promise<T>{
+/** docs/1022 模板期望集视图（itemId 目录身份；mcp 为符号引用）。 */
+export interface HubTemplatePublic {id:string;key:string;revision:number;displayName:string;description:string;useCases:string[];iconKey:string;counts:{skills:number;plugins:number;mcpEndpoints:number};updatedAt:string}
+export interface HubInstantiateResult {profileId:string;templateId:string;revision:number;profileName:string;items:{kind:Exclude<HubKind,'mcp.endpoint'>;itemId:string;enabled:boolean}[];mcpEndpoints:{service:string;domain:string;version:string;enabled:boolean}[];skippedItems:{item:unknown;reason:string}[];entries:HubEntry[];operation?:HubOperation}
+export async function hubSetupRequest<T>(action:'check'|'templates'|'instantiate'|'preview'|'execute'|'status'|'restart',body:unknown,signal?:AbortSignal):Promise<T>{
  const response=await fetch(`/api/desktop/hub/generations/${action}`,{method:'POST',credentials:'same-origin',redirect:'error',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify(body),signal:signal?AbortSignal.any([signal,AbortSignal.timeout(action==='execute'?120000:30000)]):AbortSignal.timeout(action==='execute'?120000:30000)})
  if(!response.ok){
   if(response.status===503)throw Error('BASE_VERSION_NOT_ENABLED')
@@ -32,6 +35,16 @@ export async function hubSetupRequest<T>(action:'check'|'preview'|'execute'|'sta
  const value=await response.json() as T|{available:boolean;result?:T;reason?:string}
  if(value&&typeof value==='object'&&'available'in value){if(!value.available||!('result'in value))throw Error(value.reason??'BASE_VERSION_NOT_ENABLED');return value.result as T}
  return value as T
+}
+
+/** 公开模板列表（仅 published；L0 固定源，Host 校验响应）。 */
+export async function hubTemplatesRequest(signal?:AbortSignal):Promise<{list:HubTemplatePublic[];total:number}>{
+ const result=await hubSetupRequest<{list:HubTemplatePublic[];total:number}>('templates',{},signal)
+ return Array.isArray(result?.list)?result:Promise.reject(Error('HUB_INVALID_RESPONSE'))
+}
+/** 注册期望集：profileId 由 Host 绑定到当前 Profile 目录身份，物化走既有管线。 */
+export async function hubInstantiateRequest(input:{templateId:string;profileName:string},signal?:AbortSignal):Promise<HubInstantiateResult>{
+ return hubSetupRequest<HubInstantiateResult>('instantiate',{templateId:input.templateId,profileName:input.profileName.trim()},signal)
 }
 
 /** Host selects this Profile's verified channel; an older/malformed reply cannot silently mean stable. */

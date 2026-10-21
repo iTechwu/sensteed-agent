@@ -7,6 +7,7 @@ import type { DofeAccessSettings } from '../dofe-plugins.ts'
 import { pluginPresentations, PLUGIN_PRESENTATION_GROUPS } from '../plugin-presentations.ts'
 import { DofePluginCard } from './DofePluginItems.tsx'
 import { HubSetupSection } from './HubSetupSection.tsx'
+import { ProfileTemplatesSection } from './profile-templates.tsx'
 import type { DofeAccessLocaleKey } from './dofe-access.ts'
 import type { HubKind } from './hub-setup-state.ts'
 
@@ -73,7 +74,11 @@ function HubPageContent({ kind, t, create, loadSkills, navigation, ...props }: H
       <button type="button" aria-pressed={currentTab === 'catalog'} onClick={() => selectTab('catalog')}>{t('catalogTab')}</button>
       <button type="button" aria-pressed={currentTab === 'installed'} onClick={() => selectTab('installed')}>{t(secondary)}</button>
     </div>
-    <div hidden={currentTab !== 'catalog'}><HubSetupSection kind={kind} t={t} {...props} /></div>
+    <div hidden={currentTab !== 'catalog'}>
+      {/* docs/1022：模板仅对技能目录面暴露（插件面沿用既有目录） */}
+      {kind === 'skill' ? <ProfileTemplatesSection t={t} /> : null}
+      <HubSetupSection kind={kind} t={t} {...props} />
+    </div>
     {currentTab === 'installed' && (kind === 'skill' ? <SkillLibrary loadSkills={loadSkills} t={t} />
       : <><div className="dshHubToolbar">{selectedPlugin && <button type="button" className="dshHubSecondary" onClick={() => navigation?.select('installed')}>{t('catalogBackToAll')}</button>}</div>{PLUGIN_PRESENTATION_GROUPS.map(group => {
           const entries = builtInPlugins.filter(entry => entry.group === group.id)
