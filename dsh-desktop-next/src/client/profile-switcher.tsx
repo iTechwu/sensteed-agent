@@ -1,5 +1,5 @@
 /** Sidebar foot Profile switcher (docs/1022 §6.1). Intents only; storage and scoping stay in the Host. */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { MoreVertical, Plus } from 'lucide-react'
 import { trackHubSwitch } from './hub-analytics.ts'
 
@@ -23,6 +23,8 @@ export function ProfileSwitcher({ wide, t, openPlugins }: ProfileSwitcherProps) 
   const [profiles, setProfiles] = useState<ContentProfileView[] | undefined>(undefined)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
   const request = window.desktopNext?.contentProfiles?.request
 
   useEffect(() => {
@@ -37,6 +39,32 @@ export function ProfileSwitcher({ wide, t, openPlugins }: ProfileSwitcherProps) 
     }).catch(() => { if (!cancelled) setProfiles([]) })
     return () => { cancelled = true }
   }, [open, request])
+
+  // 键盘可达：打开即聚焦当前项；↑↓/Home/End 在菜单项间移动，Esc 关闭并归还焦点。
+  useEffect(() => {
+    if (!open || !menuRef.current) return
+    const items = menuRef.current.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')
+    const target = [...items].find(item => item.getAttribute('aria-current') === 'true') ?? items[0]
+    target?.focus()
+  }, [open, profiles])
+  const onMenuKeyDown = (event: React.KeyboardEvent): void => {
+    if (event.key === 'Escape') {
+      event.stopPropagation()
+      setOpen(false)
+      triggerRef.current?.focus()
+      return
+    }
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp' && event.key !== 'Home' && event.key !== 'End') return
+    event.preventDefault()
+    const items = [...menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? []]
+    if (!items.length) return
+    const index = items.findIndex(item => item === document.activeElement)
+    const next = event.key === 'ArrowDown' ? items[(index + 1 + items.length) % items.length]
+      : event.key === 'ArrowUp' ? items[(index - 1 + items.length) % items.length]
+      : event.key === 'Home' ? items[0]
+      : items[items.length - 1]
+    next?.focus()
+  }
 
   if (!request) return null
   const glyph = (profile: ContentProfileView | undefined): string => (profile ? profile.name.slice(0, 1) : '·')
@@ -58,6 +86,7 @@ export function ProfileSwitcher({ wide, t, openPlugins }: ProfileSwitcherProps) 
   return (
     <div style={{ position: 'relative', display: 'flex' }}>
       <button
+        ref={triggerRef}
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
@@ -69,7 +98,12 @@ export function ProfileSwitcher({ wide, t, openPlugins }: ProfileSwitcherProps) 
         {wide || !current ? <MoreVertical size={16} aria-hidden="true" /> : <span aria-hidden="true" style={{ fontSize: 12, fontWeight: 600 }}>{glyph(current)}</span>}
       </button>
       {open ? (
-        <div role="menu" aria-label={t('profilesLabel')} style={{
+        <div
+          ref={menuRef}
+          role="menu"
+          onKeyDown={onMenuKeyDown}
+          aria-label={t('profilesLabel')}
+          style={{
           position: 'absolute', bottom: 'calc(100% + 6px)', left: 0, zIndex: 40, minWidth: wide ? 240 : 200,
           background: 'var(--background, #fff)', border: '1px solid var(--border, #e5e7eb)', borderRadius: 10,
           boxShadow: '0 8px 24px rgb(0 0 0 / 12%)', padding: 6,

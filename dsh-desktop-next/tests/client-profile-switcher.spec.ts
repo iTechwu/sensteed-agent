@@ -59,6 +59,20 @@ describe('ProfileSwitcher', () => {
     expect(host.textContent).toContain('已切换')
   })
 
+  it('focuses the current item on open, moves with arrows, and closes on Escape', async () => {
+    const request = bridge()
+    const host = await mount()
+    await act(async () => { host.querySelector<HTMLButtonElement>('button[aria-haspopup="menu"]')!.click() })
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 10)) })
+    expect(document.activeElement?.getAttribute('aria-current')).toBe('true')
+    const menu = host.querySelector('[role="menu"]')!
+    await act(async () => { menu.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })) })
+    expect(document.activeElement?.textContent).toContain('数据分析')
+    await act(async () => { menu.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
+    expect(host.querySelector('[role="menu"]')).toBeNull()
+    expect(document.activeElement?.getAttribute('aria-haspopup')).toBe('menu')
+  })
+
   it('keeps the current profile without a confirm when reselected', async () => {
     const request = bridge()
     const host = await mount()
