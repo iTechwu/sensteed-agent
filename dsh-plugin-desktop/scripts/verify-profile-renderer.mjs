@@ -46,10 +46,10 @@ export async function verifyProfileRenderer({ url, cookie, rendererHeader, twoLe
       assert.equal(await rail.locator('[data-slot="sidebar.settings"]').count(), 1)
       assert.equal(await rail.locator('[data-slot="sidebar.workspaces"]').count(), 0)
       // This isolated Host intentionally retains its login gate; exercise shell actions directly.
-      await rail.locator('.sensteedModuleFoot .sensteedModuleButton').evaluate(button => button.click())
+      await rail.locator('.sensteedModuleFoot .sensteedModuleButton').last().evaluate(button => button.click())
       await page.waitForFunction(() => document.querySelector('.sensteedAgentSidebarSurface')?.getBoundingClientRect().width === 0)
       assert.equal(await rail.evaluate(element => element.getBoundingClientRect().width), 52)
-      await rail.locator('.sensteedModuleFoot .sensteedModuleButton').evaluate(button => button.click())
+      await rail.locator('.sensteedModuleFoot .sensteedModuleButton').last().evaluate(button => button.click())
       await page.waitForFunction(() => (document.querySelector('.sensteedAgentSidebarSurface')?.getBoundingClientRect().width ?? 0) >= 264)
       await rail.locator('[data-slot="sidebar.settings"] button').first().evaluate(button => button.click())
       const dialog = page.locator('[data-shortcut-modal="settings"]')

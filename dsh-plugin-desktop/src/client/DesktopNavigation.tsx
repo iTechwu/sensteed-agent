@@ -1,13 +1,15 @@
 /** Desktop composition: persistent modules beside the existing context column. */
 import { createContext, createElement, useContext, useCallback, useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Home, PanelLeft, SquarePen, Database, Gauge, ShieldCheck, Clock, Blocks, Sparkles } from 'lucide-react'
+import { ArrowDownToLine, Home, LoaderCircle, PanelLeft, SquarePen, Database, Gauge, ShieldCheck, Clock, Blocks, Sparkles } from 'lucide-react'
 import { Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsRenderSlots, SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { SidebarRootComponentProps } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from './business-navigation-contract.ts'
 import type { DesktopClientPlatform } from './environment.ts'
+import type { DesktopSettingsApi } from './desktop-settings-api.ts'
+import { useDesktopUpdateRail } from './desktop-update-rail.ts'
 import { sidebarBrandMarkDataUrl } from './generated-brand-assets.ts'
 
 const RailTarget = createContext<HTMLElement | null>(null)
@@ -27,11 +29,11 @@ export function DesktopNavigationFrame({ Frame, frameProps, platform }: {
   </RailTarget.Provider>
 }
 
-function RailButton({ label, active, onClick, children, hint = true }: {
-  label: string; active?: boolean; onClick: () => void; children: ReactNode; hint?: boolean
+function RailButton({ label, active, busy, onClick, children, hint = true }: {
+  label: string; active?: boolean; busy?: boolean; onClick: () => void; children: ReactNode; hint?: boolean
 }) {
   return <PluginRailSeat hintEnabled={hint}>
-    <button type="button" className="sensteedModuleButton" aria-label={label}
+    <button type="button" className="sensteedModuleButton" aria-label={label} data-busy={busy || undefined}
       aria-current={active ? 'page' : undefined} onClick={onClick}>{children}</button>
   </PluginRailSeat>
 }
@@ -77,9 +79,10 @@ function PluginRailSeat({ children, beforeNavigate, hintEnabled = true, icon, ac
 }
 
 /** Keep the session browser mounted while a module owns the main panel. */
-export function DesktopNavigationSidebar({ collapsed, startSession, toggleSidebar, selectPanel,
-  usePanels, usePanelInfo, useExtensions, renderSlot, t }: Omit<SidebarRootComponentProps, 'selectPanel' | 'renderSlot'> & PropsRenderSlots<'sidebar.brand.mark' | 'sidebar.brand.name' | 'sidebar.toggle.badge' | 'sidebar.panellist' | 'sidebar.workspaces' | 'sidebar.settings' | 'sidebar.footer.action' | 'desktop.navigation.context'> & { selectPanel: (id: MainPanelId | null) => void; useExtensions: SnapshotSelectorHook<readonly string[]> }) {
+export function DesktopNavigationSidebar({ collapsed, startSession, toggleSidebar, selectPanel, api,
+  usePanels, usePanelInfo, useExtensions, renderSlot, t }: Omit<SidebarRootComponentProps, 'selectPanel' | 'renderSlot'> & PropsRenderSlots<'sidebar.brand.mark' | 'sidebar.brand.name' | 'sidebar.toggle.badge' | 'sidebar.panellist' | 'sidebar.workspaces' | 'sidebar.settings' | 'sidebar.footer.action' | 'desktop.navigation.context'> & { selectPanel: (id: MainPanelId | null) => void; useExtensions: SnapshotSelectorHook<readonly string[]>; api?: DesktopSettingsApi }) {
   const target = useContext(RailTarget)
+  const update = useDesktopUpdateRail(api)
   const [preview, setPreview] = useState<string | null>(null)
   const previewTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const openPreview = (id?: string) => { clearTimeout(previewTimer.current); if (collapsed && id) setPreview(id) }
@@ -113,6 +116,9 @@ export function DesktopNavigationSidebar({ collapsed, startSession, toggleSideba
   const shownLabel = preview ? previewHome ? homeLabel : panels.find(p => p.id === preview)?.label ?? businessLabels[preview] ?? contextLabel : contextLabel
   const contextTarget = home ? (zh ? '项目与聊天' : 'projects and chats') : `${contextLabel}${zh ? '导航' : ' navigation'}`
   const toggleLabel = collapsed ? (zh ? `展开${contextTarget}` : `Expand ${contextTarget}`) : (zh ? `收起${contextTarget}` : `Collapse ${contextTarget}`)
+  const updateLabel = update.busy ? (zh ? '正在下载更新…' : 'Downloading update…')
+    : update.latestVersion ? (zh ? `下载更新 v${update.latestVersion}` : `Download update v${update.latestVersion}`)
+    : (zh ? '下载更新' : 'Download update')
   const extensionActive = (id: string) => id === active || id === 'dofe-sensteed-finance' && active === 'sensteed-finance'
   const ordered = [...panels].sort((a, b) => {
     const rank = (id: string) => id === 'schedules' ? 0 : id === 'plugins' ? 1 : id === 'sensteed-skill-manager' ? 2 : 3
@@ -139,6 +145,10 @@ export function DesktopNavigationSidebar({ collapsed, startSession, toggleSideba
       </div>
     </div>
     <div className="sensteedModuleFoot">
+      {update.available && <RailButton label={updateLabel} busy={update.busy} onClick={() => { void update.start() }}>
+        {update.busy ? <LoaderCircle size={19} className="sensteedUpdateSpin" /> : <ArrowDownToLine size={19} />}
+        <span className="sensteedUpdateDot" aria-hidden="true" />
+      </RailButton>}
       <RailButton label={toggleLabel} onClick={toggleSidebar}><PanelLeft size={19} /></RailButton>
       <PluginRailSeat>{renderSlot('sidebar.settings', { wide: false })}</PluginRailSeat>
     </div>

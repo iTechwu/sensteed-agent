@@ -37,6 +37,11 @@ export function installDesktopNavigationStyles(): () => void {
 .sensteedKnowledgeModule { margin-bottom:8px; }
 .sensteedModuleExtensions:not(:has(button)) { display:none; }
 .sensteedModuleExtensions { margin-top:16px; padding-top:12px; border-top:1px solid var(--dsw-alias-border-l1); }
+.sensteedModuleButton[data-busy] { pointer-events:none; }
+.sensteedUpdateDot { position:absolute; top:6px; right:6px; width:8px; height:8px; border-radius:50%; background:var(--dsw-alias-brand-primary); box-shadow:0 0 0 2px var(--dsw-alias-bg-layer-1); }
+.sensteedUpdateSpin { animation:sensteedUpdateSpin 900ms linear infinite; }
+@keyframes sensteedUpdateSpin { to { transform:rotate(360deg); } }
+@media(prefers-reduced-motion:reduce) { .sensteedUpdateSpin { animation:none; } }
 body .sensteedNavigationFrame .sensteedModuleRail [data-slot="sidebar.footer.action"] { max-height:none; overflow:visible; scrollbar-gutter:auto; width:40px; margin:0; padding:0; gap:8px; }
 body .sensteedNavigationFrame .sensteedModuleRail [data-slot="sidebar.footer.action"] button { box-sizing:border-box; width:40px; min-width:0; height:40px; margin:0; padding:0; justify-content:center; gap:0; border-radius:10px; }
 body .sensteedNavigationFrame .sensteedModuleRail [data-slot="sidebar.footer.action"] button::after { content:none !important; }

@@ -10,11 +10,12 @@ import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SidebarPanelMetadata } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { ScheduleContext, type ScheduleContextSource } from './ScheduleContext.tsx'
+import type { DesktopSettingsApi } from './desktop-settings-api.ts'
 import { DesktopNavigationSidebar } from './DesktopNavigation.tsx'
 import { installDesktopNavigationStyles } from './desktop-navigation-styles.ts'
 
 /** Preserve all dynamic panel registrations and plugin-owned permission gates. */
-export function applyDesktopNavigation(ctx: Context): void {
+export function applyDesktopNavigation(ctx: Context, deps?: { api?: DesktopSettingsApi }): void {
   // Custom profiles retaining upstream ownership keep their complete sidebar.
   if (ctx.slots.entries('sidebar').length > 0) return
   ctx.effect(installDesktopNavigationStyles, 'desktop: navigation styles')
@@ -39,6 +40,7 @@ export function applyDesktopNavigation(ctx: Context): void {
       'sidebar.footer.action': { kind: 'list', scope: 'root' },
     },
     inject: () => ({
+      api: deps?.api,
       startSession: () => { ctx.uiWorkspace.startSession() },
       toggleSidebar: () => { ctx.layout.toggleSidebar() },
       selectPanel: (id: MainPanelId | null) => { ctx.layout.selectPanel(id) },

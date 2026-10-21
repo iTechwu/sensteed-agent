@@ -175,7 +175,7 @@ export function apply(ctx: ClientContext): void {
   if (environment.mode === 'advanced') applyAdvancedShell(ctx, environment)
   if (environment.mode === 'extended') applyExtendedShell(ctx, environment, desktopSettings)
   if (environment.mode !== 'compatibility') ctx.inject(['layout', 'uiWorkspace', 'shortcuts'], scope => {
-    applyDesktopNavigation(scope)
+    applyDesktopNavigation(scope, { api: desktopSettings.api })
   })
   // Scoped rather than module-level on purpose: the shells above provide
   // `layout`, and upstream's `uiWorkspace` injects it. Naming `uiWorkspace` in

@@ -99,6 +99,38 @@ describe('desktop navigation composition', () => {
       const nav = container.querySelector('nav')!
       expect([...nav.querySelectorAll('button')].map(button => button.getAttribute('aria-label'))).toEqual(['主页', '知识与记忆', '定时任务', '插件'])
       expect(container.querySelector('[data-slot="sidebar.settings"]')).not.toBeNull()
+      expect(container.querySelectorAll('.sensteedModuleFoot .sensteedModuleButton')).toHaveLength(1)
+    } finally { await act(async () => root.unmount()); container.remove(); vi.unstubAllGlobals() }
+  })
+
+  it('offers the available update in the foot and starts the install flow on click', async () => {
+    const { DesktopNavigationFrame, DesktopNavigationSidebar } = await import('../src/client/DesktopNavigation.tsx')
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+    const container = document.createElement('div'); document.body.append(container)
+    const root = createRoot(container)
+    const checkForUpdates = vi.fn(async () => {})
+    const inspectUpdates = vi.fn(async () => ({
+      status: 'update-available', channel: 'stable', latestVersion: '9.9.9', checkedAt: '2026-10-21T00:00:00Z',
+    }))
+    const Component = (props: Record<string, unknown>) => createElement(DesktopNavigationSidebar as ComponentType<Record<string, unknown>>, {
+      ...props, collapsed: false, width: 0, toggleSidebar: vi.fn(), startSession: vi.fn(), selectPanel: vi.fn(),
+      api: { checkForUpdates, inspectUpdates },
+      useExtensions: (select: (ids: readonly string[]) => unknown) => select([]),
+      usePanelInfo: (select: (value: { activePanelId: string | null }) => unknown) => select({ activePanelId: null }),
+      usePanels: (select: (value: unknown) => unknown) => select([]),
+      t: (key: string) => key === 'session.new' ? '新聊天' : key,
+      renderSlot: () => null,
+    })
+    try {
+      await act(async () => root.render(createElement(DesktopNavigationFrame, { Frame: Component, frameProps: {}, platform: 'linux' })))
+      await act(async () => {})
+      const foot = container.querySelector('.sensteedModuleFoot')!
+      const update = foot.querySelector<HTMLButtonElement>('[aria-label="下载更新 v9.9.9"]')
+      expect(update).not.toBeNull()
+      expect(foot.firstElementChild!.contains(update!)).toBe(true)
+      expect(container.querySelectorAll('.sensteedModuleFoot .sensteedModuleButton')).toHaveLength(2)
+      await act(async () => { update!.click() })
+      expect(checkForUpdates).toHaveBeenCalledOnce()
     } finally { await act(async () => root.unmount()); container.remove(); vi.unstubAllGlobals() }
   })
 })
