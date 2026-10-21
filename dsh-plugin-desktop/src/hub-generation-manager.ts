@@ -4,7 +4,7 @@ import{inspectSavedHubPlan,inspectSavedHubInventory}from'./hub-saved-plan.ts'
 import{verifyHubBootAuthorization}from'./hub-boot-authorization.ts'
 import{randomUUID}from'node:crypto'
 import type{Context}from'@deepseek-ai/cordis'
-import{HubHostError,type HubHostClient}from'./hub-host-client.ts'
+import{HubHostError,type HubHostClient,type HubProfileTemplatePublic}from'./hub-host-client.ts'
 import{loadHubOfflineBoot,saveHubOfflineBoot,clearHubOfflineBoot}from'./hub-offline-boot.ts'
 import{resolveHubHostIdentity}from'./hub-host-identity.ts'
 import{HubGenerationStore}from'./hub-generation-store.ts'
@@ -57,7 +57,15 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
    },
    async templates(input:unknown){
     const{channel}=z.strictObject({channel:z.enum(['stable','beta']).optional()}).parse(input??{}),env=await environment(channel)
-    return await client.profileTemplates(env.context)
+    // 分页拉全量（上限 10 页防御）：模板选择器不做服务端翻页
+    const list:HubProfileTemplatePublic[]=[]
+    let total=0
+    for(let page=1;page<=10;page+=1){
+      const result=await client.profileTemplates(env.context,page)
+      total=result.total;list.push(...result.list)
+      if(list.length>=total||result.list.length===0)break
+    }
+    return{list,total}
    },
    async instantiate(input:unknown){
     await requireMutationAllowed()
