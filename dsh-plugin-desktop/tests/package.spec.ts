@@ -53,6 +53,7 @@ const manifest = JSON.parse(readFileSync(new URL('package.json', packageRoot), '
       signIgnore?: unknown
       target?: unknown
       x64ArchFiles?: unknown
+      artifactName?: unknown
     }
     win?: { asar?: unknown; compression?: unknown; extraResources?: unknown; icon?: unknown; asarUnpack?: unknown; target?: unknown; artifactName?: unknown }
     nsis?: Record<string, unknown>
@@ -94,6 +95,7 @@ const builderConfig = JSON.parse(readFileSync(new URL('electron-builder.json', p
     signIgnore?: unknown
     target?: unknown
     x64ArchFiles?: unknown
+    artifactName?: unknown
   }
   win?: { icon?: unknown; files?: unknown; target?: unknown; artifactName?: unknown; extraResources?: unknown }
   nsis?: Record<string, unknown>
@@ -953,6 +955,7 @@ describe('published package surface', () => {
     ])
     expect(builderConfig?.linux?.artifactName).toBe(`${String(activeBrandChannel.artifactPrefix)}-\${version}-\${arch}.\${ext}`)
     expect(builderConfig?.linux?.executableName).toBe(String(activeBrandChannel.artifactPrefix).toLowerCase())
+    expect(builderConfig?.mac?.artifactName).toBe(`${String(activeBrandChannel.artifactPrefix)}-\${version}-\${arch}.\${ext}`)
     expect(builderConfig?.deb).toEqual({
       packageName: String(activeBrandChannel.artifactPrefix).toLowerCase(),
       packageCategory: 'devel',

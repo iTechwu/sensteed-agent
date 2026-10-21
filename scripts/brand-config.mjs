@@ -282,6 +282,10 @@ export function renderBuilderConfig(config, base) {
       artifactName: `${active.artifactPrefix}-\${version}-\${arch}.\${ext}`,
       executableName: linuxStem,
     },
+    mac: {
+      ...base.mac,
+      artifactName: `${active.artifactPrefix}-\${version}-\${arch}.\${ext}`,
+    },
     deb: {
       ...base.deb,
       packageName: linuxStem,

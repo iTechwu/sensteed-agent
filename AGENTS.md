@@ -42,9 +42,9 @@ This repository owns the desktop product around an unmodified DeepSeek Harness c
 - 版本号与 tag 一致：以 DeepSeek Harness 的 release 版本为基准（与 `upstream.json` 的 `sourceVersion` 一致），追加 `-beta.` 与打包发起时刻的时间戳，时间戳格式为 `YYYYMMDDHHmm`（如 `202610120940`）。
 - 示例：DeepSeek release 为 `0.2.1-alpha.2`、2026-10-12 09:40 发起打包 → tag 与 `dsh-plugin-desktop/package.json` 的 `version` 均为 `0.2.1-alpha.2-beta.202610120940`。
 - 顺序：合并 `dev` → `main`；在 `main` 上更新 `version` 字段（electron-builder 以 `${version}` 生成产物文件名）并提交；打 tag（名称与 `version` 完全一致）；push `main` 与 tag 到 `origin`；再对 `main` 发起打包。
-- 可执行入口：`corepack pnpm release:prepare` 预览，`corepack pnpm release:prepare --execute` 从干净且已 push 的 dev 执行上述流程；`release-source.json` 将本次 Harness commit 固定到版本提交。CI 的普通 dev/main push 只跑检查，精确版本 tag 自动产出未签名候选包；在同一 tagged main 上手动选择 `release` 才走签名发布。所有打包入口由 `release:verify` 同源门禁拦截未打 tag 或版本漂移的源码。
+- 可执行入口：`corepack pnpm release:prepare` 预览，`corepack pnpm release:prepare --execute` 从干净且已 push 的 dev 执行上述流程；`release-source.json` 将本次 Harness commit 固定到版本提交。CI 的普通 dev/main push 只跑检查，精确版本 tag 自动产出未签名候选包，并在 check 与全部平台打包 job 通过后自动把安装包与未签名清单发布到 TOS（`publish-tos`）。在同一 tagged main 上手动 dispatch `publish_kind=release` 才走签名发布（签名公证清单 + `mac-release` 产物目录）。所有打包入口由 `release:verify` 同源门禁拦截未打 tag 或版本漂移的源码。
 - 内置内容先在 dev 刷新并提交；所有 tagged 打包仅离线校验，不得在 tag 后重新联网刷新。首次由历史 2.x 桌面编号迁移到 Harness 0.x 编号需手动安装，正常 SemVer 比较不把降级当作自动更新。
-- 签名发布路径只做离线校验，发布内容必须等于 tag 指向的提交内容。
+- TOS 发布与签名发布路径都只做离线校验，发布内容必须等于 tag 指向的提交内容；产物命名必须符合 brand 配置的 filename-safe `artifactPrefix`（各平台安装包不得回退到中文 `productName` 默认命名）。
 
 ## 内置 Skills 与 Plugins (Built-in skills and plugins)
 
