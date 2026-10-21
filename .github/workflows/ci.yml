@@ -372,8 +372,8 @@ jobs:
         with:
           name: desktop-windows
           path: |
-            dsh-plugin-desktop/dist/*-Agent-*-Setup.exe
-            dsh-plugin-desktop/dist/*-Agent-*-Portable.zip
+            dsh-plugin-desktop/dist/*-Setup.exe
+            dsh-plugin-desktop/dist/*-Portable.zip
           if-no-files-found: error
           retention-days: 1
           compression-level: 0
@@ -457,8 +457,8 @@ jobs:
         with:
           name: ${{ inputs.brand || 'sensteed' }}-agent-linux-x64
           path: |
-            dsh-plugin-desktop/dist/*-Agent-Beta-*.AppImage
-            dsh-plugin-desktop/dist/*-Agent-Beta-*.deb
+            dsh-plugin-desktop/dist/*.AppImage
+            dsh-plugin-desktop/dist/*.deb
           if-no-files-found: error
           retention-days: 7
 
