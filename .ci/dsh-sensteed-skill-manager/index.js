@@ -1,3 +1,4 @@
+import { callGenerationManager } from './hub-generation-bridge.js'
 import { execFile } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { lstatSync } from 'node:fs'
@@ -540,6 +541,10 @@ export function apply(ctx, overrides = {}) {
       const requestPath = req.url?.split('?', 1)[0]
       const sharedName = safeRouteName(requestPath)
       try {
+        const generationMethod = requestPath.startsWith(`${ROUTE}/hub/generation/`) ? requestPath.slice(`${ROUTE}/hub/generation/`.length) : null
+        if (generationMethod && ['check','preview','execute','status'].includes(generationMethod) && req.method === 'POST') {
+          return respond(res,200,await callGenerationManager(ctx,generationMethod,await readJsonBody(req)))
+        }
         if (requestPath.startsWith(`${ROUTE}/hub/skills/`)) {
           try {
             if (req.method === 'POST' && requestPath === `${ROUTE}/hub/skills/preview`) return respond(res,200,await installer.preview(await readJsonBody(req)))
