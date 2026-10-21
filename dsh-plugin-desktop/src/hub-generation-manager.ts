@@ -55,6 +55,15 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
     const{channel}=z.strictObject({channel:z.enum(['stable','beta']).optional()}).parse(input),env=await environment(channel)
     return{channel:env.snapshot.channel,profileId:env.identity.profileId,activeGenerationDigest:env.activeGenerationDigest,entries:env.snapshot.entries,activeItems:env.installed.filter(i=>!i.userRemoved).map(i=>({kind:i.kind,itemId:i.itemId,enabled:i.enabled})),operation:summary(env.store)}
    },
+   async instantiate(input:unknown){
+    await requireMutationAllowed()
+    const{channel,templateId,profileName}=z.strictObject({channel:z.enum(['stable','beta']).optional(),templateId:z.uuid(),profileName:z.string().min(1).max(24)}).parse(input)
+    const env=await environment(channel)
+    // docs/1022 方案 B：注册期望集（profileId=本端 Profile 目录身份），物化走既有
+    // preview→execute→restart 意图管线（快照已被期望集裁剪）
+    const result=await client.instantiateProfileTemplate(env.context,{templateId,profileName,deviceId:env.identity.deviceId,profileId:env.identity.profileId})
+    return{profileId:env.identity.profileId,templateId:result.templateId,revision:result.revision,profileName:result.profileName,items:result.items,mcpEndpoints:result.mcpEndpoints,skippedItems:result.skippedItems,entries:env.snapshot.entries,operation:summary(env.store)}
+   },
    async preview(input:unknown){
     await requireMutationAllowed()
     const{channel,requested}=z.strictObject({channel:z.enum(['stable','beta']),requested:requestedSchema}).parse(input),env=await environment(channel,true)
