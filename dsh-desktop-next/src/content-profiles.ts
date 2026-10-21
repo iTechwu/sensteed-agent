@@ -5,8 +5,8 @@ import { join } from 'node:path'
 import { atomicJson } from './private-files.ts'
 
 export type ContentProfileItem =
-  | { kind: 'skill'; identity: string; version: string; enabled: boolean; releaseId: string }
-  | { kind: 'plugin'; identity: string; version: string; enabled: boolean; releaseId: string }
+  | { kind: 'skill'; itemId: string; enabled: boolean }
+  | { kind: 'plugin'; itemId: string; enabled: boolean }
   | { kind: 'mcp.endpoint'; service: string; domain: string; version: string; enabled: boolean }
 
 export interface ContentProfileSummary {
@@ -35,16 +35,11 @@ export interface ContentProfilesState {
   profiles: ContentProfile[]
 }
 
+/** 与 instantiateProfileTemplate 返回的字段形态一致（itemId 目录身份视图）。 */
 export interface ContentProfileInstantiateInput {
   readonly templateId: string
   readonly templateRevision: number
-  readonly plans: readonly {
-    readonly kind: 'skill' | 'plugin'
-    readonly symbol: string
-    readonly version: string
-    readonly releaseId: string
-    readonly enabled: boolean
-  }[]
+  readonly items: readonly { readonly kind: 'skill' | 'plugin'; readonly itemId: string; readonly enabled: boolean }[]
   readonly mcpEndpoints: readonly {
     readonly service: string
     readonly domain: string
@@ -110,10 +105,7 @@ export class ContentProfileStore {
   create(name: string, input: ContentProfileInstantiateInput): ContentProfile {
     const state = this.load()
     const items: ContentProfileItem[] = [
-      ...input.plans.map((plan) => ({
-        kind: plan.kind, identity: plan.symbol, version: plan.version,
-        enabled: plan.enabled, releaseId: plan.releaseId,
-      })),
+      ...input.items.map((item) => ({ kind: item.kind, itemId: item.itemId, enabled: item.enabled })),
       ...input.mcpEndpoints.map((endpoint) => ({
         kind: 'mcp.endpoint' as const, service: endpoint.service, domain: endpoint.domain,
         version: endpoint.version, enabled: endpoint.enabled,

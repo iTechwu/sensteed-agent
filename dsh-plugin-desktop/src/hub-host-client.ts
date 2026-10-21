@@ -44,15 +44,13 @@ export interface HubProfileTemplatePreview {
   }[]
 }
 export interface HubProfileTemplateInstantiateResult {
+  readonly profileId: string
   readonly templateId: string
   readonly revision: number
   readonly profileName: string
-  readonly plans: readonly {
+  readonly items: readonly {
     readonly kind: 'skill' | 'plugin'
-    readonly symbol: string
-    readonly version: string
-    readonly releaseId: string
-    readonly planId: string
+    readonly itemId: string
     readonly enabled: boolean
   }[]
   readonly mcpEndpoints: readonly {
@@ -268,35 +266,35 @@ export class HubHostClient {
       })),
     }
   }
-  /** 实例化：Hub 逐项创建既有安装计划；返回的 planId 走既有 authorize/consume 管线。 */
+  /**
+   * 实例化 = 注册 Profile 期望集（docs/1022 方案 B）：Hub 复核模板冻结集并落目录
+   * 身份视图；物化由本端走既有 sync/resolve → generations prepare → authorize/consume
+   * 管线，不新增旁路计划。profileId 是本端 Profile 目录身份（generation identity）。
+   */
   async instantiateProfileTemplate(context: HubHostContext, input: {
     readonly templateId: string
     readonly profileName: string
     readonly deviceId: string
-    readonly target: { readonly hostScopeId: string; readonly profileId: string }
+    readonly profileId: string
   }): Promise<HubProfileTemplateInstantiateResult> {
     this.assertCurrent(context)
-    if (!UUID.test(input.templateId) || !UUID.test(input.deviceId)) fail('HUB_INVALID_REQUEST')
+    if (!UUID.test(input.templateId) || !UUID.test(input.deviceId) || !UUID.test(input.profileId)) fail('HUB_INVALID_REQUEST')
     const profileName = input.profileName.trim()
     if (!profileName || profileName.length > 24) fail('HUB_INVALID_REQUEST')
-    const target = input.target
-    if (typeof target?.hostScopeId !== 'string' || target.hostScopeId.length < 1 || target.hostScopeId.length > 128
-      || typeof target.profileId !== 'string' || target.profileId.length < 1 || target.profileId.length > 128) fail('HUB_INVALID_REQUEST')
     const result = await this.request(`/skillhub/v1/profile-templates/${input.templateId}/instantiate`, context.workspaceId, {
-      templateId: input.templateId, profileName, deviceId: input.deviceId, target,
+      templateId: input.templateId, profileName, deviceId: input.deviceId, profileId: input.profileId,
     })
     this.assertCurrent(context)
-    const plans = result.data.plans, mcpEndpoints = result.data.mcpEndpoints, skippedItems = result.data.skippedItems
-    if (result.data.templateId !== input.templateId || result.data.profileName !== profileName
+    const items = result.data.items, mcpEndpoints = result.data.mcpEndpoints, skippedItems = result.data.skippedItems
+    if (result.data.templateId !== input.templateId || result.data.profileId !== input.profileId
+      || result.data.profileName !== profileName
       || typeof result.data.revision !== 'number' || !Number.isSafeInteger(result.data.revision) || result.data.revision < 1
-      || !Array.isArray(plans) || plans.length > 64 || !Array.isArray(mcpEndpoints) || mcpEndpoints.length > 64
+      || !Array.isArray(items) || items.length > 64 || !Array.isArray(mcpEndpoints) || mcpEndpoints.length > 64
       || !Array.isArray(skippedItems) || skippedItems.length > 64) fail('HUB_INVALID_RESPONSE')
-    for (const row of plans) {
-      const plan = object(row)
-      if ((plan.kind !== 'skill' && plan.kind !== 'plugin') || typeof plan.symbol !== 'string'
-        || plan.symbol.length < 1 || plan.symbol.length > 255 || typeof plan.version !== 'string' || !EXACT_VERSION.test(plan.version)
-        || typeof plan.releaseId !== 'string' || !UUID.test(plan.releaseId)
-        || typeof plan.planId !== 'string' || !UUID.test(plan.planId) || typeof plan.enabled !== 'boolean') fail('HUB_INVALID_RESPONSE')
+    for (const row of items) {
+      const item = object(row)
+      if ((item.kind !== 'skill' && item.kind !== 'plugin') || typeof item.itemId !== 'string'
+        || !UUID.test(item.itemId) || typeof item.enabled !== 'boolean') fail('HUB_INVALID_RESPONSE')
     }
     for (const row of mcpEndpoints) {
       const endpoint = object(row)
@@ -311,8 +309,8 @@ export class HubHostClient {
       templateItem(skipped.item)
     }
     return Object.freeze({
-      templateId: input.templateId, revision: result.data.revision, profileName,
-      plans: Object.freeze(plans as HubProfileTemplateInstantiateResult['plans']),
+      profileId: input.profileId, templateId: input.templateId, revision: result.data.revision, profileName,
+      items: Object.freeze(items as HubProfileTemplateInstantiateResult['items']),
       mcpEndpoints: Object.freeze(mcpEndpoints as HubProfileTemplateInstantiateResult['mcpEndpoints']),
       skippedItems: Object.freeze(skippedItems as HubProfileTemplateInstantiateResult['skippedItems']),
     })

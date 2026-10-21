@@ -16,9 +16,9 @@ function store(): ContentProfileStore {
 const templateInput: ContentProfileInstantiateInput = {
   templateId: '11111111-1111-4111-8111-111111111111',
   templateRevision: 3,
-  plans: [
-    { kind: 'skill', symbol: 'writing-pro', version: '1.2.3', releaseId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', enabled: true },
-    { kind: 'plugin', symbol: '@x/y', version: '1.0.0', releaseId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', enabled: false },
+  items: [
+    { kind: 'skill', itemId: '66666666-6666-4666-8666-666666666666', enabled: true },
+    { kind: 'plugin', itemId: '77777777-7777-4777-8777-777777777777', enabled: false },
   ],
   mcpEndpoints: [{ service: 'knowledge', domain: 'knowledge', version: '1.0.0', enabled: true }],
   skippedItems: [{ item: { kind: 'plugin', identity: '@x/z', version: '1.0.0', enabled: true }, reason: '未发布到 stable 渠道' }],
@@ -40,7 +40,7 @@ describe('content profile store', () => {
   it('keeps born state frozen when the same template later changes upstream', () => {
     const profiles = store()
     const born = profiles.create('内容创作', templateInput)
-    const changed = profiles.create('另一模板', { ...templateInput, templateRevision: 9, plans: [] })
+    const changed = profiles.create('另一模板', { ...templateInput, templateRevision: 9, items: [] })
     expect(born.items).toHaveLength(3)
     expect(changed.items).toHaveLength(1)
     expect(profiles.get(born.id)?.items).toHaveLength(3)

@@ -109,7 +109,8 @@ describe('Profile template endpoints (docs/1022 A1)', () => {
   const publicList = { list: [{ id: templateId, key: 'content-creation', revision: 3, displayName: '内容创作', description: '一句话介绍', useCases: ['写作', '翻译'], iconKey: 'pen', counts: { skills: 2, plugins: 1, mcpEndpoints: 1 }, updatedAt: '2026-10-21T00:00:00.000Z' }], total: 1, page: 1, limit: 50 }
   const mcpItem = { kind: 'mcp.endpoint', service: 'knowledge', domain: 'knowledge', version: '1.0.0', enabled: true }
   const preview = { templateId, revision: 3, items: [{ item: mcpItem, disposition: 'installable', releaseId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }] }
-  const instantiate = { templateId, revision: 3, profileName: '内容创作', plans: [{ kind: 'skill', symbol: 'writing-pro', version: '1.2.3', releaseId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', planId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', enabled: true }], mcpEndpoints: [{ service: 'knowledge', domain: 'knowledge', version: '1.0.0', enabled: true }], skippedItems: [{ item: { kind: 'plugin', identity: '@x/y', version: '1.0.0', enabled: true }, reason: '未发布到 stable 渠道' }] }
+  const profileId = '55555555-5555-4555-8555-555555555555'
+  const instantiate = { profileId, templateId, revision: 3, profileName: '内容创作', items: [{ kind: 'skill', itemId: '66666666-6666-4666-8666-666666666666', enabled: true }], mcpEndpoints: [{ service: 'knowledge', domain: 'knowledge', version: '1.0.0', enabled: true }], skippedItems: [{ item: { kind: 'plugin', identity: '@x/y', version: '1.0.0', enabled: true }, reason: '未发布到 stable 渠道' }] }
 
   it('lists public templates at fixed origin without leaking the bearer', async () => {
     const f = clientFor((path) => path.includes('/me') ? { code: 200, data: me } : { code: 200, data: publicList })
@@ -140,15 +141,16 @@ describe('Profile template endpoints (docs/1022 A1)', () => {
     await expect(g.client.profileTemplatePreview(other, templateId)).rejects.toMatchObject({ code: 'HUB_INVALID_RESPONSE' })
     f.client.dispose(); g.client.dispose()
   })
-  it('instantiates through existing install plans and validates the reply shape', async () => {
+  it('registers the profile selection for the generations pipeline and validates the reply', async () => {
     const f = clientFor((path) => path.includes('/me') ? { code: 200, data: me } : { code: 201, data: instantiate })
     const context = await f.client.context(workspace)
-    const result = await f.client.instantiateProfileTemplate(context, { templateId, profileName: '  内容创作  ', deviceId, target: { hostScopeId: 'scope-1', profileId: 'profile-1' } })
-    expect(result).toMatchObject({ profileName: '内容创作', plans: [{ planId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' }] })
+    const result = await f.client.instantiateProfileTemplate(context, { templateId, profileName: '  内容创作  ', deviceId, profileId })
+    expect(result).toMatchObject({ profileId, profileName: '内容创作', items: [{ kind: 'skill', enabled: true }] })
     const call = f.fetcher.mock.calls.at(-1)
     expect(call?.[0]).toBe(`https://ai.hozonauto.com/plugins/api/skillhub/v1/profile-templates/${templateId}/instantiate`)
-    expect(call?.[1]).toMatchObject({ method: 'POST', body: JSON.stringify({ templateId, profileName: '内容创作', deviceId, target: { hostScopeId: 'scope-1', profileId: 'profile-1' } }) })
-    await expect(f.client.instantiateProfileTemplate(context, { templateId, profileName: '', deviceId, target: { hostScopeId: 's', profileId: 'p' } })).rejects.toMatchObject({ code: 'HUB_INVALID_REQUEST' })
+    expect(call?.[1]).toMatchObject({ method: 'POST', body: JSON.stringify({ templateId, profileName: '内容创作', deviceId, profileId }) })
+    await expect(f.client.instantiateProfileTemplate(context, { templateId, profileName: '', deviceId, profileId })).rejects.toMatchObject({ code: 'HUB_INVALID_REQUEST' })
+    await expect(f.client.instantiateProfileTemplate(context, { templateId, profileName: 'x', deviceId, profileId: 'not-a-uuid' })).rejects.toMatchObject({ code: 'HUB_INVALID_REQUEST' })
     f.client.dispose()
   })
   it('requires SSO before any template call', async () => {
