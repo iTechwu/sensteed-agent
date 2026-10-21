@@ -10,6 +10,8 @@ import { appRequestHeaders, forwardWebRequest, serveWebDocument } from './web-do
 import { installAppDownloads } from './app-downloads.ts'
 import { claimDesktopSingleInstance } from './single-instance.ts'
 import { NEXT_PACKAGE, parseFeatures, profileName } from './profiles.ts'
+import { handleContentProfilesRequest } from './content-profiles-ipc.ts'
+import { CONTENT_PROFILES_FILENAME, ContentProfileStore } from './content-profiles.ts'
 import { APP_URL, IPC, SHELL_URL } from './ipc.ts'
 import { WINDOWS_TITLEBAR_HEIGHT } from './windows-layout.ts'
 import { preferredDesktopLocale, resolveDesktopLocale } from './menu-locale.ts'
@@ -835,6 +837,14 @@ async function main(): Promise<void> {
     runtime.report(new Error(message.slice(0, 4096)))
   })
   ipcMain.handle(IPC.state, event => { assertDesktopSender(event); return state() })
+  // docs/1022 内容 Profile：渲染进程只发意图；存储挂在当前 boot Profile 目录下。
+  ipcMain.handle(IPC.contentProfiles, (event, request: unknown) => {
+    assertDesktopSender(event)
+    return handleContentProfilesRequest(
+      new ContentProfileStore(join(runtime.profiles.directory(runtime.selected), CONTENT_PROFILES_FILENAME)),
+      request,
+    )
+  })
   ipcMain.handle('dsh-desktop:setup-onboarding', async (event, request: unknown) => {
     assertSender(event, mainWindow, APP_URL)
     if (!request || typeof request !== 'object' || Array.isArray(request)) throw new Error('Invalid setup request')

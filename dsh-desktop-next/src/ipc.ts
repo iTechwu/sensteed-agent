@@ -4,6 +4,7 @@ export const IPC = {
   shortcutsChanged: 'dsh-next:shortcuts-changed', shortcutsRecording: 'dsh-next:shortcuts-recording',
   boot: 'dsh-next:boot', failed: 'dsh-next:failed', directory: 'dsh-next:directory',
   state: 'dsh-next:state', command: 'dsh-next:command',
+  contentProfiles: 'dsh-next:content-profiles',
   settingsOpen: 'dsh-next:settings-open', settingsTake: 'dsh-next:settings-take',
   browserLinks: 'dsh-next:browser-links',
   browserAcquire: 'dsh-next:browser-acquire', browserRelease: 'dsh-next:browser-release',

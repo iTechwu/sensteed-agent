@@ -108,6 +108,8 @@ export type DesktopCommand =
 
 export interface DesktopBridge {
   readonly permissions?: DesktopPermissions
+  /** docs/1022 内容 Profile 意图通道；结构校验与存储都在 Host。 */
+  readonly contentProfiles?: { request(request: unknown): Promise<unknown> }
   /** Native menu/Host requests, delivered only to the main app. */
   onOpenSettings?(listener: (page: DesktopSettingsPage) => void): () => void
   state(): Promise<DesktopState>
