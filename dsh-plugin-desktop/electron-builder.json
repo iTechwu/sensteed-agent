@@ -143,6 +143,7 @@
     },
     "hardenedRuntime": true,
     "icon": "build/app-icon-mac.png",
+    "artifactName": "hozonauto-agent-beta-${version}-${arch}.${ext}",
     "mergeASARs": true,
     "notarize": true,
     "extraResources": [
