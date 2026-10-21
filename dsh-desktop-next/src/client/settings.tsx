@@ -26,11 +26,11 @@ export function NextDesktopSettings({ adapter, language, onOpenPlugins }: { adap
   const state = useDesktopState(adapter)
   const t = desktopTranslate(language)
   return <div data-next-desktop-settings=""><DesktopSettingsSection
-    t={t} api={adapter.api} version={state?.version ?? ''} platform={state?.platform === 'darwin' || state?.platform === 'win32' ? state.platform : 'linux'}
+    t={t} api={adapter.api} platform={state?.platform === 'darwin' || state?.platform === 'win32' ? state.platform : 'linux'}
     initialMode="compatibility"
     setMode={async () => { throw new Error('Window modes are not supported in Next') }}
     desktopSettings={adapter.desktopSettings} notificationSettings={adapter.notificationSettings}
-    capabilities={{ logging: false, windowModes: false, pluginSelectors: false, updates: false, materialRequiresRestart: false, nativeLanConfirmation: true, jobNotifications: false }}
+    capabilities={{ logging: false, windowModes: false, pluginSelectors: false, materialRequiresRestart: false, nativeLanConfirmation: true, jobNotifications: false }}
     introNotice={<div className="dshDesktopSettingsNotice dshNextPluginSettingsNotice" data-next-plugin-settings-notice>
       <span>{language.startsWith('zh') ? '插件市场在插件页面管理；远程控制设置位于 IM机器人。' : 'Manage plugin markets on the Plugins page; remote control is available under IM bots.'}</span>
       <Button variant="outline" size="sm" onClick={onOpenPlugins}>{language.startsWith('zh') ? '前往插件页面' : 'Go to Plugins'}</Button>

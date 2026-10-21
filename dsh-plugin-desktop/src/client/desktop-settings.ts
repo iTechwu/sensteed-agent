@@ -4,6 +4,7 @@ import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import { DesktopSettingsSection, type DesktopNotificationSettings, type DesktopShellSettings } from './DesktopSettingsSection.tsx'
+import { DesktopVersionsSection } from './DesktopVersionsSection.tsx'
 import { DesktopTerminalSettingsAction } from './DesktopTerminalSettingsAction.tsx'
 import { createDesktopSettingsApi } from './desktop-settings-api.ts'
 import { en, zh } from './desktop-settings-locales.ts'
@@ -93,7 +94,6 @@ export function applyDesktopSettings(
     inject: () => ({
       api,
       platform: environment.platform,
-      version: environment.version,
       initialMode: environment.mode,
       setMode,
       desktopSettings,
@@ -105,6 +105,17 @@ export function applyDesktopSettings(
       },
     }),
   }, DesktopSettingsSection))
+  ctx.slots.inject('settings.section', () => ctx.slots.register({
+    name: 'settings.section',
+    id: 'versions',
+    order: 110,
+    label: () => t('versionsNav'),
+    locale: DESKTOP_SETTINGS_LOCALE_NAMESPACE,
+    inject: () => ({
+      api,
+      version: environment.version,
+    }),
+  }, DesktopVersionsSection))
   ctx.slots.inject('settings.action', () => ctx.slots.register({
     name: 'settings.action',
     id: 'open-desktop-terminal',

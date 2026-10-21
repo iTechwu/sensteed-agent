@@ -1,4 +1,3 @@
-import { DesktopUpdateSettings } from './DesktopUpdateSettings.tsx'
 /** Desktop-owned settings section registered into the official Settings shell. */
 
 import {
@@ -46,8 +45,6 @@ export interface DesktopNotificationSettings {
 export interface DesktopSettingsSectionInjected {
   readonly api: DesktopSettingsApi
   readonly platform: DesktopClientPlatform
-  /** Installed Desktop product version rendered by the update section. */
-  readonly version: string
   readonly initialMode: DesktopShellSettings['mode']
   readonly setMode: (mode: DesktopShellSettings['mode']) => Promise<void>
   readonly desktopSettings: Pick<DesktopSettingsForm<DesktopShellSettings>, 'getSnapshot' | 'subscribe' | 'set'>
@@ -61,7 +58,6 @@ export interface DesktopSettingsSectionInjected {
     readonly materialRequiresRestart?: boolean
     readonly nativeLanConfirmation?: boolean
     readonly jobNotifications?: boolean
-    readonly updates?: boolean
     readonly logging?: boolean
   }
   readonly openPlugins?: () => void
@@ -361,7 +357,6 @@ export function DesktopSettingsSection({
   close,
   api,
   platform,
-  version,
   initialMode,
   setMode: persistMode,
   desktopSettings,
@@ -907,8 +902,6 @@ export function DesktopSettingsSection({
           </>
         )}
       </section>
-
-      {capabilities?.updates !== false && <DesktopUpdateSettings api={api} version={version} t={t} />}
 
       {capabilities?.logging !== false && <section className="sensteedAgentSettingsGroup" aria-labelledby="dsh-desktop-logging-title">
         <h3 id="dsh-desktop-logging-title">{t('loggingTitle')}</h3>

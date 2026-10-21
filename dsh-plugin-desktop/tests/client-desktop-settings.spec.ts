@@ -28,6 +28,7 @@ import {
   resolveDesktopLanConfirmation,
 } from '../src/client/DesktopSettingsSection.tsx'
 import { DesktopTerminalSettingsAction } from '../src/client/DesktopTerminalSettingsAction.tsx'
+import { DesktopVersionsSection } from '../src/client/DesktopVersionsSection.tsx'
 import {
   createDesktopSettingsApi,
   desktopRendererActionsBridge,
@@ -187,9 +188,9 @@ describe('Desktop settings API', () => {
     })).toThrow('inconsistent LAN HTTPS state')
   })
 
-  it('names the section Desktop settings and describes browser opening as permission', () => {
-    expect(zh.nav).toBe('桌面')
-    expect(en.nav).toBe('Desktop')
+  it('names the section Agent settings and describes browser opening as permission', () => {
+    expect(zh.nav).toBe('Agent 设置')
+    expect(en.nav).toBe('Agent Settings')
     expect(Object.values(zh)).not.toContain('将在启动时创建')
     expect(Object.values(en)).not.toContain('Created when first started')
     expect(zh.openBrowser).toBe('允许在浏览器中打开')
@@ -739,9 +740,27 @@ describe('Desktop settings Slot registration', () => {
       capabilities: { pluginSelectors: false },
       openPlugins: expect.any(Function),
     })
+    expect(options.inject()).not.toHaveProperty('version')
     expect(component).toBe(DesktopSettingsSection)
 
-    const [actionOptions, actionComponent] = register.mock.calls[1] as unknown as [
+    const [versionsOptions, versionsComponent] = register.mock.calls[1] as unknown as [
+      { id: string; order: number; locale: string; label: () => string; inject: () => Record<string, unknown> },
+      unknown,
+    ]
+    expect(versionsOptions).toMatchObject({
+      name: 'settings.section',
+      id: 'versions',
+      order: 110,
+      locale: DESKTOP_SETTINGS_LOCALE_NAMESPACE,
+    })
+    expect(versionsOptions.label()).toBe(`${DESKTOP_SETTINGS_LOCALE_NAMESPACE}:versionsNav`)
+    expect(versionsOptions.inject()).toMatchObject({
+      api: expect.anything(),
+      version: '2.0.3',
+    })
+    expect(versionsComponent).toBe(DesktopVersionsSection)
+
+    const [actionOptions, actionComponent] = register.mock.calls[2] as unknown as [
       { id: string; order: number; locale: string; inject: () => Record<string, unknown> },
       unknown,
     ]
@@ -754,15 +773,15 @@ describe('Desktop settings Slot registration', () => {
     expect(actionOptions.inject()).toHaveProperty('api')
     expect(actionComponent).toBe(DesktopTerminalSettingsAction)
     expect(inject).toHaveBeenCalledWith('plugins.bundle.hidden', expect.any(Function))
-    expect(register).toHaveBeenNthCalledWith(3, {
+    expect(register).toHaveBeenNthCalledWith(4, {
       name: 'plugins.bundle.hidden',
       key: 'dsh-community-market',
     }, expect.any(Function))
-    expect(register).toHaveBeenNthCalledWith(4, {
+    expect(register).toHaveBeenNthCalledWith(5, {
       name: 'plugins.bundle.hidden',
       key: 'dshmarket',
     }, expect.any(Function))
-    expect(register).toHaveBeenNthCalledWith(5, {
+    expect(register).toHaveBeenNthCalledWith(6, {
       name: 'plugins.bundle.hidden',
       key: '@agents-anywhere/dsh-bridge-next',
     }, expect.any(Function))

@@ -1307,6 +1307,17 @@ describe('published package surface', () => {
     expect(conversationRoot).toContain('data-dsh-conversation-drop-target')
   })
 
+  it('maps dedicated sidebar glyphs for the desktop-registered settings sections in the sibling fork', () => {
+    // 桌面注册的 settings.section id 必须在 fork navIcon 有专属映射,避免落到通用齿轮兜底。
+    const forkRoot = resolve(fileURLToPath(workspaceRoot), '../deepseek-harness')
+    const settingsRoot = readFileSync(
+      join(forkRoot, 'packages', 'client', 'ui-settings-general', 'src', 'client', 'SettingsRoot.tsx'),
+      'utf8',
+    )
+    expect(settingsRoot).toContain("id === 'desktop'")
+    expect(settingsRoot).toContain("id === 'versions'")
+  })
+
   it('resolves electron-builder through the pinned app-builder-lib keychain patch', () => {
     const lockfile = readFileSync(new URL('pnpm-lock.yaml', workspaceRoot), 'utf8')
     const patch = readFileSync(new URL('patches/app-builder-lib@26.17.0.patch', workspaceRoot), 'utf8')
