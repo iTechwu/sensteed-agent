@@ -41,6 +41,14 @@ function HubSetupEditor({t,kind}:Pick<Props,'t'|'kind'>){
    void hubSetupRequest<HubOperation>('status',{operationId:operation?.operationId},controller.signal).then(value=>{
     if(mounted.current&&!controller.signal.aborted){
      setOperation(value);setError(undefined)
+     // docs/1022 §6.4：generation 真激活（终态、回执已清）回写内容 Profile 应用回执。
+     const contentProfiles=(window as unknown as { dshContentProfiles?:{ request(input:unknown):Promise<unknown> } }).dshContentProfiles
+     if(contentProfiles&&value.phase==='ACTIVATED'&&!value.pendingReceipt){
+      void contentProfiles.request({action:'active'}).then(active=>{
+       if(typeof active==='string')return contentProfiles.request({action:'mark-applied',id:active})
+       return undefined
+      }).catch(()=>{})
+     }
      // docs/1022 §7：应用终态失败一次性上报（回滚或需人工介入且不可重试）
      const failedPhase=value.phase==='ROLLED_BACK'?'install':value.phase==='NEEDS_ATTENTION'&&value.retryAllowed===false?'load':null
      const key=`${value.operationId}:${failedPhase??''}`
