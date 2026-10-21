@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { LayoutTemplate } from 'lucide-react'
 import { hubInstantiateRequest, hubTemplatesRequest, type HubInstantiateResult, type HubTemplatePublic } from './hub-setup-state.ts'
+import { trackHubTemplate } from './hub-analytics.ts'
 import type { DofeAccessLocaleKey } from './dofe-access.ts'
 type Copy = (key: DofeAccessLocaleKey) => string
 
@@ -15,6 +16,7 @@ export function ProfileTemplatesSection({ disabled, t, onRegistered }: {
 }) {
   const [templates, setTemplates] = useState<HubTemplatePublic[] | undefined>(undefined)
   const [loadError, setLoadError] = useState(false)
+  const [reloadEpoch, setReloadEpoch] = useState(0)
   const [selected, setSelected] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
@@ -24,14 +26,25 @@ export function ProfileTemplatesSection({ disabled, t, onRegistered }: {
     if (disabled) return
     const controller = new AbortController()
     hubTemplatesRequest(controller.signal)
-      .then(result => { setTemplates(result.list); setLoadError(false) })
+      .then(result => {
+        setTemplates(result.list); setLoadError(false)
+        if (reloadEpoch === 0) trackHubTemplate({ event: 'PROFILE_TEMPLATE_VIEWED', properties: { surface: 'list' } })
+      })
       .catch(() => { if (!controller.signal.aborted) { setTemplates([]); setLoadError(true) } })
     return () => controller.abort()
-  }, [disabled])
+  }, [disabled, reloadEpoch])
 
   if (disabled) return null
   if (templates === undefined) return <p className="dshHubHint">{t('hubWorking')}</p>
-  if (loadError) return <p className="dshHubHint">{t('templateLoadFailed')}</p>
+  if (loadError) return (
+    <p className="dshHubHint">
+      {t('templateLoadFailed')}
+      {' '}
+      <button type="button" className="dshHubSecondary" onClick={() => { setLoadError(false); setTemplates(undefined); setReloadEpoch(value => value + 1) }}>
+        {t('templateRetry')}
+      </button>
+    </p>
+  )
   if (templates.length === 0) return null
 
   const chosen = templates.find(template => template.id === selected) ?? null
@@ -42,10 +55,20 @@ export function ProfileTemplatesSection({ disabled, t, onRegistered }: {
     setBusy(true); setNotice('')
     try {
       const result = await hubInstantiateRequest({ templateId: chosen.id, profileName })
+      trackHubTemplate({
+        event: 'PROFILE_TEMPLATE_INSTANTIATED',
+        properties: { planCount: result.items.length, skippedCount: result.skippedItems.length },
+      })
       setNotice(t('templateRegistered'))
       setName('')
       onRegistered?.(result)
-    } catch { setNotice(t('templateCreateFailed')) } finally { setBusy(false) }
+    } catch {
+      trackHubTemplate({
+        event: 'PROFILE_TEMPLATE_INSTANTIATED',
+        properties: { planCount: 0, skippedCount: 0, errorClass: 'error' },
+      })
+      setNotice(t('templateCreateFailed'))
+    } finally { setBusy(false) }
   }
 
   return (
