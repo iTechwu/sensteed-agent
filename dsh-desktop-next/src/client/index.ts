@@ -10,7 +10,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import { installDesktopSettingsStyles } from '../../../dsh-plugin-desktop/src/client/desktop-settings-styles.ts'
 import { installSidebarFooterStyles } from '../../../dsh-plugin-desktop/src/client/sidebar-footer-styles.ts'
 import { NextSettingsAdapter } from './settings-adapter.ts'
-import { NextDesktopSettings, NextDesktopActions } from './settings.tsx'
+import { NextDesktopSettings, NextDesktopActions, NextVersionsSettingsPage } from './settings.tsx'
 import { installWindowStyles } from './styles.ts'
 import { registerPluginControls } from './plugin-controls.tsx'
 import { installPluginControlsStyles } from './plugin-controls-styles.ts'
@@ -26,7 +26,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
   interface LocaleNamespaceMap {
     'desktop.settings': DesktopSettingsLocaleKey
-    'desktop-next': 'settings' | 'language' | 'safeMode' | 'safeModeDetail' | 'recovery' | 'dismiss'
+    'desktop-next': 'settings' | 'versions' | 'language' | 'safeMode' | 'safeModeDetail' | 'recovery' | 'dismiss'
   }
 }
 
@@ -41,8 +41,8 @@ export interface DesktopRemoteControlService {
 export function apply(ctx: Context): void {
   ctx.effect(installUiDiagnostics, 'AA and Plugins client lifecycle diagnostics')
   ctx.effect(() => ctx.locale.register('desktop-next', {
-    zh: { settings: '桌面设置', language: 'zh', safeMode: '安全模式', safeModeDetail: '当前使用临时环境。退出安全模式并重启后返回原 Profile，临时数据不会保留。', dismiss: '关闭提示', recovery: '打开恢复助手' },
-    en: { settings: 'Desktop settings', language: 'en', safeMode: 'Safe mode', safeModeDetail: 'You are using a temporary environment. Exiting Safe Mode and restarting returns to the original Profile and removes the temporary data.', dismiss: 'Dismiss notice', recovery: 'Open recovery assistant' },
+    zh: { settings: 'Agent 设置', versions: '版本管理', language: 'zh', safeMode: '安全模式', safeModeDetail: '当前使用临时环境。退出安全模式并重启后返回原 Profile，临时数据不会保留。', dismiss: '关闭提示', recovery: '打开恢复助手' },
+    en: { settings: 'Agent settings', versions: 'Version management', language: 'en', safeMode: 'Safe mode', safeModeDetail: 'You are using a temporary environment. Exiting Safe Mode and restarting returns to the original Profile and removes the temporary data.', dismiss: 'Dismiss notice', recovery: 'Open recovery assistant' },
   }), 'Next settings and recovery labels')
   ctx.effect(() => installDesktopSettingsStyles('dsh-desktop-next'), 'Shared Desktop settings styles')
   ctx.effect(installPluginControlsStyles, 'Plugin controls and permission dialog styles')
@@ -85,6 +85,10 @@ export function apply(ctx: Context): void {
       name: 'settings.section', id: 'desktop', order: 100, locale: 'desktop-next', label: () => t('settings'),
       inject: () => ({ adapter, openPlugins: () => ctx.layout.selectPanel('plugins' as MainPanelId) }),
     }, DesktopSettings))
+    ctx.slots.inject('settings.section', () => ctx.slots.register({
+      name: 'settings.section', id: 'versions', order: 110, locale: 'desktop-next', label: () => t('versions'),
+      inject: () => ({ adapter }),
+    }, NextVersionsSettings))
     ctx.slots.inject('settings.action', () => ctx.slots.register({
       name: 'settings.action', id: 'desktop-native-actions', order: 1, locale: 'desktop-next', inject: () => ({ adapter }),
     }, SettingsActions))
@@ -175,4 +179,8 @@ function DesktopSettings({ t, adapter, close, openPlugins }: PropsLocale<'deskto
 
 function SettingsActions({ t, adapter }: PropsLocale<'desktop-next'> & { adapter: NextSettingsAdapter }) {
   return createElement(NextDesktopActions, { adapter, language: t('language') })
+}
+
+function NextVersionsSettings({ t, adapter }: PropsLocale<'desktop-next'> & { adapter: NextSettingsAdapter }) {
+  return createElement(NextVersionsSettingsPage, { adapter, language: t('language') })
 }

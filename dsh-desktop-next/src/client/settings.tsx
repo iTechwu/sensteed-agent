@@ -48,6 +48,26 @@ export function NextDesktopActions({ adapter, language }: { adapter: NextSetting
   return <DesktopNativeActions api={adapter.api} t={desktopTranslate(language)} placement="settings" terminalAvailable={state?.platform === 'darwin' || state?.platform === 'win32'} />
 }
 
+/** Versions-and-updates page; the update group moved here from the Desktop page. */
+export function NextVersionsSettingsPage({ adapter, language }: { adapter: NextSettingsAdapter; language: string }) {
+  const state = useDesktopState(adapter)
+  const t = desktopTranslate(language)
+  const [busy, setBusy] = useState(false)
+  const [failure, setFailure] = useState('')
+  const run = async (operation: () => Promise<void>): Promise<void> => {
+    setBusy(true); setFailure('')
+    try { await operation() } catch (error) { setFailure(error instanceof Error ? error.message : String(error)) } finally { setBusy(false) }
+  }
+  return <div data-next-desktop-settings=""><div className="sensteedAgentSettings">
+    <header className="sensteedAgentSettingsHeader">
+      <h2>{t('versionsTitle')}</h2>
+      <p>{t('versionsIntro')}</p>
+    </header>
+    {failure && <p role="alert" className="dshDesktopSettingsError">{failure}</p>}
+    {state && <NextUpdateSettings state={state} language={language} run={command => { void run(() => adapter.command(command)) }} />}
+  </div></div>
+}
+
 function NextBrowserActions({ adapter, state, language }: { adapter: NextSettingsAdapter; state: DesktopState; language: string }) {
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState('')
@@ -76,7 +96,6 @@ function NextDesktopOptions({ adapter, state, language }: { adapter: NextSetting
   const action = (type: DesktopCommand['type'], cn: string, en: string, unavailable = false) => <button key={type} type="button" className="dshDesktopSettingsButton dshDesktopSettingsButtonSecondary" disabled={busy || state.busy || unavailable} onClick={() => { void run(() => adapter.command({ type } as DesktopCommand)) }}>{t(cn, en)}</button>
   return <>
     {failure && <p role="alert" className="dshDesktopSettingsError">{failure}</p>}
-    <NextUpdateSettings state={state} language={language} run={command => { void run(() => adapter.command(command)) }} />
     <section className="dshDesktopSettingsGroup"><h3>{t('后台运行', 'Background operation')}</h3>
       <DesktopSettingsToggleRow label={t('关闭窗口后保持后台运行', 'Keep running after closing the window')} checked={state.preferences.closeToTray} disabled={busy || state.busy || state.safeMode} onChange={closeToTray => { void run(() => adapter.savePreferences({ closeToTray })) }} />
       <p className="dshDesktopSettingsHint">{state.trayAvailable ? t('可从托盘重新打开窗口。', 'Reopen the window from the tray.') : t('系统托盘不可用，关闭主窗口将退出应用。', 'The tray is unavailable; closing the main window quits the application.')}</p>
