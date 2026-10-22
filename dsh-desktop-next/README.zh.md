@@ -2,22 +2,23 @@
 
 [English](README.md) | 中文
 
-基于 DeepSeek Harness **0.1.6-alpha.2** 的独立实验包。主窗口直接加载官方发布的 `@deepseek-ai/dsh-web-frontend`，复用官方 Web 应用、插件管理器和基本桌面样式；Next 添加系统托盘、桌面设置和工具、Profile、恢复、Agents Anywhere 手机远控、社区市场和 dshmarket。
+基于 DeepSeek Harness **0.2.1-rc.2** 的独立实验包。主窗口直接加载官方发布的 `@deepseek-ai/dsh-web-frontend`，复用官方 Web 应用、插件管理器和基本桌面样式；Next 添加系统托盘、桌面设置和工具、Profile、恢复、Agents Anywhere 手机远控、社区市场和 dshmarket。
 
 ## 开发与验证
 
-在外层仓库根目录执行，使用 Node.js `^22.19.0` 或 `>=24.0.0`，以及 Corepack 提供的 Yarn 4.18.0：
+在外层仓库根目录执行，使用 Node.js `^22.19.0` 或 `>=24.0.0`，以及 Corepack 提供的 pnpm 11.28.5：
+
+同级 `../deepseek-harness` 检出须位于 `dev`，版本与 `upstream.json` 一致。根工作区采用[归属说明](../.agents/notes/implemented/process/2026-08-31-sibling-fork-direct-workspace.zh.md)约定的直接 sibling 边界。
 
 ```sh
-git submodule update --init --recursive
 corepack pnpm install --frozen-lockfile
 corepack pnpm --filter dsh-desktop-next run check
 corepack pnpm --filter dsh-desktop-next run dev
 ```
 
-`check:next` 构建市场与 Next，执行类型检查、单元测试、官方前端与沙箱 preload 检查，以及临时目录中的真实 Host 检查，不打开图形应用。后者使用离线本地测试插件验证 pnpm、通过官方插件管理器完成的市场开关与卸载、鉴权、Profile 切换和恢复后启动，并清理测试进程与文件。额外的真实运行时检查覆盖原生 HTTP/WebSocket 访问限制、浏览器访问切换、损坏清单、独立安全模式、全局补丁修复与进程退出。
+`corepack pnpm --filter dsh-desktop-next run check` 构建市场与 Next，执行类型检查、单元测试、官方前端与沙箱 preload 检查，以及临时目录中的真实 Host 检查，不打开图形应用。后者使用离线本地测试插件验证 pnpm、通过官方插件管理器完成的市场开关与卸载、鉴权、Profile 切换和恢复后启动，并清理测试进程与文件。额外的真实运行时检查覆盖原生 HTTP/WebSocket 访问限制、浏览器访问切换、损坏清单、独立安全模式、全局补丁修复与进程退出。
 
-`dev:next` 是显式的图形启动命令；已有构建可用 `corepack pnpm --filter dsh-desktop-next run start` 启动。两者都会在壳启动前于 `.desktop-build/runtime` 下准备随包解释器载荷，与上游桌面端的开发启动器一致，因此开发运行中也有 Office 技能；首次启动会下载锁定的压缩包和 wheel。Electron 二进制尚未缓存时会下载。需要额外检查真实 Electron Node 模式时，先完成构建，再运行：
+`corepack pnpm --filter dsh-desktop-next run dev` 是显式的图形启动命令；已有构建可用 `corepack pnpm --filter dsh-desktop-next run start` 启动。两者都会在壳启动前于 `.desktop-build/runtime` 下准备随包解释器载荷，与上游桌面端的开发启动器一致，因此开发运行中也有 Office 技能；首次启动会下载锁定的压缩包和 wheel。Electron 二进制尚未缓存时会下载。需要额外检查真实 Electron Node 模式时，先完成构建，再运行：
 
 ```sh
 corepack pnpm --filter dsh-desktop-next run verify:host:electron
@@ -25,7 +26,7 @@ corepack pnpm --filter dsh-desktop-next run verify:host:electron
 
 此检查不打开 Electron 窗口。主窗口呈现、原生对话框和真实手机连接仍需手动验收。
 
-CI 还会在 Linux 中运行 `xvfb-run --auto-servernum corepack pnpm --filter dsh-desktop-next run verify:protocol --no-sandbox`。此独立测试使用真实 Electron 渲染进程、自定义协议和临时 Host，在关闭普通浏览器访问时验证市场源操作，并拒绝其他页面来源的请求。它不属于跨平台的 `check:next` 命令；关闭沙箱的参数仅用于这个隔离的 CI 进程。
+CI 还会在 Linux 中运行 `xvfb-run --auto-servernum corepack pnpm --filter dsh-desktop-next run verify:protocol --no-sandbox`。此独立测试使用真实 Electron 渲染进程、自定义协议和临时 Host，在关闭普通浏览器访问时验证市场源操作，并拒绝其他页面来源的请求。它不属于跨平台的 `corepack pnpm --filter dsh-desktop-next run check` 命令；关闭沙箱的参数仅用于这个隔离的 CI 进程。
 
 同一 Linux/Xvfb 环境中的 `verify:sidebar-browser --no-sandbox` 使用同时返回 `frame-ancestors 'none'` 和 `X-Frame-Options: DENY` 的本地测试页，验证 iframe 被拦截、凭租约挂载的真实访客页成功加载、访客自身的安全设置、应用 Cookie 与 preload 隔离、原生历史、伪造租约被拒、工作区分区隔离，以及释放后的清理。跨平台的 `verify:window-controls` 则通过模拟原生接口检查官方工具栏、分栏缩放、弹窗遮挡、标签切换与关闭，并验证普通 Web 客户端仍使用 iframe。
 
@@ -96,9 +97,9 @@ export async function record(ctx: Context) {
 
 屏幕共享应在用户点击“共享”时直接调用 `navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })`。macOS 15 及以上使用 Electron 的系统选择器，其余系统使用原生菜单选择来源，不自动选择屏幕。系统选择器的单次共享授权可能不同于全局屏幕录制权限。权限服务本身不录制媒体，屏幕共享也不授予电脑输入控制能力。打包 Next 时保留产品自己的 `NSMicrophoneUsageDescription`，主应用和 Helper 签名直接使用固定上游 checkout 中的 `apps/desktop/scripts/macos-entitlements.plist`。语音输入通过 `getUserMedia` 触发 Chromium/macOS 的录音授权，语音插件旁不再提供额外权限按钮。
 
-内置官方 `@deepseek-ai/dsh-experimental-computer-use-cua-driver-native@0.1.6-alpha.2`，**默认停用**。在**插件**页顶部的 Computer Use 分区中启用，并查看实际加载状态。入口复用官方插件槽位、开关和插件管理服务；Profile 条目 ID 为 `computer-use-cua-driver-native`。共享的 `computer-use` 注册服务已提供。操作和截图沿用现有对话工具卡片及图片附件；理解截图需要模型路由声明支持图片输入。开关左侧的齿轮打开授权弹窗。
+内置官方 `@deepseek-ai/dsh-experimental-computer-use-cua-driver-native@0.2.1-rc.2`，**默认停用**。在**插件**页顶部的 Computer Use 分区中启用，并查看实际加载状态。入口复用官方插件槽位、开关和插件管理服务；Profile 条目 ID 为 `computer-use-cua-driver-native`。共享的 `computer-use` 注册服务已提供。操作和截图沿用现有对话工具卡片及图片附件；理解截图需要模型路由声明支持图片输入。开关左侧的齿轮打开授权弹窗。
 
-版本限定的 Yarn 补丁位于 `patches/dsh-experimental-computer-use-cua-driver-native@0.1.6-alpha.2.patch`。存在 `desktopPermissions` 时，`check_permissions` 通过桌面服务查询权限；`prompt: true` 为缺失的权限打开授权弹窗，再以 `prompt: false` 由驱动执行只读检查。驱动始终报告其实际权限，不根据桌面返回值假定授权成功。没有桌面服务时保留上游行为。固定的 `@trycua/cua-driver@0.28.0` 二进制、操作工具、图片处理和关闭流程保持上游实现。只能注册一个 provider，但这不会自动串行化多个会话对同一桌面的操作。
+存在 `desktopPermissions` 时，桌面权限适配器使 `check_permissions` 通过桌面服务查询权限；`prompt: true` 为缺失的权限打开授权弹窗，再以 `prompt: false` 由驱动执行只读检查。驱动始终报告其实际权限，不根据桌面返回值假定授权成功。没有桌面服务时保留上游行为。固定的 `@trycua/cua-driver@0.28.0` 二进制、操作工具、图片处理和关闭流程保持上游实现。只能注册一个 provider，但这不会自动串行化多个会话对同一桌面的操作。
 
 单元测试对安装后的补丁插件使用模拟原生 SDK。可选的原生验证要求 SDK 支持当前平台，会加载并关闭真实插件，不发送输入、不截图：
 
@@ -125,6 +126,16 @@ corepack pnpm --filter dsh-desktop-next run verify:host --computer-use
 
 普通 Web Profile 无需在 `package.json` 中声明 `dsh-desktop-next`；Next 仅在自身 Host 启动和配置重组时提供该能力。已有的旧 Next Profile 会在备份清单后移除这个历史 bundle 条目，避免 Stable 或 CLI 打开同一 Profile 时载入 Next 能力。
 
+## 企业内容 Profile
+
+普通 Next 保留官方前端和共享 `runProfile` 组合。经过封存的安装版可通过 `--enterprise-content` 显式开启企业内容，例如 macOS 使用 `open -a "DSH NEXT" --args --enterprise-content`。重启保留该参数。开发源码目录没有可信 build target，请求此模式会进入恢复助手。
+
+企业模式装配固定安装 bundles、共享企业产品、Host 路由与签名代际管理器，不加载任意 Profile overlay 或普通安装器路径。模板登记精确发布与启用位，应用沿用 preview → execute → restart。Host 在健康激活回执确认后才记录已应用；登记保持待应用，失败可恢复，回切保留创建后的编辑。内容 Profile 沿用现有账号和会话边界。
+
+Next 启动器重新计算实际封存 build 身份，监督子进程替换，并要求当前文档的私有健康 nonce 与真实加载证据。下载、staging、Profile 切换及代际变更共用安装维护锁。安装器交接后，只有已验证的新 build 启动或显式取消安装才解除屏障；取消安装器后，可用 `--cancel-enterprise-update` 启动原安装版请求恢复，安装器进程退出本身不足以解除屏障。Next 保留原有更新协议，不宣称支持 Models v2 制品协议。
+
+源码测试和无头浏览器检查不等于可信 target proof、各平台安装验收或生产可用。状态模型与验收边界见[应用归属说明](../.agents/notes/implemented/architecture/2026-10-22-content-profile-application.zh.md)。
+
 ## 架构与来源
 
 ```text
@@ -144,7 +155,7 @@ alpha.1 的无端口管道方案已被 alpha.2 的 WebServer 方案替代。本�
 
 主界面使用官方前端产物，不复制聊天、设置或插件管理页面。macOS 窗口材质、平台标记、Windows 标题栏菜单与主题同步参考官方实现。主窗口与 shell 窗口中的可编辑区域显示官方的右键编辑菜单：撤销、重做、剪切、复制、粘贴和全选，不带快捷键标注，可用状态由 Chromium 提供，选中的只读文本只提供“复制”，Windows 文案跟随当前应用语言。Windows 原生窗口按钮是例外：按钮背景保持透明，只有图标颜色跟随主题，因此始终透出下方页面实际绘制的底色，包括官方全窗口的引导页与登录页。Next 通过官方的 `settings.section` 槽位添加“桌面”分区，通过 `settings.action` 添加顶部快捷操作。桌面分区直接复用 `dsh-plugin-desktop` 的 `DesktopSettingsSection`、顶部操作和样式；恢复与 Profile 窗口复用原有 React 页面、窗口标题区和基础组件。Next 只适配状态与操作接口，并按能力隐藏未支持的功能，不维护另一套页面副本。共享组件改动同步到 Stable，保留两个版本原有的默认行为。应用 preload 同样安装官方的 `__DSH_HOST_PATHS__` 桥接（基于 Electron 的 `webUtils`）：拖入、选择或粘贴的、带有真实路径的文件和文件夹会以 `@path` 引用进入输入框而不是上传；官方输入框只有在该桥接存在时才接受拖入的文件夹。经过发送者校验的窄 IPC 接口只提供预定义的原生操作，普通浏览器不会获得原生 Desktop 接口。在主窗口添加工作区会直接打开系统文件夹对话框（macOS 为 Finder，Windows 为资源管理器），与上游桌面端一致：Next 启动时把采样到的局域网地址作为可信来源交给 Host，以便开启局域网访问时无需重启 Host，而上游的自适应目录选择器据此挂载应用内目录浏览面板，因此 Next 的客户端 bundle 在桌面窗口里用基于 preload 桥接的无界面驱动遮蔽该占位。通过本机或局域网访问的普通浏览器仍使用 Host 挂载的面板。
 
-Next 是正式的 Profile bundle，因此上游插件管理器重新组合配置时仍保留附加能力。版本限定的补丁从安装清单读取 `dsh.optionalBundles` 和 `dsh.exclusiveBundles`，并为发布版插件管理界面添加 `plugins.overview`、`plugins.bundle.hidden` 槽位。Next 通过槽位添加顶部设置并隐藏重复的 bundle 卡片；未声明互斥组的安装保持原管理器行为。dshmarket 的安装接口调用官方 `runPluginCommand`，使用 Next 当前 Profile、安装路径和内置 pnpm，不依赖系统 PATH 中的 pnpm。开发目录启动时，只为 Next 自身在 `home/profiles/node_modules` 建立一个受管链接；其他依赖由 alpha.2 的 runtime resolver 解析。所有上游运行时依赖来自发布包，不链接或改写 `deepseek-harness/` 源码。
+Next 在运行时提供应用自有的 Profile 层，重组钩子使附加能力在共享插件管理操作和 HMR 后仍保留，不写入共享 Profile 清单。版本限定的补丁从安装清单读取 `dsh.optionalBundles` 和 `dsh.exclusiveBundles`，并为发布版插件管理界面添加 `plugins.overview`、`plugins.bundle.hidden` 槽位。Next 通过槽位添加顶部设置并隐藏重复的 bundle 卡片；未声明互斥组的安装保持原管理器行为。dshmarket 的安装接口调用官方 `runPluginCommand`，使用 Next 当前 Profile、安装路径和内置 pnpm，不依赖系统 PATH 中的 pnpm。开发目录启动时，只为 Next 自身在 `home/profiles/node_modules` 建立一个受管链接；其他依赖由上游 runtime resolver 解析。Next 显式声明与参考版本对应的上游包版本；开发时由根 sibling 工作区解析，打包时物化生产依赖闭包。Harness 行为通过 sibling 的 `dev` 分支原生提交维护。
 
 [upstream-reference.json](upstream-reference.json) 记录参考提交和复制文件的原始摘要；原始许可保存在 [LICENSE.upstream](LICENSE.upstream)。
 
