@@ -4,7 +4,7 @@ import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { DofeAccessLocaleKey } from './dofe-access.ts'
 import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { DofeAccessSettings } from '../dofe-plugins.ts'
-import { hubCheckRequest, hubBlocked, hubInitialSelections, hubKey, hubSetupRequest, hubTerminal, type HubKind, type HubCheck, type HubOperation, type HubPreview, type HubSelection } from './hub-setup-state.ts'
+import { hubCheckRequest, hubProfilesRequest, hubBlocked, hubInitialSelections, hubKey, hubSetupRequest, hubTerminal, type HubKind, type HubCheck, type HubOperation, type HubPreview, type HubSelection } from './hub-setup-state.ts'
 import { trackHubTemplate } from './hub-analytics.ts'
 type Props={kind?:HubKind;t:(key:DofeAccessLocaleKey)=>string;settingsScope?:ConfigForm<DofeAccessSettings>;subscribeReconnect?:(listener:()=>void)=>()=>void}
 const noSubscribe=()=>()=>{}
@@ -41,11 +41,10 @@ function HubSetupEditor({t,kind}:Pick<Props,'t'|'kind'>){
    void hubSetupRequest<HubOperation>('status',{operationId:operation?.operationId},controller.signal).then(value=>{
     if(mounted.current&&!controller.signal.aborted){
      setOperation(value);setError(undefined)
-     // docs/1022 §6.4：generation 真激活（终态、回执已清）回写内容 Profile 应用回执。
-     const contentProfiles=(window as unknown as { dshContentProfiles?:{ request(input:unknown):Promise<unknown> } }).dshContentProfiles
-     if(contentProfiles&&value.phase==='ACTIVATED'&&!value.pendingReceipt){
-      void contentProfiles.request({action:'active'}).then(active=>{
-       if(typeof active==='string')return contentProfiles.request({action:'mark-applied',id:active})
+     // docs/1022 §6.4：generation 真激活（终态、回执已清）经 Host 意图回写内容 Profile 应用回执。
+     if(value.phase==='ACTIVATED'&&!value.pendingReceipt){
+      void hubProfilesRequest<unknown>({action:'active'}).then(active=>{
+       if(typeof active==='string')return hubProfilesRequest({action:'mark-applied',id:active})
        return undefined
       }).catch(()=>{})
      }

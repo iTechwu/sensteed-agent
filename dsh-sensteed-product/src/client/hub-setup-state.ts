@@ -23,7 +23,7 @@ export function hubInitialSelections(check:HubCheck):HubSelection[]{
 /** docs/1022 模板期望集视图（itemId 目录身份；mcp 为符号引用）。 */
 export interface HubTemplatePublic {id:string;key:string;revision:number;displayName:string;description:string;useCases:string[];iconKey:string;counts:{skills:number;plugins:number;mcpEndpoints:number};updatedAt:string}
 export interface HubInstantiateResult {profileId:string;templateId:string;revision:number;profileName:string;items:{kind:Exclude<HubKind,'mcp.endpoint'>;itemId:string;enabled:boolean}[];mcpEndpoints:{service:string;domain:string;version:string;enabled:boolean}[];skippedItems:{item:unknown;reason:string}[];entries:HubEntry[];operation?:HubOperation}
-export async function hubSetupRequest<T>(action:'check'|'templates'|'instantiate'|'preview'|'execute'|'status'|'restart',body:unknown,signal?:AbortSignal):Promise<T>{
+export async function hubSetupRequest<T>(action:'check'|'profiles'|'telemetry'|'templates'|'instantiate'|'preview'|'execute'|'status'|'restart',body:unknown,signal?:AbortSignal):Promise<T>{
  const response=await fetch(`/api/desktop/hub/generations/${action}`,{method:'POST',credentials:'same-origin',redirect:'error',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify(body),signal:signal?AbortSignal.any([signal,AbortSignal.timeout(action==='execute'?120000:30000)]):AbortSignal.timeout(action==='execute'?120000:30000)})
  if(!response.ok){
   if(response.status===503)throw Error('BASE_VERSION_NOT_ENABLED')
@@ -45,6 +45,12 @@ export async function hubTemplatesRequest(signal?:AbortSignal):Promise<{list:Hub
 /** 注册期望集：profileId 由 Host 绑定到当前 Profile 目录身份，物化走既有管线。 */
 export async function hubInstantiateRequest(input:{templateId:string;profileName:string},signal?:AbortSignal):Promise<HubInstantiateResult>{
  return hubSetupRequest<HubInstantiateResult>('instantiate',{templateId:input.templateId,profileName:input.profileName.trim()},signal)
+}
+
+/** docs/1022 §6.4 内容 Profile 意图（Host 所有存储；双壳同通道）。 */
+export interface HubContentProfileView { id:string; name:string; summary:{skills:number;plugins:number;mcpEndpoints:number;skipped:number} }
+export async function hubProfilesRequest<T>(input:unknown,signal?:AbortSignal):Promise<T>{
+ return hubSetupRequest<T>('profiles',input,signal)
 }
 
 /** Host selects this Profile's verified channel; an older/malformed reply cannot silently mean stable. */
