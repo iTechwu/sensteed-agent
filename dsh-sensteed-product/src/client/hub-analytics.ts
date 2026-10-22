@@ -1,5 +1,7 @@
 /** docs/1022 §7 模板埋点：fire-and-forget，打到 Hub 白名单端点（无鉴权、闭集 schema）。 */
-import { HUB_GENERATION_ORIGIN } from '../../../dsh-plugin-desktop/src/hub-generation-store.ts'
+// 与宿主 HUB_GENERATION_ORIGIN（dsh-plugin-desktop/src/hub-generation-store.ts）同源；
+// client bundle 禁止导入宿主模块（node:* 依赖会破坏渲染端闭包冒烟）。
+const HUB_GENERATION_ORIGIN = 'https://ai.hozonauto.com/plugins/api'
 
 export type HubTemplateEvent =
   | { event: 'PROFILE_TEMPLATE_VIEWED'; properties: { surface: 'list' } }
