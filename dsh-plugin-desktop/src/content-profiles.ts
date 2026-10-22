@@ -9,7 +9,9 @@ export interface HubInstantiatedShape {
 
 /** Host-owned content-combination Profile store (docs/1022 §6.4).
  * 双壳（stable desktop 与 NEXT）共用：渲染进程只发意图，存储与作用域都在 Host 进程，
- * 落盘在 harness profile 目录（与 generation identity 的 profilePath 同族）。 */
+ * 落盘在 harness profile 目录（与 generation identity 的 profilePath 同族）。
+ * 创建入口仅 instantiate（§6.3 Tab B 等价 = 企业目录勾选流程，不另建本地 Profile）；
+ * 早期实验壳创建的无模板来源行仍可读取与本地切换。 */
 /** Content-combination Profile store (docs/1022 §6.4). Born-from-template stays frozen: upstream template updates never mutate an existing profile. */
 import { randomUUID } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
@@ -159,20 +161,6 @@ export class ContentProfileStore {
     })
   }
 
-  async createCustom(name: string, items: readonly ContentProfileItem[]): Promise<ContentProfile> {
-    return this.transact((state) => {
-      const profile: ContentProfile = {
-        id: randomUUID(),
-        name: uniqueProfileName(state.profiles.map((existing) => existing.name), name),
-        summary: summarize(items, 0),
-        items: [...items],
-        skippedItems: [],
-        createdAt: new Date().toISOString(),
-      }
-      return { result: profile, next: { ...state, profiles: [...state.profiles, profile] } }
-    })
-  }
-
   async rename(id: string, name: string): Promise<ContentProfile | undefined> {
     return this.transact((state) => {
       if (!state.profiles.some((profile) => profile.id === id)) return { result: undefined }
@@ -301,19 +289,6 @@ export async function handleContentProfilesRequest(
         mcpEndpoints: mcpEndpoints.map(mcpEndpoint),
         skippedItems: skippedItems as { item: unknown; reason: string }[],
       })
-    }
-    case 'create-custom': {
-      const items = request.items
-      if (!Array.isArray(items) || items.length < 1 || items.length > 64) fail('Invalid profile items')
-      const validated: ContentProfileItem[] = items.map((item): ContentProfileItem => {
-        const entry = item as Record<string, unknown>
-        if (entry.kind === 'mcp.endpoint') return mcpEndpoint(entry)
-        if ((entry.kind !== 'skill' && entry.kind !== 'plugin')
-          || typeof entry.itemId !== 'string' || !uuid.test(entry.itemId)
-          || typeof entry.enabled !== 'boolean') fail('Invalid profile item')
-        return { kind: entry.kind, itemId: entry.itemId, enabled: entry.enabled }
-      })
-      return await store.createCustom(profileName(request.name), validated)
     }
     case 'rename': return await store.rename(id(), profileName(request.name))
     case 'remove': return await store.remove(id())

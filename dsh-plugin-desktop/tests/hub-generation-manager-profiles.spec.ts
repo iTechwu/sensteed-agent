@@ -1,9 +1,10 @@
 import {generateKeyPairSync,randomUUID,sign} from 'node:crypto'
-import {mkdtempSync,realpathSync,rmSync} from 'node:fs'
+import {mkdtempSync,realpathSync,rmSync,writeFileSync} from 'node:fs'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {afterEach,expect,it,vi} from 'vitest'
 import {registerHubGenerationManager} from '../src/hub-generation-manager.ts'
+import {CONTENT_PROFILES_FILENAME} from '../src/content-profiles.ts'
 import {HubGenerationStore} from '../src/hub-generation-store.ts'
 import {HubExecutionJournal} from '../src/hub-execution-journal.ts'
 import {resolveHubHostIdentity} from '../src/hub-host-identity.ts'
@@ -37,11 +38,14 @@ function fixture(){
   const profile=await manager.profiles({action:'create',name:'模板出生',templateId:randomUUID(),templateRevision:3,items:[{kind:'skill',itemId:randomUUID(),enabled:true}],mcpEndpoints:[],skippedItems:[]}) as {id:string}
   return profile.id
  }
- const createCustom=async()=>{
-  const profile=await manager.profiles({action:'create-custom',name:'自定义组装',items:[{kind:'skill',itemId:randomUUID(),enabled:true}]}) as {id:string}
-  return profile.id
+ // 自定义组装不再有创建入口（§6.3 Tab B 等价 = 目录勾选流程）；早期实验壳的
+ // 无模板来源行经直写存储落盘，验证 activate 仍按本地切换兼容。
+ const legacyCustom=()=>{
+  const id=randomUUID()
+  writeFileSync(join(root,CONTENT_PROFILES_FILENAME),`${JSON.stringify({version:1,activeId:null,profiles:[{id,name:'自定义组装',summary:{skills:1,plugins:0,mcpEndpoints:0,skipped:0},items:[{kind:'skill',itemId:randomUUID(),enabled:true}],skippedItems:[],createdAt:new Date().toISOString()}]},null,2)}\n`)
+  return id
  }
- return{manager,check,registerTemplateSelection,identity,createTemplateBorn,createCustom,active:()=>manager.profiles({action:'active'})}
+ return{manager,check,registerTemplateSelection,identity,createTemplateBorn,legacyCustom,active:()=>manager.profiles({action:'active'})}
 }
 it('activate on a template-born profile re-registers the frozen revision and reports skipped items',async()=>{
  const f=fixture(),id=await f.createTemplateBorn()
@@ -53,20 +57,19 @@ it('activate on a template-born profile re-registers the frozen revision and rep
  expect(f.check).toHaveBeenCalledOnce()
 })
 it('activate on a custom profile switches locally without touching Hub',async()=>{
- const f=fixture(),id=await f.createCustom()
+ const f=fixture(),id=f.legacyCustom()
  await expect(f.manager.profiles({action:'activate',id})).resolves.toEqual({switched:true,skippedCount:0})
  expect(f.registerTemplateSelection).not.toHaveBeenCalled()
  await expect(f.active()).resolves.toBe(id)
 })
 it('activate on an unknown id fails without changing the active profile',async()=>{
- const f=fixture(),id=await f.createCustom()
+ const f=fixture(),id=f.legacyCustom()
  await expect(f.manager.profiles({action:'activate',id:randomUUID()})).rejects.toThrow('HUB_PROFILE_NOT_FOUND')
  await expect(f.active()).resolves.toBe(null)
  await expect(f.manager.profiles({action:'activate',id})).resolves.toEqual({switched:true,skippedCount:0})
 })
 it('a failed re-registration keeps the previously active profile',async()=>{
- const f=fixture()
- const first=await f.createCustom()
+ const f=fixture(),first=f.legacyCustom()
  await expect(f.manager.profiles({action:'activate',id:first})).resolves.toEqual({switched:true,skippedCount:0})
  const templateBorn=await f.createTemplateBorn()
  vi.mocked(f.registerTemplateSelection).mockRejectedValueOnce(new Error('HUB_UNAVAILABLE'))

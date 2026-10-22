@@ -62,7 +62,7 @@ describe('content profile store', () => {
 
   it('tracks activeId, clears it on removal, and stamps applied receipts', async () => {
     const profiles = store()
-    const first = await profiles.createCustom('自定义', [{ kind: 'mcp.endpoint', service: 'exa', domain: 'search', version: '1.0.0', enabled: true }])
+    const first = await profiles.create('自定义', templateInput)
     const second = await profiles.create('模板', templateInput)
     expect(profiles.activeId()).toBeNull()
     expect(await profiles.setActive(first.id)).toBe(true)
