@@ -1,3 +1,5 @@
+import {HubSupervisorRequestSchema,type HubSupervisorRequest} from '../../dsh-plugin-desktop/src/hub-supervisor-protocol.ts'
+import type {HubLoadedEvidence} from '../../dsh-plugin-desktop/src/hub-generation-health.ts'
 /** Electron Node-mode child lifecycle for the shared Web application. */
 
 import type { LogInput } from './log-record.ts'
@@ -66,7 +68,7 @@ interface InjectionsEvent {
   readonly error?: string
 }
 
-type DesktopHostEvent = ReadyEvent | FatalEvent | PlatformSessionEvent | PlatformLoginEvent | InjectionsEvent | { type: 'permission'; requestId: number; action: DesktopPermissionAction; permission: DesktopPermission } | { type: 'logging-config'; requestId: number; error?: string } | { type: 'browser-access'; requestId: number; error?: string } | { type: 'notification'; notification: DesktopNotification } | { readonly type: 'shutdown-complete' } | { readonly type: 'desktop-action'; readonly action: 'restart' | 'terminal' } | {
+type DesktopHostEvent = {type:'hub-external';url:string}|{type:'hub-policy';policy:unknown}|{type:'hub-mutation';requestId:number;error?:string}|{type:'hub-switch';request:HubSupervisorRequest}|{type:'hub-renderer-wait';requestId:number;generationId:string}|{type:'hub-health';requestId:number;evidence?:HubLoadedEvidence;error?:string}|ReadyEvent | FatalEvent | PlatformSessionEvent | PlatformLoginEvent | InjectionsEvent | { type: 'permission'; requestId: number; action: DesktopPermissionAction; permission: DesktopPermission } | { type: 'logging-config'; requestId: number; error?: string } | { type: 'browser-access'; requestId: number; error?: string } | { type: 'notification'; notification: DesktopNotification } | { readonly type: 'shutdown-complete' } | { readonly type: 'desktop-action'; readonly action: 'restart' | 'terminal' } | {
   readonly type: 'update-tasks'
   readonly requestId: number
   readonly active: boolean
@@ -97,6 +99,12 @@ function isDesktopHostEvent(message: unknown): message is DesktopHostEvent {
   if (typeof message !== 'object' || message === null || !('type' in message)) return false
   const candidate = message as Record<string, unknown>
   switch (candidate.type) {
+    case 'hub-external': return typeof candidate.url==='string'&&candidate.url.length<8192&&candidate.url.startsWith('https://')
+    case 'hub-policy': return (candidate.policy === null || typeof candidate.policy === 'object') && JSON.stringify(candidate.policy).length < 32768
+    case 'hub-mutation': return Number.isSafeInteger(candidate.requestId)
+    case 'hub-switch': return HubSupervisorRequestSchema.safeParse(candidate.request).success
+    case 'hub-renderer-wait': return Number.isSafeInteger(candidate.requestId) && typeof candidate.generationId==='string'
+    case 'hub-health': return Number.isSafeInteger(candidate.requestId) && (typeof candidate.error==='string'||typeof candidate.evidence==='object'&&candidate.evidence!==null)
     case 'shutdown-complete':
       return true
     case 'ready':
@@ -247,6 +255,7 @@ export class DesktopHostProcess {
     private readonly onPlatformSession?: (session: PlatformSession | null) => void,
     private readonly onPlatformLogin?: (request: DesktopPlatformLoginRequest) => void,
     private readonly onDiagnostic?: (input: LogInput) => void,
+    private readonly hub?: {request(input:HubSupervisorRequest):void;waitRendererHealthy(id:string):Promise<void>;openExternal?(url:string):Promise<void>;reportPolicy?(policy:unknown):void},
   ) {}
 
   /**
@@ -282,6 +291,10 @@ export class DesktopHostProcess {
         child.kill('SIGTERM')
         return
       }
+      if(message.type==='hub-external'){if(!this.stopping&&!this.failureReported)void this.hub?.openExternal?.(message.url).catch(error=>this.fail(error));return}
+      if(message.type==='hub-policy'){if(!this.stopping&&!this.failureReported)this.hub?.reportPolicy?.(message.policy);return}
+      if(message.type==='hub-switch'){if(this.stopping||this.failureReported)return;this.hub?.request(message.request);return}
+      if(message.type==='hub-renderer-wait'){if(this.stopping||this.failureReported)return;const request=message;void (this.hub?.waitRendererHealthy(request.generationId)??Promise.reject(Error('Hub unavailable'))).then(()=>{if(child.connected)child.send({type:'hub-renderer-result',requestId:request.requestId},()=>{})},()=>{if(child.connected)child.send({type:'hub-renderer-result',requestId:request.requestId,error:'HUB_NEXT_RENDERER_UNHEALTHY'},()=>{})});return}
       this.diagnostic({ source: 'host.ipc', event: 'received', developer: true, pid: child.pid, fields: { type: message.type, ...('requestId' in message ? { requestId: message.requestId } : {}) } })
       if (message.type === 'ready') this.readyResolve({ url: message.url, injections: message.injections })
       else if (message.type === 'platform-session') this.onPlatformSession?.(message.session)
@@ -438,8 +451,11 @@ export class DesktopHostProcess {
     return { activeTasks: response.activeTasks, scheduledTasks: response.scheduledTasks }
   }
 
+  async ensureHubMutationAllowed():Promise<void>{await this.control({type:'hub-mutation'},30000,'Hub update policy timed out')}
+  async inspectHubHealth():Promise<HubLoadedEvidence>{const response=await this.control({type:'hub-health'},10000,'Hub health timed out');if(response.type!=='hub-health'||!response.evidence)throw Error('HUB_NEXT_HEALTH_UNAVAILABLE');return response.evidence}
+
   private async control(
-    request: { readonly type: 'update-tasks'; readonly action: 'inspect' | 'lock' | 'unlock' } | { readonly type: 'quit-inspection' },
+    request: {readonly type:'hub-mutation'}|{readonly type:'hub-health'} | { readonly type: 'update-tasks'; readonly action: 'inspect' | 'lock' | 'unlock' } | { readonly type: 'quit-inspection' },
     deadlineMs: number, deadlineMessage: string,
   ): Promise<DesktopHostControlResponse> {
     const child = this.child

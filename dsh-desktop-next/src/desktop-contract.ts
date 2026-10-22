@@ -67,6 +67,7 @@ export interface DesktopState {
   home: string
   platform: string
   version: string
+  mandatoryUpdate?: {phase:'notice'|'blocking';minVersion:string;deadline?:string;notice?:{title?:string;zh?:string;en?:string;detail?:string}}
   updates?: import('./update-state.ts').NextUpdateState
   trayAvailable: boolean
   notificationsAvailable: boolean
@@ -107,6 +108,8 @@ export type DesktopCommand =
     | 'diagnostics' | 'open-browser' | 'open-lan' | 'copy-browser' | 'copy-lan' | 'export-ca' | 'quit' }
 
 export interface DesktopBridge {
+  reportHubHealthy?():Promise<void>
+  reportHubFailure?(message:string):Promise<void>
   readonly permissions?: DesktopPermissions
   /** Native menu/Host requests, delivered only to the main app. */
   onOpenSettings?(listener: (page: DesktopSettingsPage) => void): () => void

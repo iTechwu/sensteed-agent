@@ -7,6 +7,7 @@ import { DEFAULT_PREFERENCES, SAFE_MODE_PREFERENCES } from '../src/desktop-contr
 import type { NextDesktopRuntime } from '../src/desktop-runtime.ts'
 import { NextProfiles } from '../src/profiles.ts'
 import { NextRecovery } from '../src/recovery.ts'
+import { withDesktopMaintenance } from '../../dsh-plugin-desktop/src/desktop-maintenance.ts'
 
 const originalMonitors = new Set(process.listeners('uncaughtExceptionMonitor'))
 afterEach(() => { for (const listener of process.listeners('uncaughtExceptionMonitor')) if (!originalMonitors.has(listener)) process.off('uncaughtExceptionMonitor', listener) })
@@ -327,7 +328,7 @@ it.each(['normal', '--next-safe-mode'])('stages an explicit update before hiding
     const window = fixture.windows[0]; window.visible = true
     const sender = { sender: window.webContents, senderFrame: window.webContents.mainFrame }
     await fixture.handlers.get('dsh-next:command')!(sender, { type: 'install-update' })
-    expect(stage).toHaveBeenCalledOnce(); expect(fixture.close).not.toHaveBeenCalled(); expect(window.visible).toBe(true)
+    await vi.waitFor(()=>expect(stage).toHaveBeenCalledOnce()); expect(fixture.close).not.toHaveBeenCalled(); expect(window.visible).toBe(true)
     stageReady()
     await vi.waitFor(() => expect(fixture.close).toHaveBeenCalledOnce())
     expect(window.visible).toBe(false); expect(launch).not.toHaveBeenCalled()
@@ -595,6 +596,32 @@ it('shares pending mode requests and allows a fresh relaunch request after cance
     expect(dialog.showMessageBox).toHaveBeenCalledTimes(2)
     expect(fixture.restart).not.toHaveBeenCalled()
   } finally { process.argv.splice(0, process.argv.length, ...argv); vi.unstubAllEnvs(); rmSync(home, { recursive: true, force: true }) }
+})
+
+it('waits for installation maintenance before persisting a Profile switch', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'next-maintained-profile-switch-'))
+  vi.stubEnv('DSH_DESKTOP_NEXT_HOME', home)
+  let release!: () => void, held = false, holding: Promise<void> | undefined
+  try {
+    await import('../src/main.ts')
+    await vi.waitFor(() => expect(fixture.windows).toHaveLength(1))
+    const profiles = new NextProfiles(home)
+    profiles.create('work')
+    holding = withDesktopMaintenance('installer', () => new Promise<void>(resolve => { held = true; release = resolve }))
+    await vi.waitFor(() => expect(held).toBe(true))
+    const window = fixture.windows[0]
+    const switching = fixture.handlers.get('dsh-next:command')!({ sender: window.webContents, senderFrame: window.webContents.mainFrame }, { type: 'switch', name: 'work' })
+    const outcome = await Promise.race([switching.then(() => 'switched'), new Promise(resolve => setTimeout(() => resolve('waiting'), 30))])
+    expect(outcome).toBe('waiting')
+    expect(profiles.active).toBe('desktop')
+    release(); await holding; await switching
+    expect(profiles.active).toBe('work')
+    const { app } = await import('electron')
+    await vi.waitFor(() => expect(app.relaunch).toHaveBeenCalledOnce())
+  } finally {
+    release?.(); await holding
+    vi.unstubAllEnvs(); rmSync(home, { recursive: true, force: true })
+  }
 })
 
 it('persists a Profile switch and relaunches the app only after hiding windows and closing its Host', async () => {

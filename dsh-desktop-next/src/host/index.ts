@@ -1,3 +1,5 @@
+import { nextHubBootstrapSchema, runNextEnterpriseProfile } from './hub-boot.ts'
+import type { HubSupervisorRequest } from '../../../dsh-plugin-desktop/src/hub-supervisor-protocol.ts'
 /** Alpha.2 shared Web profile runner, hosted by an Electron Node-mode child. */
 import { auditHostPlugins, configureHostLogging, hostLog, hostOperation } from './logging.ts'
 import { basename, delimiter, join, resolve } from 'node:path'
@@ -45,13 +47,15 @@ export async function main(): Promise<void> {
   configureHostLogging(preferences)
   hostLog({ source: 'host', event: 'process.start', fields: { profile: basename(projectDir), node: process.version } })
   const trustedHosts = JSON.parse(process.env.DSH_NEXT_TRUSTED_HOSTS ?? '[]') as unknown
-  if (!Array.isArray(trustedHosts) || trustedHosts.some(host => typeof host !== 'string')) throw new Error('Invalid Next trusted hosts')
+  if (!Array.isArray(trustedHosts) || trustedHosts.some((host) => typeof host !== 'string')) throw new Error('Invalid Next trusted hosts')
   const systemProxy = parseSystemProxyProbe(process.env[SYSTEM_PROXY_ENV])
   configureNextBrowserAccess(process.env.DSH_NEXT_NATIVE_TOKEN, preferences.browserAccess)
   delete process.env.DSH_NEXT_NATIVE_TOKEN
   delete process.env.DSH_NEXT_PREFERENCES
   delete process.env.DSH_NEXT_TRUSTED_HOSTS
   delete process.env[SYSTEM_PROXY_ENV]
+  const enterprise = process.env.DSH_NEXT_HUB_BOOT ? nextHubBootstrapSchema.parse(JSON.parse(process.env.DSH_NEXT_HUB_BOOT)) : undefined
+  delete process.env.DSH_NEXT_HUB_BOOT
   const profile = loadNextProfile(projectDir, home)
   const runtimePatch = join(projectDir, 'desktop-next.runtime.patch.json')
   atomicJson(runtimePatch, [
@@ -62,12 +66,15 @@ export async function main(): Promise<void> {
   const { environment, resolution: proxy } = withSystemProxy(loadLayeredEnv('dsh-desktop-next'), systemProxy, trustedHosts as string[])
   // One line on every start, direct included: a connectivity report cannot be answered without it.
   for (const line of [proxy.summary, ...proxy.diagnostics]) process.stderr.write(`dsh-desktop-next: ${maskSecrets(line)}\n`)
-  const application = runProfile({
-    environment, profile: basename(projectDir),
+  const runOptions = {
+    environment,
+    profile: basename(projectDir),
     resolvedProfile: { profile, installAnchor: NEXT_PACKAGE },
-    patchFiles: [join(runtimeDir, 'host.cordis.patch.yml'), join(projectDir, 'desktop-next.cordis.patch.json'), runtimePatch], args: ['--no-open', '--port', String(preferences.port)],
+    patchFiles: [join(runtimeDir, 'host.cordis.patch.yml'), join(projectDir, 'desktop-next.cordis.patch.json'), runtimePatch],
+    args: ['--no-open', '--port', String(preferences.port)],
     packageManager: {
-      command: process.execPath, args: ['--expose-internals', bundledPnpmEntry(NEXT_PACKAGE), ...withDesktopPnpmPolicy([])],
+      command: process.execPath,
+      args: ['--expose-internals', bundledPnpmEntry(NEXT_PACKAGE), ...withDesktopPnpmPolicy([])],
       env: {
         DSH_DESKTOP_NODE_EXECUTABLE: process.execPath,
         ...(process.versions.electron ? { ELECTRON_RUN_AS_NODE: '1' } : {}),
@@ -75,26 +82,115 @@ export async function main(): Promise<void> {
         PATH: `${unpackedPath(join(runtimeDir, 'scripts', 'node-bin'))}${delimiter}${process.env.PATH ?? ''}`,
       },
     },
-  })
-  const send = (value: object): Promise<void> => new Promise((resolveSend, reject) => {
-    if (!process.connected || !process.send) return resolveSend()
-    process.send(value, error => error ? reject(error) : resolveSend())
-  })
+  }
+  const rendererRequests = new Map<number, { resolve(): void; reject(error: Error): void }>()
+  let rendererRequestId = 0
+  const supervisor = {
+    request: async (request: HubSupervisorRequest) => {
+      await send({ type: 'hub-switch', request })
+    },
+    waitRendererHealthy: async (generationId: string) => {
+      const requestId = ++rendererRequestId
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          rendererRequests.delete(requestId)
+          reject(Error('HUB_NEXT_RENDERER_TIMEOUT'))
+        }, 45000)
+        rendererRequests.set(requestId, {
+          resolve() {
+            clearTimeout(timer)
+            rendererRequests.delete(requestId)
+            resolve()
+          },
+          reject(error) {
+            clearTimeout(timer)
+            rendererRequests.delete(requestId)
+            reject(error)
+          },
+        })
+        void send({ type: 'hub-renderer-wait', requestId, generationId }).catch(reject)
+      })
+    },
+  }
+  const application = enterprise
+    ? runNextEnterpriseProfile(runOptions, home, enterprise, supervisor, {
+        openExternal: async (url) => {
+          if (new URL(url).protocol !== 'https:') throw Error('HUB_NEXT_EXTERNAL_URL_REFUSED')
+          await send({ type: 'hub-external', url })
+        },
+        reportPolicy: (policy) => {
+          void send({ type: 'hub-policy', policy }).catch(fatal)
+        },
+      })
+    : runProfile(runOptions)
+  const send = (value: object): Promise<void> =>
+    new Promise((resolveSend, reject) => {
+      if (!process.connected || !process.send) return resolveSend()
+      process.send(value, (error) => (error ? reject(error) : resolveSend()))
+    })
   let stopping: Promise<void> | undefined
   const accountWatch = new AbortController()
-  const stop = (): Promise<void> => stopping ??= (async () => {
-    const end = hostOperation('host', 'shutdown')
-    accountWatch.abort()
-    const running = await application.catch(() => undefined)
-    try { await running?.shutdown.shutdown(0); end() } catch (error) { end(error); throw error }
-    await send({ type: 'shutdown-complete' })
-    if (process.connected) process.disconnect()
-    process.exit(0)
-  })()
+  const stop = (): Promise<void> =>
+    (stopping ??= (async () => {
+      const end = hostOperation('host', 'shutdown')
+      accountWatch.abort()
+      const running = await application.catch(() => undefined)
+      try {
+        await running?.shutdown.shutdown(0)
+        end()
+      } catch (error) {
+        end(error)
+        throw error
+      }
+      await send({ type: 'shutdown-complete' })
+      if (process.connected) process.disconnect()
+      process.exit(0)
+    })())
   process.on('message', (value: unknown) => {
+    if (value && typeof value === 'object' && 'type' in value && value.type === 'hub-renderer-result') {
+      const r = value as unknown as { requestId: number; error?: string }
+      if (r.error) rendererRequests.get(r.requestId)?.reject(Error(r.error))
+      else rendererRequests.get(r.requestId)?.resolve()
+      return
+    }
+    if (value && typeof value === 'object' && 'type' in value && value.type === 'hub-mutation') {
+      const r = value as unknown as { requestId: number }
+      void application
+        .then(async ({ ctx }) => {
+          const policy = ctx.get('sensteedMandatoryUpdatePolicy')
+          if (!policy) throw Error('HUB_NEXT_UPDATE_POLICY_REQUIRED')
+          await policy.ensureMutationAllowed()
+        })
+        .then(
+          () => send({ type: 'hub-mutation', requestId: r.requestId }),
+          () => send({ type: 'hub-mutation', requestId: r.requestId, error: 'HUB_DESKTOP_UPDATE_REQUIRED' }),
+        )
+        .catch(fatal)
+      return
+    }
+    if (value && typeof value === 'object' && 'type' in value && value.type === 'hub-health') {
+      const r = value as unknown as { requestId: number }
+      void application
+        .then(async ({ ctx }) => {
+          const health = ctx.get('hubGenerationBoot')
+          if (!health) throw Error('no managed health')
+          return health.inspectLoaded(ctx.skills, `hub-${health.generationId}`)
+        })
+        .then(
+          (evidence) => send({ type: 'hub-health', requestId: r.requestId, evidence }),
+          () => send({ type: 'hub-health', requestId: r.requestId, error: 'HUB_NEXT_HEALTH_UNAVAILABLE' }),
+        )
+        .catch(fatal)
+      return
+    }
     if (typeof value === 'object' && value !== null && 'type' in value && value.type === 'logging-config') {
       const request = value as { requestId?: unknown; developerLogging?: unknown; logLevel?: unknown }
-      if (!Number.isSafeInteger(request.requestId) || typeof request.developerLogging !== 'boolean' || !['debug', 'info', 'warn', 'error'].includes(String(request.logLevel))) return
+      if (
+        !Number.isSafeInteger(request.requestId) ||
+        typeof request.developerLogging !== 'boolean' ||
+        !['debug', 'info', 'warn', 'error'].includes(String(request.logLevel))
+      )
+        return
       configureHostLogging({ developerLogging: request.developerLogging, logLevel: request.logLevel as typeof preferences.logLevel })
       void send({ type: 'logging-config', requestId: request.requestId }).catch(fatal)
       return
@@ -106,23 +202,35 @@ export async function main(): Promise<void> {
       // would request bundles the Web server no longer publishes, so the answer is collected now.
       const query = value as { requestId?: unknown }
       if (!Number.isSafeInteger(query.requestId)) return
-      void application.then(async ({ ctx }) => {
-        if (stopping) throw new Error('Next Host is stopping')
-        await send({ type: 'injections', requestId: query.requestId, injections: ctx.webServer.collectIndexInjections() })
-      }).catch(async () => { await send({ type: 'injections', requestId: query.requestId, error: 'Could not collect Web boot injections' }) }).catch(fatal)
+      void application
+        .then(async ({ ctx }) => {
+          if (stopping) throw new Error('Next Host is stopping')
+          await send({ type: 'injections', requestId: query.requestId, injections: ctx.webServer.collectIndexInjections() })
+        })
+        .catch(async () => {
+          await send({ type: 'injections', requestId: query.requestId, error: 'Could not collect Web boot injections' })
+        })
+        .catch(fatal)
       return
     }
     if (typeof value !== 'object' || value === null || !('type' in value) || value.type !== 'browser-access') return
     const request = value as { requestId?: unknown; enabled?: unknown }
     if (!Number.isSafeInteger(request.requestId) || typeof request.enabled !== 'boolean') return
     const enabled = request.enabled
-    void application.then(async ({ ctx }) => {
-      if (stopping) throw new Error('Next Host is stopping')
-      ;(ctx.webServer as NextWebServer).setBrowserAccess(enabled)
-      await send({ type: 'browser-access', requestId: request.requestId })
-    }).catch(async () => { await send({ type: 'browser-access', requestId: request.requestId, error: 'Could not update browser access' }) }).catch(fatal)
+    void application
+      .then(async ({ ctx }) => {
+        if (stopping) throw new Error('Next Host is stopping')
+        ;(ctx.webServer as NextWebServer).setBrowserAccess(enabled)
+        await send({ type: 'browser-access', requestId: request.requestId })
+      })
+      .catch(async () => {
+        await send({ type: 'browser-access', requestId: request.requestId, error: 'Could not update browser access' })
+      })
+      .catch(fatal)
   })
-  process.once('disconnect', () => { void stop().catch(fatal) })
+  process.once('disconnect', () => {
+    void stop().catch(fatal)
+  })
   const { ctx } = await application
   auditHostPlugins(ctx)
   // Office skills and the workspace dependency tool need the bundled payload; a packaged Host without it fails here.
@@ -130,16 +238,32 @@ export async function main(): Promise<void> {
   if (office === undefined) hostLog({ source: 'host', event: 'office.unavailable', level: 'warn', fields: { source: primaryRuntime } })
   else {
     const mounted = hostOperation('host', 'office.mount', { source: office.source })
-    try { await ctx.plugin(desktopOffice, office); mounted() } catch (error) { mounted(error); throw error }
+    try {
+      await ctx.plugin(desktopOffice, office)
+      mounted()
+    } catch (error) {
+      mounted(error)
+      throw error
+    }
   }
   hostLog({ source: 'host', event: 'process.ready' })
-  await send({ type: 'ready', url: ctx.connection.authenticatedUrl(`http://127.0.0.1:${ctx.webServer.port}`),
-    injections: ctx.webServer.collectIndexInjections() })
+  await send({
+    type: 'ready',
+    url: ctx.connection.authenticatedUrl(`http://127.0.0.1:${ctx.webServer.port}`),
+    injections: ctx.webServer.collectIndexInjections(),
+  })
   const account = ctx.get('deepseekAccount') as PlatformLoginAccount | undefined
   if (account !== undefined && !stopping) {
     // A broken watcher only loses the automatic browser hand-off; the dialog still offers the link.
-    void watchPlatformLogin(account, (request) => { void send({ type: 'platform-login', ...request }).catch(() => {}) }, accountWatch.signal)
-      .catch((error: unknown) => { if (!accountWatch.signal.aborted) console.error('[dsh-desktop-next] platform login watcher stopped', error) })
+    void watchPlatformLogin(
+      account,
+      (request) => {
+        void send({ type: 'platform-login', ...request }).catch(() => {})
+      },
+      accountWatch.signal,
+    ).catch((error: unknown) => {
+      if (!accountWatch.signal.aborted) console.error('[dsh-desktop-next] platform login watcher stopped', error)
+    })
   }
 }
 
@@ -152,7 +276,10 @@ function fatal(error: unknown): void {
   // stderr bytes and this IPC message race, and the shell reports the first
   // failure it sees.
   const diagnostic = inspect(error, { depth: 4, maxArrayLength: 50 }).slice(0, MAX_FATAL_DIAGNOSTIC_CHARS)
-  if (process.connected) process.send?.({ type: 'fatal', message, diagnostic }, () => { if (process.connected) process.disconnect() })
+  if (process.connected)
+    process.send?.({ type: 'fatal', message, diagnostic }, () => {
+      if (process.connected) process.disconnect()
+    })
   console.error(error)
   process.exitCode = 1
 }

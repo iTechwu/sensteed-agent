@@ -10,6 +10,7 @@ export function NextUpdateSettings({ state, language, run }: { state: DesktopSta
   return <section className="dshDesktopSettingsGroup" data-next-updates>
     <h3>{t('应用更新', 'App updates')}</h3>
     <p className="dshDesktopSettingsHint">DSH NEXT · {state.version}</p>
+    {state.mandatoryUpdate&&<p role="alert">{t('最低版本要求：','Minimum required version: ')}{state.mandatoryUpdate.minVersion}{state.mandatoryUpdate.deadline?` · ${state.mandatoryUpdate.deadline}`:''}{' '}{state.mandatoryUpdate.notice?.[language.startsWith('zh')?'zh':'en']??state.mandatoryUpdate.notice?.detail??''}</p>}
     <p role={update.phase === 'error' ? 'alert' : 'status'}>{updateLabel(update, language)}</p>
     {update.phase === 'ready' && <p className="dshDesktopSettingsHint">{t('安装时会重启应用并中断正在运行的任务，Profile 和会话会保留。', 'Installation restarts the app and interrupts running tasks. Profiles and sessions are retained.')}</p>}
     {update.phase === 'downloading' && <progress style={{ width: '100%' }} aria-label={t('更新下载进度', 'Update download progress')} max={update.total ?? 1} value={update.total ? update.received ?? 0 : undefined} />}

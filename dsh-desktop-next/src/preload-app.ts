@@ -11,6 +11,8 @@ import { onOpenSettings } from './preload-settings.ts'
 import { createDesktopKeyboardBridge } from './preload-keyboard.ts'
 import { createDesktopBrowserBridge } from './preload-browser.ts'
 
+let hubDocumentNonce:string|undefined
+let boot:Promise<unknown>|undefined
 if (location.protocol === 'dsh-app:' && location.hostname === 'app') {
   markDocumentPlatform()
   syncNativeTheme()
@@ -26,6 +28,8 @@ if (location.protocol === 'dsh-app:' && location.hostname === 'app') {
     finish: (profile: string, selection?: unknown) => ipcRenderer.invoke('dsh-desktop:setup-onboarding', { action: 'finish', profile, selection }),
   })
   contextBridge.exposeInMainWorld('desktopNext', {
+    reportHubHealthy:()=>hubDocumentNonce?ipcRenderer.invoke('dsh-next:hub-renderer-healthy',hubDocumentNonce):Promise.resolve(),
+    reportHubFailure:(message:string)=>ipcRenderer.invoke(IPC.failed,message),
     permissions: permissionBridge(),
     onOpenSettings,
     state: () => ipcRenderer.invoke(IPC.state),
@@ -36,7 +40,7 @@ if (location.protocol === 'dsh-app:' && location.hostname === 'app') {
   // carrier; without `browser` the official plugin silently falls back to the sandboxed iframe.
   contextBridge.exposeInMainWorld('dshDesktop', { protocolVersion: 1, browser: createDesktopBrowserBridge(), ...createDesktopKeyboardBridge() })
   contextBridge.exposeInMainWorld('dshDesktopBoot', {
-    ready: () => ipcRenderer.invoke(IPC.boot),
+    ready: () => boot??=ipcRenderer.invoke(IPC.boot).then(result=>{hubDocumentNonce=result.hubDocumentNonce;return result}),
     failed: (message: string) => ipcRenderer.invoke(IPC.failed, message),
   })
   contextBridge.exposeInMainWorld('__DSH_DIRECTORY_PICKER__', { pick: () => ipcRenderer.invoke(IPC.directory) })
