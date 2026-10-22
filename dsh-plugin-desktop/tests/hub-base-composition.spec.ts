@@ -6,6 +6,20 @@ import { dirname, join } from 'node:path'
 import { load } from 'js-yaml'
 import { entryListSchema, type PatchOptions } from '@deepseek-ai/cordis-plugin-include'
 
+it('excludes the rc.2 marketplace installer at root and inside agent presets', () => {
+ const result = hubBaseComposition([{insert:[
+  {id:'market',name:'@deepseek-ai/dsh-plugin-market'},
+  {id:'market-client',name:'@deepseek-ai/dsh-client-ui-plugin-market'},
+  {id:'preset',name:'@deepseek-ai/dsh-agent-preset',config:{plugins:[
+   {id:'market-tools',name:'@deepseek-ai/dsh-plugin-market/tools'},
+   {id:'clock',name:'@deepseek-ai/dsh-time-context'},
+  ]}},
+ ]}])
+ expect(JSON.stringify(result)).not.toContain('dsh-plugin-market')
+ expect(JSON.stringify(result)).not.toContain('dsh-client-ui-plugin-market')
+ expect(JSON.stringify(result)).toContain('dsh-time-context')
+})
+
 it.each(['cordis', 'standard', 'ptc'])('removes unavailable plugin-manager tools from the shipped %s preset without mutating it', preset => {
  const require = createRequire(import.meta.url)
  const path = join(dirname(require.resolve('@deepseek-ai/dsh-web-app/package.json')), 'presets', `${preset}.patch.yml`)

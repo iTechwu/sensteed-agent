@@ -3,7 +3,7 @@ import { composeEntries } from '@deepseek-ai/dsh-app-boot'
 import type { PatchOptions } from '@deepseek-ai/cordis-plugin-include'
 import type { EntryOptions } from '@deepseek-ai/cordis-plugin-loader'
 import { packageNameFromSpecifier } from './package-overlay.ts'
-const forbidden = new Set(['@deepseek-ai/dsh-plugin-manager', '@deepseek-ai/dsh-plugin-manager/tools', '@deepseek-ai/dsh-client-ui-plugin-manager', '@dofe/dsh-sensteed-skill-manager'])
+const forbidden = new Set(['@deepseek-ai/dsh-plugin-market', '@deepseek-ai/dsh-plugin-market/tools', '@deepseek-ai/dsh-client-ui-plugin-market', '@deepseek-ai/dsh-plugin-manager', '@deepseek-ai/dsh-plugin-manager/tools', '@deepseek-ai/dsh-client-ui-plugin-manager', '@dofe/dsh-sensteed-skill-manager'])
 /** Preset children activate later in Agent scopes, so root-only filtering misses them. */
 function withoutNativeInstaller(rows: readonly EntryOptions[]): EntryOptions[] {
   return rows.filter(row => !forbidden.has(row.name)).map(row => {
