@@ -2,13 +2,16 @@
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import * as atomic from '@deepseek-ai/dsh-atomic-write'
 import {
   ContentProfileStore,
   recordInstantiatedProfile,
   uniqueProfileName,
   type ContentProfileInstantiateInput,
 } from '../src/content-profiles.ts'
+
+afterEach(() => vi.restoreAllMocks())
 
 function store(): ContentProfileStore {
   return new ContentProfileStore(join(mkdtempSync(join(tmpdir(), 'content-profiles-')), 'content-profiles.json'))
@@ -92,6 +95,29 @@ describe('content profile store', () => {
 })
 
 describe('content profile store concurrency', () => {
+  it('keeps the last committed state visible after a failed write and allows retry', async () => {
+    const profiles = store()
+    const first = await profiles.create('已保存', templateInput)
+    await profiles.setActive(first.id)
+    vi.spyOn(atomic, 'writeFileAtomic').mockRejectedValueOnce(new Error('disk full'))
+    await expect(profiles.create('未保存', templateInput)).rejects.toThrow('disk full')
+    expect(profiles.list().map(profile => profile.name)).toEqual(['已保存'])
+    expect(profiles.activeId()).toBe(first.id)
+    await profiles.create('重试', templateInput)
+    expect(profiles.list().map(profile => profile.name)).toEqual(['已保存', '重试'])
+  })
+
+  it('serializes read-modify-write across separate store owners', async () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'content-profiles-')), 'content-profiles.json')
+    const left = new ContentProfileStore(file), right = new ContentProfileStore(file)
+    await left.create('共同名字', templateInput)
+    right.load()
+    await Promise.all([left.create('共同名字', templateInput), right.create('共同名字', templateInput)])
+    expect(new ContentProfileStore(file).list().map(profile => profile.name)).toEqual(['共同名字', '共同名字副本', '共同名字副本2'])
+    expect(left.list()).toHaveLength(3)
+    expect(right.list()).toHaveLength(3)
+  })
+
   it('serializes concurrent creates without losing updates', async () => {
     const profiles = store()
     const created = await Promise.all(

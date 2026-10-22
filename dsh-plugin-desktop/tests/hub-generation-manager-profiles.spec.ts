@@ -4,7 +4,7 @@ import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {afterEach,expect,it,vi} from 'vitest'
 import {registerHubGenerationManager} from '../src/hub-generation-manager.ts'
-import {CONTENT_PROFILES_FILENAME} from '../src/content-profiles.ts'
+import {CONTENT_PROFILES_FILENAME,ContentProfileStore} from '../src/content-profiles.ts'
 import {HubGenerationStore} from '../src/hub-generation-store.ts'
 import {HubExecutionJournal} from '../src/hub-execution-journal.ts'
 import {resolveHubHostIdentity} from '../src/hub-host-identity.ts'
@@ -75,4 +75,21 @@ it('a failed re-registration keeps the previously active profile',async()=>{
  vi.mocked(f.registerTemplateSelection).mockRejectedValueOnce(new Error('HUB_UNAVAILABLE'))
  await expect(f.manager.profiles({action:'activate',id:templateBorn})).rejects.toThrow('HUB_UNAVAILABLE')
  await expect(f.active()).resolves.toBe(first)
+})
+it('does not acknowledge activation until its local selection is durable',async()=>{
+ const f=fixture(),id=f.legacyCustom()
+ let release!:(result:boolean)=>void
+ const gate=new Promise<boolean>(resolve=>{release=resolve})
+ vi.spyOn(ContentProfileStore.prototype,'setActive').mockReturnValue(gate)
+ let completed=false
+ const selecting=f.manager.profiles({action:'activate',id}).then(value=>{completed=true;return value})
+ await new Promise(resolve=>setImmediate(resolve))
+ expect(completed).toBe(false)
+ release(true)
+ await expect(selecting).resolves.toMatchObject({switched:true})
+})
+it('rejects an activation whose local selection no longer exists',async()=>{
+ const f=fixture(),id=f.legacyCustom()
+ vi.spyOn(ContentProfileStore.prototype,'setActive').mockResolvedValue(false)
+ await expect(f.manager.profiles({action:'activate',id})).rejects.toThrow('HUB_PROFILE_NOT_FOUND')
 })

@@ -78,7 +78,7 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
        deviceId:env.identity.deviceId,profileId:env.identity.profileId})
       skippedCount=result.skippedItems.length
      }
-     if(!profiles.setActive(id))throw new Error('HUB_PROFILE_NOT_FOUND')
+     if(!await profiles.setActive(id))throw new Error('HUB_PROFILE_NOT_FOUND')
      return{switched:true,skippedCount}
     }
     return handleContentProfilesRequest(profiles, input)

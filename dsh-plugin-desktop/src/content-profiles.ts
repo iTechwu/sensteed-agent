@@ -87,37 +87,29 @@ export class ContentProfileStore {
   constructor(private readonly file: string) {}
 
   load(): ContentProfilesState {
-    if (this.cached) return this.cached
     if (!existsSync(this.file)) return { ...EMPTY, profiles: [] }
     try {
       const parsed = JSON.parse(readFileSync(this.file, 'utf8')) as ContentProfilesState
       if (parsed?.version !== 1 || !Array.isArray(parsed.profiles) || typeof parsed.activeId !== 'string' && parsed.activeId !== null) return { ...EMPTY, profiles: [] }
-      this.cached = parsed
       return parsed
     } catch {
       return { ...EMPTY, profiles: [] }
     }
   }
 
-  /** 进程内镜像：load 优先读镜像，避免在途原子写造成读写撕裂。 */
-  private cached: ContentProfilesState | undefined
   private writeChain: Promise<void> = Promise.resolve()
   /**
-   * 变更事务：读镜像 → 修改 → 落盘整段串行入链，消除并发「读改写」丢更新；
-   * 事务错误冒泡给调用者，链自身不断。磁盘写由进程内锁串行；进程外由
-   * generation 维护锁约束安装类写者。
+   * 文件锁覆盖读取、修改和原子提交；其他 Host/store 实例同样读取最新提交。
+   * 读者只能看见完整的已提交文件，失败写入不会发布内存态，链自身不中断。
    */
   private transact<T>(fn: (state: ContentProfilesState) => { result: T; next?: ContentProfilesState }): Promise<T> {
-    const exec = this.writeChain.then(async () => {
+    const exec = this.writeChain.then(() => withFileLock(this.file, async () => {
       const outcome = fn(this.load())
       if (outcome.next) {
-        this.cached = outcome.next
-        await withFileLock(this.file, async () => {
-          await writeFileAtomic(this.file, `${JSON.stringify(outcome.next, null, 2)}\n`, { mode: 0o600, dirMode: 0o700 })
-        })
+        await writeFileAtomic(this.file, `${JSON.stringify(outcome.next, null, 2)}\n`, { mode: 0o600, dirMode: 0o700 })
       }
       return outcome.result
-    })
+    }))
     this.writeChain = exec.then(() => undefined, () => undefined)
     return exec
   }
