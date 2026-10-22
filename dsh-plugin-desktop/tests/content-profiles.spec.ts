@@ -1,5 +1,5 @@
 /** Content Profile store (docs/1022 §6.4): 唯一命名、出生冻结、active 语义与持久化。 */
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -80,7 +80,7 @@ describe('content profile store', () => {
     expect(await profiles.remove(second.id)).toBe(false)
   })
 
-  it('round-trips through disk and falls back to an empty state on corrupt files', async () => {
+  it('round-trips through disk and preserves corrupt files for recovery', async () => {
     const file = join(mkdtempSync(join(tmpdir(), 'content-profiles-')), 'content-profiles.json')
     const profiles = new ContentProfileStore(file)
     const created = await profiles.create('内容创作', templateInput)
@@ -90,7 +90,9 @@ describe('content profile store', () => {
     expect(reopened.activeId()).toBe(created.id)
     expect(reopened.get(created.id)?.summary).toEqual({ skills: 1, plugins: 1, mcpEndpoints: 1, skipped: 1 })
     writeFileSync(file, '{not json')
-    expect(new ContentProfileStore(file).load().profiles).toEqual([])
+    expect(() => new ContentProfileStore(file).load()).toThrow('HUB_PROFILE_STATE_CORRUPT')
+    await expect(new ContentProfileStore(file).create('新配置', templateInput)).rejects.toThrow('HUB_PROFILE_STATE_CORRUPT')
+    expect(readFileSync(file, 'utf8')).toBe('{not json')
   })
 })
 

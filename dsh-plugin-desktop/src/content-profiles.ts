@@ -16,6 +16,7 @@ export interface HubInstantiatedShape {
 import { createHash, randomUUID } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { withFileLock, writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
+import { z } from 'zod'
 
 export type ContentProfileItem =
   | { kind: 'skill'; itemId: string; enabled: boolean; releaseId?: string; version?: string }
@@ -107,19 +108,34 @@ function summarize(items: readonly ContentProfileItem[], skipped: number): Conte
 }
 
 const EMPTY: ContentProfilesState = { version: 1, activeId: null, profiles: [] }
+const contentItemSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.enum(['skill', 'plugin']), itemId: z.uuid(), enabled: z.boolean(), releaseId: z.uuid().optional(), version: z.string().min(1).optional() }),
+  z.object({ kind: z.literal('mcp.endpoint'), service: z.string().min(1), domain: z.string().min(1), version: z.string().min(1), enabled: z.boolean() }),
+])
+const skippedSchema = z.array(z.object({ item: z.unknown(), reason: z.string() }))
+const contentStateSchema = z.object({
+  version: z.literal(1), activeId: z.uuid().nullable(),
+  profiles: z.array(z.object({ id: z.uuid(), name: z.string().min(1), sourceTemplateId: z.uuid().optional(), sourceTemplateRevision: z.number().int().positive().optional(),
+    summary: z.object({ skills: z.number().int().nonnegative(), plugins: z.number().int().nonnegative(), mcpEndpoints: z.number().int().nonnegative(), skipped: z.number().int().nonnegative() }),
+    items: z.array(contentItemSchema), skippedItems: skippedSchema, createdAt: z.string(), lastAppliedAt: z.string().optional() })),
+  appliedId: z.uuid().nullable().optional(), appliedItems: z.array(contentItemSchema).optional(), appliedScope: z.string().optional(),
+  apply: z.object({ phase: z.enum(['idle', 'registering', 'registered', 'applying', 'failed']), targetId: z.uuid().optional(), operationId: z.uuid().optional(), error: z.string().optional() }).optional(),
+  application: z.object({ contentProfileId: z.uuid(), selectionDigest: z.string(), operationId: z.uuid(), planDigest: z.string(), generationDigest: z.string(), scope: z.string() }).optional(),
+}).superRefine((state, ctx) => {
+  const ids = new Set(state.profiles.map(profile => profile.id))
+  if (ids.size !== state.profiles.length || [state.activeId, state.appliedId, state.application?.contentProfileId, state.apply?.targetId].some(id => id != null && !ids.has(id))) ctx.addIssue({ code: 'custom', message: 'Invalid Profile references' })
+})
 
-/** 仅持久化 profiles 与 activeId；apply 阶段是运行时状态，不属于本存储。 */
+/** Persist selection and application receipts together; malformed files remain available for recovery. */
 export class ContentProfileStore {
   constructor(private readonly file: string) {}
 
   load(): ContentProfilesState {
     if (!existsSync(this.file)) return { ...EMPTY, profiles: [] }
     try {
-      const parsed = JSON.parse(readFileSync(this.file, 'utf8')) as ContentProfilesState
-      if (parsed?.version !== 1 || !Array.isArray(parsed.profiles) || typeof parsed.activeId !== 'string' && parsed.activeId !== null) return { ...EMPTY, profiles: [] }
-      return parsed
+      return contentStateSchema.parse(JSON.parse(readFileSync(this.file, 'utf8'))) as ContentProfilesState
     } catch {
-      return { ...EMPTY, profiles: [] }
+      throw Error('HUB_PROFILE_STATE_CORRUPT')
     }
   }
 
@@ -254,6 +270,7 @@ export class ContentProfileStore {
       const next = {
         ...state,
         activeId: state.activeId === id ? null : state.activeId,
+        ...(state.apply?.targetId === id ? { apply: { phase: 'idle' as const } } : {}),
         profiles: state.profiles.filter((profile) => profile.id !== id),
       }
       return { result: true, next }
