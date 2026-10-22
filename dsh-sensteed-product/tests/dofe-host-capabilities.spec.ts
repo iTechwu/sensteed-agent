@@ -60,6 +60,71 @@ function fixture() {
 }
 afterEach(() => { vi.useRealTimers() })
 
+it('applies symbolic Profile endpoints through the existing credential and single-owner transport gate', async () => {
+  const f = fixture()
+  await apply(f.ctx)
+  try {
+    f.mcp().register(tool)
+    await settle()
+    await f.mcp().applyProfileEndpoints([{ service: 'tools', domain: 'platform', version: '1.0.0', enabled: true }])
+    expect(f.clients).toHaveLength(1)
+    await f.mcp().applyProfileEndpoints([])
+    expect(f.active.size).toBe(0)
+    await f.mcp().applyProfileEndpoints([{ service: 'tools', domain: 'platform', version: '1.0.0', enabled: true }])
+    expect(f.active.size).toBe(1)
+    expect(f.clients.at(-1)?.config.headers).toEqual({ Authorization: 'Bearer test-models', 'X-Company-Code': expect.any(String) })
+    await expect(f.mcp().applyProfileEndpoints([{ service: 'tools', domain: 'platform', version: '2.0.0', enabled: true }])).rejects.toThrow('HUB_MCP_ENDPOINT_VERSION_UNAVAILABLE')
+    expect(f.active.size).toBe(1)
+  } finally { await f.dispose() }
+})
+
+it('connects MCP-only Profiles and transfers route ownership to a later plugin without duplicate clients', async () => {
+  const f = fixture()
+  await apply(f.ctx)
+  try {
+    await f.mcp().applyProfileEndpoints([{ service: 'tools', domain: 'platform', version: '1.0.0', enabled: true }])
+    expect(f.clients).toHaveLength(1)
+    const first = f.clients[0]!
+    f.mcp().register(tool)
+    await settle()
+    expect(first.dispose).toHaveBeenCalledOnce()
+    expect(f.active.size).toBe(1)
+    expect(f.clients.at(-1)?.config.serverName).toBe(tool.serverName)
+    f.clear(); f.binding(); await settle()
+    expect(f.active.size).toBe(0)
+    await expect(f.mcp().applyProfileEndpoints([{ service: 'tools', domain: 'platform', version: '1.0.0', enabled: true }])).rejects.toThrow('HUB_MCP_ACCESS_REQUIRED')
+  } finally { await f.dispose() }
+})
+
+it('does not replace a route whose previous Profile owner failed to stop', async () => {
+  const f = fixture()
+  await apply(f.ctx)
+  try {
+    await f.mcp().applyProfileEndpoints([{ service: 'tools', domain: 'platform', version: '1.0.0', enabled: true }])
+    f.clients[0]!.dispose.mockRejectedValueOnce(Error('still owns transport'))
+    f.mcp().register(tool)
+    await settle()
+    expect(f.clients).toHaveLength(1)
+    expect(f.active.size).toBe(1)
+  } finally { await f.dispose() }
+})
+
+it('hands a finance Profile transport to its plugin and rejects reuse of its namespace by another endpoint', async () => {
+  const f = fixture()
+  await apply(f.ctx)
+  try {
+    await f.mcp().applyProfileEndpoints([{ service: 'datasource', domain: 'finance', version: '1.0.0', enabled: true }])
+    f.mcp().register(finance)
+    await settle()
+    expect(f.clients).toHaveLength(2)
+    expect(f.active.size).toBe(1)
+    expect(f.gate().financeAllowed).toBe(true)
+    await f.mcp().applyProfileEndpoints([{ service: 'tools', domain: 'platform', version: '1.0.0', enabled: true }])
+    const namespace = f.clients.at(-1)!.config.serverName
+    expect(() => f.mcp().register({ ...supplier, serverName: namespace })).toThrow('HUB_MCP_DUPLICATE_SERVER')
+  } finally { await f.dispose() }
+})
+
 it('owns no default business transports and rejects unsafe declarations before reserving a namespace', async () => {
   const f = fixture()
   await apply(f.ctx)

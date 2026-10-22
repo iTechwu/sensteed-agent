@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { MoreVertical, Plus } from 'lucide-react'
-import { hubProfilesRequest, type HubContentProfileView } from './hub-setup-state.ts'
+import { hubProfilesRequest, type HubContentProfileView, type HubContentProfileStatus } from './hub-setup-state.ts'
 import { trackHubTemplate } from './hub-analytics.ts'
 import type { DofeAccessLocaleKey } from './dofe-access.ts'
 
@@ -21,7 +21,9 @@ const MENU_WIDTH = { wide: 240, narrow: 200 } as const
 export function ProfileSwitcher({ wide, t, openHub }: ProfileSwitcherProps) {
   const [open, setOpen] = useState(false)
   const [profiles, setProfiles] = useState<HubContentProfileView[] | undefined>(undefined)
-  const [activeId, setActiveId] = useState<string | null>(null)
+  const [status, setStatus] = useState<HubContentProfileStatus>()
+  const [loadError, setLoadError] = useState(false)
+  const [epoch, setEpoch] = useState(0)
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
   const [anchor, setAnchor] = useState<{ left: number; bottom: number }>({ left: 0, bottom: 0 })
@@ -46,18 +48,20 @@ export function ProfileSwitcher({ wide, t, openHub }: ProfileSwitcherProps) {
   }, [open, wide])
 
   useEffect(() => {
-    if (!open) return
-    let cancelled = false
-    const controller = new AbortController()
-    void Promise.all([
-      hubProfilesRequest<HubContentProfileView[]>({ action: 'list' }, controller.signal),
-      hubProfilesRequest<string | null>({ action: 'active' }, controller.signal),
-    ]).then(([list, active]) => {
-      if (cancelled) return
-      setProfiles(list); setActiveId(active)
-    }).catch(() => { if (!cancelled) setProfiles([]) })
-    return () => { cancelled = true; controller.abort() }
+    const changed = () => setEpoch(value => value + 1)
+    window.addEventListener('sensteed:content-profiles-changed', changed)
+    const timer = open ? setInterval(changed, 3000) : undefined
+    return () => { window.removeEventListener('sensteed:content-profiles-changed', changed); clearInterval(timer) }
   }, [open])
+  useEffect(() => {
+    const controller = new AbortController()
+    void hubProfilesRequest<HubContentProfileStatus>({ action: 'status' }, controller.signal).then(value => {
+      if (controller.signal.aborted) return
+      if (!Array.isArray(value?.profiles) || !value.apply) throw Error('HUB_INVALID_RESPONSE')
+      setStatus(value); setProfiles(value.profiles); setLoadError(false)
+    }).catch(() => { if (!controller.signal.aborted) setLoadError(true) })
+    return () => controller.abort()
+  }, [open, epoch])
 
   // 键盘可达：打开即聚焦当前项；↑↓/Home/End 在菜单项间移动，Esc 关闭并归还焦点。
   useEffect(() => {
@@ -86,18 +90,20 @@ export function ProfileSwitcher({ wide, t, openHub }: ProfileSwitcherProps) {
   }
 
   const glyph = (profile: HubContentProfileView | undefined): string => (profile ? profile.name.slice(0, 1) : '·')
+  const activeId = status?.appliedId ?? null
+  const applying = busy || status?.apply.phase === 'applying' || status?.apply.phase === 'registering'
   const current = profiles?.find(profile => profile.id === activeId)
 
   const switchTo = (profile: HubContentProfileView): void => {
-    if (busy) return
+    if (applying) return
     if (profile.id === activeId) { setNotice(t('alreadyCurrent')); return }
     // 期望集切换后需重新应用：确认后仅改注册，物化经企业目录页的既有检查/安装管线。
     if (!window.confirm(`${t('switchHint')}「${profile.name}」`)) return
     // §6.4 应用中再操作：菜单禁用，activate 在途期间不可重复触发
     setBusy(true); setNotice(t('hubWorking'))
-    void hubProfilesRequest<{ switched: boolean; skippedCount: number }>({ action: 'activate', id: profile.id }).then((result) => {
+    void hubProfilesRequest<{ registered: boolean; skippedCount: number }>({ action: 'activate', id: profile.id }).then((result) => {
       trackHubTemplate({ event: 'PROFILE_SWITCHED', properties: { itemCount: profile.summary.skills + profile.summary.plugins } })
-      setActiveId(profile.id)
+      setEpoch(value => value + 1)
       // 重注册按当前 release 复核，个别条目可能已不可用：显式告知，不静默缩水
       setNotice(result.skippedCount > 0 ? `${t('switched')} ${t('switchSkipped').replace('{count}', String(result.skippedCount))}` : t('switched'))
     }).catch(() => {
@@ -133,11 +139,11 @@ export function ProfileSwitcher({ wide, t, openHub }: ProfileSwitcherProps) {
             boxShadow: '0 8px 24px rgb(0 0 0 / 12%)', padding: 6, color: 'var(--dsw-alias-label-primary, inherit)',
           }}>
           {/* §6.1 第一项永远「＋ 新增 Profile」 */}
-          <button type="button" role="menuitem" disabled={busy} onClick={() => { setOpen(false); openHub() }}
+          <button type="button" role="menuitem" disabled={applying} onClick={() => { setOpen(false); openHub() }}
             style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 6, padding: '6px 8px', fontSize: 12, borderRadius: 8, textAlign: 'left' }}>
             <Plus size={14} aria-hidden="true" />{t('createHint')}
           </button>
-          {profiles === undefined ? <p role="status" style={{ margin: '4px 8px', fontSize: 12 }}>{t('loadFailed')}</p> : (
+          {loadError ? <p role="alert" style={{ margin: '4px 8px', fontSize: 12 }}>{t('loadFailed')} <button type="button" onClick={() => setEpoch(value => value + 1)}>{t('templateRetry')}</button></p> : profiles === undefined ? <p role="status" style={{ margin: '4px 8px', fontSize: 12 }}>{t('catalogLoading')}</p> : (
             <ul role="none" style={{ listStyle: 'none', margin: 0, padding: 0, maxHeight: 240, overflowY: 'auto' }}>
               {profiles.length === 0 ? <li role="none" style={{ padding: '4px 8px', fontSize: 12, opacity: 0.7 }}>{t('createHint')}</li> : profiles.map(profile => {
                 const isCurrent = profile.id === activeId
@@ -147,14 +153,14 @@ export function ProfileSwitcher({ wide, t, openHub }: ProfileSwitcherProps) {
                     <button
                       type="button"
                       role="menuitem"
-                      disabled={busy}
+                      disabled={applying}
                       onClick={() => switchTo(profile)}
                       aria-current={isCurrent ? 'true' : undefined}
                       style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 8, padding: '6px 8px', textAlign: 'left', borderRadius: 8, background: isCurrent ? 'var(--dsw-alias-interactive-bg-hover, #f3f4f6)' : 'transparent' }}
                     >
                       <span aria-hidden="true" style={{ fontSize: 12, fontWeight: 600 }}>{glyph(profile)}</span>
                       <span style={{ flex: 1, minWidth: 0 }}>
-                        <span style={{ display: 'block', fontSize: 13 }}>{profile.name}{isCurrent ? ` · ${t('current')}` : ''}</span>
+                        <span style={{ display: 'block', fontSize: 13 }}>{profile.name}{isCurrent ? ` · ${t('current')}` : status?.registeredId === profile.id ? ` · ${t('profilePending')}` : ''}</span>
                         <span style={{ display: 'block', fontSize: 11, opacity: 0.65 }}>{countsLine(profile)}</span>
                       </span>
                       {/* §6.1 阻断项 ⚠ 徽标：创建时跳过的条目不静默 */}

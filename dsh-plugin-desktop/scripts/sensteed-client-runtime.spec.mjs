@@ -31,7 +31,7 @@ test('executes client effects and slot registrations', async () => {
         document.body.append(node)
         if (document.body.children[0] !== node || document.getElementById('fixture-notice') !== node) throw Error('notice not attached')
         const root = require('react-dom/client').createRoot(node)
-        root.render({ type: 'notice' })
+        root.render(require('react-dom').createPortal({ type: 'notice' }, document.body))
         return () => {
           root.unmount()
           node.remove()

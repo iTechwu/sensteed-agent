@@ -108,9 +108,9 @@ describe('Profile template endpoints (docs/1022 A1)', () => {
   }
   const publicList = { list: [{ id: templateId, key: 'content-creation', revision: 3, displayName: '内容创作', description: '一句话介绍', useCases: ['写作', '翻译'], iconKey: 'pen', counts: { skills: 2, plugins: 1, mcpEndpoints: 1 }, updatedAt: '2026-10-21T00:00:00.000Z' }], total: 1, page: 1, limit: 50 }
   const mcpItem = { kind: 'mcp.endpoint', service: 'knowledge', domain: 'knowledge', version: '1.0.0', enabled: true }
-  const preview = { templateId, revision: 3, items: [{ item: mcpItem, disposition: 'installable', releaseId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }] }
+  const preview = { templateId, revision: 3, items: [{ item: mcpItem, disposition: 'installable' }] }
   const profileId = '55555555-5555-4555-8555-555555555555'
-  const instantiate = { profileId, templateId, revision: 3, profileName: '内容创作', items: [{ kind: 'skill', itemId: '66666666-6666-4666-8666-666666666666', enabled: true }], mcpEndpoints: [{ service: 'knowledge', domain: 'knowledge', version: '1.0.0', enabled: true }], skippedItems: [{ item: { kind: 'plugin', identity: '@x/y', version: '1.0.0', enabled: true }, reason: '未发布到 stable 渠道' }] }
+  const instantiate = { profileId, templateId, revision: 3, profileName: '内容创作', items: [{ kind: 'skill', itemId: '66666666-6666-4666-8666-666666666666', releaseId: '88888888-8888-4888-8888-888888888888', version: '1.0.0', enabled: true }], mcpEndpoints: [{ service: 'knowledge', domain: 'knowledge', version: '1.0.0', enabled: true }], skippedItems: [{ item: { kind: 'plugin', identity: '@x/y', version: '1.0.0', enabled: true }, reason: '未发布到 stable 渠道' }] }
 
   it('lists public templates at fixed origin without leaking the bearer', async () => {
     const f = clientFor((path) => path.includes('/me') ? { code: 200, data: me } : { code: 200, data: publicList })
@@ -154,7 +154,7 @@ describe('Profile template endpoints (docs/1022 A1)', () => {
     f.client.dispose()
   })
   it('re-registers a selection from a frozen revision at the fixed origin', async () => {
-    const payload = { profileId, templateId, revision: 3, items: [{ kind: 'skill', itemId: '66666666-6666-4666-8666-666666666666', enabled: true }], mcpEndpoints: [], skippedItems: [] }
+    const payload = { profileId, templateId, revision: 3, items: [{ kind: 'skill', itemId: '66666666-6666-4666-8666-666666666666', releaseId: '88888888-8888-4888-8888-888888888888', version: '1.0.0', enabled: true }], mcpEndpoints: [], skippedItems: [] }
     const f = clientFor((path) => path.includes('/me') ? { code: 200, data: me } : { code: 200, data: payload })
     const context = await f.client.context(workspace)
     const result = await f.client.registerTemplateSelection(context, { templateId, revision: 3, deviceId, profileId })

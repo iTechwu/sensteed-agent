@@ -31,6 +31,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 }
 
 export const inject = ['slots', 'layout', 'locale']
+let rendererBootFailed=false
 
 export interface DesktopRemoteControlService {
   read(): Promise<{ enabled: boolean; available: boolean }>
@@ -99,6 +100,7 @@ export function apply(ctx: Context): void {
       name: 'shell.overlay', id: 'desktop-next-safe-mode', order: 100, locale: 'desktop-next',
     }, SafeModeNotice))
   }
+  ctx.slots.inject('shell.overlay',()=>ctx.slots.register({name:'shell.overlay',id:'next-hub-health',order:110,locale:'desktop-next'},NextHubHealth))
   ctx.effect(installWindowStyles, 'Next native materials and header interactions')
 }
 
@@ -115,8 +117,9 @@ function installUiDiagnostics(): () => void {
       plugins: document.querySelector('[data-next-plugin-controls]') !== null,
     }
   }
-  const onError = (event: ErrorEvent): void => { console.error(`[next-ui-error] ${String(event.error?.stack ?? event.message).slice(0, 8192)}`) }
-  const onRejection = (event: PromiseRejectionEvent): void => { console.error(`[next-ui-error] ${String(event.reason?.stack ?? event.reason).slice(0, 8192)}`) }
+  const fail = (error:unknown):void=>{rendererBootFailed=true;void window.desktopNext?.reportHubFailure?.(String(error).slice(0,4096)).catch(()=>{})}
+  const onError = (event: ErrorEvent): void => { fail(event.message);console.error(`[next-ui-error] ${String(event.error?.stack ?? event.message).slice(0, 8192)}`) }
+  const onRejection = (event: PromiseRejectionEvent): void => { fail(event.reason);console.error(`[next-ui-error] ${String(event.reason?.stack ?? event.reason).slice(0, 8192)}`) }
   window.addEventListener('error', onError)
   window.addEventListener('unhandledrejection', onRejection)
   let previous = read()
@@ -184,3 +187,6 @@ function SettingsActions({ t, adapter }: PropsLocale<'desktop-next'> & { adapter
 function NextVersionsSettings({ t, adapter }: PropsLocale<'desktop-next'> & { adapter: NextSettingsAdapter }) {
   return createElement(NextVersionsSettingsPage, { adapter, language: t('language') })
 }
+
+/** Reports this mounted official document through its private preload nonce. */
+function NextHubHealth(){useEffect(()=>{let second=0;const first=requestAnimationFrame(()=>{second=requestAnimationFrame(()=>{if(!rendererBootFailed)void window.desktopNext?.reportHubHealthy?.().catch(()=>{})})});return()=>{cancelAnimationFrame(first);cancelAnimationFrame(second)}},[]);return null}

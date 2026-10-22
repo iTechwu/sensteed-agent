@@ -76,7 +76,7 @@ describe('ProfileTemplatesSection', () => {
         return jsonResponse({ templateId: template.id, revision: 3, items: [] })
       }
       if (String(input).endsWith('/instantiate')) {
-        expect(JSON.parse(String(init?.body))).toEqual({ templateId: template.id, profileName: '内容创作' })
+        expect(JSON.parse(String(init?.body))).toEqual({ templateId: template.id, templateRevision: 3, profileName: '内容创作' })
         return jsonResponse({
           profileId: '55555555-5555-4555-8555-555555555555', templateId: template.id, revision: 3,
           profileName: '内容创作', items: [], mcpEndpoints: [], skippedItems: [{ item: { kind: 'plugin', identity: '@x/y', version: '1.0.0', enabled: true }, reason: '未发布到 stable 渠道' }], entries: [],

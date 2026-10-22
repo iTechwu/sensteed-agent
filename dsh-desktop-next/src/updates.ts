@@ -11,6 +11,8 @@ export interface NextUpdateOptions {
   version: string
   platform: string
   packaged: boolean
+  /** Installation maintenance wraps download and staging together. */
+  maintain?(action: () => Promise<void>): Promise<void>
   userData: string
   /** Fetch adapter for the version check. */
   request: UpdateRequest
@@ -118,7 +120,7 @@ export class NextUpdates {
       this.set({ phase: 'error', error: this.options.packaged ? 'unsupported' : 'development' }); return Promise.resolve()
     }
     if (this.state.phase === 'ready' || this.state.phase === 'installing') return Promise.resolve()
-    return this.run(async signal => {
+    const download=()=>this.run(async signal => {
       let preparing = false
       try {
         // Recheck before a counted download; the service also pins targetVersion across races.
@@ -151,6 +153,9 @@ export class NextUpdates {
         this.set({ phase: 'error', error: preparing ? 'prepare' : 'download' })
       }
     })
+    const start = () => this.disposed || this.state.phase === 'ready' || this.state.phase === 'installing'
+      ? Promise.resolve() : download()
+    return this.options.maintain ? this.options.maintain(start) : start()
   }
   async install(): Promise<void> {
     if (this.disposed || this.state.phase !== 'ready') return

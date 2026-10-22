@@ -13,13 +13,14 @@ export interface HubInstantiatedShape {
  * 创建入口仅 instantiate（§6.3 Tab B 等价 = 企业目录勾选流程，不另建本地 Profile）；
  * 早期实验壳创建的无模板来源行仍可读取与本地切换。 */
 /** Content-combination Profile store (docs/1022 §6.4). Born-from-template stays frozen: upstream template updates never mutate an existing profile. */
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { withFileLock, writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
+import { z } from 'zod'
 
 export type ContentProfileItem =
-  | { kind: 'skill'; itemId: string; enabled: boolean }
-  | { kind: 'plugin'; itemId: string; enabled: boolean }
+  | { kind: 'skill'; itemId: string; enabled: boolean; releaseId?: string; version?: string }
+  | { kind: 'plugin'; itemId: string; enabled: boolean; releaseId?: string; version?: string }
   | { kind: 'mcp.endpoint'; service: string; domain: string; version: string; enabled: boolean }
 
 export interface ContentProfileSummary {
@@ -40,19 +41,46 @@ export interface ContentProfile {
   skippedItems: { item: unknown; reason: string }[]
   createdAt: string
   lastAppliedAt?: string
+  selectionOperation?: {planId:string;operationId:string}
 }
 
 export interface ContentProfilesState {
   version: 1
   activeId: string | null
   profiles: ContentProfile[]
+  appliedId?: string | null
+  appliedItems?: ContentProfileItem[]
+  appliedScope?: string
+  apply?: ContentProfileApply
+  application?: ContentProfileApplication
+}
+
+export interface ContentProfileApply {
+  phase: 'idle' | 'registering' | 'registered' | 'applying' | 'failed'
+  targetId?: string
+  operationId?: string
+  error?: string
+}
+export interface ContentProfileApplication {
+  contentProfileId: string
+  selectionDigest: string
+  operationId: string
+  planDigest: string
+  generationDigest: string
+  scope: string
+}
+export interface ContentProfileProjection {
+  profiles: readonly ContentProfile[]
+  registeredId: string | null
+  appliedId: string | null
+  apply: ContentProfileApply
 }
 
 /** 与 instantiateProfileTemplate 返回的字段形态一致（itemId 目录身份视图）。 */
 export interface ContentProfileInstantiateInput {
   readonly templateId: string
   readonly templateRevision: number
-  readonly items: readonly { readonly kind: 'skill' | 'plugin'; readonly itemId: string; readonly enabled: boolean }[]
+  readonly items: readonly { readonly kind: 'skill' | 'plugin'; readonly itemId: string; readonly enabled: boolean; readonly releaseId?: string; readonly version?: string }[]
   readonly mcpEndpoints: readonly {
     readonly service: string
     readonly domain: string
@@ -81,43 +109,50 @@ function summarize(items: readonly ContentProfileItem[], skipped: number): Conte
 }
 
 const EMPTY: ContentProfilesState = { version: 1, activeId: null, profiles: [] }
+const contentItemSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.enum(['skill', 'plugin']), itemId: z.uuid(), enabled: z.boolean(), releaseId: z.uuid().optional(), version: z.string().min(1).optional() }),
+  z.object({ kind: z.literal('mcp.endpoint'), service: z.string().min(1), domain: z.string().min(1), version: z.string().min(1), enabled: z.boolean() }),
+])
+const skippedSchema = z.array(z.object({ item: z.unknown(), reason: z.string() }))
+const contentStateSchema = z.object({
+  version: z.literal(1), activeId: z.uuid().nullable(),
+  profiles: z.array(z.object({ id: z.uuid(), name: z.string().min(1), sourceTemplateId: z.uuid().optional(), sourceTemplateRevision: z.number().int().positive().optional(),
+    summary: z.object({ skills: z.number().int().nonnegative(), plugins: z.number().int().nonnegative(), mcpEndpoints: z.number().int().nonnegative(), skipped: z.number().int().nonnegative() }),
+    items: z.array(contentItemSchema), skippedItems: skippedSchema, createdAt: z.string(), lastAppliedAt: z.string().optional(), selectionOperation:z.object({planId:z.uuid(),operationId:z.uuid()}).optional() })),
+  appliedId: z.uuid().nullable().optional(), appliedItems: z.array(contentItemSchema).optional(), appliedScope: z.string().optional(),
+  apply: z.object({ phase: z.enum(['idle', 'registering', 'registered', 'applying', 'failed']), targetId: z.uuid().optional(), operationId: z.uuid().optional(), error: z.string().optional() }).optional(),
+  application: z.object({ contentProfileId: z.uuid(), selectionDigest: z.string(), operationId: z.uuid(), planDigest: z.string(), generationDigest: z.string(), scope: z.string() }).optional(),
+}).superRefine((state, ctx) => {
+  const ids = new Set(state.profiles.map(profile => profile.id))
+  if (ids.size !== state.profiles.length || [state.activeId, state.appliedId, state.application?.contentProfileId, state.apply?.targetId].some(id => id != null && !ids.has(id))) ctx.addIssue({ code: 'custom', message: 'Invalid Profile references' })
+})
 
-/** 仅持久化 profiles 与 activeId；apply 阶段是运行时状态，不属于本存储。 */
+/** Persist selection and application receipts together; malformed files remain available for recovery. */
 export class ContentProfileStore {
   constructor(private readonly file: string) {}
 
   load(): ContentProfilesState {
-    if (this.cached) return this.cached
     if (!existsSync(this.file)) return { ...EMPTY, profiles: [] }
     try {
-      const parsed = JSON.parse(readFileSync(this.file, 'utf8')) as ContentProfilesState
-      if (parsed?.version !== 1 || !Array.isArray(parsed.profiles) || typeof parsed.activeId !== 'string' && parsed.activeId !== null) return { ...EMPTY, profiles: [] }
-      this.cached = parsed
-      return parsed
+      return contentStateSchema.parse(JSON.parse(readFileSync(this.file, 'utf8'))) as ContentProfilesState
     } catch {
-      return { ...EMPTY, profiles: [] }
+      throw Error('HUB_PROFILE_STATE_CORRUPT')
     }
   }
 
-  /** 进程内镜像：load 优先读镜像，避免在途原子写造成读写撕裂。 */
-  private cached: ContentProfilesState | undefined
   private writeChain: Promise<void> = Promise.resolve()
   /**
-   * 变更事务：读镜像 → 修改 → 落盘整段串行入链，消除并发「读改写」丢更新；
-   * 事务错误冒泡给调用者，链自身不断。磁盘写由进程内锁串行；进程外由
-   * generation 维护锁约束安装类写者。
+   * 文件锁覆盖读取、修改和原子提交；其他 Host/store 实例同样读取最新提交。
+   * 读者只能看见完整的已提交文件，失败写入不会发布内存态，链自身不中断。
    */
   private transact<T>(fn: (state: ContentProfilesState) => { result: T; next?: ContentProfilesState }): Promise<T> {
-    const exec = this.writeChain.then(async () => {
+    const exec = this.writeChain.then(() => withFileLock(this.file, async () => {
       const outcome = fn(this.load())
       if (outcome.next) {
-        this.cached = outcome.next
-        await withFileLock(this.file, async () => {
-          await writeFileAtomic(this.file, `${JSON.stringify(outcome.next, null, 2)}\n`, { mode: 0o600, dirMode: 0o700 })
-        })
+        await writeFileAtomic(this.file, `${JSON.stringify(outcome.next, null, 2)}\n`, { mode: 0o600, dirMode: 0o700 })
       }
       return outcome.result
-    })
+    }))
     this.writeChain = exec.then(() => undefined, () => undefined)
     return exec
   }
@@ -136,11 +171,71 @@ export class ContentProfileStore {
     return this.load().activeId
   }
 
+  projection(): ContentProfileProjection {
+    const state = this.load()
+    return { profiles: state.profiles, registeredId: state.activeId, appliedId: state.appliedId ?? null,
+      apply: state.apply ?? (state.activeId ? { phase: 'registered', targetId: state.activeId } : { phase: 'idle' }) }
+  }
+
+  selectionDigest(id: string): string {
+    const profile = this.get(id)
+    if (!profile) throw Error('HUB_PROFILE_NOT_FOUND')
+    return createHash('sha256').update(JSON.stringify({ id, items: profile.items, templateId: profile.sourceTemplateId, revision: profile.sourceTemplateRevision })).digest('hex')
+  }
+
+  async beginRegistration(id: string): Promise<void> {
+    await this.transact(state => {
+      if (state.application) throw Error('HUB_OPERATION_PENDING')
+      if (!state.profiles.some(profile => profile.id === id)) throw Error('HUB_PROFILE_NOT_FOUND')
+      if (state.apply?.phase === 'registering' && state.apply.targetId !== id) throw Error('HUB_PROFILE_REGISTRATION_UNCONFIRMED')
+      return { result: undefined, next: { ...state, apply: { phase: 'registering', targetId: id } } }
+    })
+  }
+
+  async register(id: string, input: ContentProfileInstantiateInput): Promise<void> {
+    await this.transact(state => {
+      if (state.application) throw Error('HUB_OPERATION_PENDING')
+      const profile = state.profiles.find(profile => profile.id === id)
+      if (!profile) throw Error('HUB_PROFILE_NOT_FOUND')
+      const items: ContentProfileItem[] = [...input.items, ...input.mcpEndpoints.map(endpoint => ({ kind: 'mcp.endpoint' as const, ...endpoint }))]
+      const profiles = state.profiles.map(row => row.id === id ? { ...row, items, skippedItems: [...input.skippedItems], summary: summarize(items, input.skippedItems.length) } : row)
+      return { result: undefined, next: { ...state, profiles, activeId: id, apply: { phase: 'registered', targetId: id } } }
+    })
+  }
+
+  async registrationFailed(id: string, error = 'HUB_PROFILE_REGISTRATION_UNCONFIRMED'): Promise<void> {
+    await this.transact(state => ({ result: undefined, next: { ...state, apply: { phase: 'failed', targetId: id, error } } }))
+  }
+
+  application(): ContentProfileApplication | undefined { return this.load().application }
+
+  async beginApplication(application: ContentProfileApplication): Promise<void> {
+    await this.transact(state => {
+      if (state.application || state.apply?.phase === 'registering') throw Error('HUB_OPERATION_PENDING')
+      if (state.activeId !== application.contentProfileId || this.selectionDigest(application.contentProfileId) !== application.selectionDigest) throw Error('HUB_PROFILE_SELECTION_CHANGED')
+      return { result: undefined, next: { ...state, application, apply: { phase: 'applying', targetId: application.contentProfileId, operationId: application.operationId } } }
+    })
+  }
+
+  async finishApplication(expected: ContentProfileApplication, healthy: boolean, error = 'HUB_PROFILE_APPLY_FAILED', resolved?:{items:ContentProfileInstantiateInput['items'];planId:string}): Promise<void> {
+    await this.transact(state => {
+      if (JSON.stringify(state.application) !== JSON.stringify(expected)) throw Error('HUB_PROFILE_APPLICATION_CHANGED')
+      const profile = state.profiles.find(profile => profile.id === expected.contentProfileId)
+      if (!profile || this.selectionDigest(profile.id) !== expected.selectionDigest) throw Error('HUB_PROFILE_SELECTION_CHANGED')
+      const { application: _finished, ...rest } = state
+      const appliedProfile = resolved ? { ...profile, items:[...resolved.items,...profile.items.filter(item=>item.kind==='mcp.endpoint')], selectionOperation:{planId:resolved.planId,operationId:expected.operationId} } : profile
+      appliedProfile.summary=summarize(appliedProfile.items,appliedProfile.skippedItems.length)
+      return { result: undefined, next: healthy
+        ? { ...rest, appliedId: profile.id, appliedItems: appliedProfile.items, appliedScope: expected.scope, profiles: state.profiles.map(row => row.id === profile.id ? { ...appliedProfile, lastAppliedAt: new Date().toISOString() } : row), apply: { phase: 'idle' } }
+        : { ...rest, apply: { phase: 'failed', targetId: profile.id, operationId: expected.operationId, error } } }
+    })
+  }
+
   /** 模板实例化结果落库：出生即冻结（templateId+revision 仅作来源记录）。 */
   async create(name: string, input: ContentProfileInstantiateInput): Promise<ContentProfile> {
     return this.transact((state) => {
       const items: ContentProfileItem[] = [
-        ...input.items.map((item) => ({ kind: item.kind, itemId: item.itemId, enabled: item.enabled })),
+        ...input.items.map((item) => ({ ...item })),
         ...input.mcpEndpoints.map((endpoint) => ({
           kind: 'mcp.endpoint' as const, service: endpoint.service, domain: endpoint.domain,
           version: endpoint.version, enabled: endpoint.enabled,
@@ -174,9 +269,11 @@ export class ContentProfileStore {
   async remove(id: string): Promise<boolean> {
     return this.transact((state) => {
       if (!state.profiles.some((profile) => profile.id === id)) return { result: false }
+      if (state.appliedId === id || state.application?.contentProfileId === id || state.apply?.phase === 'registering' && state.apply.targetId === id) throw Error('HUB_PROFILE_IN_USE')
       const next = {
         ...state,
         activeId: state.activeId === id ? null : state.activeId,
+        ...(state.apply?.targetId === id ? { apply: { phase: 'idle' as const } } : {}),
         profiles: state.profiles.filter((profile) => profile.id !== id),
       }
       return { result: true, next }

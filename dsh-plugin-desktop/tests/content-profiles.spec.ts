@@ -1,14 +1,17 @@
 /** Content Profile store (docs/1022 §6.4): 唯一命名、出生冻结、active 语义与持久化。 */
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import * as atomic from '@deepseek-ai/dsh-atomic-write'
 import {
   ContentProfileStore,
   recordInstantiatedProfile,
   uniqueProfileName,
   type ContentProfileInstantiateInput,
 } from '../src/content-profiles.ts'
+
+afterEach(() => vi.restoreAllMocks())
 
 function store(): ContentProfileStore {
   return new ContentProfileStore(join(mkdtempSync(join(tmpdir(), 'content-profiles-')), 'content-profiles.json'))
@@ -77,7 +80,7 @@ describe('content profile store', () => {
     expect(await profiles.remove(second.id)).toBe(false)
   })
 
-  it('round-trips through disk and falls back to an empty state on corrupt files', async () => {
+  it('round-trips through disk and preserves corrupt files for recovery', async () => {
     const file = join(mkdtempSync(join(tmpdir(), 'content-profiles-')), 'content-profiles.json')
     const profiles = new ContentProfileStore(file)
     const created = await profiles.create('内容创作', templateInput)
@@ -87,11 +90,36 @@ describe('content profile store', () => {
     expect(reopened.activeId()).toBe(created.id)
     expect(reopened.get(created.id)?.summary).toEqual({ skills: 1, plugins: 1, mcpEndpoints: 1, skipped: 1 })
     writeFileSync(file, '{not json')
-    expect(new ContentProfileStore(file).load().profiles).toEqual([])
+    expect(() => new ContentProfileStore(file).load()).toThrow('HUB_PROFILE_STATE_CORRUPT')
+    await expect(new ContentProfileStore(file).create('新配置', templateInput)).rejects.toThrow('HUB_PROFILE_STATE_CORRUPT')
+    expect(readFileSync(file, 'utf8')).toBe('{not json')
   })
 })
 
 describe('content profile store concurrency', () => {
+  it('keeps the last committed state visible after a failed write and allows retry', async () => {
+    const profiles = store()
+    const first = await profiles.create('已保存', templateInput)
+    await profiles.setActive(first.id)
+    vi.spyOn(atomic, 'writeFileAtomic').mockRejectedValueOnce(new Error('disk full'))
+    await expect(profiles.create('未保存', templateInput)).rejects.toThrow('disk full')
+    expect(profiles.list().map(profile => profile.name)).toEqual(['已保存'])
+    expect(profiles.activeId()).toBe(first.id)
+    await profiles.create('重试', templateInput)
+    expect(profiles.list().map(profile => profile.name)).toEqual(['已保存', '重试'])
+  })
+
+  it('serializes read-modify-write across separate store owners', async () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'content-profiles-')), 'content-profiles.json')
+    const left = new ContentProfileStore(file), right = new ContentProfileStore(file)
+    await left.create('共同名字', templateInput)
+    right.load()
+    await Promise.all([left.create('共同名字', templateInput), right.create('共同名字', templateInput)])
+    expect(new ContentProfileStore(file).list().map(profile => profile.name)).toEqual(['共同名字', '共同名字副本', '共同名字副本2'])
+    expect(left.list()).toHaveLength(3)
+    expect(right.list()).toHaveLength(3)
+  })
+
   it('serializes concurrent creates without losing updates', async () => {
     const profiles = store()
     const created = await Promise.all(
@@ -121,5 +149,39 @@ describe('recordInstantiatedProfile (manager instantiate 本地落库)', () => {
     expect(created.summary).toEqual({ skills: 1, plugins: 1, mcpEndpoints: 1, skipped: 1 })
     expect(profiles.activeId()).toBe(created.id)
     expect(profiles.list()).toHaveLength(1)
+  })
+})
+
+describe('content Profile registration and application', () => {
+  it('keeps registration separate from a matching healthy application', async () => {
+    const profiles = store()
+    const first = await profiles.create('工作', templateInput)
+    await profiles.register(first.id, templateInput)
+    expect(profiles.projection()).toMatchObject({ registeredId: first.id, appliedId: null, apply: { phase: 'registered', targetId: first.id } })
+    const application = { contentProfileId: first.id, selectionDigest: profiles.selectionDigest(first.id), operationId: '11111111-1111-4111-8111-111111111111', planDigest: 'a'.repeat(64), generationDigest: 'b'.repeat(64), scope: 'c'.repeat(64) }
+    await profiles.beginApplication(application)
+    await expect(profiles.finishApplication({ ...application, operationId: '22222222-2222-4222-8222-222222222222' }, true)).rejects.toThrow('HUB_PROFILE_APPLICATION_CHANGED')
+    expect(profiles.projection().appliedId).toBeNull()
+    await profiles.finishApplication(application, true)
+    expect(profiles.projection()).toMatchObject({ appliedId: first.id, apply: { phase: 'idle' } })
+    expect(profiles.get(first.id)?.lastAppliedAt).toBeDefined()
+  })
+
+  it('retains the applied Profile after another application fails and protects both selections', async () => {
+    const profiles = store()
+    const first = await profiles.create('原环境', templateInput)
+    await profiles.register(first.id, templateInput)
+    const firstApplication = { contentProfileId: first.id, selectionDigest: profiles.selectionDigest(first.id), operationId: '11111111-1111-4111-8111-111111111111', planDigest: 'a'.repeat(64), generationDigest: 'b'.repeat(64), scope: 'c'.repeat(64) }
+    await profiles.beginApplication(firstApplication)
+    await profiles.finishApplication(firstApplication, true)
+    const second = await profiles.create('待应用', templateInput)
+    await profiles.register(second.id, templateInput)
+    const secondApplication = { ...firstApplication, contentProfileId: second.id, selectionDigest: profiles.selectionDigest(second.id), operationId: '22222222-2222-4222-8222-222222222222' }
+    await profiles.beginApplication(secondApplication)
+    await expect(profiles.remove(first.id)).rejects.toThrow('HUB_PROFILE_IN_USE')
+    await expect(profiles.register(first.id, templateInput)).rejects.toThrow('HUB_OPERATION_PENDING')
+    await profiles.finishApplication(secondApplication, false, 'HUB_STAGE_FAILED')
+    expect(profiles.projection()).toMatchObject({ registeredId: second.id, appliedId: first.id, apply: { phase: 'failed', targetId: second.id, error: 'HUB_STAGE_FAILED' } })
+    expect(profiles.get(second.id)?.lastAppliedAt).toBeUndefined()
   })
 })

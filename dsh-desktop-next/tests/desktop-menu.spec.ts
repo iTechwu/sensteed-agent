@@ -47,6 +47,16 @@ it('keeps valid escape routes during failure or safe mode and only advertises su
   expect(desktopMenu({ ...state, browserUrl: 'http://127.0.0.1:1234' }, 'en', vi.fn(), vi.fn()).some(item => item.label === 'Open in Browser')).toBe(true)
 })
 
+it.each([['zh-CN', '需要更新到 2.0.20-next'], ['en', 'Update required: 2.0.20-next']])('opens update checks from the mandatory version notice in %s', (language, label) => {
+  const run = vi.fn()
+  const menu = desktopMenu({ ...state, mandatoryUpdate: { phase: 'blocking', minVersion: '2.0.20-next' } }, language, vi.fn(), run)
+  const notice = menu.find(item => item.label === label)
+  expect(notice).toBeDefined()
+  ;(notice!.click as () => void)()
+  expect(run).toHaveBeenCalledWith({ type: 'check-updates' })
+  expect(menu.some(item => item.label === (language === 'en' ? 'Recovery Assistant…' : '恢复助手…'))).toBe(true)
+})
+
 it('preserves application arguments while replacing one-shot launch modes', () => {
   const argv = ['/fixture/lib/main.js', '--next-recovery', '--next-safe-mode', '--next-onboarding', '--example=value']
   expect(relaunchArguments(argv, true, true, true)).toEqual(['/fixture/lib/main.js', '--example=value', '--next-recovery'])

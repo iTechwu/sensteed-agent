@@ -31,6 +31,8 @@ const PROCESS_RESOLVER = Symbol.for('dsh-plugin-desktop.profile-package-resolver
 type ModuleSource = 'install' | 'profile'
 
 interface ProfileResolverRegistration {
+  readonly installPackageUrl: string
+  readonly installRequire: NodeJS.Require
   readonly profileBaseUrl: string
   readonly profileDirectory: string
   readonly hostOwnedOnly?: boolean
@@ -369,7 +371,7 @@ function selectedOverlayCandidate(
   const cached = registration.overlayCandidates.get(packageName)
   if (cached !== undefined && registration.managedSelection === undefined) return cached
   const overlay = findOverlayPackage(packageName, {
-    installPackageUrl: DESKTOP_PACKAGE_URL,
+    installPackageUrl: registration.installPackageUrl,
     profilePackageUrl: registration.profileBaseUrl,
     ...(registration.hostOwnedOnly===true?{hostOwnedOnly:true}:{}),
     ...(registration.managedSelection === undefined ? {} : { managedSelection: registration.managedSelection }),
@@ -435,7 +437,7 @@ function resolveFromAnchor(
   if (!context.conditions?.includes('require')) {
     return nextResolve(specifier, {
       ...context,
-      parentURL: exactAnchor === undefined ? (source === 'profile' ? registration.profileBaseUrl : DESKTOP_ENTRY_URL) : pathToFileURL(exactAnchor).href,
+      parentURL: exactAnchor === undefined ? (source === 'profile' ? registration.profileBaseUrl : registration.installPackageUrl===DESKTOP_PACKAGE_URL?DESKTOP_ENTRY_URL:registration.installPackageUrl) : pathToFileURL(exactAnchor).href,
     })
   }
   // Node's synchronous hook observes require/createRequire, but its CJS
@@ -445,7 +447,7 @@ function resolveFromAnchor(
   // the nested require.resolve call from re-entering our own policy.
   state.bypassDepth += 1
   try {
-    const require = exactAnchor === undefined ? (source === 'profile' ? registration.profileRequire : DESKTOP_REQUIRE) : createRequire(exactAnchor)
+    const require = exactAnchor === undefined ? (source === 'profile' ? registration.profileRequire : registration.installRequire) : createRequire(exactAnchor)
     return {
       url: pathToFileURL(require.resolve(specifier)).href,
       shortCircuit: true,
@@ -464,7 +466,7 @@ function resolveCommonJsFromAnchor(
   state.bypassDepth += 1
   try {
     const exactAnchor = managedAnchor(registration, request, source)
-    const require = exactAnchor === undefined ? (source === 'profile' ? registration.profileRequire : DESKTOP_REQUIRE) : createRequire(exactAnchor)
+    const require = exactAnchor === undefined ? (source === 'profile' ? registration.profileRequire : registration.installRequire) : createRequire(exactAnchor)
     return require.resolve(request)
   } finally {
     state.bypassDepth -= 1
@@ -719,7 +721,7 @@ function ensureResolverState(): ProcessResolverState {
  * @param profileBaseUrl - file URL for the Profile package.json.
  * @returns an idempotent registration disposer.
  */
-export function installProfilePackageResolver(profileBaseUrl: string, managedSelection?: HubManagedPackageSelection, hostOwnedOnly=false): () => void {
+export function installProfilePackageResolver(profileBaseUrl: string, managedSelection?: HubManagedPackageSelection, hostOwnedOnly=false, installPackageUrl=DESKTOP_PACKAGE_URL): () => void {
   const parsed = new URL(profileBaseUrl)
   if (parsed.protocol !== 'file:' || parsed.search.length > 0 || parsed.hash.length > 0) {
     throw new Error('dsh-plugin-desktop: Profile package resolver requires a plain file URL')
@@ -734,6 +736,7 @@ export function installProfilePackageResolver(profileBaseUrl: string, managedSel
   let registration = state.registrations.get(normalizedBaseUrl)
   if (registration === undefined) {
     registration = {
+      installPackageUrl, installRequire: installPackageUrl===DESKTOP_PACKAGE_URL?DESKTOP_REQUIRE:createRequire(installPackageUrl),
       profileBaseUrl: normalizedBaseUrl,
       hostOwnedOnly,
       ...(managedSelection === undefined ? {} : { managedSelection }),
@@ -751,7 +754,7 @@ export function installProfilePackageResolver(profileBaseUrl: string, managedSel
     state.registrations.set(normalizedBaseUrl, registration)
     refreshCanonicalProfilePath(registration)
   } else {
-    if (registration.managedSelection !== managedSelection||registration.hostOwnedOnly!==hostOwnedOnly) throw new Error('Profile resolver generation authority changed while retained')
+    if (registration.managedSelection !== managedSelection||registration.hostOwnedOnly!==hostOwnedOnly||registration.installPackageUrl!==installPackageUrl) throw new Error('Profile resolver generation authority changed while retained')
     // A retain denotes a new Loader/HMR generation.
     invalidatePackageSelections(registration)
   }

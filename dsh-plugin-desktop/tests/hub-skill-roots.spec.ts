@@ -4,6 +4,11 @@ vi.mock('@deepseek-ai/dsh-skill-filesystem', () => ({ installFilesystemSkillRoot
 import { bundledSkillRoot } from '../src/bundled-skill-root.ts'
 import { registerHubBootstrapSkillRoots, registerHubSkillRoots } from '../src/hub-skill-roots.ts'
 
+it('does not inherit another shell bundled roots when explicitly absent',()=>{
+ calls.policy.mockImplementation((_ctx,policy)=>{expect(policy).toMatchObject({roots:[]});return()=>{}})
+ registerHubBootstrapSkillRoots({effect:vi.fn(),inject:vi.fn()} as never,undefined,{bundledRoot:null})
+})
+
 it('seals generation roots before mounting the sole Host provider', async () => {
   const order: string[] = []
   calls.policy.mockImplementation((_ctx, policy) => {

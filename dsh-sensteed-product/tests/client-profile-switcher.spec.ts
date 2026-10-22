@@ -2,7 +2,7 @@
 // @vitest-environment jsdom
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ProfileSwitcher } from '../src/client/profile-switcher.tsx'
 import { DOFE_ACCESS_COPY } from '../src/client/dofe-access.ts'
 
@@ -17,9 +17,10 @@ function stubProfilesApi() {
     const body = JSON.parse(String(init?.body ?? '{}')) as { action?: string; id?: string }
     const path = String(input)
     if (path.endsWith('/profiles')) {
+      if (body.action === 'status') return Response.json({ profiles, registeredId: profiles[0]!.id, appliedId: profiles[0]!.id, apply: { phase: 'idle' } })
       if (body.action === 'list') return new Response(JSON.stringify(profiles), { headers: { 'content-type': 'application/json' } })
       if (body.action === 'active') return new Response(JSON.stringify(profiles[0]!.id), { headers: { 'content-type': 'application/json' } })
-      if (body.action === 'activate') return new Response(JSON.stringify({ switched: true, skippedCount: 1 }), { headers: { 'content-type': 'application/json' } })
+      if (body.action === 'activate') return new Response(JSON.stringify({ registered: true, skippedCount: 1 }), { headers: { 'content-type': 'application/json' } })
     }
     if (path.endsWith('/telemetry')) return new Response('{"delivered":true}', { headers: { 'content-type': 'application/json' } })
     throw new Error(`unexpected fetch ${path}`)
@@ -28,7 +29,8 @@ function stubProfilesApi() {
 
 describe('ProfileSwitcher', () => {
   const roots: Root[] = []
-  afterEach(() => { for (const root of roots.splice(0)) root.unmount(); vi.unstubAllGlobals() })
+  beforeEach(() => vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true))
+  afterEach(() => { act(() => { for (const root of roots.splice(0)) root.unmount() }); vi.unstubAllGlobals() })
 
   async function mount(): Promise<HTMLElement> {
     const host = document.createElement('div')
@@ -104,7 +106,8 @@ describe('ProfileSwitcher', () => {
       const body = JSON.parse(String(init?.body ?? '{}')) as { action?: string }
       const path = String(input)
       if (path.endsWith('/profiles')) {
-        if (body.action === 'list') return new Response(JSON.stringify(profiles), { headers: { 'content-type': 'application/json' } })
+        if (body.action === 'status') return Response.json({ profiles, registeredId: profiles[0]!.id, appliedId: profiles[0]!.id, apply: { phase: 'idle' } })
+      if (body.action === 'list') return new Response(JSON.stringify(profiles), { headers: { 'content-type': 'application/json' } })
         if (body.action === 'active') return new Response(JSON.stringify(profiles[0]!.id), { headers: { 'content-type': 'application/json' } })
         if (body.action === 'activate') return new Response('{"error":"HUB_UNAVAILABLE"}', { status: 409, headers: { 'content-type': 'application/json' } })
       }
@@ -131,7 +134,8 @@ describe('ProfileSwitcher', () => {
       const body = JSON.parse(String(init?.body ?? '{}')) as { action?: string }
       const path = String(input)
       if (path.endsWith('/profiles')) {
-        if (body.action === 'list') return new Response(JSON.stringify(profiles), { headers: { 'content-type': 'application/json' } })
+        if (body.action === 'status') return Response.json({ profiles, registeredId: profiles[0]!.id, appliedId: profiles[0]!.id, apply: { phase: 'idle' } })
+      if (body.action === 'list') return new Response(JSON.stringify(profiles), { headers: { 'content-type': 'application/json' } })
         if (body.action === 'active') return new Response(JSON.stringify(profiles[0]!.id), { headers: { 'content-type': 'application/json' } })
         if (body.action === 'activate') return gate
       }
@@ -149,7 +153,7 @@ describe('ProfileSwitcher', () => {
     expect([...document.body.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].every(item => item.disabled)).toBe(true)
     expect(document.body.textContent).toContain(t('hubWorking'))
     await act(async () => {
-      release(new Response(JSON.stringify({ switched: true, skippedCount: 0 }), { headers: { 'content-type': 'application/json' } }))
+      release(new Response(JSON.stringify({ registered: true, skippedCount: 0 }), { headers: { 'content-type': 'application/json' } }))
       await new Promise(resolve => setTimeout(resolve, 20))
     })
     expect(document.body.textContent).toContain(t('switched'))

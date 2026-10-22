@@ -1,5 +1,12 @@
 /** Headless owner of the Host, desktop preferences, Profiles and recovery. */
-import { randomBytes } from 'node:crypto'
+import { z } from 'zod'
+import { randomBytes, randomUUID } from 'node:crypto'
+import { NextHubSupervisor } from './hub-integration.ts'
+import { readSealedHubReleaseTrust } from '../../dsh-plugin-desktop/src/hub-release-trust.ts'
+import type { HubSyncTarget } from '../../dsh-plugin-desktop/src/hub-sync-verifier.ts'
+import type { HubTrustedHostBootInput } from '../../dsh-plugin-desktop/src/hub-host-boot.ts'
+import type { HubGenerationSupervisor } from '../../dsh-plugin-desktop/src/hub-supervisor-protocol.ts'
+import { HubRendererHealth } from '../../dsh-plugin-desktop/src/hub-renderer-health.ts'
 import { mkdtempSync } from 'node:fs'
 import { cleanupDisposableTree } from '../../dsh-plugin-desktop/src/disposable-tree.ts'
 import { join } from 'node:path'
@@ -30,6 +37,8 @@ interface RuntimeOptions {
   /** The system proxy main probed at startup; the Host decides whether it applies. */
   systemProxy?(): DesktopSystemProxyProbe
   certificate(addresses: readonly string[]): Promise<DesktopLanHttpsCertificate>
+  openHubExternal?(url:string):Promise<void>
+  onHubReady?(): void
   onFailure(): void
   onChange(): void
   onRestart(): void
@@ -39,7 +48,25 @@ interface RuntimeOptions {
   onPlatformLogin?(request: DesktopPlatformLoginRequest): void
 }
 
+const mandatoryProjection = z.object({
+  phase: z.enum(['none', 'notice', 'blocking']),
+  minVersion: z.string().max(120).optional(),
+  deadline: z.string().max(64).optional(),
+  notice: z.object({
+    title: z.string().max(256).optional(), zh: z.string().max(512).optional(),
+    en: z.string().max(512).optional(), detail: z.string().max(16384).optional(),
+  }).optional(),
+})
 export class NextDesktopRuntime {
+  mandatoryUpdate: DesktopState['mandatoryUpdate']
+  private reportHubPolicy(input: unknown): void {
+    const result = mandatoryProjection.safeParse(input ?? { phase: 'none' })
+    if (!result.success) return
+    const value = result.data
+    this.mandatoryUpdate = value.phase !== 'none' && value.minVersion
+      ? { ...value, phase: value.phase, minVersion: value.minVersion } : undefined
+    this.options.onChange()
+  }
   readonly profiles: NextProfiles
   readonly recovery: NextRecovery
   readonly settings: DesktopPreferenceStore
@@ -57,6 +84,15 @@ export class NextDesktopRuntime {
   auth: { url: string; cookie: string; token: string; injections: readonly unknown[] } | undefined
   lan: DesktopLanHttpsRuntime | undefined
   private safeHome: string | undefined
+  hubTarget: HubSyncTarget | undefined
+  hubDocumentNonce: string | undefined
+  private readonly hubRenderer = new HubRendererHealth()
+  private hubGenerationId: string | undefined
+  failHubRenderer(error: unknown): void { this.hubRenderer.fail(error) }
+  reportHubRendererHealthy(nonce: unknown): void {
+    if (typeof nonce !== 'string' || nonce !== this.hubDocumentNonce || !this.hubGenerationId) throw Error('HUB_NEXT_DOCUMENT_CHANGED')
+    this.hubRenderer.healthy(this.hubGenerationId)
+  }
   private hostProcess: DesktopHostProcess | undefined
 
   constructor(readonly options: RuntimeOptions) {
@@ -64,7 +100,7 @@ export class NextDesktopRuntime {
     this.recovery = new NextRecovery(this.profiles)
     this.settings = new DesktopPreferenceStore(options.stateHome ?? options.home)
     this.diagnostics = new DesktopDiagnostics(options.home)
-    this.backend = new DesktopBackendController(onFailure => this.createHost(onFailure), state => {
+    this.backend = new DesktopBackendController(onFailure => this.createBackendHost(onFailure), state => {
       this.diagnostics.record({ source: 'desktop.backend', event: 'phase', fields: { phase: state.phase } })
       if (state.phase === 'error' && !this.closing) {
         this.report(state.failure ?? state.message)
@@ -93,6 +129,7 @@ export class NextDesktopRuntime {
 
   report(error: unknown): void {
     if (this.closing) return
+    if(this.hubTarget)this.hubRenderer.fail(error)
     this.failure = maskSecrets(error instanceof Error ? error.message : String(error))
     this.diagnostics.record({ source: 'desktop', event: 'runtime.failed', level: 'error', error })
     this.options.onFailure()
@@ -204,7 +241,7 @@ export class NextDesktopRuntime {
     }
   }
 
-  state(): Pick<DesktopState, 'selected' | 'profiles' | 'unavailableProfiles' | 'features' | 'preferences' | 'phase' | 'busy' | 'failure' | 'safeMode' | 'home' | 'browserUrl' | 'lan' | 'checkpoint' | 'logs'> {
+  state(): Pick<DesktopState, 'mandatoryUpdate'|'selected' | 'profiles' | 'unavailableProfiles' | 'features' | 'preferences' | 'phase' | 'busy' | 'failure' | 'safeMode' | 'home' | 'browserUrl' | 'lan' | 'checkpoint' | 'logs'> {
     let features = { ...DEFAULT_FEATURES }
     let profiles: string[] = []
     let checkpoint: DesktopState['checkpoint'] = null
@@ -212,7 +249,7 @@ export class NextDesktopRuntime {
     try { profiles = this.profiles.list() } catch (error) { failure ||= maskSecrets(String(error)) }
     if (!this.safeMode) try { features = this.profiles.features(this.selected) } catch (error) { failure ||= maskSecrets(String(error)) }
     try { const saved = this.recovery.latest(this.selected); if (saved) checkpoint = { created: saved.created } } catch { /* Recovery remains usable without backups. */ }
-    return { selected: this.selected, profiles, unavailableProfiles: profiles.filter(name => !this.profiles.selectable(name)), features, preferences: { ...this.preferences }, phase: this.recoveryMode ? 'recovery' : !this.auth && failure ? 'error' : this.backend.state.phase,
+    return { mandatoryUpdate:this.mandatoryUpdate,selected: this.selected, profiles, unavailableProfiles: profiles.filter(name => !this.profiles.selectable(name)), features, preferences: { ...this.preferences }, phase: this.recoveryMode ? 'recovery' : !this.auth && failure ? 'error' : this.backend.state.phase,
       busy: this.busy, failure, safeMode: this.safeMode, home: this.options.home,
       browserUrl: this.auth && this.preferences.browserAccess && !this.safeMode ? new URL(this.auth.url).origin : null,
       lan: this.lan?.snapshot() ?? null, checkpoint, logs: this.diagnostics.snapshot() }
@@ -265,7 +302,61 @@ export class NextDesktopRuntime {
     }
   }
 
-  private createHost(onFailure: (error: Error) => void) {
+  private createBackendHost(onFailure: (error: Error) => void) {
+    if (!this.hubTarget || this.safeMode) return this.createHost(onFailure)
+    const target = this.hubTarget, userData = join(this.options.home, 'hub-content')
+    const profileDirectory = this.profiles.directory(this.selected)
+    privateDirectory(userData)
+    let epoch = 0
+    const owner = new NextHubSupervisor({
+      target, trust: readSealedHubReleaseTrust(), userData, profileDirectory,
+      ensureMutationAllowed: async () => {
+        if (!this.hostProcess) throw Error('HUB_NEXT_UPDATE_POLICY_REQUIRED')
+        await this.hostProcess.ensureHubMutationAllowed()
+      },
+      lifecycle: {
+        start: async (input, bind) => {
+          const startedEpoch = ++epoch
+          this.hubGenerationId = input?.reference.generationId
+          this.hubDocumentNonce = randomUUID()
+          if (this.hubGenerationId) this.hubRenderer.begin(this.hubGenerationId)
+          else this.hubRenderer.fail(Error('Hub base Host'))
+          const host = this.createHost(onFailure, { target, userData, ...(input ? { generation: input } : {}) }, {
+            request: request => {
+              // Defer until the requesting child's IPC handler releases its stack.
+              setImmediate(() => {
+                void owner.request(request, () => startedEpoch === epoch && !this.closing).catch(error => this.report(error))
+              })
+            },
+            waitRendererHealthy: id => owner.waitRendererHealthy(id),
+            openExternal: async url => {
+              if (!this.options.openHubExternal) throw Error('HUB_NEXT_EXTERNAL_UNAVAILABLE')
+              await this.options.openHubExternal(url)
+            },
+            reportPolicy: policy => this.reportHubPolicy(policy),
+          })
+          bind({ fiber: { dispose: () => host.stop() } })
+          await host.start()
+          this.options.onHubReady?.()
+        },
+        waitRendererHealthy: id => this.hubRenderer.wait(id),
+        inspectHealth: async () => {
+          if (!this.hostProcess) throw Error('HUB_NEXT_HEALTH_UNAVAILABLE')
+          return this.hostProcess.inspectHubHealth()
+        },
+      },
+    })
+    return {
+      start: () => owner.start(),
+      stop: async () => {
+        this.hubRenderer.fail(Error('Next Host stopped'))
+        epoch++
+        await owner.dispose()
+      },
+    }
+  }
+
+  private createHost(onFailure: (error: Error) => void, bootstrap?:{target:HubSyncTarget;userData:string;generation?:HubTrustedHostBootInput},hub?:{request:HubGenerationSupervisor['request']|((request:Parameters<HubGenerationSupervisor['request']>[0])=>void);waitRendererHealthy:HubGenerationSupervisor['waitRendererHealthy'];openExternal?(url:string):Promise<void>;reportPolicy?(policy:unknown):void}) {
     const { options } = this
     const actualHome = this.safeMode ? this.safeHome! : options.home
     const profile = this.safeMode ? DEFAULT_PROFILE : this.selected
@@ -277,13 +368,13 @@ export class NextDesktopRuntime {
     this.lan = lan
     let stopped = false
     const host = new DesktopHostProcess(options.executable, options.root, new NextProfiles(actualHome).directory(profile), undefined,
-      { ...process.env, DSH_HOME: actualHome, DSH_NEXT_NATIVE_TOKEN: token,
+      { ...process.env, ...(bootstrap?{DSH_NEXT_HUB_BOOT:JSON.stringify(bootstrap)}:{}), DSH_HOME: actualHome, DSH_NEXT_NATIVE_TOKEN: token,
         DSH_NEXT_PREFERENCES: JSON.stringify(effective), DSH_NEXT_TRUSTED_HOSTS: JSON.stringify(addresses),
         [SYSTEM_PROXY_ENV]: JSON.stringify(options.systemProxy?.() ?? {}),
         ...(this.safeMode ? { DSH_TELEMETRY_DISABLED: '1' } : {}) },
       onFailure, options.primaryRuntime, undefined, join(options.root, 'lib', 'host.js'), options.onRestart, options.onNotification,
       (chunk, stream, pid) => this.diagnostics.hostChunk(chunk, stream, pid), options.onTerminal, options.onPermission, undefined, options.onPlatformLogin,
-      input => { if (input.event === 'exit') this.diagnostics.hostClosed(input.pid); this.diagnostics.record(input) })
+      input => { if (input.event === 'exit') this.diagnostics.hostClosed(input.pid); this.diagnostics.record(input) },hub)
     this.hostProcess = host
     return {
       start: async (): Promise<void> => {

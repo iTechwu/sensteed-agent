@@ -1,4 +1,6 @@
 /** Official Desktop transport with a Host-independent native shell. */
+import { readNextHubTarget } from './hub-target.ts'
+import { withDesktopMaintenance, recordDesktopInstallerHandoff, recoverCancelledDesktopInstallation, confirmDesktopMaintenanceBuild } from '../../dsh-plugin-desktop/src/desktop-maintenance.ts'
 import { installDesktopShortcuts } from './keyboard.ts'
 import { spawn } from 'node:child_process'
 import { readFileSync } from 'node:fs'
@@ -127,6 +129,8 @@ const runtime = new NextDesktopRuntime({
       throw error
     }
   },
+  openHubExternal:async url=>{const parsed=new URL(url);if(parsed.protocol!=='https:'||parsed.username||parsed.password)throw Error('HUB_NEXT_EXTERNAL_URL_REFUSED');await shell.openExternal(url)},
+  onHubReady: () => { if(mainWindow&&!mainWindow.isDestroyed())void mainWindow.loadURL(APP_URL+'?hub_document='+runtime.hubDocumentNonce).catch(error=>runtime.report(error)) },
   onFailure: () => { if (app.isReady()) openControls('recovery') },
   onChange: () => { if (app.isReady()) native.refresh() },
   onRestart: () => run({ type: 'restart' }),
@@ -171,6 +175,7 @@ const updateInstaller = new NextUpdateInstaller({ platform: process.platform, ex
   log: error => runtime.diagnostics.append(String(error), 'warn') })
 const updates = new NextUpdates({ version, platform: process.platform, packaged: app.isPackaged, userData: electronData,
   request: (url, init) => net.fetch(url, { ...init, credentials: 'omit' }),
+  maintain:async action=>{privateDirectory(join(home,'hub-content'));return withDesktopMaintenance('installer',action,join(home,'hub-content'))},
   artifactRequest: createArtifactRequest(),
   changed: () => { if (app.isReady() && !quitting) native.refresh() },
   available: nextVersion => {
@@ -185,7 +190,8 @@ const updates = new NextUpdates({ version, platform: process.platform, packaged:
   install: async () => {
     runtime.busy = true; native.refresh()
     try {
-      await updateInstaller.stage()
+      privateDirectory(join(home,'hub-content'))
+      await withDesktopMaintenance('installer',async()=>{await updateInstaller.stage();const targetVersion=updates.snapshot().version;if(!targetVersion)throw Error('HUB_NEXT_UPDATE_VERSION_REQUIRED');await recordDesktopInstallerHandoff(targetVersion)},join(home,'hub-content'))
       if (!quitting) { installingUpdate = true; app.quit() }
     } finally { runtime.busy = false; if (!quitting) native.refresh() }
   },
@@ -271,6 +277,7 @@ function createWindow(preload: string, primary = false): BrowserWindow {
     if (typeof message !== 'string') return
     const level = typeof event?.level === 'string' ? event.level : _level
     const failure = level === 'error' || level === 3 || message.includes('[next-ui-error]') || message.includes('slot entry crashed') || message.includes('slot factory occurrence crashed')
+    if(failure&&runtime.hubTarget)runtime.failHubRenderer(Error(message.slice(0,4096)))
     if (!failure && !runtime.preferences.developerLogging) return
     if (Date.now() - intervalStart >= 1000) { intervalStart = Date.now(); count = 0; failureCount = 0 }
     const currentCount = failure ? ++failureCount : ++count
@@ -374,7 +381,7 @@ function openMain(): void {
 }
 /** Cancelled or retired window navigations are not Host failures. */
 async function loadMainDocument(owner: BrowserWindow): Promise<void> {
-  try { await owner.loadURL(APP_URL) } catch (error) {
+  try { await owner.loadURL(runtime.hubDocumentNonce?APP_URL+'?hub_document='+runtime.hubDocumentNonce:APP_URL) } catch (error) {
     if (quitting || owner.isDestroyed() || mainWindow !== owner) return
     const failure = error as { code?: string; errno?: number }
     if (failure?.code === 'ERR_ABORTED' || failure?.errno === -3) return
@@ -613,7 +620,8 @@ async function performCommand(input: Record<string, unknown>, type: string, sour
     }
     if (!await confirmed(messages[String(type)] ?? t('重启工作环境以应用更改？', 'Restart the environment to apply this change?'))) return
     if (type === 'switch') {
-      runtime.profiles.select(next)
+      privateDirectory(join(home, 'hub-content'))
+      await withDesktopMaintenance('profile-switch', async () => { runtime.profiles.select(next) }, join(home, 'hub-content'))
       relaunch = relaunchArguments(process.argv.slice(1), false, false)
       app.quit()
       return
@@ -825,9 +833,22 @@ async function main(): Promise<void> {
   })
   ipcMain.handle(IPC.boot, async event => {
     assertSender(event, mainWindow, APP_URL)
-    await runtime.startup
+    const nonce = runtime.hubDocumentNonce
+    const current = () => {
+      assertSender(event, mainWindow, APP_URL)
+      if (runtime.hubTarget && (nonce !== runtime.hubDocumentNonce
+        || new URL(event.senderFrame!.url).searchParams.get('hub_document') !== nonce)) throw Error('HUB_NEXT_DOCUMENT_CHANGED')
+    }
+    current(); await runtime.startup; current()
     if (!runtime.backend.host || !runtime.auth) throw new Error('Next Host is unavailable')
-    return { injections: await runtime.injections(), streamBaseUrl: new URL(runtime.auth.url).origin }
+    const auth = runtime.auth, injections = await runtime.injections()
+    current()
+    if (auth !== runtime.auth) throw Error('HUB_NEXT_DOCUMENT_CHANGED')
+    return { hubDocumentNonce: nonce, injections, streamBaseUrl: new URL(auth.url).origin }
+  })
+  ipcMain.handle('dsh-next:hub-renderer-healthy', (event, nonce: unknown) => {
+    assertSender(event, mainWindow, APP_URL)
+    runtime.reportHubRendererHealthy(nonce)
   })
   ipcMain.handle(IPC.failed, (event, message: unknown) => {
     assertSender(event, mainWindow, APP_URL)
@@ -964,6 +985,21 @@ async function main(): Promise<void> {
     // Packaging sealed the payload with the shell, dsh, platform and architectures it was released for.
     try { verifyPackagedRuntimeIdentity(join(root, DESKTOP_RUNTIME_FILE), { version, dshVersion: readInstalledPackageVersion(root, '@deepseek-ai/dsh'), platform: process.platform, arch: process.arch }) }
     catch (error) { runtime.recoveryMode = true; runtime.report(error) }
+  }
+  if (app.isPackaged && !runtime.safeMode) {
+    try {
+      const maintenanceTarget = await readNextHubTarget({ isPackaged: true, appPath: app.getAppPath(), resourcesPath: process.resourcesPath, version })
+      if (!maintenanceTarget) throw Error('HUB_NEXT_SEALED_TARGET_REQUIRED')
+      try { await confirmDesktopMaintenanceBuild({ hostBuildDigest: maintenanceTarget.hostBuildDigest, sensteedVersion: maintenanceTarget.sensteedVersion }) }
+      catch (error) {
+        if (process.argv.includes('--cancel-enterprise-update')) await recoverCancelledDesktopInstallation()
+        else throw error
+      }
+      if (process.argv.includes('--enterprise-content') && !runtime.recoveryMode) runtime.hubTarget = maintenanceTarget
+    } catch (error) { runtime.recoveryMode = true; runtime.report(error) }
+  } else if (process.argv.includes('--enterprise-content') && !runtime.safeMode) {
+    runtime.recoveryMode = true
+    runtime.report(Error('HUB_NEXT_SEALED_TARGET_REQUIRED'))
   }
   if (!runtime.safeMode && !runtime.recoveryMode) {
     try {

@@ -13,12 +13,12 @@ export class HubGenerationExecution {
  constructor(private readonly store:HubGenerationStore,private readonly execution:HubGenerationClient,
   private readonly client:HubHostClient,private readonly context:HubHostContext,private readonly trust:HubReleaseTrust){}
  /** Leaves active generation untouched. Launcher must stop old writers before separate activation. */
- async stage(cap:VerifiedHubGenerationPlan):Promise<HubExecutionRecord>{
-  return withDesktopMaintenance('hub-stage',()=>this.stageLocked(cap),this.store.root)
+ async stage(cap:VerifiedHubGenerationPlan,operationId=randomUUID()):Promise<HubExecutionRecord>{
+  return withDesktopMaintenance('hub-stage',()=>this.stageLocked(cap,operationId),this.store.root)
  }
- private async stageLocked(cap:VerifiedHubGenerationPlan):Promise<HubExecutionRecord>{
+ private async stageLocked(cap:VerifiedHubGenerationPlan,operationId:ReturnType<typeof randomUUID>):Promise<HubExecutionRecord>{
   const journal=new HubExecutionJournal(this.store),plan=generationPlanData(cap)
-  let record=await journal.begin(cap,randomUUID(),generationPlanEnvelope(cap) as Record<string,unknown>),proof:VerifiedHubGenerationConsumption|undefined
+  let record=await journal.begin(cap,operationId,generationPlanEnvelope(cap) as Record<string,unknown>),proof:VerifiedHubGenerationConsumption|undefined
   try{
    const grant=await this.execution.authorize(cap)
    record=await journal.advance(record,'CONSUMING')
