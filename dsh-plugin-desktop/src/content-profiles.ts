@@ -13,7 +13,7 @@ export interface HubInstantiatedShape {
  * 创建入口仅 instantiate（§6.3 Tab B 等价 = 企业目录勾选流程，不另建本地 Profile）；
  * 早期实验壳创建的无模板来源行仍可读取与本地切换。 */
 /** Content-combination Profile store (docs/1022 §6.4). Born-from-template stays frozen: upstream template updates never mutate an existing profile. */
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { withFileLock, writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 
@@ -46,6 +46,31 @@ export interface ContentProfilesState {
   version: 1
   activeId: string | null
   profiles: ContentProfile[]
+  appliedId?: string | null
+  appliedItems?: ContentProfileItem[]
+  apply?: ContentProfileApply
+  application?: ContentProfileApplication
+}
+
+export interface ContentProfileApply {
+  phase: 'idle' | 'registering' | 'registered' | 'applying' | 'failed'
+  targetId?: string
+  operationId?: string
+  error?: string
+}
+export interface ContentProfileApplication {
+  contentProfileId: string
+  selectionDigest: string
+  operationId: string
+  planDigest: string
+  generationDigest: string
+  scope: string
+}
+export interface ContentProfileProjection {
+  profiles: readonly ContentProfile[]
+  registeredId: string | null
+  appliedId: string | null
+  apply: ContentProfileApply
 }
 
 /** 与 instantiateProfileTemplate 返回的字段形态一致（itemId 目录身份视图）。 */
@@ -128,6 +153,64 @@ export class ContentProfileStore {
     return this.load().activeId
   }
 
+  projection(): ContentProfileProjection {
+    const state = this.load()
+    return { profiles: state.profiles, registeredId: state.activeId, appliedId: state.appliedId ?? null,
+      apply: state.apply ?? (state.activeId ? { phase: 'registered', targetId: state.activeId } : { phase: 'idle' }) }
+  }
+
+  selectionDigest(id: string): string {
+    const profile = this.get(id)
+    if (!profile) throw Error('HUB_PROFILE_NOT_FOUND')
+    return createHash('sha256').update(JSON.stringify({ id, items: profile.items, templateId: profile.sourceTemplateId, revision: profile.sourceTemplateRevision })).digest('hex')
+  }
+
+  async beginRegistration(id: string): Promise<void> {
+    await this.transact(state => {
+      if (state.application) throw Error('HUB_OPERATION_PENDING')
+      if (!state.profiles.some(profile => profile.id === id)) throw Error('HUB_PROFILE_NOT_FOUND')
+      if (state.apply?.phase === 'registering' && state.apply.targetId !== id) throw Error('HUB_PROFILE_REGISTRATION_UNCONFIRMED')
+      return { result: undefined, next: { ...state, apply: { phase: 'registering', targetId: id } } }
+    })
+  }
+
+  async register(id: string, input: ContentProfileInstantiateInput): Promise<void> {
+    await this.transact(state => {
+      if (state.application) throw Error('HUB_OPERATION_PENDING')
+      const profile = state.profiles.find(profile => profile.id === id)
+      if (!profile) throw Error('HUB_PROFILE_NOT_FOUND')
+      const items: ContentProfileItem[] = [...input.items, ...input.mcpEndpoints.map(endpoint => ({ kind: 'mcp.endpoint' as const, ...endpoint }))]
+      const profiles = state.profiles.map(row => row.id === id ? { ...row, items, skippedItems: [...input.skippedItems], summary: summarize(items, input.skippedItems.length) } : row)
+      return { result: undefined, next: { ...state, profiles, activeId: id, apply: { phase: 'registered', targetId: id } } }
+    })
+  }
+
+  async registrationFailed(id: string, error = 'HUB_PROFILE_REGISTRATION_UNCONFIRMED'): Promise<void> {
+    await this.transact(state => ({ result: undefined, next: { ...state, apply: { phase: 'failed', targetId: id, error } } }))
+  }
+
+  application(): ContentProfileApplication | undefined { return this.load().application }
+
+  async beginApplication(application: ContentProfileApplication): Promise<void> {
+    await this.transact(state => {
+      if (state.application || state.apply?.phase === 'registering') throw Error('HUB_OPERATION_PENDING')
+      if (state.activeId !== application.contentProfileId || this.selectionDigest(application.contentProfileId) !== application.selectionDigest) throw Error('HUB_PROFILE_SELECTION_CHANGED')
+      return { result: undefined, next: { ...state, application, apply: { phase: 'applying', targetId: application.contentProfileId, operationId: application.operationId } } }
+    })
+  }
+
+  async finishApplication(expected: ContentProfileApplication, healthy: boolean, error = 'HUB_PROFILE_APPLY_FAILED'): Promise<void> {
+    await this.transact(state => {
+      if (JSON.stringify(state.application) !== JSON.stringify(expected)) throw Error('HUB_PROFILE_APPLICATION_CHANGED')
+      const profile = state.profiles.find(profile => profile.id === expected.contentProfileId)
+      if (!profile || this.selectionDigest(profile.id) !== expected.selectionDigest) throw Error('HUB_PROFILE_SELECTION_CHANGED')
+      const { application: _finished, ...rest } = state
+      return { result: undefined, next: healthy
+        ? { ...rest, appliedId: profile.id, appliedItems: profile.items, profiles: state.profiles.map(row => row.id === profile.id ? { ...row, lastAppliedAt: new Date().toISOString() } : row), apply: { phase: 'idle' } }
+        : { ...rest, apply: { phase: 'failed', targetId: profile.id, operationId: expected.operationId, error } } }
+    })
+  }
+
   /** 模板实例化结果落库：出生即冻结（templateId+revision 仅作来源记录）。 */
   async create(name: string, input: ContentProfileInstantiateInput): Promise<ContentProfile> {
     return this.transact((state) => {
@@ -166,6 +249,7 @@ export class ContentProfileStore {
   async remove(id: string): Promise<boolean> {
     return this.transact((state) => {
       if (!state.profiles.some((profile) => profile.id === id)) return { result: false }
+      if (state.appliedId === id || state.application?.contentProfileId === id || state.apply?.phase === 'registering' && state.apply.targetId === id) throw Error('HUB_PROFILE_IN_USE')
       const next = {
         ...state,
         activeId: state.activeId === id ? null : state.activeId,

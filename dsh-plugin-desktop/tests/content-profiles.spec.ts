@@ -149,3 +149,37 @@ describe('recordInstantiatedProfile (manager instantiate 本地落库)', () => {
     expect(profiles.list()).toHaveLength(1)
   })
 })
+
+describe('content Profile registration and application', () => {
+  it('keeps registration separate from a matching healthy application', async () => {
+    const profiles = store()
+    const first = await profiles.create('工作', templateInput)
+    await profiles.register(first.id, templateInput)
+    expect(profiles.projection()).toMatchObject({ registeredId: first.id, appliedId: null, apply: { phase: 'registered', targetId: first.id } })
+    const application = { contentProfileId: first.id, selectionDigest: profiles.selectionDigest(first.id), operationId: '11111111-1111-4111-8111-111111111111', planDigest: 'a'.repeat(64), generationDigest: 'b'.repeat(64), scope: 'c'.repeat(64) }
+    await profiles.beginApplication(application)
+    await expect(profiles.finishApplication({ ...application, operationId: '22222222-2222-4222-8222-222222222222' }, true)).rejects.toThrow('HUB_PROFILE_APPLICATION_CHANGED')
+    expect(profiles.projection().appliedId).toBeNull()
+    await profiles.finishApplication(application, true)
+    expect(profiles.projection()).toMatchObject({ appliedId: first.id, apply: { phase: 'idle' } })
+    expect(profiles.get(first.id)?.lastAppliedAt).toBeDefined()
+  })
+
+  it('retains the applied Profile after another application fails and protects both selections', async () => {
+    const profiles = store()
+    const first = await profiles.create('原环境', templateInput)
+    await profiles.register(first.id, templateInput)
+    const firstApplication = { contentProfileId: first.id, selectionDigest: profiles.selectionDigest(first.id), operationId: '11111111-1111-4111-8111-111111111111', planDigest: 'a'.repeat(64), generationDigest: 'b'.repeat(64), scope: 'c'.repeat(64) }
+    await profiles.beginApplication(firstApplication)
+    await profiles.finishApplication(firstApplication, true)
+    const second = await profiles.create('待应用', templateInput)
+    await profiles.register(second.id, templateInput)
+    const secondApplication = { ...firstApplication, contentProfileId: second.id, selectionDigest: profiles.selectionDigest(second.id), operationId: '22222222-2222-4222-8222-222222222222' }
+    await profiles.beginApplication(secondApplication)
+    await expect(profiles.remove(first.id)).rejects.toThrow('HUB_PROFILE_IN_USE')
+    await expect(profiles.register(first.id, templateInput)).rejects.toThrow('HUB_OPERATION_PENDING')
+    await profiles.finishApplication(secondApplication, false, 'HUB_STAGE_FAILED')
+    expect(profiles.projection()).toMatchObject({ registeredId: second.id, appliedId: first.id, apply: { phase: 'failed', targetId: second.id, error: 'HUB_STAGE_FAILED' } })
+    expect(profiles.get(second.id)?.lastAppliedAt).toBeUndefined()
+  })
+})
