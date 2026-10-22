@@ -35,7 +35,7 @@ function fixture(managed=false){
  const client={context:async()=>({tenantId:identity.tenantId,actorRef:identity.actorRef}),check,registerTemplateSelection,registerOperationSelection,watchInvalidation:()=>()=>{},watchOfflineDenial:()=>()=>{}}
  let manager!: {profiles(input:unknown):Promise<unknown>;status(input:unknown):Promise<unknown>}
  const policy={snapshot:()=>({phase:'none' as 'none'|'notice'|'blocking'}),ensureMutationAllowed:vi.fn(async()=>{})}
- const scope={get:()=>policy,hubHostClient:client,provide:(_name:string,value:unknown)=>{manager=value as typeof manager},effect:(fn:()=>()=>void)=>{cleanups.push(fn())},inject:()=>{}}
+ const scope={get:()=>policy,hubHostClient:client,hubGenerationBoot:undefined as {generationId:string}|undefined,provide:(_name:string,value:unknown)=>{manager=value as typeof manager},effect:(fn:()=>()=>void)=>{cleanups.push(fn())},inject:()=>{}}
  registerHubGenerationManager({inject:(_keys:string[],fn:(v:unknown)=>void)=>fn(scope)} as never,{target,userData:root,profileDirectory:root,managed})
  const createTemplateBorn=async()=>{
   const profile=await new ContentProfileStore(join(root,CONTENT_PROFILES_FILENAME)).create('模板出生',{templateId:randomUUID(),templateRevision:3,items:[{kind:'skill',itemId:randomUUID(),enabled:true}],mcpEndpoints:[],skippedItems:[]})
@@ -48,8 +48,20 @@ function fixture(managed=false){
   writeFileSync(join(root,CONTENT_PROFILES_FILENAME),`${JSON.stringify({version:1,activeId:null,profiles:[{id,name:'自定义组装',summary:{skills:1,plugins:0,mcpEndpoints:0,skipped:0},items:[{kind:'skill',itemId:randomUUID(),enabled:true}],skippedItems:[],createdAt:new Date().toISOString()}]},null,2)}\n`)
   return id
  }
- return{root,manager,policy,check,registerTemplateSelection,registerOperationSelection,identity,createTemplateBorn,legacyCustom,active:()=>manager.profiles({action:'active'})}
+ return{root,manager,policy,check,registerTemplateSelection,registerOperationSelection,identity,scope,createTemplateBorn,legacyCustom,active:()=>manager.profiles({action:'active'})}
 }
+
+it.each(['foreign-scope','different-generation','different-operation','current'] as const)('projects the applied Profile only for its current healthy Host binding: %s',async scenario=>{
+ const f=fixture(true),id=await f.createTemplateBorn(),profiles=new ContentProfileStore(join(f.root,CONTENT_PROFILES_FILENAME))
+ await f.manager.profiles({action:'activate',id})
+ const scope=new HubGenerationStore(f.root,f.identity).scope,operationId=randomUUID(),generationId=randomUUID(),descriptorDigest='3'.repeat(64)
+ const state=profiles.load()
+ writeFileSync(join(f.root,CONTENT_PROFILES_FILENAME),JSON.stringify({...state,appliedId:id,appliedScope:scenario==='foreign-scope'?'other':scope,profiles:state.profiles.map(row=>({...row,selectionOperation:{planId:randomUUID(),operationId}}))}))
+ f.scope.hubGenerationBoot={generationId:scenario==='different-generation'?randomUUID():generationId}
+ vi.mocked(HubGenerationStore.prototype.readState).mockReturnValue({active:{generationId,descriptorDigest}} as never)
+ vi.mocked(HubExecutionJournal.prototype.read).mockReturnValue({operationId:scenario==='different-operation'?randomUUID():operationId,phase:'ACTIVATED',pendingReceipt:null,descriptorDigest} as never)
+ await expect(f.manager.profiles({action:'status'})).resolves.toMatchObject({appliedId:scenario==='current'?id:null})
+})
 it('activate on a template-born profile re-registers the frozen revision and reports skipped items',async()=>{
  const f=fixture(),id=await f.createTemplateBorn()
  await expect(f.manager.profiles({action:'activate',id})).resolves.toEqual({registered:true,skippedCount:1})

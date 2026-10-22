@@ -61,11 +61,21 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
    }else if(record.pendingReceipt===null&&(record.phase==='ROLLED_BACK'||record.phase==='NEEDS_ATTENTION'&&hubExecutionCanBegin(record))){await content().finishApplication(application,false,'HUB_PROFILE_APPLY_FAILED')}
   },false)}
   let lastStore:HubGenerationStore|undefined
+  function projectContent(){
+   const projection=content().projection(),state=content().load()
+   if(!options.managed||!lastStore||state.appliedScope!==lastStore.scope)return{...projection,appliedId:null}
+   const active=lastStore.readState().active,loaded=scope.hubGenerationBoot
+   if(!active||loaded?.generationId!==active.generationId)return{...projection,appliedId:null}
+   const journal=new HubExecutionJournal(lastStore),pending=journal.read(),record=pending?.descriptorDigest===active.descriptorDigest?pending:journal.readHealthyInventory()
+   const applied=state.profiles.find(profile=>profile.id===state.appliedId)
+   if(record?.phase!=='ACTIVATED'||record.pendingReceipt!==null||record.descriptorDigest!==active.descriptorDigest||applied?.selectionOperation?.operationId!==record.operationId)return{...projection,appliedId:null}
+   return projection
+  }
   let closing=false
   async function closeManaged(){if(!options.managed||closing)return;closing=true;await scope.hubGenerationSupervisor.request({kind:'base'})}
-  const unwatch=client.watchInvalidation(()=>{intents.clear();if(options.managed){void closeManaged().catch(()=>{})}else{const pending=recovery;setImmediate(()=>{void (pending??Promise.resolve()).catch(()=>{}).then(()=>resume()).catch(()=>{})})}})
+  const unwatch=client.watchInvalidation(()=>{intents.clear();lastStore=undefined;if(options.managed){void closeManaged().catch(()=>{})}else{const pending=recovery;setImmediate(()=>{void (pending??Promise.resolve()).catch(()=>{}).then(()=>resume()).catch(()=>{})})}})
   scope.effect(()=>()=>unwatch(),'Hub identity fence')
-  const undeny=client.watchOfflineDenial(()=>{intents.clear();clearHubOfflineBoot(options);void closeManaged().catch(()=>{})})
+  const undeny=client.watchOfflineDenial(()=>{intents.clear();lastStore=undefined;clearHubOfflineBoot(options);void closeManaged().catch(()=>{})})
   scope.effect(()=>()=>undeny(),'Hub explicit refusal fence')
   async function identityEnvironment(requireIdle=false){
    const context=await client.context(),identity=await resolveHubHostIdentity(options.userData,options.profileDirectory,client,context)
@@ -99,11 +109,11 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
    async check(input:unknown){
     const{channel}=z.strictObject({channel:z.enum(['stable','beta']).optional()}).parse(input),env=await environment(channel)
     await reconcileContent(env.store)
-    return{channel:env.snapshot.channel,profileId:env.identity.profileId,activeGenerationDigest:env.activeGenerationDigest,entries:env.snapshot.entries,activeItems:env.installed.filter(i=>!i.userRemoved).map(i=>({kind:i.kind,itemId:i.itemId,enabled:i.enabled})),operation:summary(env.store),contentProfile:content().projection()}
+    return{channel:env.snapshot.channel,profileId:env.identity.profileId,activeGenerationDigest:env.activeGenerationDigest,entries:env.snapshot.entries,activeItems:env.installed.filter(i=>!i.userRemoved).map(i=>({kind:i.kind,itemId:i.itemId,enabled:i.enabled})),operation:summary(env.store),contentProfile:projectContent()}
    },
    async profiles(input:unknown){
     const request=z.object({action:z.string()}).passthrough().parse(input??{})
-    if(request.action==='status'){const projection=content().projection();return options.managed?projection:{...projection,appliedId:null}}
+    if(request.action==='status')return projectContent()
     if(['create','set-active','mark-applied'].includes(request.action))throw Error('HUB_PROFILE_ACTION_FORBIDDEN')
     if(request.action==='activate')return mutate(async()=>{
      const{id}=z.strictObject({action:z.literal('activate'),id:z.uuid()}).parse(input)
@@ -212,7 +222,7 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
     // Explicit Hub 401/403 fences offlineOwner(), so it cannot enter this branch.
     if(error instanceof HubHostError&&(error.code==='HUB_UNAVAILABLE'||error.code==='HUB_SSO_REQUIRED')){
      const cached=await loadHubOfflineBoot({...options,client,trust,recoverUnconfirmed:!options.managed}).catch(()=>undefined)
-     if(cached){if(!options.managed)await scope.hubGenerationSupervisor.request({kind:'managed',...cached});return}
+     if(cached){lastStore=new HubGenerationStore(options.userData,cached.identity);if(!options.managed)await scope.hubGenerationSupervisor.request({kind:'managed',...cached});return}
     }
     if(error instanceof HubHostError&&(error.code==='HUB_ACCESS_DENIED'||error.code==='HUB_SSO_REQUIRED'&&!await client.offlineOwner()))clearHubOfflineBoot(options)
     throw error
@@ -221,6 +231,7 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
   function resume():Promise<void>{if(recovery)return recovery;const pending=recoverBoot();recovery=pending;void pending.finally(()=>{if(recovery===pending)recovery=undefined}).catch(()=>{});return pending}
   async function resumeOnce(){
    const context=await client.context(),identity=await resolveHubHostIdentity(options.userData,options.profileDirectory,client,context),store=new HubGenerationStore(options.userData,identity),journal=new HubExecutionJournal(store)
+   lastStore=store
    let record=journal.read();if(!record){await reconcileContent(store);return}
    // A new sealed Host can observe prior choices but cannot reuse old execution or boot grants.
    if(record.signedPlan&&inspectSavedHubInventory(record,identity,options.target,trust).hostTargetChanged){
