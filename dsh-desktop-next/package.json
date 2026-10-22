@@ -221,7 +221,15 @@
     "react": "18.3.1",
     "selfsigned": "5.5.0",
     "yaml": "^2.9.0",
-    "@deepseek-ai/libreoffice-kit": "0.1.5"
+    "@deepseek-ai/libreoffice-kit": "0.1.5",
+    "@dofe/dsh-sensteed-product": "workspace:*",
+    "@dofe/dsh-sensteed-finance": "file:../../docker-helm.dofe.ai/plugins/dsh-sensteed-finance",
+    "@dofe/dsh-sensteed-knowledge": "file:../../docker-helm.dofe.ai/plugins/dsh-sensteed-knowledge",
+    "@dofe/dsh-knowledge-capture": "file:../../docker-helm.dofe.ai/plugins/dsh-knowledge-capture",
+    "@dofe/dsh-openmontage-mcp": "workspace:*",
+    "@dofe/dsh-opencli": "file:../../docker-helm.dofe.ai/plugins/dsh-opencli",
+    "js-yaml": "^4.1.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@base-ui/react": "^1.7.0",

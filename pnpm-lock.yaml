@@ -16661,6 +16661,30 @@ importers:
       yaml:
         specifier: ^2.9.0
         version: 2.9.0
+      '@dofe/dsh-sensteed-product':
+        specifier: workspace:*
+        version: link:../dsh-sensteed-product
+      '@dofe/dsh-sensteed-finance':
+        specifier: file:../../docker-helm.dofe.ai/plugins/dsh-sensteed-finance
+        version: file:../docker-helm.dofe.ai/plugins/dsh-sensteed-finance
+      '@dofe/dsh-sensteed-knowledge':
+        specifier: file:../../docker-helm.dofe.ai/plugins/dsh-sensteed-knowledge
+        version: file:../docker-helm.dofe.ai/plugins/dsh-sensteed-knowledge
+      '@dofe/dsh-knowledge-capture':
+        specifier: file:../../docker-helm.dofe.ai/plugins/dsh-knowledge-capture
+        version: file:../docker-helm.dofe.ai/plugins/dsh-knowledge-capture
+      '@dofe/dsh-openmontage-mcp':
+        specifier: workspace:*
+        version: link:../deepseek-harness/plugins/dsh-openmontage-mcp
+      '@dofe/dsh-opencli':
+        specifier: file:../../docker-helm.dofe.ai/plugins/dsh-opencli
+        version: file:../docker-helm.dofe.ai/plugins/dsh-opencli
+      js-yaml:
+        specifier: ^4.1.0
+        version: 4.3.1
+      zod:
+        specifier: ^4.4.3
+        version: 4.5.4
     devDependencies:
       '@base-ui/react':
         specifier: ^1.7.0
