@@ -31,7 +31,8 @@ function fixture(managed=false){
   return verifyHubSyncSnapshot({snapshot,signature:{algorithm:'Ed25519',canonicalization:'RFC8785',keyId:'test',payloadDigest:hubSyncDigest(snapshot),signature:sign(null,Buffer.from(hubCanonicalJson(snapshot)),keys.privateKey).toString('base64')}},trust,expected)
  })
  const registerTemplateSelection=vi.fn(async(_context:unknown,input:{templateId:string;revision:number;deviceId:string;profileId:string})=>({templateId:input.templateId,profileId:input.profileId,revision:input.revision,items:[],mcpEndpoints:[],skippedItems:[{item:{kind:'plugin',identity:'@x/y',version:'1.0.0',enabled:true},reason:'未发布到 stable 渠道'}]}))
- const client={context:async()=>({tenantId:identity.tenantId,actorRef:identity.actorRef}),check,registerTemplateSelection,watchInvalidation:()=>()=>{},watchOfflineDenial:()=>()=>{}}
+ const registerOperationSelection=vi.fn(async()=>({items:[]}))
+ const client={context:async()=>({tenantId:identity.tenantId,actorRef:identity.actorRef}),check,registerTemplateSelection,registerOperationSelection,watchInvalidation:()=>()=>{},watchOfflineDenial:()=>()=>{}}
  let manager!: {profiles(input:unknown):Promise<unknown>;status(input:unknown):Promise<unknown>}
  const policy={snapshot:()=>({phase:'none' as 'none'|'notice'|'blocking'}),ensureMutationAllowed:vi.fn(async()=>{})}
  const scope={get:()=>policy,hubHostClient:client,provide:(_name:string,value:unknown)=>{manager=value as typeof manager},effect:(fn:()=>()=>void)=>{cleanups.push(fn())},inject:()=>{}}
@@ -47,7 +48,7 @@ function fixture(managed=false){
   writeFileSync(join(root,CONTENT_PROFILES_FILENAME),`${JSON.stringify({version:1,activeId:null,profiles:[{id,name:'自定义组装',summary:{skills:1,plugins:0,mcpEndpoints:0,skipped:0},items:[{kind:'skill',itemId:randomUUID(),enabled:true}],skippedItems:[],createdAt:new Date().toISOString()}]},null,2)}\n`)
   return id
  }
- return{root,manager,policy,check,registerTemplateSelection,identity,createTemplateBorn,legacyCustom,active:()=>manager.profiles({action:'active'})}
+ return{root,manager,policy,check,registerTemplateSelection,registerOperationSelection,identity,createTemplateBorn,legacyCustom,active:()=>manager.profiles({action:'active'})}
 }
 it('activate on a template-born profile re-registers the frozen revision and reports skipped items',async()=>{
  const f=fixture(),id=await f.createTemplateBorn()
@@ -56,13 +57,19 @@ it('activate on a template-born profile re-registers the frozen revision and rep
  expect(f.registerTemplateSelection.mock.calls[0]![1]).toMatchObject({deviceId:f.identity.deviceId,profileId:f.identity.profileId,revision:3})
  await expect(f.active()).resolves.toBe(id)
  // 自定义组装不触达 Hub 注册
- expect(f.check).toHaveBeenCalledOnce()
+ expect(f.check).not.toHaveBeenCalled()
 })
 it('refuses to pretend that a legacy local-only Profile changed the Hub selection',async()=>{
  const f=fixture(),id=f.legacyCustom()
  await expect(f.manager.profiles({action:'activate',id})).rejects.toThrow('HUB_PROFILE_TEMPLATE_REQUIRED')
  expect(f.registerTemplateSelection).not.toHaveBeenCalled()
  await expect(f.active()).resolves.toBe(null)
+})
+it('can re-register a frozen template when legacy server selection makes catalog resolution fail closed',async()=>{
+ const f=fixture(),id=await f.createTemplateBorn()
+ f.check.mockRejectedValue(Error('legacy selection requires re-registration'))
+ await expect(f.manager.profiles({action:'activate',id})).resolves.toMatchObject({registered:true})
+ expect(f.check).not.toHaveBeenCalled()
 })
 it('activate on an unknown id fails without changing the active profile',async()=>{
  const f=fixture(),id=await f.createTemplateBorn()
@@ -130,10 +137,16 @@ it('reconciles an acknowledged healthy application on the Host after reconnect w
  const record={...application,phase:'ACTIVATED',pendingReceipt:null,descriptorDigest:'3'.repeat(64)}
  vi.mocked(HubExecutionJournal.prototype.read).mockReturnValue(record as never)
  vi.mocked(HubGenerationStore.prototype.readState).mockReturnValue({active:{descriptorDigest:record.descriptorDigest}} as never)
- vi.mocked(inspectSavedHubPlan).mockReturnValue({} as never)
+ vi.mocked(inspectSavedHubPlan).mockReturnValue({plan:{planId:randomUUID(),items:[]}} as never)
  await f.manager.status({operationId:application.operationId})
  expect(profiles.projection()).toMatchObject({appliedId:id,apply:{phase:'idle'}})
  expect(profiles.get(id)?.lastAppliedAt).toBeDefined()
+ expect(profiles.get(id)?.selectionOperation?.operationId).toBe(application.operationId)
+ const initialRegistrations=f.registerTemplateSelection.mock.calls.length
+ vi.mocked(HubGenerationStore.prototype.readState).mockReturnValue({active:null} as never)
+ await f.manager.profiles({action:'activate',id})
+ expect(f.registerTemplateSelection).toHaveBeenCalledTimes(initialRegistrations)
+ expect(f.registerOperationSelection).toHaveBeenCalledTimes(2)
 })
 it('does not attribute another operation or an unacknowledged receipt to the registered Profile',async()=>{
  const f=fixture(true),id=await f.createTemplateBorn(),profiles=new ContentProfileStore(join(f.root,CONTENT_PROFILES_FILENAME))
@@ -167,7 +180,7 @@ it('serializes concurrent healthy receipt reconciliation without a second comple
  const record={...application,phase:'ACTIVATED',pendingReceipt:null,descriptorDigest:'3'.repeat(64)}
  vi.mocked(HubExecutionJournal.prototype.read).mockReturnValue(record as never)
  vi.mocked(HubGenerationStore.prototype.readState).mockReturnValue({active:{descriptorDigest:record.descriptorDigest}} as never)
- vi.mocked(inspectSavedHubPlan).mockReturnValue({} as never)
+ vi.mocked(inspectSavedHubPlan).mockReturnValue({plan:{planId:randomUUID(),items:[]}} as never)
  const original=ContentProfileStore.prototype.finishApplication
  let release!:()=>void,started!:()=>void
  const gate=new Promise<void>(resolve=>{release=resolve}),entered=new Promise<void>(resolve=>{started=resolve})

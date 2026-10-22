@@ -41,6 +41,7 @@ export interface ContentProfile {
   skippedItems: { item: unknown; reason: string }[]
   createdAt: string
   lastAppliedAt?: string
+  selectionOperation?: {planId:string;operationId:string}
 }
 
 export interface ContentProfilesState {
@@ -117,7 +118,7 @@ const contentStateSchema = z.object({
   version: z.literal(1), activeId: z.uuid().nullable(),
   profiles: z.array(z.object({ id: z.uuid(), name: z.string().min(1), sourceTemplateId: z.uuid().optional(), sourceTemplateRevision: z.number().int().positive().optional(),
     summary: z.object({ skills: z.number().int().nonnegative(), plugins: z.number().int().nonnegative(), mcpEndpoints: z.number().int().nonnegative(), skipped: z.number().int().nonnegative() }),
-    items: z.array(contentItemSchema), skippedItems: skippedSchema, createdAt: z.string(), lastAppliedAt: z.string().optional() })),
+    items: z.array(contentItemSchema), skippedItems: skippedSchema, createdAt: z.string(), lastAppliedAt: z.string().optional(), selectionOperation:z.object({planId:z.uuid(),operationId:z.uuid()}).optional() })),
   appliedId: z.uuid().nullable().optional(), appliedItems: z.array(contentItemSchema).optional(), appliedScope: z.string().optional(),
   apply: z.object({ phase: z.enum(['idle', 'registering', 'registered', 'applying', 'failed']), targetId: z.uuid().optional(), operationId: z.uuid().optional(), error: z.string().optional() }).optional(),
   application: z.object({ contentProfileId: z.uuid(), selectionDigest: z.string(), operationId: z.uuid(), planDigest: z.string(), generationDigest: z.string(), scope: z.string() }).optional(),
@@ -216,14 +217,16 @@ export class ContentProfileStore {
     })
   }
 
-  async finishApplication(expected: ContentProfileApplication, healthy: boolean, error = 'HUB_PROFILE_APPLY_FAILED'): Promise<void> {
+  async finishApplication(expected: ContentProfileApplication, healthy: boolean, error = 'HUB_PROFILE_APPLY_FAILED', resolved?:{items:ContentProfileInstantiateInput['items'];planId:string}): Promise<void> {
     await this.transact(state => {
       if (JSON.stringify(state.application) !== JSON.stringify(expected)) throw Error('HUB_PROFILE_APPLICATION_CHANGED')
       const profile = state.profiles.find(profile => profile.id === expected.contentProfileId)
       if (!profile || this.selectionDigest(profile.id) !== expected.selectionDigest) throw Error('HUB_PROFILE_SELECTION_CHANGED')
       const { application: _finished, ...rest } = state
+      const appliedProfile = resolved ? { ...profile, items:[...resolved.items,...profile.items.filter(item=>item.kind==='mcp.endpoint')], selectionOperation:{planId:resolved.planId,operationId:expected.operationId} } : profile
+      appliedProfile.summary=summarize(appliedProfile.items,appliedProfile.skippedItems.length)
       return { result: undefined, next: healthy
-        ? { ...rest, appliedId: profile.id, appliedItems: profile.items, appliedScope: expected.scope, profiles: state.profiles.map(row => row.id === profile.id ? { ...row, lastAppliedAt: new Date().toISOString() } : row), apply: { phase: 'idle' } }
+        ? { ...rest, appliedId: profile.id, appliedItems: appliedProfile.items, appliedScope: expected.scope, profiles: state.profiles.map(row => row.id === profile.id ? { ...appliedProfile, lastAppliedAt: new Date().toISOString() } : row), apply: { phase: 'idle' } }
         : { ...rest, apply: { phase: 'failed', targetId: profile.id, operationId: expected.operationId, error } } }
     })
   }

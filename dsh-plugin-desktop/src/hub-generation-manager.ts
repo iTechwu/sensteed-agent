@@ -49,11 +49,15 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
    }
    if(record.operationId!==application.operationId||record.planDigest!==application.planDigest||record.generationDigest!==application.generationDigest)return
    if(record.phase==='ACTIVATED'&&record.pendingReceipt===null&&options.managed&&store.readState().active?.descriptorDigest===record.descriptorDigest){
-    inspectSavedHubPlan(record,store.identity,options.target,trust)
+    const saved=inspectSavedHubPlan(record,store.identity,options.target,trust)
     const profile=content().get(application.contentProfileId)
     if(!profile||content().selectionDigest(profile.id)!==application.selectionDigest)throw Error('HUB_PROFILE_SELECTION_CHANGED')
     await applyMcp(profile.items)
-    await content().finishApplication(application,true)
+    const context=await client.context()
+    const resolved=await client.registerOperationSelection(context,{deviceId:store.identity.deviceId,profileId:store.identity.profileId,planId:saved.plan.planId,operationId:record.operationId})
+    const key=(item:{kind:string;itemId:string;releaseId:string;enabled:boolean})=>JSON.stringify([item.kind,item.itemId,item.releaseId,item.enabled])
+    if(resolved.items.map(key).sort().join('\n')!==saved.plan.items.filter(item=>item.action!=='uninstall').map(key).sort().join('\n'))throw Error('HUB_PROFILE_OPERATION_SELECTION_MISMATCH')
+    await content().finishApplication(application,true,undefined,{items:resolved.items,planId:saved.plan.planId})
    }else if(record.pendingReceipt===null&&(record.phase==='ROLLED_BACK'||record.phase==='NEEDS_ATTENTION'&&hubExecutionCanBegin(record))){await content().finishApplication(application,false,'HUB_PROFILE_APPLY_FAILED')}
   },false)}
   let lastStore:HubGenerationStore|undefined
@@ -63,9 +67,14 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
   scope.effect(()=>()=>unwatch(),'Hub identity fence')
   const undeny=client.watchOfflineDenial(()=>{intents.clear();clearHubOfflineBoot(options);void closeManaged().catch(()=>{})})
   scope.effect(()=>()=>undeny(),'Hub explicit refusal fence')
-  async function environment(requestedChannel?:'stable'|'beta',requireIdle=false){
+  async function identityEnvironment(requireIdle=false){
    const context=await client.context(),identity=await resolveHubHostIdentity(options.userData,options.profileDirectory,client,context)
    const store=new HubGenerationStore(options.userData,identity);lastStore=store
+   if(requireIdle&&!hubExecutionCanBegin(new HubExecutionJournal(store).read()))throw new Error('HUB_OPERATION_PENDING')
+   return{context,identity,store}
+  }
+  async function environment(requestedChannel?:'stable'|'beta',requireIdle=false){
+   const{context,identity,store}=await identityEnvironment(requireIdle)
    const state=store.readState(),journal=new HubExecutionJournal(store),pendingRecord=journal.read(),record=pendingRecord?.descriptorDigest===state.active?.descriptorDigest?pendingRecord:journal.readHealthyInventory()
    if(requireIdle&&!hubExecutionCanBegin(pendingRecord))throw new Error('HUB_OPERATION_PENDING')
    let activeGenerationDigest:string|null=null,minimumPolicyRevision=0,channel=requestedChannel??'stable'
@@ -101,10 +110,10 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
      const profile=content().get(id)
      if(!profile)throw Error('HUB_PROFILE_NOT_FOUND')
      if(!profile.sourceTemplateId||!profile.sourceTemplateRevision)throw Error('HUB_PROFILE_TEMPLATE_REQUIRED')
-     const env=await environment(undefined,true)
+     const env=await identityEnvironment(true)
      await content().beginRegistration(id);intents.clear()
      try{
-      const result=await client.registerTemplateSelection(env.context,{templateId:profile.sourceTemplateId,revision:profile.sourceTemplateRevision,deviceId:env.identity.deviceId,profileId:env.identity.profileId})
+      const result=profile.selectionOperation?{...await client.registerOperationSelection(env.context,{...profile.selectionOperation,deviceId:env.identity.deviceId,profileId:env.identity.profileId}),revision:profile.sourceTemplateRevision,mcpEndpoints:profile.items.filter(item=>item.kind==='mcp.endpoint'),skippedItems:profile.skippedItems,templateId:profile.sourceTemplateId}:await client.registerTemplateSelection(env.context,{templateId:profile.sourceTemplateId,revision:profile.sourceTemplateRevision,deviceId:env.identity.deviceId,profileId:env.identity.profileId})
       await content().register(id,{...result,templateRevision:result.revision})
       return{registered:true,skippedCount:result.skippedItems.length}
      }catch(error){await content().registrationFailed(id);throw error}
@@ -117,7 +126,7 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
     return await relayHubTelemetry(events)
    },
    async templates(input:unknown){
-    const{channel}=z.strictObject({channel:z.enum(['stable','beta']).optional()}).parse(input??{}),env=await environment(channel)
+    z.strictObject({channel:z.enum(['stable','beta']).optional()}).parse(input??{});const env=await identityEnvironment()
     // 分页拉全量（上限 10 页防御）：模板选择器不做服务端翻页
     const list:HubProfileTemplatePublic[]=[]
     let total=0
@@ -130,20 +139,20 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
    },
    async'template-preview'(input:unknown){
     // docs/1022 §6.3：卡片展开逐项 disposition 预览（创建前阻断项显式呈现）
-    const{channel,templateId}=z.strictObject({channel:z.enum(['stable','beta']).optional(),templateId:z.uuid()}).parse(input)
-    const env=await environment(channel)
+    const{templateId}=z.strictObject({channel:z.enum(['stable','beta']).optional(),templateId:z.uuid()}).parse(input)
+    const env=await identityEnvironment()
     return await client.profileTemplatePreview(env.context,templateId)
    },
    async instantiate(input:unknown){return mutate(async()=>{
-    const{channel,templateId,templateRevision,profileName}=z.strictObject({channel:z.enum(['stable','beta']).optional(),templateId:z.uuid(),templateRevision:z.number().int().positive().optional(),profileName:z.string().trim().min(1).max(24)}).parse(input)
-    const env=await environment(channel,true),preview=await client.profileTemplatePreview(env.context,templateId)
+    const{templateId,templateRevision,profileName}=z.strictObject({channel:z.enum(['stable','beta']).optional(),templateId:z.uuid(),templateRevision:z.number().int().positive().optional(),profileName:z.string().trim().min(1).max(24)}).parse(input)
+    const env=await identityEnvironment(true),preview=await client.profileTemplatePreview(env.context,templateId)
     if(templateRevision!==undefined&&templateRevision!==preview.revision)throw Error('HUB_TEMPLATE_CHANGED')
     const local=await content().create(profileName,{templateId,templateRevision:preview.revision,items:[],mcpEndpoints:[],skippedItems:[]})
     await content().beginRegistration(local.id);intents.clear()
     try{
      const result=await client.registerTemplateSelection(env.context,{templateId,revision:preview.revision,deviceId:env.identity.deviceId,profileId:env.identity.profileId})
      await content().register(local.id,{...result,templateRevision:result.revision})
-     return{profileId:env.identity.profileId,contentProfileId:local.id,templateId,revision:result.revision,profileName:local.name,items:result.items,mcpEndpoints:result.mcpEndpoints,skippedItems:result.skippedItems,entries:env.snapshot.entries,operation:summary(env.store)}
+     return{profileId:env.identity.profileId,contentProfileId:local.id,templateId,revision:result.revision,profileName:local.name,items:result.items,mcpEndpoints:result.mcpEndpoints,skippedItems:result.skippedItems,entries:[],operation:summary(env.store)}
     }catch(error){await content().registrationFailed(local.id);throw error}
    })},
    async preview(input:unknown){return mutate(async()=>{
@@ -286,7 +295,7 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
   if(options.managed){const timer=setInterval(()=>{void resume().catch(()=>{void closeManaged().catch(()=>{})})},60_000);timer.unref();scope.effect(()=>()=>clearInterval(timer),'Hub managed lease renewal')}
   scope.inject(['appReady'],ready=>{ready.appReady?.onReady(()=>{void resume().catch(()=>{scope.logger('hub-generation').warn('Hub managed boot requires authenticated recovery');void closeManaged().catch(()=>{})})})})
   scope.provide('hubGenerationManager',manager)
-  scope.effect(()=>async()=>{disposed=true;intents.clear();await mutationTail;await profiles?.flush()},'Desktop Hub intent lifetime')
+  scope.effect(()=>async()=>{disposed=true;intents.clear();await recovery?.catch(()=>{});await mutationTail;await profiles?.flush()},'Desktop Hub intent lifetime')
  })
 }
 /** Renderer-safe projection of durable journal state. Evidence digests and timestamps stay Host-only. */

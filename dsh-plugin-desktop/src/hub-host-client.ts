@@ -8,7 +8,7 @@ const MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 const EXACT_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-beta(\.[1-9]\d*)?)?$/u
 const MCP_ENDPOINT_PART = /^[a-z][a-z0-9_-]{0,79}$/u
 type HubRequestPath = '/skillhub/v1/me' | '/skillhub/v1/devices/bind' | '/skillhub/v1/sync/resolve'
-  | '/skillhub/v1/generations/boot-authorization' | '/skillhub/v1/generations/plans' | '/skillhub/v1/generations/installation-reports'
+  | '/skillhub/v1/generations/boot-authorization' | '/skillhub/v1/generations/plans' | '/skillhub/v1/generations/installation-reports' | '/skillhub/v1/generations/selection'
   | `/skillhub/v1/generations/plans/${string}/${'authorize' | 'consume' | 'consume-status' | 'downloads'}`
   | `/skillhub/v1/profile-templates/public?${string}`
   | `/skillhub/v1/profile-templates/${string}/preview`
@@ -371,6 +371,17 @@ export class HubHostClient {
     return (await this.request('/skillhub/v1/generations/boot-authorization',context.workspaceId,input)).data
   }
   /** Read-only signed update check; never calls prepare/consume/activate. */
+  async registerOperationSelection(context:HubHostContext,input:{deviceId:string;profileId:string;planId:string;operationId:string}):Promise<{items:HubProfileTemplateInstantiateResult['items']}>{
+    this.assertCurrent(context)
+    if(Object.values(input).some(value=>!UUID.test(value)))fail('HUB_INVALID_REQUEST')
+    const result=await this.request('/skillhub/v1/generations/selection',context.workspaceId,input)
+    this.assertCurrent(context)
+    const items=result.data.items
+    if(!Array.isArray(items)||items.length>256)fail('HUB_INVALID_RESPONSE')
+    const seen=new Set<string>()
+    for(const row of items){const item=object(row),key=`${item.kind}:${item.itemId}`;if((item.kind!=='skill'&&item.kind!=='plugin')||typeof item.itemId!=='string'||!UUID.test(item.itemId)||typeof item.releaseId!=='string'||!UUID.test(item.releaseId)||typeof item.version!=='string'||!EXACT_VERSION.test(item.version)||typeof item.enabled!=='boolean'||seen.has(key))fail('HUB_INVALID_RESPONSE');seen.add(key)}
+    return{items:items as unknown as HubProfileTemplateInstantiateResult['items']}
+  }
   async check(context: HubHostContext, request: {
     readonly mode: 'initial' | 'check' | 'reconcile'
     readonly installed: readonly { readonly kind: 'skill' | 'plugin'; readonly itemId: string; readonly releaseId: string | null;
@@ -380,7 +391,7 @@ export class HubHostClient {
     if (expected.origin !== HUB_GENERATION_ORIGIN || expected.tenantId !== context.tenantId || expected.actorRef !== context.actorRef) fail('HUB_CONTEXT_CHANGED')
     const result = await this.request('/skillhub/v1/sync/resolve', context.workspaceId, {
       mode: request.mode, channel: expected.channel, deviceId: expected.deviceId, profileId: expected.profileId,
-      observedStateDigest: expected.observedStateDigest, target: expected.target, installed: request.installed,
+      observedStateDigest: expected.observedStateDigest, target: expected.target, installed: request.installed, includeCatalog:true,
     })
     this.assertCurrent(context)
     return verifyHubSyncSnapshot(result.data, trust, expected)
