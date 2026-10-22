@@ -1,10 +1,13 @@
 import type {} from '@dofe/dsh-sensteed-product/update-policy'
 /** Host-only UI intents. All identities, targets, paths and grants remain below this boundary. */
 import{inspectSavedHubPlan,inspectSavedHubInventory}from'./hub-saved-plan.ts'
+import{join}from'node:path'
+import{ContentProfileStore,handleContentProfilesRequest,recordInstantiatedProfile,CONTENT_PROFILES_FILENAME}from'./content-profiles.ts'
+import{relayHubTelemetry}from'./hub-analytics-relay.ts'
 import{verifyHubBootAuthorization}from'./hub-boot-authorization.ts'
 import{randomUUID}from'node:crypto'
 import type{Context}from'@deepseek-ai/cordis'
-import{HubHostError,type HubHostClient}from'./hub-host-client.ts'
+import{HubHostError,type HubHostClient,type HubProfileTemplatePublic}from'./hub-host-client.ts'
 import{loadHubOfflineBoot,saveHubOfflineBoot,clearHubOfflineBoot}from'./hub-offline-boot.ts'
 import{resolveHubHostIdentity}from'./hub-host-identity.ts'
 import{HubGenerationStore}from'./hub-generation-store.ts'
@@ -20,6 +23,7 @@ type Intent={nonce:string;cap:VerifiedHubGenerationPlan;client:HubGenerationClie
 export function registerHubGenerationManager(ctx:Context,options:{readonly target:HubSyncTarget;readonly userData:string;readonly profileDirectory:string;readonly managed?:boolean}):void{
  ctx.inject(['hubHostClient'],scope=>{
   const client=scope.hubHostClient as HubHostClient,trust=readSealedHubReleaseTrust(),intents=new Map<string,Intent>()
+  let profiles:ContentProfileStore|undefined
   let lastStore:HubGenerationStore|undefined
   let closing=false
   async function closeManaged(){if(!options.managed||closing)return;closing=true;await scope.hubGenerationSupervisor.request({kind:'base'})}
@@ -54,6 +58,64 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
    async check(input:unknown){
     const{channel}=z.strictObject({channel:z.enum(['stable','beta']).optional()}).parse(input),env=await environment(channel)
     return{channel:env.snapshot.channel,profileId:env.identity.profileId,activeGenerationDigest:env.activeGenerationDigest,entries:env.snapshot.entries,activeItems:env.installed.filter(i=>!i.userRemoved).map(i=>({kind:i.kind,itemId:i.itemId,enabled:i.enabled})),operation:summary(env.store)}
+   },
+   async profiles(input:unknown){
+    // docs/1022 §6.4：内容 Profile 存储 Host 所有；双壳渲染进程经同一意图通道触达。
+    profiles ??= new ContentProfileStore(join(options.profileDirectory, CONTENT_PROFILES_FILENAME))
+    const request=z.object({action:z.string()}).passthrough().parse(input??{})
+    if(request.action==='activate'){
+     // §6.2 切换必须重新应用：模板出生的 Profile 按冻结修订重注册期望集（Hub 目录
+     // 随之改向），再本地置当前；自定义 Profile 仅本地切换（不重定目录范围）。
+     const{id}=z.strictObject({action:z.literal('activate'),id:z.uuid()}).parse(input)
+     await requireMutationAllowed()
+     const profile=profiles.get(id)
+     if(!profile)throw new Error('HUB_PROFILE_NOT_FOUND')
+     let skippedCount=0
+     if(profile.sourceTemplateId&&profile.sourceTemplateRevision){
+      const env=await environment()
+      const result=await client.registerTemplateSelection(env.context,{
+       templateId:profile.sourceTemplateId,revision:profile.sourceTemplateRevision,
+       deviceId:env.identity.deviceId,profileId:env.identity.profileId})
+      skippedCount=result.skippedItems.length
+     }
+     if(!profiles.setActive(id))throw new Error('HUB_PROFILE_NOT_FOUND')
+     return{switched:true,skippedCount}
+    }
+    return handleContentProfilesRequest(profiles, input)
+   },
+   async telemetry(input:unknown){
+    const{events}=z.strictObject({events:z.array(z.unknown()).max(64)}).parse(input)
+    return await relayHubTelemetry(events)
+   },
+   async templates(input:unknown){
+    const{channel}=z.strictObject({channel:z.enum(['stable','beta']).optional()}).parse(input??{}),env=await environment(channel)
+    // 分页拉全量（上限 10 页防御）：模板选择器不做服务端翻页
+    const list:HubProfileTemplatePublic[]=[]
+    let total=0
+    for(let page=1;page<=10;page+=1){
+      const result=await client.profileTemplates(env.context,page)
+      total=result.total;list.push(...result.list)
+      if(list.length>=total||result.list.length===0)break
+    }
+    return{list,total}
+   },
+   async'template-preview'(input:unknown){
+    // docs/1022 §6.3：卡片展开逐项 disposition 预览（创建前阻断项显式呈现）
+    const{channel,templateId}=z.strictObject({channel:z.enum(['stable','beta']).optional(),templateId:z.uuid()}).parse(input)
+    const env=await environment(channel)
+    return await client.profileTemplatePreview(env.context,templateId)
+   },
+   async instantiate(input:unknown){
+    await requireMutationAllowed()
+    const{channel,templateId,profileName}=z.strictObject({channel:z.enum(['stable','beta']).optional(),templateId:z.uuid(),profileName:z.string().min(1).max(24)}).parse(input)
+    const env=await environment(channel)
+    // docs/1022 方案 B：注册期望集（profileId=本端 Profile 目录身份），物化走既有
+    // preview→execute→restart 意图管线（快照已被期望集裁剪）
+    const result=await client.instantiateProfileTemplate(env.context,{templateId,profileName,deviceId:env.identity.deviceId,profileId:env.identity.profileId})
+    // 本地内容 Profile 落库并置当前（§6.3 创建即应用）：切换器/回执/切换埋点的数据源
+    profiles ??= new ContentProfileStore(join(options.profileDirectory, CONTENT_PROFILES_FILENAME))
+    const local=await recordInstantiatedProfile(profiles,profileName,result)
+    return{profileId:env.identity.profileId,contentProfileId:local.id,templateId:result.templateId,revision:result.revision,profileName:result.profileName,items:result.items,mcpEndpoints:result.mcpEndpoints,skippedItems:result.skippedItems,entries:env.snapshot.entries,operation:summary(env.store)}
    },
    async preview(input:unknown){
     await requireMutationAllowed()

@@ -8,7 +8,7 @@ it.each([true, false])('keeps legacy pages when present and falls back after dis
   const core = new SlotCore()
   core.register({ name: 'root', children: {
     main: { kind: 'keyed', scope: 'root' },
-    'sidebar.panellist': { kind: 'list', scope: 'root' },
+    'sidebar.panellist': { kind: 'list', scope: 'root' }, 'sidebar.footer.action': { kind: 'list', scope: 'root' },
     'desktop.navigation.context': { kind: 'keyed', scope: 'root' },
     'plugins.tab': { kind: 'list', scope: 'root' },
   } }, (() => null) as never)
@@ -31,7 +31,7 @@ it('retains and opens a session before querying its skill catalog', async () => 
   const core = new SlotCore()
   core.register({ name: 'root', children: {
     main: { kind: 'keyed', scope: 'root' }, 'desktop.navigation.context': { kind: 'keyed', scope: 'root' },
-    'sidebar.panellist': { kind: 'list', scope: 'root' }, 'plugins.tab': { kind: 'list', scope: 'root' },
+    'sidebar.panellist': { kind: 'list', scope: 'root' }, 'sidebar.footer.action': { kind: 'list', scope: 'root' }, 'plugins.tab': { kind: 'list', scope: 'root' },
   } }, (() => null) as never)
   let retained = false
   const list = vi.fn(async () => { expect(retained).toBe(true); return { ok: true, value: { skills: [{ name: 'local' }] } } })

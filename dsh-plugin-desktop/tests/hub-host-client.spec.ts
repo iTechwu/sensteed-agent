@@ -2,7 +2,7 @@ import { createHash, generateKeyPairSync, randomUUID, sign } from 'node:crypto'
 import { hubCanonicalJson, hubSyncDigest, hubSyncSnapshotData, type HubSyncExpected } from '../src/hub-sync-verifier.ts'
 import { registerHubHostService } from '../src/hub-host-service.ts'
 import { describe, expect, it, vi } from 'vitest'
-import { HubHostClient, type HubSsoSession } from '../src/hub-host-client.ts'
+import { HubHostClient, type HubHostContext, type HubSsoSession } from '../src/hub-host-client.ts'
 const tenant = '11111111-1111-4111-8111-111111111111', workspace = '22222222-2222-4222-8222-222222222222'
 function fixture() {
   let session: HubSsoSession | undefined = { accessToken: 'test-only-token', operator: 'test-actor', tenantId: tenant }
@@ -92,3 +92,83 @@ it('downloads only aggregate UUID content and checks exact streamed signed bytes
 })
 
 it('notifies the running managed Host only for binding changes, not its first context sample',async()=>{const f=fixture(),listener=vi.fn();const stop=f.client.watchInvalidation(listener);await f.client.context();expect(listener).not.toHaveBeenCalled();f.logout();expect(listener).toHaveBeenCalledOnce();stop();f.change();expect(listener).toHaveBeenCalledOnce();f.client.dispose()})
+
+describe('Profile template endpoints (docs/1022 A1)', () => {
+  const templateId = '33333333-3333-4333-8333-333333333333', deviceId = '44444444-4444-4444-8444-444444444444'
+  const me = { tenantId: tenant, workspace: { ssoTeam: { id: workspace } }, permissions: ['catalog:read'] }
+  function clientFor(reply: (path: string) => { code: number; data: unknown }) {
+    let session: HubSsoSession | undefined = { accessToken: 'test-only-token', operator: 'test-actor', tenantId: tenant }
+    const auth = { getDatasourceSession: () => session, watchBinding: () => () => {} }
+    const fetcher = vi.fn<typeof fetch>(async (input) => {
+      const path = String(input)
+      const { code, data } = reply(path)
+      return new Response(JSON.stringify({ code, data }), { headers: { 'content-type': 'application/json' } })
+    })
+    return { client: new HubHostClient(auth, fetcher), fetcher, logout: () => { session = undefined } }
+  }
+  const publicList = { list: [{ id: templateId, key: 'content-creation', revision: 3, displayName: '内容创作', description: '一句话介绍', useCases: ['写作', '翻译'], iconKey: 'pen', counts: { skills: 2, plugins: 1, mcpEndpoints: 1 }, updatedAt: '2026-10-21T00:00:00.000Z' }], total: 1, page: 1, limit: 50 }
+  const mcpItem = { kind: 'mcp.endpoint', service: 'knowledge', domain: 'knowledge', version: '1.0.0', enabled: true }
+  const preview = { templateId, revision: 3, items: [{ item: mcpItem, disposition: 'installable', releaseId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }] }
+  const profileId = '55555555-5555-4555-8555-555555555555'
+  const instantiate = { profileId, templateId, revision: 3, profileName: '内容创作', items: [{ kind: 'skill', itemId: '66666666-6666-4666-8666-666666666666', enabled: true }], mcpEndpoints: [{ service: 'knowledge', domain: 'knowledge', version: '1.0.0', enabled: true }], skippedItems: [{ item: { kind: 'plugin', identity: '@x/y', version: '1.0.0', enabled: true }, reason: '未发布到 stable 渠道' }] }
+
+  it('lists public templates at fixed origin without leaking the bearer', async () => {
+    const f = clientFor((path) => path.includes('/me') ? { code: 200, data: me } : { code: 200, data: publicList })
+    const context = await f.client.context(workspace)
+    const result = await f.client.profileTemplates(context)
+    expect(result.total).toBe(1)
+    expect(result.list[0]).toMatchObject({ id: templateId, displayName: '内容创作', counts: { skills: 2 } })
+    expect(JSON.stringify(result)).not.toContain('test-only-token')
+    expect(f.fetcher.mock.calls.at(-1)?.[0]).toBe('https://ai.hozonauto.com/plugins/api/skillhub/v1/profile-templates/public?page=1&limit=50')
+    f.client.dispose()
+  })
+  it('rejects malformed template payloads as invalid responses', async () => {
+    const broken = { ...publicList, list: [{ ...publicList.list[0]!, displayName: ''.padEnd(25, '名') }] }
+    const f = clientFor((path) => path.includes('/me') ? { code: 200, data: me } : { code: 200, data: broken })
+    const context = await f.client.context(workspace)
+    await expect(f.client.profileTemplates(context)).rejects.toMatchObject({ code: 'HUB_INVALID_RESPONSE' })
+    f.client.dispose()
+  })
+  it('previews per-item disposition and requires a reason on blocked entries', async () => {
+    const f = clientFor((path) => path.includes('/me') ? { code: 200, data: me } : { code: 200, data: preview })
+    const context = await f.client.context(workspace)
+    const result = await f.client.profileTemplatePreview(context, templateId)
+    expect(result.items[0]).toMatchObject({ disposition: 'installable' })
+    await expect(f.client.profileTemplatePreview(context, 'not-a-uuid')).rejects.toMatchObject({ code: 'HUB_INVALID_REQUEST' })
+    const blocked = { ...preview, items: [{ item: { kind: 'skill', identity: 'a', version: '1.0.0', enabled: true }, disposition: 'blocked' }] }
+    const g = clientFor((path) => path.includes('/me') ? { code: 200, data: me } : { code: 200, data: blocked })
+    const other = await g.client.context(workspace)
+    await expect(g.client.profileTemplatePreview(other, templateId)).rejects.toMatchObject({ code: 'HUB_INVALID_RESPONSE' })
+    f.client.dispose(); g.client.dispose()
+  })
+  it('registers the profile selection for the generations pipeline and validates the reply', async () => {
+    const f = clientFor((path) => path.includes('/me') ? { code: 200, data: me } : { code: 201, data: instantiate })
+    const context = await f.client.context(workspace)
+    const result = await f.client.instantiateProfileTemplate(context, { templateId, profileName: '  内容创作  ', deviceId, profileId })
+    expect(result).toMatchObject({ profileId, profileName: '内容创作', items: [{ kind: 'skill', enabled: true }] })
+    const call = f.fetcher.mock.calls.at(-1)
+    expect(call?.[0]).toBe(`https://ai.hozonauto.com/plugins/api/skillhub/v1/profile-templates/${templateId}/instantiate`)
+    expect(call?.[1]).toMatchObject({ method: 'POST', body: JSON.stringify({ templateId, profileName: '内容创作', deviceId, profileId }) })
+    await expect(f.client.instantiateProfileTemplate(context, { templateId, profileName: '', deviceId, profileId })).rejects.toMatchObject({ code: 'HUB_INVALID_REQUEST' })
+    await expect(f.client.instantiateProfileTemplate(context, { templateId, profileName: 'x', deviceId, profileId: 'not-a-uuid' })).rejects.toMatchObject({ code: 'HUB_INVALID_REQUEST' })
+    f.client.dispose()
+  })
+  it('re-registers a selection from a frozen revision at the fixed origin', async () => {
+    const payload = { profileId, templateId, revision: 3, items: [{ kind: 'skill', itemId: '66666666-6666-4666-8666-666666666666', enabled: true }], mcpEndpoints: [], skippedItems: [] }
+    const f = clientFor((path) => path.includes('/me') ? { code: 200, data: me } : { code: 200, data: payload })
+    const context = await f.client.context(workspace)
+    const result = await f.client.registerTemplateSelection(context, { templateId, revision: 3, deviceId, profileId })
+    expect(result).toMatchObject({ profileId, templateId, revision: 3, items: [{ kind: 'skill' }] })
+    expect(f.fetcher.mock.calls.at(-1)?.[0]).toBe(`https://ai.hozonauto.com/plugins/api/skillhub/v1/profile-templates/${templateId}/revisions/3/selection`)
+    await expect(f.client.registerTemplateSelection(context, { templateId, revision: 0, deviceId, profileId })).rejects.toMatchObject({ code: 'HUB_INVALID_REQUEST' })
+    f.client.dispose()
+  })
+
+  it('requires SSO before any template call', async () => {
+    const f = clientFor(() => { throw new Error('must not fetch') })
+    f.logout()
+    const stale = { tenantId: tenant, workspaceId: workspace, actorRef: 'test-actor', permissions: [], revision: 0 } as HubHostContext
+    await expect(f.client.profileTemplates(stale)).rejects.toMatchObject({ code: 'HUB_SSO_REQUIRED' })
+    f.client.dispose()
+  })
+})

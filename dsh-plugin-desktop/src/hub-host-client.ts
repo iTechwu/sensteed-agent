@@ -4,9 +4,64 @@ import { HUB_GENERATION_ORIGIN } from './hub-generation-store.ts'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024
+/** 精确版本（与 Hub 侧 HubVersionSchema 同值域）；模板条目只允许精确版本引用。 */
+const EXACT_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-beta(\.[1-9]\d*)?)?$/u
+const MCP_ENDPOINT_PART = /^[a-z][a-z0-9_-]{0,79}$/u
 type HubRequestPath = '/skillhub/v1/me' | '/skillhub/v1/devices/bind' | '/skillhub/v1/sync/resolve'
   | '/skillhub/v1/generations/boot-authorization' | '/skillhub/v1/generations/plans' | '/skillhub/v1/generations/installation-reports'
   | `/skillhub/v1/generations/plans/${string}/${'authorize' | 'consume' | 'consume-status' | 'downloads'}`
+  | `/skillhub/v1/profile-templates/public?${string}`
+  | `/skillhub/v1/profile-templates/${string}/preview`
+  | `/skillhub/v1/profile-templates/${string}/instantiate`
+  | `/skillhub/v1/profile-templates/${string}/revisions/${number}/selection`
+/** docs/1022 标准模板（§4 wire 形态）；结构与 Hub 契约一一对应，仅结构校验不带语义。 */
+export interface HubProfileTemplateItem {
+  readonly kind: 'skill' | 'plugin' | 'mcp.endpoint'
+  readonly identity?: string
+  readonly service?: string
+  readonly domain?: string
+  readonly version: string
+  readonly enabled: boolean
+}
+export interface HubProfileTemplatePublic {
+  readonly id: string
+  readonly key: string
+  readonly revision: number
+  readonly displayName: string
+  readonly description: string
+  readonly useCases: readonly string[]
+  readonly iconKey: string
+  readonly counts: { readonly skills: number; readonly plugins: number; readonly mcpEndpoints: number }
+  readonly updatedAt: string
+}
+export interface HubProfileTemplatePreview {
+  readonly templateId: string
+  readonly revision: number
+  readonly items: readonly {
+    readonly item: HubProfileTemplateItem
+    readonly disposition: 'installable' | 'blocked'
+    readonly reason?: string
+    readonly releaseId?: string
+  }[]
+}
+export interface HubProfileTemplateInstantiateResult {
+  readonly profileId: string
+  readonly templateId: string
+  readonly revision: number
+  readonly profileName: string
+  readonly items: readonly {
+    readonly kind: 'skill' | 'plugin'
+    readonly itemId: string
+    readonly enabled: boolean
+  }[]
+  readonly mcpEndpoints: readonly {
+    readonly service: string
+    readonly domain: string
+    readonly version: string
+    readonly enabled: boolean
+  }[]
+  readonly skippedItems: readonly { readonly item: HubProfileTemplateItem; readonly reason: string }[]
+}
 export interface HubSsoSession { readonly accessToken: string; readonly tenantId: string; readonly operator: string }
 /** Structural L0 SSO seam; no product or extension runtime imports and no second refresh-token writer. */
 export interface HubSsoSource {
@@ -30,6 +85,19 @@ function fail(code: HubHostError['code']): never { throw new HubHostError(code) 
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) fail('HUB_INVALID_RESPONSE')
   return value as Record<string, unknown>
+}
+/** 模板条目三类符号引用的闭集校验（docs/1022 §3）。 */
+function templateItem(value: unknown): HubProfileTemplateItem {
+  const item = object(value)
+  if (typeof item.version !== 'string' || !EXACT_VERSION.test(item.version) || typeof item.enabled !== 'boolean') fail('HUB_INVALID_RESPONSE')
+  if (item.kind === 'mcp.endpoint') {
+    if (typeof item.service !== 'string' || !MCP_ENDPOINT_PART.test(item.service)
+      || typeof item.domain !== 'string' || !MCP_ENDPOINT_PART.test(item.domain)) fail('HUB_INVALID_RESPONSE')
+    return Object.freeze({ kind: item.kind, service: item.service, domain: item.domain, version: item.version, enabled: item.enabled })
+  }
+  if ((item.kind !== 'skill' && item.kind !== 'plugin') || typeof item.identity !== 'string'
+    || item.identity.length < 1 || item.identity.length > 214) fail('HUB_INVALID_RESPONSE')
+  return Object.freeze({ kind: item.kind, identity: item.identity, version: item.version, enabled: item.enabled })
 }
 async function responseJson(response: Response): Promise<unknown> {
   const size = response.headers.get('content-length')
@@ -136,6 +204,162 @@ export class HubHostClient {
     this.assertCurrent(context)
     if(typeof result.data.deviceId!=='string'||!UUID.test(result.data.deviceId)||result.data.ownerRef!==context.actorRef)fail('HUB_INVALID_RESPONSE')
     return result.data.deviceId
+  }
+  /** Agent 模板选择器的公开列表（仅 published）；结构与 docs/1022 §4 一一对应。 */
+  async profileTemplates(context: HubHostContext, page = 1): Promise<{ readonly list: readonly HubProfileTemplatePublic[]; readonly total: number }> {
+    this.assertCurrent(context)
+    if (!Number.isSafeInteger(page) || page < 1 || page > 10_000) fail('HUB_INVALID_REQUEST')
+    const result = await this.request(`/skillhub/v1/profile-templates/public?page=${page}&limit=50`, context.workspaceId)
+    this.assertCurrent(context)
+    const rows = result.data.list
+    if (!Array.isArray(rows) || rows.length > 100 || typeof result.data.total !== 'number'
+      || !Number.isSafeInteger(result.data.total) || result.data.total < 0) fail('HUB_INVALID_RESPONSE')
+    const list = rows.map((row): HubProfileTemplatePublic => {
+      const item = object(row)
+      const counts = object(item.counts)
+      const useCases = item.useCases
+      if (typeof item.id !== 'string' || !UUID.test(item.id) || typeof item.key !== 'string'
+        || !/^[a-z0-9][a-z0-9-]{0,79}$/u.test(item.key) || typeof item.revision !== 'number'
+        || !Number.isSafeInteger(item.revision) || item.revision < 1 || typeof item.displayName !== 'string'
+        || item.displayName.length < 1 || item.displayName.length > 24 || typeof item.description !== 'string'
+        || item.description.length > 120 || typeof item.iconKey !== 'string' || item.iconKey.length < 1
+        || item.iconKey.length > 64 || typeof item.updatedAt !== 'string' || Number.isNaN(Date.parse(item.updatedAt))
+        || !Array.isArray(useCases) || useCases.length < 2 || useCases.length > 4
+        || useCases.some((useCase) => typeof useCase !== 'string' || useCase.length < 1 || useCase.length > 20)) fail('HUB_INVALID_RESPONSE')
+      const skillCount = counts.skills, pluginCount = counts.plugins, mcpCount = counts.mcpEndpoints
+      if (typeof skillCount !== 'number' || !Number.isSafeInteger(skillCount) || skillCount < 0
+        || typeof pluginCount !== 'number' || !Number.isSafeInteger(pluginCount) || pluginCount < 0
+        || typeof mcpCount !== 'number' || !Number.isSafeInteger(mcpCount) || mcpCount < 0) fail('HUB_INVALID_RESPONSE')
+      return Object.freeze({
+        id: item.id, key: item.key, revision: item.revision, displayName: item.displayName,
+        description: item.description, useCases: Object.freeze([...useCases] as string[]), iconKey: item.iconKey,
+        counts: Object.freeze({ skills: skillCount, plugins: pluginCount, mcpEndpoints: mcpCount }),
+        updatedAt: item.updatedAt,
+      })
+    })
+    return { list: Object.freeze(list), total: result.data.total }
+  }
+  /** 逐项 disposition 消费复核；blocked 原因服务端已本地化，结构仅限长文本边界。 */
+  async profileTemplatePreview(context: HubHostContext, templateId: string): Promise<HubProfileTemplatePreview> {
+    this.assertCurrent(context)
+    if (!UUID.test(templateId)) fail('HUB_INVALID_REQUEST')
+    const result = await this.request(`/skillhub/v1/profile-templates/${templateId}/preview`, context.workspaceId)
+    this.assertCurrent(context)
+    const items = result.data.items
+    if (result.data.templateId !== templateId || typeof result.data.revision !== 'number'
+      || !Number.isSafeInteger(result.data.revision) || result.data.revision < 1
+      || !Array.isArray(items) || items.length < 1 || items.length > 64) fail('HUB_INVALID_RESPONSE')
+    return {
+      templateId, revision: result.data.revision,
+      items: Object.freeze(items.map((row): HubProfileTemplatePreview['items'][number] => {
+        const entry = object(row)
+        const disposition = entry.disposition
+        if (disposition !== 'installable' && disposition !== 'blocked') fail('HUB_INVALID_RESPONSE')
+        if (entry.reason !== undefined && (typeof entry.reason !== 'string' || entry.reason.length < 1 || entry.reason.length > 200)) fail('HUB_INVALID_RESPONSE')
+        if (entry.releaseId !== undefined && (typeof entry.releaseId !== 'string' || !UUID.test(entry.releaseId))) fail('HUB_INVALID_RESPONSE')
+        if (disposition === 'blocked' && typeof entry.reason !== 'string') fail('HUB_INVALID_RESPONSE')
+        return Object.freeze({
+          item: templateItem(entry.item),
+          disposition,
+          ...(entry.reason !== undefined ? { reason: entry.reason } : {}),
+          ...(entry.releaseId !== undefined ? { releaseId: entry.releaseId } : {}),
+        })
+      })),
+    }
+  }
+  /**
+   * 实例化 = 注册 Profile 期望集（docs/1022 方案 B）：Hub 复核模板冻结集并落目录
+   * 身份视图；物化由本端走既有 sync/resolve → generations prepare → authorize/consume
+   * 管线，不新增旁路计划。profileId 是本端 Profile 目录身份（generation identity）。
+   */
+  async instantiateProfileTemplate(context: HubHostContext, input: {
+    readonly templateId: string
+    readonly profileName: string
+    readonly deviceId: string
+    readonly profileId: string
+  }): Promise<HubProfileTemplateInstantiateResult> {
+    this.assertCurrent(context)
+    if (!UUID.test(input.templateId) || !UUID.test(input.deviceId) || !UUID.test(input.profileId)) fail('HUB_INVALID_REQUEST')
+    const profileName = input.profileName.trim()
+    if (!profileName || profileName.length > 24) fail('HUB_INVALID_REQUEST')
+    const result = await this.request(`/skillhub/v1/profile-templates/${input.templateId}/instantiate`, context.workspaceId, {
+      templateId: input.templateId, profileName, deviceId: input.deviceId, profileId: input.profileId,
+    })
+    this.assertCurrent(context)
+    const items = result.data.items, mcpEndpoints = result.data.mcpEndpoints, skippedItems = result.data.skippedItems
+    if (result.data.templateId !== input.templateId || result.data.profileId !== input.profileId
+      || result.data.profileName !== profileName
+      || typeof result.data.revision !== 'number' || !Number.isSafeInteger(result.data.revision) || result.data.revision < 1
+      || !Array.isArray(items) || items.length > 64 || !Array.isArray(mcpEndpoints) || mcpEndpoints.length > 64
+      || !Array.isArray(skippedItems) || skippedItems.length > 64) fail('HUB_INVALID_RESPONSE')
+    for (const row of items) {
+      const item = object(row)
+      if ((item.kind !== 'skill' && item.kind !== 'plugin') || typeof item.itemId !== 'string'
+        || !UUID.test(item.itemId) || typeof item.enabled !== 'boolean') fail('HUB_INVALID_RESPONSE')
+    }
+    for (const row of mcpEndpoints) {
+      const endpoint = object(row)
+      if (typeof endpoint.service !== 'string' || !MCP_ENDPOINT_PART.test(endpoint.service)
+        || typeof endpoint.domain !== 'string' || !MCP_ENDPOINT_PART.test(endpoint.domain)
+        || typeof endpoint.version !== 'string' || !EXACT_VERSION.test(endpoint.version)
+        || typeof endpoint.enabled !== 'boolean') fail('HUB_INVALID_RESPONSE')
+    }
+    for (const row of skippedItems) {
+      const skipped = object(row)
+      if (typeof skipped.reason !== 'string' || skipped.reason.length < 1 || skipped.reason.length > 200) fail('HUB_INVALID_RESPONSE')
+      templateItem(skipped.item)
+    }
+    return Object.freeze({
+      profileId: input.profileId, templateId: input.templateId, revision: result.data.revision, profileName,
+      items: Object.freeze(items as HubProfileTemplateInstantiateResult['items']),
+      mcpEndpoints: Object.freeze(mcpEndpoints as HubProfileTemplateInstantiateResult['mcpEndpoints']),
+      skippedItems: Object.freeze(skippedItems as HubProfileTemplateInstantiateResult['skippedItems']),
+    })
+  }
+  /** 切换重注册（docs/1022 §6.2）：按出生冻结修订恢复期望集；响应与 instantiate 同构（无 profileName）。 */
+  async registerTemplateSelection(context: HubHostContext, input: {
+    readonly templateId: string
+    readonly revision: number
+    readonly deviceId: string
+    readonly profileId: string
+  }): Promise<Omit<HubProfileTemplateInstantiateResult, 'profileName'>> {
+    this.assertCurrent(context)
+    if (!UUID.test(input.templateId) || !UUID.test(input.deviceId) || !UUID.test(input.profileId)
+      || !Number.isSafeInteger(input.revision) || input.revision < 1) fail('HUB_INVALID_REQUEST')
+    const result = await this.request(
+      `/skillhub/v1/profile-templates/${input.templateId}/revisions/${input.revision}/selection`,
+      context.workspaceId,
+      { deviceId: input.deviceId, profileId: input.profileId },
+    )
+    this.assertCurrent(context)
+    const items = result.data.items, mcpEndpoints = result.data.mcpEndpoints, skippedItems = result.data.skippedItems
+    if (result.data.templateId !== input.templateId || result.data.profileId !== input.profileId
+      || result.data.revision !== input.revision
+      || !Array.isArray(items) || items.length > 64 || !Array.isArray(mcpEndpoints) || mcpEndpoints.length > 64
+      || !Array.isArray(skippedItems) || skippedItems.length > 64) fail('HUB_INVALID_RESPONSE')
+    for (const row of items) {
+      const item = object(row)
+      if ((item.kind !== 'skill' && item.kind !== 'plugin') || typeof item.itemId !== 'string'
+        || !UUID.test(item.itemId) || typeof item.enabled !== 'boolean') fail('HUB_INVALID_RESPONSE')
+    }
+    for (const row of mcpEndpoints) {
+      const endpoint = object(row)
+      if (typeof endpoint.service !== 'string' || !MCP_ENDPOINT_PART.test(endpoint.service)
+        || typeof endpoint.domain !== 'string' || !MCP_ENDPOINT_PART.test(endpoint.domain)
+        || typeof endpoint.version !== 'string' || !EXACT_VERSION.test(endpoint.version)
+        || typeof endpoint.enabled !== 'boolean') fail('HUB_INVALID_RESPONSE')
+    }
+    for (const row of skippedItems) {
+      const skipped = object(row)
+      if (typeof skipped.reason !== 'string' || skipped.reason.length < 1 || skipped.reason.length > 200) fail('HUB_INVALID_RESPONSE')
+      templateItem(skipped.item)
+    }
+    return Object.freeze({
+      profileId: input.profileId, templateId: input.templateId, revision: input.revision,
+      items: Object.freeze(items as HubProfileTemplateInstantiateResult['items']),
+      mcpEndpoints: Object.freeze(mcpEndpoints as HubProfileTemplateInstantiateResult['mcpEndpoints']),
+      skippedItems: Object.freeze(skippedItems as HubProfileTemplateInstantiateResult['skippedItems']),
+    })
   }
   async bootAuthorization(context:HubHostContext,input:{readonly deviceId:string;readonly profileId:string;readonly generationDigest:string;readonly target:HubSyncExpected['target']}):Promise<unknown>{
     this.assertCurrent(context)

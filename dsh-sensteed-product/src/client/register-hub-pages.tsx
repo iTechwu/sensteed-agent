@@ -9,6 +9,7 @@ declare module '@deepseek-ai/dsh-api-session-controller/client' {
 
 import { createHubNavigation, nativeHubNavigation, HubContext } from './HubNavigation.tsx'
 import { HubSetupSection } from './HubSetupSection.tsx'
+import { ProfileSwitcher } from './profile-switcher.tsx'
 import { Blocks, Sparkles } from 'lucide-react'
 import { HubPage, type CatalogSkill } from './HubPage.tsx'
 import { startCreatorConversation } from './CreatePluginMenuItem.tsx'
@@ -41,7 +42,11 @@ export function registerHubPages(ctx: Context, props: {
     name: 'plugins.tab', id: 'sensteed-enterprise', order: 1, label: () => props.t('catalogTab'),
     locale: 'dofe.access', inject: () => ({ ...props, kind: 'plugin' as const }),
   }, HubSetupSection))
-  for (const [kind, id, order, Icon, label] of [
+    // docs/1022 §6.1：sidebar 底部 Profile 切换器（官方 footer.action 槽；双壳共用）。
+    ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
+      name: 'sidebar.footer.action', id: 'dofe-profile-switcher', order: 5, locale: 'dofe.access',
+    }, ({ wide }) => <ProfileSwitcher wide={wide} t={props.t} openHub={() => ctx.layout.selectPanel('plugins' as Parameters<typeof ctx.layout.selectPanel>[0])} />))
+    for (const [kind, id, order, Icon, label] of [
     ['plugin', 'plugins', 0, Blocks, 'pluginsNav'],
     ['skill', 'sensteed-skill-manager', 1, Sparkles, 'skillsNav'],
   ] as const) {
