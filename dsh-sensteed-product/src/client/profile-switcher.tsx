@@ -1,6 +1,7 @@
 /** Sidebar foot Profile switcher (docs/1022 §6.1). 双壳共用（product 插件在 stable 与 NEXT 都加载）；
  * 渲染进程只发 Host 意图，存储与作用域都在 Host 进程。 */
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { MoreVertical, Plus } from 'lucide-react'
 import { hubProfilesRequest, type HubContentProfileView } from './hub-setup-state.ts'
 import { trackHubTemplate } from './hub-analytics.ts'
@@ -15,14 +16,34 @@ export interface ProfileSwitcherProps {
 const countsLine = (profile: HubContentProfileView): string =>
   `${profile.summary.skills} / ${profile.summary.plugins} / ${profile.summary.mcpEndpoints}`
 
+const MENU_WIDTH = { wide: 240, narrow: 200 } as const
+
 export function ProfileSwitcher({ wide, t, openHub }: ProfileSwitcherProps) {
   const [open, setOpen] = useState(false)
   const [profiles, setProfiles] = useState<HubContentProfileView[] | undefined>(undefined)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
+  const [anchor, setAnchor] = useState<{ left: number; bottom: number }>({ left: 0, bottom: 0 })
   const triggerRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+
+  // 菜单 portal 到 body 并按触发钮矩形 fixed 定位：收起态 56px 侧栏轨道会裁剪
+  // absolute 子元素（「＋ 新增 Profile」被裁成「＋ 在插」），portal 是唯一出路。
+  const placeMenu = (): void => {
+    const rect = triggerRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const width = wide ? MENU_WIDTH.wide : MENU_WIDTH.narrow
+    setAnchor({
+      left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)),
+      bottom: window.innerHeight - rect.top + 6,
+    })
+  }
+  useEffect(() => {
+    if (!open) return
+    window.addEventListener('resize', placeMenu)
+    return () => { window.removeEventListener('resize', placeMenu) }
+  }, [open, wide])
 
   useEffect(() => {
     if (!open) return
@@ -95,21 +116,21 @@ export function ProfileSwitcher({ wide, t, openHub }: ProfileSwitcherProps) {
         aria-expanded={open}
         aria-label={t('profilesLabel')}
         title={wide ? `${t('profilesLabel')}${current ? `：${current.name}` : ''}` : current ? `${current.name}` : t('profilesLabel')}
-        onClick={() => { setOpen(value => !value); setNotice('') }}
+        onClick={() => { if (!open) placeMenu(); setOpen(value => !value); setNotice('') }}
         style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
       >
         {wide || !current ? <MoreVertical size={16} aria-hidden="true" /> : <span aria-hidden="true" style={{ fontSize: 12, fontWeight: 600 }}>{glyph(current)}</span>}
       </button>
-      {open ? (
+      {open ? createPortal(
         <div
           ref={menuRef}
           role="menu"
           onKeyDown={onMenuKeyDown}
           aria-label={t('profilesLabel')}
           style={{
-            position: 'absolute', bottom: 'calc(100% + 6px)', left: 0, zIndex: 40, minWidth: wide ? 240 : 200,
-            background: 'var(--background, #fff)', border: '1px solid var(--border, #e5e7eb)', borderRadius: 10,
-            boxShadow: '0 8px 24px rgb(0 0 0 / 12%)', padding: 6,
+            position: 'fixed', bottom: anchor.bottom, left: anchor.left, zIndex: 1000, width: wide ? MENU_WIDTH.wide : MENU_WIDTH.narrow,
+            background: 'var(--dsw-alias-bg-layer-1, #fff)', border: '1px solid var(--dsw-alias-border-l2, #e5e7eb)', borderRadius: 10,
+            boxShadow: '0 8px 24px rgb(0 0 0 / 12%)', padding: 6, color: 'var(--dsw-alias-label-primary, inherit)',
           }}>
           {/* §6.1 第一项永远「＋ 新增 Profile」 */}
           <button type="button" role="menuitem" disabled={busy} onClick={() => { setOpen(false); openHub() }}
@@ -129,7 +150,7 @@ export function ProfileSwitcher({ wide, t, openHub }: ProfileSwitcherProps) {
                       disabled={busy}
                       onClick={() => switchTo(profile)}
                       aria-current={isCurrent ? 'true' : undefined}
-                      style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 8, padding: '6px 8px', textAlign: 'left', borderRadius: 8, background: isCurrent ? 'var(--accent, #f3f4f6)' : 'transparent' }}
+                      style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 8, padding: '6px 8px', textAlign: 'left', borderRadius: 8, background: isCurrent ? 'var(--dsw-alias-interactive-bg-hover, #f3f4f6)' : 'transparent' }}
                     >
                       <span aria-hidden="true" style={{ fontSize: 12, fontWeight: 600 }}>{glyph(profile)}</span>
                       <span style={{ flex: 1, minWidth: 0 }}>
@@ -146,8 +167,7 @@ export function ProfileSwitcher({ wide, t, openHub }: ProfileSwitcherProps) {
             </ul>
           )}
           {notice ? <p role="status" style={{ margin: '4px 8px', fontSize: 11, opacity: 0.8 }}>{notice}</p> : null}
-        </div>
-      ) : null}
+        </div>, document.body) : null}
     </div>
   )
 }
