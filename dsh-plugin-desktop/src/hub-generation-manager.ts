@@ -99,7 +99,7 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
     }
     return{list,total}
    },
-   async templatePreview(input:unknown){
+   async'template-preview'(input:unknown){
     // docs/1022 §6.3：卡片展开逐项 disposition 预览（创建前阻断项显式呈现）
     const{channel,templateId}=z.strictObject({channel:z.enum(['stable','beta']).optional(),templateId:z.uuid()}).parse(input)
     const env=await environment(channel)
