@@ -33,20 +33,32 @@ describe('ProfileTemplatesSection', () => {
 
   const flush = async (): Promise<void> => { await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)) }) }
 
-  it('lists published templates without an exact-match fetch to per-item endpoints', async () => {
-    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
-      expect(String(input)).toBe('/api/desktop/hub/generations/templates')
+  it('expands a card with per-item disposition preview and blocked telemetry', async () => {
+    const fetcher = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
+      if (String(input).endsWith('/template-preview')) {
+        return jsonResponse({
+          templateId: template.id, revision: 3,
+          items: [
+            { item: { kind: 'skill', identity: 'writing-pro', version: '1.2.3', enabled: true }, disposition: 'installable' },
+            { item: { kind: 'plugin', identity: '@x/y', version: '1.0.0', enabled: true }, disposition: 'blocked', reason: '未发布到 stable 渠道' },
+          ],
+        })
+      }
       return jsonResponse({ list: [template], total: 1 })
     })
     vi.stubGlobal('fetch', fetcher)
     const host = await mount()
     await flush()
     expect(host.textContent).toContain('内容创作')
-    // 收起态只展示计数徽标；描述与场景 chips 在展开区
     await act(async () => { host.querySelectorAll<HTMLButtonElement>('.dshHubCardHeading')[0]!.click() })
     await flush()
     expect(host.textContent).toContain('一句话介绍')
     expect(host.textContent).toContain('写作')
+    // §6.3 逐项预览：创建前 disposition 显式呈现（可安装 + 阻断原因）
+    expect(host.textContent).toContain('writing-pro')
+    expect(host.textContent).toContain('未发布到 stable 渠道')
+    const bodies = fetcher.mock.calls.map(([, init]) => String(init?.body ?? ''))
+    expect(bodies.some(body => body.includes('PROFILE_TEMPLATE_BLOCKED_ITEM_SHOWN'))).toBe(true)
   })
 
   it('renders nothing when no templates are published', async () => {
@@ -58,6 +70,9 @@ describe('ProfileTemplatesSection', () => {
 
   it('creates with a trimmed name, surfaces registration and notifies the parent', async () => {
     const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith('/template-preview')) {
+        return jsonResponse({ templateId: template.id, revision: 3, items: [] })
+      }
       if (String(input).endsWith('/instantiate')) {
         expect(JSON.parse(String(init?.body))).toEqual({ templateId: template.id, profileName: '内容创作' })
         return jsonResponse({

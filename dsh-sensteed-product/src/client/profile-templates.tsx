@@ -1,7 +1,7 @@
 /** Profile 模板选择区（docs/1022 §6.3 Tab A）。渲染进程只发意图；身份与校验都在 Host。 */
 import { useEffect, useState } from 'react'
 import { LayoutTemplate } from 'lucide-react'
-import { hubInstantiateRequest, hubTemplatesRequest, type HubInstantiateResult, type HubTemplatePublic } from './hub-setup-state.ts'
+import { hubInstantiateRequest, hubTemplatePreviewRequest, hubTemplatesRequest, type HubInstantiateResult, type HubTemplatePreview, type HubTemplatePublic } from './hub-setup-state.ts'
 import { trackHubTemplate } from './hub-analytics.ts'
 import type { DofeAccessLocaleKey } from './dofe-access.ts'
 type Copy = (key: DofeAccessLocaleKey) => string
@@ -22,6 +22,8 @@ export function ProfileTemplatesSection({ disabled, t, onRegistered }: {
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
   const [registered, setRegistered] = useState<HubInstantiateResult | null>(null)
+  const [previews, setPreviews] = useState<Record<string, HubTemplatePreview | undefined>>({})
+  const [previewFailed, setPreviewFailed] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     if (disabled) return
@@ -87,7 +89,18 @@ export function ProfileTemplatesSection({ disabled, t, onRegistered }: {
               className="dshHubCardHeading"
               aria-expanded={selected === template.id}
               onClick={() => {
-                if (selected !== template.id) trackHubTemplate({ event: 'PROFILE_TEMPLATE_SELECTED', properties: { source: 'template' } })
+                if (selected !== template.id) {
+                  trackHubTemplate({ event: 'PROFILE_TEMPLATE_SELECTED', properties: { source: 'template' } })
+                  // §6.3 逐项预览：展开即拉 disposition；阻断项创建前显式呈现并埋点
+                  if (!previews[template.id] && !previewFailed[template.id]) {
+                    hubTemplatePreviewRequest(template.id).then(preview => {
+                      if (!Array.isArray(preview.items)) throw new Error('malformed preview')
+                      setPreviews(current => ({ ...current, [template.id]: preview }))
+                      const blocked = preview.items.filter(entry => entry.disposition === 'blocked')
+                      if (blocked.length) trackHubTemplate({ event: 'PROFILE_TEMPLATE_BLOCKED_ITEM_SHOWN', properties: { itemCount: blocked.length } })
+                    }).catch(() => { setPreviewFailed(current => ({ ...current, [template.id]: true })) })
+                  }
+                }
                 setSelected(selected === template.id ? null : template.id); setNotice('')
               }}
             >
@@ -101,6 +114,17 @@ export function ProfileTemplatesSection({ disabled, t, onRegistered }: {
                 <p className="dshHubHint">
                   {template.useCases.map(useCase => <span key={useCase} className="dshHubChip">{useCase}</span>)}
                 </p>
+                {previews[template.id] ? (
+                  <div className="dshHubSkipped">
+                    <p>{t('templatePreviewTitle')}</p>
+                    <ul>
+                      {previews[template.id]!.items.map((entry, index) => {
+                        const symbol = entry.item.kind === 'mcp.endpoint' ? `${entry.item.service}/${entry.item.domain}` : entry.item.identity ?? ''
+                        return <li key={`${symbol}-${index}`}><code>{symbol}</code> — {entry.disposition === 'blocked' ? `${t('templatePreviewBlocked')}：${entry.reason ?? ''}` : t('templatePreviewInstallable')}</li>
+                      })}
+                    </ul>
+                  </div>
+                ) : previewFailed[template.id] ? <p className="dshHubHint">{t('templatePreviewFailed')}</p> : <p className="dshHubHint">{t('hubWorking')}</p>}
                 <label className="dshHubHint">
                   {t('templateNameLabel')}
                   <input
