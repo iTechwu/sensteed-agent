@@ -70,9 +70,11 @@ export function ProfileSwitcher({ wide, t, openHub }: ProfileSwitcherProps) {
     if (profile.id === activeId) { setNotice(t('alreadyCurrent')); return }
     // 期望集切换后需重新应用：确认后仅改注册，物化经企业目录页的既有检查/安装管线。
     if (!window.confirm(`${t('switchHint')}「${profile.name}」`)) return
-    void hubProfilesRequest<{ switched: boolean; skippedCount: number }>({ action: 'activate', id: profile.id }).then(() => {
+    void hubProfilesRequest<{ switched: boolean; skippedCount: number }>({ action: 'activate', id: profile.id }).then((result) => {
       trackHubTemplate({ event: 'PROFILE_SWITCHED', properties: { itemCount: profile.summary.skills + profile.summary.plugins } })
-      setActiveId(profile.id); setNotice(t('switched'))
+      setActiveId(profile.id)
+      // 重注册按当前 release 复核，个别条目可能已不可用：显式告知，不静默缩水
+      setNotice(result.skippedCount > 0 ? `${t('switched')} ${t('switchSkipped').replace('{count}', String(result.skippedCount))}` : t('switched'))
     }).catch(() => {
       trackHubTemplate({ event: 'PROFILE_APPLY_FAILED', properties: { phase: 'resolve', errorClass: 'error' } })
       setNotice(t('loadFailed'))

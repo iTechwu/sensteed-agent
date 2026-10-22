@@ -19,7 +19,7 @@ function stubProfilesApi() {
     if (path.endsWith('/profiles')) {
       if (body.action === 'list') return new Response(JSON.stringify(profiles), { headers: { 'content-type': 'application/json' } })
       if (body.action === 'active') return new Response(JSON.stringify(profiles[0]!.id), { headers: { 'content-type': 'application/json' } })
-      if (body.action === 'activate') return new Response(JSON.stringify({ switched: true, skippedCount: 0 }), { headers: { 'content-type': 'application/json' } })
+      if (body.action === 'activate') return new Response(JSON.stringify({ switched: true, skippedCount: 1 }), { headers: { 'content-type': 'application/json' } })
     }
     if (path.endsWith('/telemetry')) return new Response('{"delivered":true}', { headers: { 'content-type': 'application/json' } })
     throw new Error(`unexpected fetch ${path}`)
@@ -54,6 +54,7 @@ describe('ProfileSwitcher', () => {
     await flush()
     expect(fetcher).toHaveBeenCalledWith('/api/desktop/hub/generations/profiles', expect.objectContaining({ body: JSON.stringify({ action: 'activate', id: profiles[1]!.id }) }))
     expect(host.textContent).toContain(t('switched'))
+    expect(host.textContent).toContain('1 item(s) unavailable and skipped.')
     // 切换成功经 Host 中继发 PROFILE_SWITCHED
     const bodies = fetcher.mock.calls.map(([, init]) => String(init?.body ?? ''))
     expect(bodies.some(body => body.includes('PROFILE_SWITCHED'))).toBe(true)
