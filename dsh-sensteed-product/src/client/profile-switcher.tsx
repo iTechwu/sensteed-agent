@@ -20,6 +20,7 @@ export function ProfileSwitcher({ wide, t, openHub }: ProfileSwitcherProps) {
   const [profiles, setProfiles] = useState<HubContentProfileView[] | undefined>(undefined)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
+  const [busy, setBusy] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -67,9 +68,12 @@ export function ProfileSwitcher({ wide, t, openHub }: ProfileSwitcherProps) {
   const current = profiles?.find(profile => profile.id === activeId)
 
   const switchTo = (profile: HubContentProfileView): void => {
+    if (busy) return
     if (profile.id === activeId) { setNotice(t('alreadyCurrent')); return }
     // 期望集切换后需重新应用：确认后仅改注册，物化经企业目录页的既有检查/安装管线。
     if (!window.confirm(`${t('switchHint')}「${profile.name}」`)) return
+    // §6.4 应用中再操作：菜单禁用，activate 在途期间不可重复触发
+    setBusy(true); setNotice(t('hubWorking'))
     void hubProfilesRequest<{ switched: boolean; skippedCount: number }>({ action: 'activate', id: profile.id }).then((result) => {
       trackHubTemplate({ event: 'PROFILE_SWITCHED', properties: { itemCount: profile.summary.skills + profile.summary.plugins } })
       setActiveId(profile.id)
@@ -77,8 +81,9 @@ export function ProfileSwitcher({ wide, t, openHub }: ProfileSwitcherProps) {
       setNotice(result.skippedCount > 0 ? `${t('switched')} ${t('switchSkipped').replace('{count}', String(result.skippedCount))}` : t('switched'))
     }).catch(() => {
       trackHubTemplate({ event: 'PROFILE_APPLY_FAILED', properties: { phase: 'resolve', errorClass: 'error' } })
-      setNotice(t('loadFailed'))
-    })
+      // 失败时 Host 未置当前（activate 注册失败不落 setActive）：显式回退语义，不用读列表失败文案
+      setNotice(t('switchFailed'))
+    }).finally(() => setBusy(false))
   }
 
   return (
@@ -106,15 +111,22 @@ export function ProfileSwitcher({ wide, t, openHub }: ProfileSwitcherProps) {
             background: 'var(--background, #fff)', border: '1px solid var(--border, #e5e7eb)', borderRadius: 10,
             boxShadow: '0 8px 24px rgb(0 0 0 / 12%)', padding: 6,
           }}>
+          {/* §6.1 第一项永远「＋ 新增 Profile」 */}
+          <button type="button" role="menuitem" disabled={busy} onClick={() => { setOpen(false); openHub() }}
+            style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 6, padding: '6px 8px', fontSize: 12, borderRadius: 8, textAlign: 'left' }}>
+            <Plus size={14} aria-hidden="true" />{t('createHint')}
+          </button>
           {profiles === undefined ? <p role="status" style={{ margin: '4px 8px', fontSize: 12 }}>{t('loadFailed')}</p> : (
             <ul role="none" style={{ listStyle: 'none', margin: 0, padding: 0, maxHeight: 240, overflowY: 'auto' }}>
               {profiles.length === 0 ? <li role="none" style={{ padding: '4px 8px', fontSize: 12, opacity: 0.7 }}>{t('createHint')}</li> : profiles.map(profile => {
                 const isCurrent = profile.id === activeId
+                const hasSkipped = profile.summary.skipped > 0
                 return (
                   <li key={profile.id} role="none">
                     <button
                       type="button"
                       role="menuitem"
+                      disabled={busy}
                       onClick={() => switchTo(profile)}
                       aria-current={isCurrent ? 'true' : undefined}
                       style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 8, padding: '6px 8px', textAlign: 'left', borderRadius: 8, background: isCurrent ? 'var(--accent, #f3f4f6)' : 'transparent' }}
@@ -124,6 +136,8 @@ export function ProfileSwitcher({ wide, t, openHub }: ProfileSwitcherProps) {
                         <span style={{ display: 'block', fontSize: 13 }}>{profile.name}{isCurrent ? ` · ${t('current')}` : ''}</span>
                         <span style={{ display: 'block', fontSize: 11, opacity: 0.65 }}>{countsLine(profile)}</span>
                       </span>
+                      {/* §6.1 阻断项 ⚠ 徽标：创建时跳过的条目不静默 */}
+                      {hasSkipped ? <span title={t('blockedBadge')}>⚠</span> : null}
                       {isCurrent ? <span aria-hidden="true">✓</span> : null}
                     </button>
                   </li>
@@ -131,10 +145,6 @@ export function ProfileSwitcher({ wide, t, openHub }: ProfileSwitcherProps) {
               })}
             </ul>
           )}
-          <button type="button" role="menuitem" onClick={() => { setOpen(false); openHub() }}
-            style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 6, padding: '6px 8px', fontSize: 12, borderRadius: 8, textAlign: 'left' }}>
-            <Plus size={14} aria-hidden="true" />{t('createHint')}
-          </button>
           {notice ? <p role="status" style={{ margin: '4px 8px', fontSize: 11, opacity: 0.8 }}>{notice}</p> : null}
         </div>
       ) : null}
