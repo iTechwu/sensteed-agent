@@ -97,6 +97,8 @@ export function ProfileTemplatesSection({ disabled, t, onRegistered }: {
                       if (!Array.isArray(preview.items)) throw new Error('malformed preview')
                       setPreviews(current => ({ ...current, [template.id]: preview }))
                       const blocked = preview.items.filter(entry => entry.disposition === 'blocked')
+                      // §7 闭集：预览成功即发 PREVIEWED（阻断数随行）；BLOCKED_ITEM_SHOWN 仅在有阻断时发
+                      trackHubTemplate({ event: 'PROFILE_TEMPLATE_PREVIEWED', properties: { blockedCount: blocked.length } })
                       if (blocked.length) trackHubTemplate({ event: 'PROFILE_TEMPLATE_BLOCKED_ITEM_SHOWN', properties: { itemCount: blocked.length } })
                     }).catch(() => { setPreviewFailed(current => ({ ...current, [template.id]: true })) })
                   }

@@ -3,6 +3,7 @@
 export type HubTemplateEvent =
   | { event: 'PROFILE_TEMPLATE_VIEWED'; properties: { surface: 'list' } }
   | { event: 'PROFILE_TEMPLATE_SELECTED'; properties: { source: 'template' | 'custom' } }
+  | { event: 'PROFILE_TEMPLATE_PREVIEWED'; properties: { blockedCount: number } }
   | { event: 'PROFILE_TEMPLATE_INSTANTIATED'; properties: { planCount: number; skippedCount: number; errorClass?: 'conflict' | 'validation' | 'forbidden' | 'error' } }
   | { event: 'PROFILE_TEMPLATE_BLOCKED_ITEM_SHOWN'; properties: { itemCount: number } }
   | { event: 'PROFILE_APPLY_FAILED'; properties: { phase: 'unload' | 'resolve' | 'install' | 'load'; errorClass: 'conflict' | 'validation' | 'forbidden' | 'error' } }

@@ -58,6 +58,8 @@ describe('ProfileTemplatesSection', () => {
     expect(host.textContent).toContain('writing-pro')
     expect(host.textContent).toContain('未发布到 stable 渠道')
     const bodies = fetcher.mock.calls.map(([, init]) => String(init?.body ?? ''))
+    // §7 闭集：预览成功即发 PREVIEWED（含阻断数）
+    expect(bodies.some(body => body.includes('PROFILE_TEMPLATE_PREVIEWED'))).toBe(true)
     expect(bodies.some(body => body.includes('PROFILE_TEMPLATE_BLOCKED_ITEM_SHOWN'))).toBe(true)
   })
 
