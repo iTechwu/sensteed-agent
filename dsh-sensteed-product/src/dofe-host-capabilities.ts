@@ -1,4 +1,5 @@
 import { PUBLIC_MCP_CAPABILITIES, publicMcpEndpoint } from './public-mcp-capabilities.ts'
+import { createHash } from 'node:crypto'
 /** Business artifacts declare routes; only this Host owns transports and credentials. */
 import type { Context } from '@deepseek-ai/cordis'
 import { apply as applyMcpClient, name as mcpClientName, inject as mcpClientInject, type Config as McpConfig } from '@deepseek-ai/dsh-mcp-client'
@@ -13,7 +14,13 @@ export const name = 'dofe-host-capabilities'
 export const inject = ['credentials', 'dofeAccessSettings', ...(BRAND_VARIANT === 'sensteed' ? ['dofeAuth'] : [])]
 export interface HubMcpDeclaration { readonly capability: DofePluginId; readonly serverName: string; readonly path: string; readonly timeoutMs: number }
 export interface HubMcpRegistration { dispose(): Promise<void> }
-export interface HubMcpService { register(input: HubMcpDeclaration): HubMcpRegistration; registerEndpoint(input:Omit<HubMcpDeclaration,'path'>&{readonly endpointRef:{readonly service:string;readonly domain:string}}):HubMcpRegistration }
+export interface HubProfileMcpEndpoint { readonly service: string; readonly domain: string; readonly version: string; readonly enabled: boolean }
+export interface HubMcpService {
+  register(input: HubMcpDeclaration): HubMcpRegistration
+  registerEndpoint(input:Omit<HubMcpDeclaration,'path'>&{readonly endpointRef:{readonly service:string;readonly domain:string}}):HubMcpRegistration
+  /** Host-only preferences. Public projection, current entitlements and credentials remain mandatory. */
+  applyProfileEndpoints(endpoints: readonly HubProfileMcpEndpoint[]): Promise<void>
+}
 declare module '@deepseek-ai/cordis' { interface Context { hubMcp: HubMcpService } }
 
 const McpClient = { name: mcpClientName, inject: mcpClientInject, apply: applyMcpClient }
@@ -57,8 +64,11 @@ export async function apply(ctx: Context): Promise<void> {
     signature?: string
     stopping?: Promise<boolean>
     removed: boolean
+    profileOwned?: boolean
   }
   const entries = new Map<string, Entry>()
+  let profileEndpoints: Map<string, HubProfileMcpEndpoint> | undefined
+  let profileTail: Promise<void> = Promise.resolve()
   let disposed = false, revision = 0, financeAllowed = false, queued = false, running = false
   let modelsKey: string | undefined, active: AbortController | undefined, tail = Promise.resolve()
 
@@ -87,6 +97,12 @@ export async function apply(ctx: Context): Promise<void> {
   }
   function signature(entry: Entry, key: string | undefined, session: Session): string | undefined {
     if (!key || !ready() || entry.removed || !enabled().has(entry.route.capability)) return undefined
+    if (entry.profileOwned && !profileEndpoints) return undefined
+    if (profileEndpoints) {
+      if (!profileEndpoints.get(entry.route.path)?.enabled) return undefined
+      const candidates = [...entries.values()].filter(other => !other.removed && other.route.path === entry.route.path && enabled().has(other.route.capability))
+      if (entry !== (candidates.find(other => !other.profileOwned) ?? candidates[0])) return undefined
+    }
     // Models-backed routes do not send the SSO bearer. Refreshing it must only rotate finance.
     return JSON.stringify([key, session?.operator, session?.tenantId, entry.route.capability === 'finance' ? session?.accessToken : undefined, entry.route])
   }
@@ -165,12 +181,18 @@ export async function apply(ctx: Context): Promise<void> {
     invalidateLocal()
     const key = modelsKey, session = auth?.getDatasourceSession(), baseReady = ready() && Boolean(key)
     const routes = [...entries.values()].filter(entry => !entry.removed)
+    // Release old owners before starting replacements, including a later plugin taking a Profile route.
+    const retired = await interruptible(Promise.all([...entries.values()].filter(entry => signature(entry, key, session) === undefined).map(async entry => ({ path: entry.route.path, stopped: await stop(entry) }))), signal)
+    if (retired === interrupted) return
+    const blockedPaths = new Set(retired.filter(entry => !entry.stopped).map(entry => entry.path))
+    if (signal.aborted || disposed) return
     // Slow finance permission renewal must not delay unrelated MCP registration/revocation.
     for (const entry of routes.filter(entry => entry.route.capability !== 'finance')) {
+      if (blockedPaths.has(entry.route.path)) continue
       await sync(entry, baseReady, key, session, signal)
       if (signal.aborted || disposed) return
     }
-    const financeEntry = routes.find(entry => entry.route.capability === 'finance')
+    const financeEntry = routes.find(entry => entry.route.capability === 'finance' && signature(entry, key, session) !== undefined && !blockedPaths.has(entry.route.path))
     if (!financeEntry || !baseReady || !session || !enabled().has('finance')) {
       financeAccess(false)
       if (financeEntry) await sync(financeEntry, false, key, session, signal)
@@ -223,6 +245,50 @@ export async function apply(ctx: Context): Promise<void> {
     })
   }
   const service:HubMcpService={
+    applyProfileEndpoints(endpoints) {
+      const work = profileTail.then(async () => {
+        if (disposed) throw Error('HUB_MCP_DISPOSED')
+        if (!Array.isArray(endpoints) || endpoints.length > 64) throw Error('HUB_MCP_INVALID_DECLARATION')
+        const desired = new Map<string, HubProfileMcpEndpoint>()
+        for (const input of endpoints) {
+          if (!input || Object.keys(input).sort().join(',') !== 'domain,enabled,service,version' || typeof input.enabled !== 'boolean') throw Error('HUB_MCP_INVALID_DECLARATION')
+          if (input.version !== '1.0.0') throw Error('HUB_MCP_ENDPOINT_VERSION_UNAVAILABLE')
+          const endpoint = publicMcpEndpoint(input), path = endpoint.route.slice('/mcp/'.length)
+          if (desired.has(path)) throw Error('HUB_MCP_INVALID_DECLARATION')
+          desired.set(path, { ...input })
+        }
+        for (const [path, input] of desired) {
+          const key = `profile:${path}`
+          if (entries.has(key)) continue
+          const capability: DofePluginId = input.service === 'datasource' ? 'finance'
+            : input.service === 'knowledge' ? 'knowledge' : input.service === 'openmontage' ? 'openmontage'
+              : input.service === 'models' ? 'media' : input.service === 'exa' ? 'opencli'
+                : input.domain === 'supply-chain' && !enabled().has('tools') ? 'supplier-intelligence' : 'tools'
+          const route = declaration({ capability, path, serverName: path === 'finance' ? 'finance' : `profile-${createHash('sha256').update(path).digest('hex').slice(0, 16)}`, timeoutMs: 120000 })
+          if ([...entries.values()].some(entry => entry.route.serverName === route.serverName && entry.route.path !== path)) throw Error('HUB_MCP_DUPLICATE_SERVER')
+          entries.set(key, { route, removed: false, profileOwned: true })
+        }
+        const previous = profileEndpoints
+        profileEndpoints = desired
+        schedule()
+        try {
+          if (await interruptible(tail, AbortSignal.timeout(30000)) === interrupted) throw Error('HUB_MCP_STOP_UNCONFIRMED')
+          const owners = [...entries.values()].filter(entry => signature(entry, modelsKey, auth?.getDatasourceSession()) !== undefined)
+          const started = await interruptible(Promise.all(owners.map(entry => Promise.resolve(entry.client))), AbortSignal.timeout(30000))
+          if (started === interrupted) throw Error('HUB_MCP_START_FAILED')
+          for (const [path, endpoint] of desired) {
+            if (endpoint.enabled && !owners.some(entry => entry.route.path === path && entry.client && entry.signature)) throw Error('HUB_MCP_ACCESS_REQUIRED')
+          }
+        } catch (error) {
+          profileEndpoints = previous
+          schedule()
+          if (!(error instanceof Error && error.message === 'HUB_MCP_STOP_UNCONFIRMED')) await interruptible(tail, AbortSignal.timeout(30000))
+          throw error
+        }
+      })
+      profileTail = work.catch(() => {})
+      return work
+    },
     registerEndpoint(input){
       if(!input||Object.keys(input).sort().join(',')!=='capability,endpointRef,serverName,timeoutMs'||!input.endpointRef||Object.keys(input.endpointRef).sort().join(',')!=='domain,service')throw Error('HUB_MCP_INVALID_DECLARATION')
       const endpoint=publicMcpEndpoint(input.endpointRef)
@@ -232,6 +298,7 @@ export async function apply(ctx: Context): Promise<void> {
       if (disposed) throw new Error('HUB_MCP_DISPOSED')
       const route = declaration(input)
       if (entries.has(route.serverName)) throw new Error('HUB_MCP_DUPLICATE_SERVER')
+      if ([...entries.values()].some(entry => entry.route.serverName === route.serverName && entry.route.path !== route.path)) throw new Error('HUB_MCP_DUPLICATE_SERVER')
       const entry: Entry = { route, removed: false }
       entries.set(route.serverName, entry)
       schedule()
