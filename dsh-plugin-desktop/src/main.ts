@@ -855,7 +855,7 @@ async function start(): Promise<void> {
     await app.whenReady()
     const verifiedMaintenanceTarget=await readHubRuntimeTarget({isPackaged:app.isPackaged,appPath:app.getAppPath(),resourcesPath:process.resourcesPath,sensteedVersion:appVersion})
     if(verifiedMaintenanceTarget){
-      try{await confirmDesktopMaintenanceBuild(verifiedMaintenanceTarget)}catch(error){
+      try{await confirmDesktopMaintenanceBuild({hostBuildDigest:verifiedMaintenanceTarget.hostBuildDigest,sensteedVersion:verifiedMaintenanceTarget.sensteedVersion})}catch(error){
         if(!(error instanceof Error)||error.message!=='DESKTOP_INSTALLATION_RECOVERY_REQUIRED')throw error
         const choice=await dialog.showMessageBox({type:'warning',title:'安装恢复 / Installation recovery',message:'上次安装尚未确认完成。',detail:'请先关闭或取消所有安装器。确认已取消安装后，才能恢复当前版本；如仍需安装，请退出并完成安装。 / Close or cancel all installers before recovering the current version.',buttons:['退出 / Quit','已取消安装，恢复当前版本 / Recover current version'],defaultId:0,cancelId:0,noLink:true})
         if(choice.response!==1){app.quit();return}
