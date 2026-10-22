@@ -52,6 +52,8 @@ export interface HubProfileTemplateInstantiateResult {
   readonly items: readonly {
     readonly kind: 'skill' | 'plugin'
     readonly itemId: string
+    readonly releaseId: string
+    readonly version: string
     readonly enabled: boolean
   }[]
   readonly mcpEndpoints: readonly {
@@ -295,7 +297,8 @@ export class HubHostClient {
     for (const row of items) {
       const item = object(row)
       if ((item.kind !== 'skill' && item.kind !== 'plugin') || typeof item.itemId !== 'string'
-        || !UUID.test(item.itemId) || typeof item.enabled !== 'boolean') fail('HUB_INVALID_RESPONSE')
+        || !UUID.test(item.itemId) || typeof item.releaseId !== 'string' || !UUID.test(item.releaseId)
+        || typeof item.version !== 'string' || !EXACT_VERSION.test(item.version) || typeof item.enabled !== 'boolean') fail('HUB_INVALID_RESPONSE')
     }
     for (const row of mcpEndpoints) {
       const endpoint = object(row)
@@ -340,7 +343,8 @@ export class HubHostClient {
     for (const row of items) {
       const item = object(row)
       if ((item.kind !== 'skill' && item.kind !== 'plugin') || typeof item.itemId !== 'string'
-        || !UUID.test(item.itemId) || typeof item.enabled !== 'boolean') fail('HUB_INVALID_RESPONSE')
+        || !UUID.test(item.itemId) || typeof item.releaseId !== 'string' || !UUID.test(item.releaseId)
+        || typeof item.version !== 'string' || !EXACT_VERSION.test(item.version) || typeof item.enabled !== 'boolean') fail('HUB_INVALID_RESPONSE')
     }
     for (const row of mcpEndpoints) {
       const endpoint = object(row)

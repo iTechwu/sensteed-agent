@@ -18,8 +18,8 @@ import { existsSync, readFileSync } from 'node:fs'
 import { withFileLock, writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 
 export type ContentProfileItem =
-  | { kind: 'skill'; itemId: string; enabled: boolean }
-  | { kind: 'plugin'; itemId: string; enabled: boolean }
+  | { kind: 'skill'; itemId: string; enabled: boolean; releaseId?: string; version?: string }
+  | { kind: 'plugin'; itemId: string; enabled: boolean; releaseId?: string; version?: string }
   | { kind: 'mcp.endpoint'; service: string; domain: string; version: string; enabled: boolean }
 
 export interface ContentProfileSummary {
@@ -48,6 +48,7 @@ export interface ContentProfilesState {
   profiles: ContentProfile[]
   appliedId?: string | null
   appliedItems?: ContentProfileItem[]
+  appliedScope?: string
   apply?: ContentProfileApply
   application?: ContentProfileApplication
 }
@@ -77,7 +78,7 @@ export interface ContentProfileProjection {
 export interface ContentProfileInstantiateInput {
   readonly templateId: string
   readonly templateRevision: number
-  readonly items: readonly { readonly kind: 'skill' | 'plugin'; readonly itemId: string; readonly enabled: boolean }[]
+  readonly items: readonly { readonly kind: 'skill' | 'plugin'; readonly itemId: string; readonly enabled: boolean; readonly releaseId?: string; readonly version?: string }[]
   readonly mcpEndpoints: readonly {
     readonly service: string
     readonly domain: string
@@ -206,7 +207,7 @@ export class ContentProfileStore {
       if (!profile || this.selectionDigest(profile.id) !== expected.selectionDigest) throw Error('HUB_PROFILE_SELECTION_CHANGED')
       const { application: _finished, ...rest } = state
       return { result: undefined, next: healthy
-        ? { ...rest, appliedId: profile.id, appliedItems: profile.items, profiles: state.profiles.map(row => row.id === profile.id ? { ...row, lastAppliedAt: new Date().toISOString() } : row), apply: { phase: 'idle' } }
+        ? { ...rest, appliedId: profile.id, appliedItems: profile.items, appliedScope: expected.scope, profiles: state.profiles.map(row => row.id === profile.id ? { ...row, lastAppliedAt: new Date().toISOString() } : row), apply: { phase: 'idle' } }
         : { ...rest, apply: { phase: 'failed', targetId: profile.id, operationId: expected.operationId, error } } }
     })
   }
@@ -215,7 +216,7 @@ export class ContentProfileStore {
   async create(name: string, input: ContentProfileInstantiateInput): Promise<ContentProfile> {
     return this.transact((state) => {
       const items: ContentProfileItem[] = [
-        ...input.items.map((item) => ({ kind: item.kind, itemId: item.itemId, enabled: item.enabled })),
+        ...input.items.map((item) => ({ ...item })),
         ...input.mcpEndpoints.map((endpoint) => ({
           kind: 'mcp.endpoint' as const, service: endpoint.service, domain: endpoint.domain,
           version: endpoint.version, enabled: endpoint.enabled,
