@@ -4,7 +4,7 @@ import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { DofeAccessLocaleKey } from './dofe-access.ts'
 import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { DofeAccessSettings } from '../dofe-plugins.ts'
-import { hubCheckRequest, hubProfilesRequest, hubBlocked, hubInitialSelections, hubKey, hubSetupRequest, hubTerminal, type HubKind, type HubCheck, type HubOperation, type HubPreview, type HubSelection } from './hub-setup-state.ts'
+import { hubCheckRequest, hubBlocked, hubInitialSelections, hubKey, hubSetupRequest, hubTerminal, type HubKind, type HubCheck, type HubOperation, type HubPreview, type HubSelection } from './hub-setup-state.ts'
 import { trackHubTemplate } from './hub-analytics.ts'
 type Props={kind?:HubKind;t:(key:DofeAccessLocaleKey)=>string;settingsScope?:ConfigForm<DofeAccessSettings>;subscribeReconnect?:(listener:()=>void)=>()=>void}
 const noSubscribe=()=>()=>{}
@@ -41,13 +41,6 @@ function HubSetupEditor({t,kind}:Pick<Props,'t'|'kind'>){
    void hubSetupRequest<HubOperation>('status',{operationId:operation?.operationId},controller.signal).then(value=>{
     if(mounted.current&&!controller.signal.aborted){
      setOperation(value);setError(undefined)
-     // docs/1022 §6.4：generation 真激活（终态、回执已清）经 Host 意图回写内容 Profile 应用回执。
-     if(value.phase==='ACTIVATED'&&!value.pendingReceipt){
-      void hubProfilesRequest<unknown>({action:'active'}).then(active=>{
-       if(typeof active==='string')return hubProfilesRequest({action:'mark-applied',id:active})
-       return undefined
-      }).catch(()=>{})
-     }
      // docs/1022 §7：应用终态失败一次性上报（回滚或需人工介入且不可重试）
      const failedPhase=value.phase==='ROLLED_BACK'?'install':value.phase==='NEEDS_ATTENTION'&&value.retryAllowed===false?'load':null
      const key=`${value.operationId}:${failedPhase??''}`
@@ -69,7 +62,7 @@ function HubSetupEditor({t,kind}:Pick<Props,'t'|'kind'>){
    <HubCatalog check={check} kind={kind} selection={selection} disabled={busy||recovering||pending} change={change} t={t}/>
    {blocked&&<p role="status">{t('hubRequiredBlocked')}</p>}
    <p className="dshHubHint">{t('catalogFullPlan')}</p>
-   <Button className="dshHubPrimary" disabled={busy||recovering||pending||blocked||selection.length===0} onClick={()=>void run(async()=>{intent.current=undefined;setPreview(undefined);const value=await hubSetupRequest<HubPreview>('preview',{channel:check.channel,requested:selection});if(!value.intentId||!value.confirmationNonce||!value.items?.length||!Number.isFinite(Date.parse(value.expiresAt)))throw Error('INVALID_PREVIEW');intent.current=value;setPreview(value)})}>{t('hubPreview')}</Button>
+   <Button className="dshHubPrimary" disabled={busy||recovering||pending||blocked||selection.length===0&&!check.contentProfile?.registeredId} onClick={()=>void run(async()=>{intent.current=undefined;setPreview(undefined);const value=await hubSetupRequest<HubPreview>('preview',{channel:check.channel,requested:selection});if(!value.intentId||!value.confirmationNonce||!Array.isArray(value.items)||!Number.isFinite(Date.parse(value.expiresAt)))throw Error('INVALID_PREVIEW');intent.current=value;setPreview(value)})}>{t('hubPreview')}</Button>
   </>}
   {preview&&<div className="dshHubPlan" aria-label={t('hubPlan')}><h3>{t('hubPlan')}</h3><p>{t('hubBytes')}: {preview.totalBytes.toLocaleString()} bytes · {t('hubExpires')}: {new Date(preview.expiresAt).toLocaleString()}</p>
    <details className="dshHubDetails"><summary>{t('catalogDetails')}</summary><code>{preview.planDigest}</code></details><ul>{preview.items.map(item=><li key={hubKey(item)}><strong>{item.displayName??item.itemId}</strong> · {item.kind} · {item.action} · {item.version??t('hubUnknown')} · {item.enabled?t('hubEnabled'):t('hubDisabled')}

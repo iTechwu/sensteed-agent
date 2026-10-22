@@ -45,7 +45,7 @@ export function registerHubPages(ctx: Context, props: {
     // docs/1022 §6.1：sidebar 底部 Profile 切换器（官方 footer.action 槽；双壳共用）。
     ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
       name: 'sidebar.footer.action', id: 'dofe-profile-switcher', order: 5, locale: 'dofe.access',
-    }, ({ wide }) => <ProfileSwitcher wide={wide} t={props.t} openHub={() => ctx.layout.selectPanel('plugins' as Parameters<typeof ctx.layout.selectPanel>[0])} />))
+    }, ({ wide }) => <ProfileSwitcher wide={wide} t={props.t} openHub={() => ctx.layout.selectPanel('sensteed-skill-manager' as Parameters<typeof ctx.layout.selectPanel>[0])} />))
     for (const [kind, id, order, Icon, label] of [
     ['plugin', 'plugins', 0, Blocks, 'pluginsNav'],
     ['skill', 'sensteed-skill-manager', 1, Sparkles, 'skillsNav'],

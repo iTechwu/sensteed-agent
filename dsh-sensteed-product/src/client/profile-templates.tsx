@@ -1,5 +1,5 @@
 /** Profile 模板选择区（docs/1022 §6.3 Tab A）。渲染进程只发意图；身份与校验都在 Host。 */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { LayoutTemplate } from 'lucide-react'
 import { hubInstantiateRequest, hubTemplatePreviewRequest, hubTemplatesRequest, type HubInstantiateResult, type HubTemplatePreview, type HubTemplatePublic } from './hub-setup-state.ts'
 import { trackHubTemplate } from './hub-analytics.ts'
@@ -24,6 +24,21 @@ export function ProfileTemplatesSection({ disabled, t, onRegistered }: {
   const [registered, setRegistered] = useState<HubInstantiateResult | null>(null)
   const [previews, setPreviews] = useState<Record<string, HubTemplatePreview | undefined>>({})
   const [previewFailed, setPreviewFailed] = useState<Record<string, boolean>>({})
+  const previewRequests = useRef(new Map<string, AbortController>())
+  useEffect(() => () => { for (const request of previewRequests.current.values()) request.abort() }, [])
+  const loadPreview = (templateId: string): void => {
+    previewRequests.current.get(templateId)?.abort()
+    const request = new AbortController(); previewRequests.current.set(templateId, request)
+    setPreviews(current => ({ ...current, [templateId]: undefined })); setPreviewFailed(current => ({ ...current, [templateId]: false }))
+    void hubTemplatePreviewRequest(templateId, request.signal).then(preview => {
+      if (request.signal.aborted) return
+      if (!Array.isArray(preview.items)) throw new Error('malformed preview')
+      setPreviews(current => ({ ...current, [templateId]: preview }))
+      const blocked = preview.items.filter(entry => entry.disposition === 'blocked')
+      trackHubTemplate({ event: 'PROFILE_TEMPLATE_PREVIEWED', properties: { blockedCount: blocked.length } })
+      if (blocked.length) trackHubTemplate({ event: 'PROFILE_TEMPLATE_BLOCKED_ITEM_SHOWN', properties: { itemCount: blocked.length } })
+    }).catch(() => { if (!request.signal.aborted) setPreviewFailed(current => ({ ...current, [templateId]: true })) })
+  }
 
   useEffect(() => {
     if (disabled) return
@@ -52,12 +67,12 @@ export function ProfileTemplatesSection({ disabled, t, onRegistered }: {
 
   const chosen = templates.find(template => template.id === selected) ?? null
   const create = async () => {
-    if (!chosen || busy) return
+    if (!chosen || busy || !previews[chosen.id] || previewFailed[chosen.id]) return
     const profileName = name.trim()
     if (!profileName) { setNotice(t('templateNameRequired')); return }
     setBusy(true); setNotice('')
     try {
-      const result = await hubInstantiateRequest({ templateId: chosen.id, profileName })
+      const result = await hubInstantiateRequest({ templateId: chosen.id, templateRevision: previews[chosen.id]!.revision, profileName })
       trackHubTemplate({
         event: 'PROFILE_TEMPLATE_INSTANTIATED',
         properties: { planCount: result.items.length, skippedCount: result.skippedItems.length },
@@ -66,7 +81,7 @@ export function ProfileTemplatesSection({ disabled, t, onRegistered }: {
       setRegistered(result.skippedItems.length > 0 ? result : null)
       if (result.skippedItems.length > 0) trackHubTemplate({ event: 'PROFILE_TEMPLATE_BLOCKED_ITEM_SHOWN', properties: { itemCount: result.skippedItems.length } })
       setNotice(t('templateRegistered'))
-      setName('')
+      setName(chosen.displayName)
       onRegistered?.(result)
     } catch {
       trackHubTemplate({
@@ -91,17 +106,8 @@ export function ProfileTemplatesSection({ disabled, t, onRegistered }: {
               onClick={() => {
                 if (selected !== template.id) {
                   trackHubTemplate({ event: 'PROFILE_TEMPLATE_SELECTED', properties: { source: 'template' } })
-                  // §6.3 逐项预览：展开即拉 disposition；阻断项创建前显式呈现并埋点
-                  if (!previews[template.id] && !previewFailed[template.id]) {
-                    hubTemplatePreviewRequest(template.id).then(preview => {
-                      if (!Array.isArray(preview.items)) throw new Error('malformed preview')
-                      setPreviews(current => ({ ...current, [template.id]: preview }))
-                      const blocked = preview.items.filter(entry => entry.disposition === 'blocked')
-                      // §7 闭集：预览成功即发 PREVIEWED（阻断数随行）；BLOCKED_ITEM_SHOWN 仅在有阻断时发
-                      trackHubTemplate({ event: 'PROFILE_TEMPLATE_PREVIEWED', properties: { blockedCount: blocked.length } })
-                      if (blocked.length) trackHubTemplate({ event: 'PROFILE_TEMPLATE_BLOCKED_ITEM_SHOWN', properties: { itemCount: blocked.length } })
-                    }).catch(() => { setPreviewFailed(current => ({ ...current, [template.id]: true })) })
-                  }
+                  setName(template.displayName)
+                  loadPreview(template.id)
                 }
                 setSelected(selected === template.id ? null : template.id); setNotice('')
               }}
@@ -126,7 +132,7 @@ export function ProfileTemplatesSection({ disabled, t, onRegistered }: {
                       })}
                     </ul>
                   </div>
-                ) : previewFailed[template.id] ? <p className="dshHubHint">{t('templatePreviewFailed')}</p> : <p className="dshHubHint">{t('hubWorking')}</p>}
+                ) : previewFailed[template.id] ? <p role="alert" className="dshHubHint">{t('templatePreviewFailed')} <button type="button" onClick={() => loadPreview(template.id)}>{t('templateRetry')}</button></p> : <p className="dshHubHint">{t('hubWorking')}</p>}
                 <label className="dshHubHint">
                   {t('templateNameLabel')}
                   <input
@@ -137,7 +143,7 @@ export function ProfileTemplatesSection({ disabled, t, onRegistered }: {
                     onChange={event => setName(event.target.value)}
                   />
                 </label>
-                <button type="button" className="dshHubSecondary" disabled={busy} onClick={() => { void create() }}>
+                <button type="button" className="dshHubSecondary" disabled={busy || !previews[template.id] || previewFailed[template.id]} onClick={() => { void create() }}>
                   {busy ? t('hubWorking') : t('templateCreate')}
                 </button>
               </div>
