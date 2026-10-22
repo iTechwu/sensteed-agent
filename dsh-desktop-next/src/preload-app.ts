@@ -32,10 +32,6 @@ if (location.protocol === 'dsh-app:' && location.hostname === 'app') {
     browserLinks: () => ipcRenderer.invoke(IPC.browserLinks),
     command: (command: unknown) => ipcRenderer.invoke(IPC.command, command),
   })
-  // docs/1022 内容 Profile：渲染进程只发意图；存储与作用域都在 Host。
-  contextBridge.exposeInMainWorld('dshContentProfiles', {
-    request: (request: unknown) => ipcRenderer.invoke(IPC.contentProfiles, request),
-  })
   // dsh 0.1.7 implements the native Sidebar browser itself and reads its transport from this
   // carrier; without `browser` the official plugin silently falls back to the sandboxed iframe.
   contextBridge.exposeInMainWorld('dshDesktop', { protocolVersion: 1, browser: createDesktopBrowserBridge(), ...createDesktopKeyboardBridge() })

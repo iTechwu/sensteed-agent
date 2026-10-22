@@ -5,7 +5,7 @@ import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-client-connection'
 import type {} from './hub-generation-manager.ts'
 
-export const HUB_GENERATION_METHODS = ['check', 'templates', 'instantiate', 'preview', 'execute', 'status', 'restart'] as const
+export const HUB_GENERATION_METHODS = ['check', 'profiles', 'telemetry', 'templates', 'instantiate', 'preview', 'execute', 'status', 'restart'] as const
 type Method = typeof HUB_GENERATION_METHODS[number]
 export type HubGenerationIntentService = { [K in Method]: (input: unknown) => Promise<unknown> }
 const MAX_BODY_BYTES = 64 * 1024

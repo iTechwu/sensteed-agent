@@ -3,7 +3,7 @@ import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { handleContentProfilesRequest } from '../src/content-profiles-ipc.ts'
+import { handleContentProfilesRequest } from '../src/content-profiles.ts'
 import { ContentProfileStore } from '../src/content-profiles.ts'
 
 function store(): ContentProfileStore {

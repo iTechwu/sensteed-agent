@@ -1,6 +1,9 @@
 import type {} from '@dofe/dsh-sensteed-product/update-policy'
 /** Host-only UI intents. All identities, targets, paths and grants remain below this boundary. */
 import{inspectSavedHubPlan,inspectSavedHubInventory}from'./hub-saved-plan.ts'
+import{join}from'node:path'
+import{ContentProfileStore,handleContentProfilesRequest,CONTENT_PROFILES_FILENAME}from'./content-profiles.ts'
+import{relayHubTelemetry}from'./hub-analytics-relay.ts'
 import{verifyHubBootAuthorization}from'./hub-boot-authorization.ts'
 import{randomUUID}from'node:crypto'
 import type{Context}from'@deepseek-ai/cordis'
@@ -20,6 +23,7 @@ type Intent={nonce:string;cap:VerifiedHubGenerationPlan;client:HubGenerationClie
 export function registerHubGenerationManager(ctx:Context,options:{readonly target:HubSyncTarget;readonly userData:string;readonly profileDirectory:string;readonly managed?:boolean}):void{
  ctx.inject(['hubHostClient'],scope=>{
   const client=scope.hubHostClient as HubHostClient,trust=readSealedHubReleaseTrust(),intents=new Map<string,Intent>()
+  let profiles:ContentProfileStore|undefined
   let lastStore:HubGenerationStore|undefined
   let closing=false
   async function closeManaged(){if(!options.managed||closing)return;closing=true;await scope.hubGenerationSupervisor.request({kind:'base'})}
@@ -54,6 +58,15 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
    async check(input:unknown){
     const{channel}=z.strictObject({channel:z.enum(['stable','beta']).optional()}).parse(input),env=await environment(channel)
     return{channel:env.snapshot.channel,profileId:env.identity.profileId,activeGenerationDigest:env.activeGenerationDigest,entries:env.snapshot.entries,activeItems:env.installed.filter(i=>!i.userRemoved).map(i=>({kind:i.kind,itemId:i.itemId,enabled:i.enabled})),operation:summary(env.store)}
+   },
+   async profiles(input:unknown){
+    // docs/1022 §6.4：内容 Profile 存储 Host 所有；双壳渲染进程经同一意图通道触达。
+    profiles ??= new ContentProfileStore(join(options.profileDirectory, CONTENT_PROFILES_FILENAME))
+    return handleContentProfilesRequest(profiles, input)
+   },
+   async telemetry(input:unknown){
+    const{events}=z.strictObject({events:z.array(z.unknown()).max(64)}).parse(input)
+    return await relayHubTelemetry(events)
    },
    async templates(input:unknown){
     const{channel}=z.strictObject({channel:z.enum(['stable','beta']).optional()}).parse(input??{}),env=await environment(channel)

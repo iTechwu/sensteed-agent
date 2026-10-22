@@ -15,7 +15,6 @@ import { installWindowStyles } from './styles.ts'
 import { registerPluginControls } from './plugin-controls.tsx'
 import { installPluginControlsStyles } from './plugin-controls-styles.ts'
 import { SettingsRequests } from './settings-requests.tsx'
-import { ProfileSwitcher } from './profile-switcher.tsx'
 import type { DesktopSettingsLocaleKey } from '../../../dsh-plugin-desktop/src/client/desktop-settings-locales.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -24,13 +23,10 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     'plugins.overview': { kind: 'list'; scope: 'root' }
     /** Bundle rows owned by the overview controls and hidden from the card list. */
     'plugins.bundle.hidden': { kind: 'keyed'; scope: 'root' }
-    /** docs/1022 §6.1: Profile switcher beside Settings at the sidebar foot. */
-    'sidebar.footer.action': { kind: 'list'; scope: 'root'; owner: { wide: boolean } }
   }
   interface LocaleNamespaceMap {
     'desktop.settings': DesktopSettingsLocaleKey
     'desktop-next': 'settings' | 'versions' | 'language' | 'safeMode' | 'safeModeDetail' | 'recovery' | 'dismiss'
-    'desktop-next-profiles': 'profilesLabel' | 'current' | 'switchHint' | 'createHint' | 'switched' | 'alreadyCurrent' | 'loadFailed'
   }
 }
 
@@ -102,15 +98,6 @@ export function apply(ctx: Context): void {
     ctx.slots.inject('shell.overlay', () => ctx.slots.register({
       name: 'shell.overlay', id: 'desktop-next-safe-mode', order: 100, locale: 'desktop-next',
     }, SafeModeNotice))
-    // docs/1022 §6.1：sidebar 底部 Profile 切换器（官方 footer.action 槽）。
-    ctx.locale.register('desktop-next-profiles', {
-      zh: { profilesLabel: 'Profile', current: '当前', switchHint: '切换后需要重新应用：已加载的技能、插件与 MCP 工具将被替换，进行中的任务可能中断。切换到', createHint: '在插件与技能安装中创建', switched: '已切换。请到「插件与技能安装」检查并应用。', alreadyCurrent: '已是当前 Profile', loadFailed: '暂时无法读取 Profile 列表' },
-      en: { profilesLabel: 'Profile', current: 'current', switchHint: 'Switching requires re-applying: loaded skills, plugins and MCP tools will be replaced and running tasks may be interrupted. Switch to', createHint: 'Create in Install plugins and skills', switched: 'Switched. Open Install plugins and skills to check and apply.', alreadyCurrent: 'Already the current profile', loadFailed: 'Could not read profiles' },
-    })
-    ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
-      name: 'sidebar.footer.action', id: 'desktop-profile-switcher', order: 5, locale: 'desktop-next-profiles',
-      inject: () => ({ openPlugins: () => ctx.layout.selectPanel('plugins' as MainPanelId) }),
-    }, ProfileSwitcher))
   }
   ctx.effect(installWindowStyles, 'Next native materials and header interactions')
 }

@@ -76,11 +76,12 @@ describe('content profile store', () => {
     expect(profiles.remove(second.id)).toBe(false)
   })
 
-  it('round-trips through disk and falls back to an empty state on corrupt files', () => {
+  it('round-trips through disk and falls back to an empty state on corrupt files', async () => {
     const file = join(mkdtempSync(join(tmpdir(), 'content-profiles-')), 'content-profiles.json')
     const profiles = new ContentProfileStore(file)
     const created = profiles.create('内容创作', templateInput)
     profiles.setActive(created.id)
+    await profiles.flush()
     const reopened = new ContentProfileStore(file)
     expect(reopened.activeId()).toBe(created.id)
     expect(reopened.get(created.id)?.summary).toEqual({ skills: 1, plugins: 1, mcpEndpoints: 1, skipped: 1 })
