@@ -9,6 +9,8 @@ import { loadNextProfile, NEXT_PACKAGE, NextProfiles, readNextProfilePatches } f
 import { readHubRuntimeTarget } from '../../dsh-plugin-desktop/src/hub-runtime-target.ts'
 import type { HubSyncTarget } from '../../dsh-plugin-desktop/src/hub-sync-verifier.ts'
 import { loadNextHubIntegration } from './next-hub-integration-contract.ts'
+import { findOverlayPackage, packageNameFromSpecifier } from '../../dsh-plugin-desktop/src/package-overlay.ts'
+import { pathToFileURL } from 'node:url'
 
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
@@ -63,9 +65,27 @@ it('mounts the shared product and Host gates on initial and reloaded sealed ente
       expect(entries.some(row => row.name === name), `${phase}: ${name}`).toBe(true)
     }
     expect(entries.some(row => row.name === 'unsealed-user-plugin')).toBe(false)
+    expect(entries.find(row => row.id === 'hmr')?.disabled, 'A sealed enterprise graph cannot reload unsigned source').toBe(true)
   }
 })
 
 it('never manufactures a Hub target for a development checkout', async () => {
   expect(await readHubRuntimeTarget({ isPackaged: false, appPath: '/not/a/sealed/app', resourcesPath: '/not/a/sealed/resources', sensteedVersion: '2.0.19-next' })).toBeUndefined()
+})
+
+it('resolves every sealed enterprise plugin from the Next installation anchor', async () => {
+  const { nextHubBootPlan } = await loadNextHubIntegration()
+  const f = fixture(), plan = await nextHubBootPlan({ ...f, mode: 'enterprise', target, supervisor })
+  const entries = [...composeEntries([[...plan.patches]])]
+  for (const entry of entries) {
+    if (entry.group && Array.isArray(entry.config)) entries.push(...entry.config)
+    if (entry.name === '@deepseek-ai/dsh-agent-preset' && Array.isArray(entry.config?.plugins)) entries.push(...entry.config.plugins)
+  }
+  const missing = entries.flatMap(entry => {
+    const name = entry.name && packageNameFromSpecifier(entry.name)
+    if (!name) return []
+    return findOverlayPackage(name, { installPackageUrl: pathToFileURL(f.installAnchor).href,
+      profilePackageUrl: pathToFileURL(join(f.profileDirectory, 'package.json')).href, hostOwnedOnly: true }) ? [] : [name]
+  })
+  expect([...new Set(missing)], 'The sealed graph must not depend on a Profile or an ancestor workspace fallback').toEqual([])
 })

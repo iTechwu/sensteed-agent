@@ -1,6 +1,6 @@
 /** Next owns its enterprise composition and child lifecycle; signed execution stays shared. */
 import { createRequire } from 'node:module'
-import { basename, dirname, join } from 'node:path'
+import { dirname } from 'node:path'
 import { readFileSync } from 'node:fs'
 import { bundlePatchPaths, composeEntries, loadOverlayPatches, PROFILE_TEMPLATES } from '@deepseek-ai/dsh-app-boot'
 import type { PatchOptions } from '@deepseek-ai/cordis-plugin-include'
@@ -44,6 +44,7 @@ export async function nextHubBootPlan(options: NextHubBootPlanOptions) {
     return bundlePatchPaths(dirname(manifestPath), manifest.dsh.bundle).flatMap(file => loadOverlayPatches('dsh-desktop-next', file))
   })
   patches.push(...(options.patchFiles ?? []).flatMap(file => loadOverlayPatches('dsh-desktop-next', file)))
+  patches.push({ id: 'hmr', disabled: true })
   const base: PatchOptions[] = hubBaseComposition([{ insert: [...composeEntries([patches])] }])
   const boot = options.generation ? prepareHubHostBoot(options.generation, options.profileDirectory, base) : undefined
   return { runner: 'sealed' as const, patches: boot?.patches ?? base, boot, readPatches: () => boot?.compose(base) ?? base }
