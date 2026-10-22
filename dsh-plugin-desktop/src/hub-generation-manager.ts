@@ -2,7 +2,7 @@ import type {} from '@dofe/dsh-sensteed-product/update-policy'
 /** Host-only UI intents. All identities, targets, paths and grants remain below this boundary. */
 import{inspectSavedHubPlan,inspectSavedHubInventory}from'./hub-saved-plan.ts'
 import{join}from'node:path'
-import{ContentProfileStore,handleContentProfilesRequest,CONTENT_PROFILES_FILENAME}from'./content-profiles.ts'
+import{ContentProfileStore,handleContentProfilesRequest,recordInstantiatedProfile,CONTENT_PROFILES_FILENAME}from'./content-profiles.ts'
 import{relayHubTelemetry}from'./hub-analytics-relay.ts'
 import{verifyHubBootAuthorization}from'./hub-boot-authorization.ts'
 import{randomUUID}from'node:crypto'
@@ -87,7 +87,10 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
     // docs/1022 方案 B：注册期望集（profileId=本端 Profile 目录身份），物化走既有
     // preview→execute→restart 意图管线（快照已被期望集裁剪）
     const result=await client.instantiateProfileTemplate(env.context,{templateId,profileName,deviceId:env.identity.deviceId,profileId:env.identity.profileId})
-    return{profileId:env.identity.profileId,templateId:result.templateId,revision:result.revision,profileName:result.profileName,items:result.items,mcpEndpoints:result.mcpEndpoints,skippedItems:result.skippedItems,entries:env.snapshot.entries,operation:summary(env.store)}
+    // 本地内容 Profile 落库并置当前（§6.3 创建即应用）：切换器/回执/切换埋点的数据源
+    profiles ??= new ContentProfileStore(join(options.profileDirectory, CONTENT_PROFILES_FILENAME))
+    const local=await recordInstantiatedProfile(profiles,profileName,result)
+    return{profileId:env.identity.profileId,contentProfileId:local.id,templateId:result.templateId,revision:result.revision,profileName:result.profileName,items:result.items,mcpEndpoints:result.mcpEndpoints,skippedItems:result.skippedItems,entries:env.snapshot.entries,operation:summary(env.store)}
    },
    async preview(input:unknown){
     await requireMutationAllowed()

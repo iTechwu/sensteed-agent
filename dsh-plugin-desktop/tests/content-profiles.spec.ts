@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   ContentProfileStore,
+  recordInstantiatedProfile,
   uniqueProfileName,
   type ContentProfileInstantiateInput,
 } from '../src/content-profiles.ts'
@@ -103,5 +104,22 @@ describe('content profile store concurrency', () => {
     expect(listed).toHaveLength(12)
     // 唯一名在串行事务下保持无碰撞
     expect(new Set(listed.map((profile) => profile.name)).size).toBe(12)
+  })
+})
+
+describe('recordInstantiatedProfile (manager instantiate 本地落库)', () => {
+  it('creates the content profile and marks it active in one step', async () => {
+    const profiles = store()
+    const shape = {
+      templateId: templateInput.templateId,
+      revision: templateInput.templateRevision,
+      items: templateInput.items,
+      mcpEndpoints: templateInput.mcpEndpoints,
+      skippedItems: templateInput.skippedItems,
+    }
+    const created = await recordInstantiatedProfile(profiles, '内容创作', shape)
+    expect(created.summary).toEqual({ skills: 1, plugins: 1, mcpEndpoints: 1, skipped: 1 })
+    expect(profiles.activeId()).toBe(created.id)
+    expect(profiles.list()).toHaveLength(1)
   })
 })

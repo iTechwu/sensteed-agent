@@ -1,3 +1,12 @@
+/** instantiate 返回的期望集视图（manager 传入；字段与 L0 校验后的结果一致）。 */
+export interface HubInstantiatedShape {
+  readonly templateId: string
+  readonly revision: number
+  readonly items: readonly { kind: 'skill' | 'plugin'; itemId: string; enabled: boolean }[]
+  readonly mcpEndpoints: readonly { service: string; domain: string; version: string; enabled: boolean }[]
+  readonly skippedItems: readonly { item: unknown; reason: string }[]
+}
+
 /** Host-owned content-combination Profile store (docs/1022 §6.4).
  * 双壳（stable desktop 与 NEXT）共用：渲染进程只发意图，存储与作用域都在 Host 进程，
  * 落盘在 harness profile 目录（与 generation identity 的 profilePath 同族）。 */
@@ -234,6 +243,25 @@ function mcpEndpoint(value: unknown): { kind: 'mcp.endpoint'; service: string; d
     || typeof item.version !== 'string' || !exactVersion.test(item.version)
     || typeof item.enabled !== 'boolean') fail('Invalid mcp endpoint')
   return { kind: 'mcp.endpoint', service: item.service, domain: item.domain, version: item.version, enabled: item.enabled }
+}
+
+/** manager.instantiate 成功后的本地落库：创建内容 Profile 并置为当前（docs/1022 §6.3 创建即应用）。
+ * Hub 期望集注册在先（Host identity profileId）；本调用失败仅意味着切换器暂缺该条目，
+ * 不回滚 Hub 注册——重试创建得到新本地条目，期望集不受影响。 */
+export async function recordInstantiatedProfile(
+  store: ContentProfileStore,
+  name: string,
+  result: Pick<HubInstantiatedShape, 'templateId' | 'revision' | 'items' | 'mcpEndpoints' | 'skippedItems'>,
+): Promise<ContentProfile> {
+  const profile = await store.create(name, {
+    templateId: result.templateId,
+    templateRevision: result.revision,
+    items: result.items,
+    mcpEndpoints: result.mcpEndpoints,
+    skippedItems: result.skippedItems,
+  })
+  await store.setActive(profile.id)
+  return profile
 }
 
 /** 纯分发便于单测；注册壳只做 sender 校验与 store 装配。 */
