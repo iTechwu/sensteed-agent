@@ -91,17 +91,26 @@ export class ContentProfileStore {
   /** 进程内镜像：load 优先读镜像，避免在途原子写造成读写撕裂。 */
   private cached: ContentProfilesState | undefined
   private writeChain: Promise<void> = Promise.resolve()
-  private persist(state: ContentProfilesState): ContentProfilesState {
-    this.cached = state
-    // 串行化进程内写者；进程外由 generation 维护锁约束安装类写者。
-    this.writeChain = this.writeChain
-      .then(() => withFileLock(this.file, async () => {
-        await writeFileAtomic(this.file, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600, dirMode: 0o700 })
-      }))
-      .catch(() => {})
-    return state
+  /**
+   * 变更事务：读镜像 → 修改 → 落盘整段串行入链，消除并发「读改写」丢更新；
+   * 事务错误冒泡给调用者，链自身不断。磁盘写由进程内锁串行；进程外由
+   * generation 维护锁约束安装类写者。
+   */
+  private transact<T>(fn: (state: ContentProfilesState) => { result: T; next?: ContentProfilesState }): Promise<T> {
+    const exec = this.writeChain.then(async () => {
+      const outcome = fn(this.load())
+      if (outcome.next) {
+        this.cached = outcome.next
+        await withFileLock(this.file, async () => {
+          await writeFileAtomic(this.file, `${JSON.stringify(outcome.next, null, 2)}\n`, { mode: 0o600, dirMode: 0o700 })
+        })
+      }
+      return outcome.result
+    })
+    this.writeChain = exec.then(() => undefined, () => undefined)
+    return exec
   }
-  /** 等待在途持久化落盘（测试与有序关停用）。 */
+  /** 等待在途事务与落盘完成（测试与有序关停用）。 */
   flush(): Promise<void> { return this.writeChain }
 
   list(): readonly ContentProfile[] {
@@ -117,73 +126,82 @@ export class ContentProfileStore {
   }
 
   /** 模板实例化结果落库：出生即冻结（templateId+revision 仅作来源记录）。 */
-  create(name: string, input: ContentProfileInstantiateInput): ContentProfile {
-    const state = this.load()
-    const items: ContentProfileItem[] = [
-      ...input.items.map((item) => ({ kind: item.kind, itemId: item.itemId, enabled: item.enabled })),
-      ...input.mcpEndpoints.map((endpoint) => ({
-        kind: 'mcp.endpoint' as const, service: endpoint.service, domain: endpoint.domain,
-        version: endpoint.version, enabled: endpoint.enabled,
-      })),
-    ]
-    const profile: ContentProfile = {
-      id: randomUUID(),
-      name: uniqueProfileName(state.profiles.map((existing) => existing.name), name),
-      sourceTemplateId: input.templateId,
-      sourceTemplateRevision: input.templateRevision,
-      summary: summarize(items, input.skippedItems.length),
-      items,
-      skippedItems: [...input.skippedItems],
-      createdAt: new Date().toISOString(),
-    }
-    return this.persist({ ...state, profiles: [...state.profiles, profile] }).profiles.at(-1)!
+  async create(name: string, input: ContentProfileInstantiateInput): Promise<ContentProfile> {
+    return this.transact((state) => {
+      const items: ContentProfileItem[] = [
+        ...input.items.map((item) => ({ kind: item.kind, itemId: item.itemId, enabled: item.enabled })),
+        ...input.mcpEndpoints.map((endpoint) => ({
+          kind: 'mcp.endpoint' as const, service: endpoint.service, domain: endpoint.domain,
+          version: endpoint.version, enabled: endpoint.enabled,
+        })),
+      ]
+      const profile: ContentProfile = {
+        id: randomUUID(),
+        name: uniqueProfileName(state.profiles.map((existing) => existing.name), name),
+        sourceTemplateId: input.templateId,
+        sourceTemplateRevision: input.templateRevision,
+        summary: summarize(items, input.skippedItems.length),
+        items,
+        skippedItems: [...input.skippedItems],
+        createdAt: new Date().toISOString(),
+      }
+      const next = { ...state, profiles: [...state.profiles, profile] }
+      return { result: profile, next }
+    })
   }
 
-  createCustom(name: string, items: readonly ContentProfileItem[]): ContentProfile {
-    const state = this.load()
-    const profile: ContentProfile = {
-      id: randomUUID(),
-      name: uniqueProfileName(state.profiles.map((existing) => existing.name), name),
-      summary: summarize(items, 0),
-      items: [...items],
-      skippedItems: [],
-      createdAt: new Date().toISOString(),
-    }
-    return this.persist({ ...state, profiles: [...state.profiles, profile] }).profiles.at(-1)!
+  async createCustom(name: string, items: readonly ContentProfileItem[]): Promise<ContentProfile> {
+    return this.transact((state) => {
+      const profile: ContentProfile = {
+        id: randomUUID(),
+        name: uniqueProfileName(state.profiles.map((existing) => existing.name), name),
+        summary: summarize(items, 0),
+        items: [...items],
+        skippedItems: [],
+        createdAt: new Date().toISOString(),
+      }
+      return { result: profile, next: { ...state, profiles: [...state.profiles, profile] } }
+    })
   }
 
-  rename(id: string, name: string): ContentProfile | undefined {
-    const state = this.load()
-    const profiles = state.profiles.map((profile) => profile.id === id
-      ? { ...profile, name: uniqueProfileName(state.profiles.filter((other) => other.id !== id).map((other) => other.name), name) }
-      : profile)
-    return this.persist({ ...state, profiles }).profiles.find((profile) => profile.id === id)
+  async rename(id: string, name: string): Promise<ContentProfile | undefined> {
+    return this.transact((state) => {
+      if (!state.profiles.some((profile) => profile.id === id)) return { result: undefined }
+      const profiles = state.profiles.map((profile) => profile.id === id
+        ? { ...profile, name: uniqueProfileName(state.profiles.filter((other) => other.id !== id).map((other) => other.name), name) }
+        : profile)
+      return { result: profiles.find((profile) => profile.id === id), next: { ...state, profiles } }
+    })
   }
 
-  remove(id: string): boolean {
-    const state = this.load()
-    if (!state.profiles.some((profile) => profile.id === id)) return false
-    return !this.persist({
-      ...state,
-      activeId: state.activeId === id ? null : state.activeId,
-      profiles: state.profiles.filter((profile) => profile.id !== id),
-    }).profiles.some((profile) => profile.id === id)
+  async remove(id: string): Promise<boolean> {
+    return this.transact((state) => {
+      if (!state.profiles.some((profile) => profile.id === id)) return { result: false }
+      const next = {
+        ...state,
+        activeId: state.activeId === id ? null : state.activeId,
+        profiles: state.profiles.filter((profile) => profile.id !== id),
+      }
+      return { result: true, next }
+    })
   }
 
-  setActive(id: string | null): boolean {
-    const state = this.load()
-    if (id !== null && !state.profiles.some((profile) => profile.id === id)) return false
-    this.persist({ ...state, activeId: id })
-    return true
+  async setActive(id: string | null): Promise<boolean> {
+    return this.transact((state) => {
+      if (id !== null && !state.profiles.some((profile) => profile.id === id)) return { result: false }
+      return { result: true, next: { ...state, activeId: id } }
+    })
   }
 
   /** 应用完成回执；入口与阶段由调用方的 apply 管线驱动。 */
-  markApplied(id: string, appliedAt = new Date().toISOString()): ContentProfile | undefined {
-    const state = this.load()
-    const profiles = state.profiles.map((profile) => profile.id === id
-      ? { ...profile, lastAppliedAt: appliedAt }
-      : profile)
-    return this.persist({ ...state, profiles }).profiles.find((profile) => profile.id === id)
+  async markApplied(id: string, appliedAt = new Date().toISOString()): Promise<ContentProfile | undefined> {
+    return this.transact((state) => {
+      if (!state.profiles.some((profile) => profile.id === id)) return { result: undefined }
+      const profiles = state.profiles.map((profile) => profile.id === id
+        ? { ...profile, lastAppliedAt: appliedAt }
+        : profile)
+      return { result: profiles.find((profile) => profile.id === id), next: { ...state, profiles } }
+    })
   }
 }
 
@@ -219,10 +237,10 @@ function mcpEndpoint(value: unknown): { kind: 'mcp.endpoint'; service: string; d
 }
 
 /** 纯分发便于单测；注册壳只做 sender 校验与 store 装配。 */
-export function handleContentProfilesRequest(
+export async function handleContentProfilesRequest(
   store: ContentProfileStore,
   raw: unknown,
-): unknown {
+): Promise<unknown> {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) fail('Invalid content-profile request')
   const request = raw as Record<string, unknown>
   const id = (): string => { if (typeof request.id !== 'string' || !uuid.test(request.id)) fail('Invalid profile id'); return request.id }
@@ -248,7 +266,7 @@ export function handleContentProfilesRequest(
         })) fail('Invalid skipped items')
       if (typeof request.templateId !== 'string' || !uuid.test(request.templateId)
         || typeof request.templateRevision !== 'number' || !Number.isSafeInteger(request.templateRevision) || request.templateRevision < 1) fail('Invalid template source')
-      return store.create(profileName(request.name), {
+      return await store.create(profileName(request.name), {
         templateId: request.templateId,
         templateRevision: request.templateRevision,
         items: (items as { kind: 'skill' | 'plugin'; itemId: string; enabled: boolean }[]).map(item => ({ ...item, itemId: itemId(item.itemId) })),
@@ -267,15 +285,15 @@ export function handleContentProfilesRequest(
           || typeof entry.enabled !== 'boolean') fail('Invalid profile item')
         return { kind: entry.kind, itemId: entry.itemId, enabled: entry.enabled }
       })
-      return store.createCustom(profileName(request.name), validated)
+      return await store.createCustom(profileName(request.name), validated)
     }
-    case 'rename': return store.rename(id(), profileName(request.name))
-    case 'remove': return store.remove(id())
+    case 'rename': return await store.rename(id(), profileName(request.name))
+    case 'remove': return await store.remove(id())
     case 'set-active': {
       if (request.id !== null && (typeof request.id !== 'string' || !uuid.test(request.id))) fail('Invalid profile id')
-      return store.setActive(request.id as string | null)
+      return await store.setActive(request.id as string | null)
     }
-    case 'mark-applied': return store.markApplied(id())
+    case 'mark-applied': return await store.markApplied(id())
     default: fail('Invalid content-profile action')
   }
 }

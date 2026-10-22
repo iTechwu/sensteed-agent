@@ -19,34 +19,34 @@ const validCreate = {
 }
 
 describe('content profiles ipc dispatch', () => {
-  it('creates from an instantiate result and lists profiles', () => {
+  it('creates from an instantiate result and lists profiles', async () => {
     const profiles = store()
-    const created = handleContentProfilesRequest(profiles, validCreate) as { id: string; summary: { skills: number; mcpEndpoints: number; skipped: number } }
+    const created = await handleContentProfilesRequest(profiles, validCreate) as { id: string; summary: { skills: number; mcpEndpoints: number; skipped: number } }
     expect(created.summary).toEqual({ skills: 1, plugins: 0, mcpEndpoints: 1, skipped: 1 })
-    expect(handleContentProfilesRequest(profiles, { action: 'list' })).toHaveLength(1)
-    expect(handleContentProfilesRequest(profiles, { action: 'active' })).toBeNull()
+    expect(await handleContentProfilesRequest(profiles, { action: 'list' })).toHaveLength(1)
+    expect(await handleContentProfilesRequest(profiles, { action: 'active' })).toBeNull()
   })
 
-  it('rejects malformed intents without touching storage', () => {
+  it('rejects malformed intents without touching storage', async () => {
     const profiles = store()
-    expect(() => handleContentProfilesRequest(profiles, { ...validCreate, name: '' })).toThrow('Invalid profile name')
-    expect(() => handleContentProfilesRequest(profiles, { ...validCreate, name: '名'.repeat(25) })).toThrow('Invalid profile name')
-    expect(() => handleContentProfilesRequest(profiles, { ...validCreate, templateId: 'not-a-uuid' })).toThrow()
-    expect(() => handleContentProfilesRequest(profiles, { ...validCreate, items: [{ kind: 'skill', itemId: 'nope', enabled: true }] })).toThrow()
-    expect(() => handleContentProfilesRequest(profiles, { ...validCreate, mcpEndpoints: [{ service: 'Knowledge', domain: 'knowledge', version: '1.0.0', enabled: true }] })).toThrow()
-    expect(() => handleContentProfilesRequest(profiles, { action: 'nope' })).toThrow('Invalid content-profile action')
-    expect(handleContentProfilesRequest(profiles, { action: 'list' })).toHaveLength(0)
+    await expect(handleContentProfilesRequest(profiles, { ...validCreate, name: '' })).rejects.toThrow('Invalid profile name')
+    await expect(handleContentProfilesRequest(profiles, { ...validCreate, name: '名'.repeat(25) })).rejects.toThrow('Invalid profile name')
+    await expect(handleContentProfilesRequest(profiles, { ...validCreate, templateId: 'not-a-uuid' })).rejects.toThrow()
+    await expect(handleContentProfilesRequest(profiles, { ...validCreate, items: [{ kind: 'skill', itemId: 'nope', enabled: true }] })).rejects.toThrow()
+    await expect(handleContentProfilesRequest(profiles, { ...validCreate, mcpEndpoints: [{ service: 'Knowledge', domain: 'knowledge', version: '1.0.0', enabled: true }] })).rejects.toThrow()
+    await expect(handleContentProfilesRequest(profiles, { action: 'nope' })).rejects.toThrow('Invalid content-profile action')
+    expect(await handleContentProfilesRequest(profiles, { action: 'list' })).toHaveLength(0)
   })
 
-  it('supports rename, activate and applied receipts through the same dispatch', () => {
+  it('supports rename, activate and applied receipts through the same dispatch', async () => {
     const profiles = store()
-    const created = handleContentProfilesRequest(profiles, validCreate) as { id: string }
-    expect((handleContentProfilesRequest(profiles, { action: 'rename', id: created.id, name: '改名' }) as { name: string }).name).toBe('改名')
-    expect(handleContentProfilesRequest(profiles, { action: 'set-active', id: created.id })).toBe(true)
-    expect(handleContentProfilesRequest(profiles, { action: 'active' })).toBe(created.id)
-    expect((handleContentProfilesRequest(profiles, { action: 'mark-applied', id: created.id }) as { lastAppliedAt: string }).lastAppliedAt).toBeDefined()
-    expect(handleContentProfilesRequest(profiles, { action: 'remove', id: created.id })).toBe(true)
-    expect(handleContentProfilesRequest(profiles, { action: 'active' })).toBeNull()
-    expect(() => handleContentProfilesRequest(profiles, { action: 'set-active', id: 'nope' })).toThrow()
+    const created = await handleContentProfilesRequest(profiles, validCreate) as { id: string }
+    expect((await handleContentProfilesRequest(profiles, { action: 'rename', id: created.id, name: '改名' }) as { name: string }).name).toBe('改名')
+    expect(await handleContentProfilesRequest(profiles, { action: 'set-active', id: created.id })).toBe(true)
+    expect(await handleContentProfilesRequest(profiles, { action: 'active' })).toBe(created.id)
+    expect((await handleContentProfilesRequest(profiles, { action: 'mark-applied', id: created.id }) as { lastAppliedAt: string }).lastAppliedAt).toBeDefined()
+    expect(await handleContentProfilesRequest(profiles, { action: 'remove', id: created.id })).toBe(true)
+    expect(await handleContentProfilesRequest(profiles, { action: 'active' })).toBeNull()
+    await expect(handleContentProfilesRequest(profiles, { action: 'set-active', id: 'nope' })).rejects.toThrow()
   })
 })
