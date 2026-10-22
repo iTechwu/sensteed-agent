@@ -37,6 +37,28 @@ it('checks without downloading; download completion waits for an explicit instal
   expect(options.install).toHaveBeenCalledOnce()
   expect(updates.snapshot().phase).toBe('installing')
 })
+
+it('holds installation maintenance throughout download and preparation',async()=>{
+ let held=false
+ const maintain=vi.fn(async(work:()=>Promise<void>)=>{held=true;try{await work()}finally{held=false}})
+ const prepare=vi.fn(async()=>{expect(held).toBe(true)})
+ const {updates}=await fixture({maintain,prepare})
+ await updates.check();await updates.download()
+ expect(maintain).toHaveBeenCalledOnce();expect(prepare).toHaveBeenCalledOnce();expect(held).toBe(false)
+})
+
+it('coalesces duplicate downloads queued behind installation maintenance', async () => {
+  let tail = Promise.resolve()
+  const maintain = (work: () => Promise<void>) => {
+    const pending = tail.then(work)
+    tail = pending.catch(() => {})
+    return pending
+  }
+  const { updates, options } = await fixture({ maintain })
+  await Promise.all([updates.download(), updates.download()])
+  expect(updates.snapshot().phase).toBe('ready')
+  expect(options.prepare).toHaveBeenCalledOnce()
+})
 it('does not confuse an unpublished channel, invalid response or network failure with up to date', async () => {
   for (const response of [new Response('', { status: 400 }), new Response('', { status: 503 }), Response.json({ version: '2.0.18', channel: 'stable' })]) {
     const { updates } = await fixture({ request: async () => response })
