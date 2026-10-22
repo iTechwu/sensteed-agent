@@ -12,7 +12,7 @@ describe('relayHubTelemetry', () => {
       { event: 'PROFILE_SWITCHED', properties: { itemCount: 3 } },
     ], fetcher as unknown as typeof fetch)
     expect(result).toEqual({ delivered: true, relayed: 2 })
-    const [url, init] = fetcher.mock.calls[0] as [string, RequestInit]
+    const [url, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit]
     expect(url).toBe('https://ai.hozonauto.com/plugins/api/analytics/track')
     expect(init).toMatchObject({ method: 'POST', credentials: 'omit', redirect: 'error' })
     expect(JSON.parse(String(init.body)).events).toHaveLength(2)
