@@ -86,7 +86,9 @@ export async function bootDesktopHost(options: DesktopHostOptions, runtime: Desk
   const { prepared: suppliedPrepared, profilePreferences, homeDir, activeProfileName, pluginManagementStatePath,
     selectionStatePath, marketUserDataDir, releaseUserDataLocations, desktopLaunchEnvironment,
     desktopPnpmBootstrap } = options
-  if(options.hubRuntimeTarget)await confirmDesktopMaintenanceBuild(options.hubRuntimeTarget)
+  // 维护身份只取两字段投影（同 main.ts 启动路径）；BuildSchema strictObject 把完整
+  // HubSyncTarget 视为 Unrecognized keys，会让打包版每个 Profile 的插件服务启动必炸。
+  if(options.hubRuntimeTarget)await confirmDesktopMaintenanceBuild({hostBuildDigest:options.hubRuntimeTarget.hostBuildDigest,sensteedVersion:options.hubRuntimeTarget.sensteedVersion})
   const prepared = options.hubRuntimeTarget === undefined ? suppliedPrepared : prepareSealedDesktopProfile(suppliedPrepared)
   const createFreshDesktopProfile = (name: string) => {
     const created = createDesktopWebProfile(homeDir, name)
