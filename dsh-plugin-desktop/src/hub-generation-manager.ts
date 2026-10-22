@@ -62,6 +62,25 @@ export function registerHubGenerationManager(ctx:Context,options:{readonly targe
    async profiles(input:unknown){
     // docs/1022 §6.4：内容 Profile 存储 Host 所有；双壳渲染进程经同一意图通道触达。
     profiles ??= new ContentProfileStore(join(options.profileDirectory, CONTENT_PROFILES_FILENAME))
+    const request=z.object({action:z.string()}).passthrough().parse(input??{})
+    if(request.action==='activate'){
+     // §6.2 切换必须重新应用：模板出生的 Profile 按冻结修订重注册期望集（Hub 目录
+     // 随之改向），再本地置当前；自定义 Profile 仅本地切换（不重定目录范围）。
+     const{id}=z.strictObject({action:z.literal('activate'),id:z.uuid()}).parse(input)
+     await requireMutationAllowed()
+     const profile=profiles.get(id)
+     if(!profile)throw new Error('HUB_PROFILE_NOT_FOUND')
+     let skippedCount=0
+     if(profile.sourceTemplateId&&profile.sourceTemplateRevision){
+      const env=await environment()
+      const result=await client.registerTemplateSelection(env.context,{
+       templateId:profile.sourceTemplateId,revision:profile.sourceTemplateRevision,
+       deviceId:env.identity.deviceId,profileId:env.identity.profileId})
+      skippedCount=result.skippedItems.length
+     }
+     if(!profiles.setActive(id))throw new Error('HUB_PROFILE_NOT_FOUND')
+     return{switched:true,skippedCount}
+    }
     return handleContentProfilesRequest(profiles, input)
    },
    async telemetry(input:unknown){

@@ -19,7 +19,7 @@ function stubProfilesApi() {
     if (path.endsWith('/profiles')) {
       if (body.action === 'list') return new Response(JSON.stringify(profiles), { headers: { 'content-type': 'application/json' } })
       if (body.action === 'active') return new Response(JSON.stringify(profiles[0]!.id), { headers: { 'content-type': 'application/json' } })
-      if (body.action === 'set-active') return new Response('true', { headers: { 'content-type': 'application/json' } })
+      if (body.action === 'activate') return new Response(JSON.stringify({ switched: true, skippedCount: 0 }), { headers: { 'content-type': 'application/json' } })
     }
     if (path.endsWith('/telemetry')) return new Response('{"delivered":true}', { headers: { 'content-type': 'application/json' } })
     throw new Error(`unexpected fetch ${path}`)
@@ -52,7 +52,7 @@ describe('ProfileSwitcher', () => {
     vi.stubGlobal('confirm', vi.fn(() => true))
     await act(async () => { host.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')[1]!.click() })
     await flush()
-    expect(fetcher).toHaveBeenCalledWith('/api/desktop/hub/generations/profiles', expect.objectContaining({ body: JSON.stringify({ action: 'set-active', id: profiles[1]!.id }) }))
+    expect(fetcher).toHaveBeenCalledWith('/api/desktop/hub/generations/profiles', expect.objectContaining({ body: JSON.stringify({ action: 'activate', id: profiles[1]!.id }) }))
     expect(host.textContent).toContain(t('switched'))
     // 切换成功经 Host 中继发 PROFILE_SWITCHED
     const bodies = fetcher.mock.calls.map(([, init]) => String(init?.body ?? ''))
@@ -68,7 +68,7 @@ describe('ProfileSwitcher', () => {
     await act(async () => { host.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')[0]!.click() })
     await flush()
     expect(host.textContent).toContain(t('alreadyCurrent'))
-    expect(fetcher).not.toHaveBeenCalledWith('/api/desktop/hub/generations/profiles', expect.objectContaining({ body: JSON.stringify({ action: 'set-active', id: profiles[0]!.id }) }))
+    expect(fetcher).not.toHaveBeenCalledWith('/api/desktop/hub/generations/profiles', expect.objectContaining({ body: JSON.stringify({ action: 'activate', id: profiles[0]!.id }) }))
   })
 
   it('focuses the current item on open, moves with arrows, and closes on Escape', async () => {

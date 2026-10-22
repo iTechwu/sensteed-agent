@@ -70,7 +70,7 @@ export function ProfileSwitcher({ wide, t, openHub }: ProfileSwitcherProps) {
     if (profile.id === activeId) { setNotice(t('alreadyCurrent')); return }
     // 期望集切换后需重新应用：确认后仅改注册，物化经企业目录页的既有检查/安装管线。
     if (!window.confirm(`${t('switchHint')}「${profile.name}」`)) return
-    void hubProfilesRequest({ action: 'set-active', id: profile.id }).then(() => {
+    void hubProfilesRequest<{ switched: boolean; skippedCount: number }>({ action: 'activate', id: profile.id }).then(() => {
       trackHubTemplate({ event: 'PROFILE_SWITCHED', properties: { itemCount: profile.summary.skills + profile.summary.plugins } })
       setActiveId(profile.id); setNotice(t('switched'))
     }).catch(() => {

@@ -153,6 +153,17 @@ describe('Profile template endpoints (docs/1022 A1)', () => {
     await expect(f.client.instantiateProfileTemplate(context, { templateId, profileName: 'x', deviceId, profileId: 'not-a-uuid' })).rejects.toMatchObject({ code: 'HUB_INVALID_REQUEST' })
     f.client.dispose()
   })
+  it('re-registers a selection from a frozen revision at the fixed origin', async () => {
+    const payload = { profileId, templateId, revision: 3, items: [{ kind: 'skill', itemId: '66666666-6666-4666-8666-666666666666', enabled: true }], mcpEndpoints: [], skippedItems: [] }
+    const f = clientFor((path) => path.includes('/me') ? { code: 200, data: me } : { code: 200, data: payload })
+    const context = await f.client.context(workspace)
+    const result = await f.client.registerTemplateSelection(context, { templateId, revision: 3, deviceId, profileId })
+    expect(result).toMatchObject({ profileId, templateId, revision: 3, items: [{ kind: 'skill' }] })
+    expect(f.fetcher.mock.calls.at(-1)?.[0]).toBe(`https://ai.hozonauto.com/plugins/api/skillhub/v1/profile-templates/${templateId}/revisions/3/selection`)
+    await expect(f.client.registerTemplateSelection(context, { templateId, revision: 0, deviceId, profileId })).rejects.toMatchObject({ code: 'HUB_INVALID_REQUEST' })
+    f.client.dispose()
+  })
+
   it('requires SSO before any template call', async () => {
     const f = clientFor(() => { throw new Error('must not fetch') })
     f.logout()
