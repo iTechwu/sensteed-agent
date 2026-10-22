@@ -98,6 +98,12 @@ function missing(specifier: string, parentURL?: string): Error {
 }
 
 describe('installProfilePackageResolver', () => {
+  it('uses the owning installation anchor for a sealed Next Host', () => {
+    const profileBaseUrl = 'file:///profiles/next/package.json'
+    releases.push(retainProfilePackageResolver(profileBaseUrl, undefined, true, 'file:///next/package.json'))
+    harness.resolve!('next-only', { parentURL: profileBaseUrl }, (_name, context) => ({ url: `${context.parentURL}/module.js` }))
+    expect(harness.overlay).toHaveBeenCalledWith('next-only', expect.objectContaining({ installPackageUrl: 'file:///next/package.json', hostOwnedOnly: true }))
+  })
   beforeEach(() => {
     harness.resolve = undefined
     harness.deregister.mockClear()

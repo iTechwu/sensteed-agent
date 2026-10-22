@@ -1,11 +1,11 @@
 /** Serial supervisor ownership: an old Host must be confirmed stopped before pointer or process replacement. */
-import type{DesktopStartupGenerationHost}from'./startup-generation.ts'
+export interface HubHostLifetime { readonly fiber: { dispose(): void | Promise<void> } }
 export class HubHostSupervisor{
- private host:DesktopStartupGenerationHost|undefined
+ private host:HubHostLifetime|undefined
  private tail=Promise.resolve()
  private stopped=false
- bind(host:DesktopStartupGenerationHost):void{if(this.stopped||this.host)throw new Error('Hub supervisor already owns a Host');this.host=host}
- async replace(mutate:()=>Promise<void>,start:(bind:(host:DesktopStartupGenerationHost)=>void)=>Promise<void>):Promise<void>{
+ bind(host:HubHostLifetime):void{if(this.stopped||this.host)throw new Error('Hub supervisor already owns a Host');this.host=host}
+ async replace(mutate:()=>Promise<void>,start:(bind:(host:HubHostLifetime)=>void)=>Promise<void>):Promise<void>{
   const task=this.tail.then(async()=>{
    if(this.stopped)throw new Error('Hub supervisor is stopped')
    const old=this.host
