@@ -4,7 +4,6 @@
 /** Content-combination Profile store (docs/1022 §6.4). Born-from-template stays frozen: upstream template updates never mutate an existing profile. */
 import { randomUUID } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { withFileLock, writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 
 export type ContentProfileItem =
@@ -188,9 +187,8 @@ export class ContentProfileStore {
   }
 }
 
-/** 默认落盘位置由调用方用 data-directory 解析后传入；此处仅提供文件名约定。 */
+/** 落盘文件名约定；目录由 manager 的 profileDirectory 决定。 */
 export const CONTENT_PROFILES_FILENAME = 'content-profiles.json'
-export const contentProfilesFile = (home: string): string => join(home, CONTENT_PROFILES_FILENAME)
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu
 const endpointPart = /^[a-z][a-z0-9_-]{0,79}$/u
