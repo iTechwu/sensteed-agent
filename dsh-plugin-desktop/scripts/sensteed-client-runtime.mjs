@@ -111,6 +111,10 @@ function createBrowserHarness(pluginId) {
   const require = (name) => {
     if (name === 'react') return React
     if (name === 'react/jsx-runtime') return { jsx: noopComponent, jsxs: noopComponent, Fragment: 'Fragment' }
+    if (name === 'react-dom') return { createPortal: (children, container) => {
+      if (!container) throw new Error('Portal requires an attached container')
+      return { type: 'portal', children, container }
+    } }
     if (name === 'react-dom/client') {
       return { createRoot: node => {
         if (!node.parentNode) throw new Error('React root must be attached before rendering')
