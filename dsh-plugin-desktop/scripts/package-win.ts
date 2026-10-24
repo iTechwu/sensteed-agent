@@ -280,8 +280,14 @@ function runBuilder(
       '--config.win.signExecutable=false',
       '--config.npmRebuild=false',
       '--config.electronFuses.onlyLoadAppFromAsar=false',
-      ...(prepackagedDir === undefined ? [] : ['--prepackaged', prepackagedDir]),
+      // 常规 prepare→package 流保持既有双参形态;复用模式从 CI 环境直接进入打包,单参收尾。
+      ...(prepackagedDir === undefined || options.env.DSH_WINDOWS_REUSE_UNPACKED === '1'
+        ? []
+        : ['--prepackaged', prepackagedDir]),
       ...(targetCompression === undefined ? [] : [`--config.win.compression=${targetCompression}`]),
+      ...(prepackagedDir !== undefined && options.env.DSH_WINDOWS_REUSE_UNPACKED === '1'
+        ? [`--prepackaged=${prepackagedDir}`]
+        : []),
     ],
     options.desktopRoot,
     builderEnvironment(cleanEnvironment),
@@ -335,7 +341,11 @@ export function packageWindowsArtifacts(
   artifacts: readonly ('installer' | 'portable archive')[],
 ): void {
   windowsCompressionOverride(options.env)
-  prepareWindowsPackage(options)
+  if (options.env.DSH_WINDOWS_REUSE_UNPACKED === '1') {
+    options.log('Reusing the unpacked Windows application directory.')
+  } else {
+    prepareWindowsPackage(options)
+  }
   targets.forEach((target, index) => {
     const artifact = artifacts[index] ?? (target === 'nsis' ? 'installer' : 'portable archive')
     const verifier = target === 'nsis' ? options.verifier : (options.extraVerifiers?.[0] ?? options.verifier)

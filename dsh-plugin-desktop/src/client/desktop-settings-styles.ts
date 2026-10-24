@@ -482,6 +482,20 @@ body [data-slot="sidebar.footer.action"] button[aria-label="Mobile connection"] 
    the dark palette's light text. An opaque option fill keeps that list readable;
    the closed control is unchanged, and macOS's native menu ignores it. */
 body[data-ds-dark-theme] select :is(option, optgroup) { background-color: var(--dsw-alias-bg-layer-2); }
+/* Shared official-style select control (upstream DesktopSettingsSelect). */
+.dshDesktopSettingsSelect {
+  flex: 0 0 auto;
+  min-width: 150px;
+  min-height: 32px;
+  padding: 4px 28px 4px 10px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 12px;
+}
+.dshDesktopSettingsSelect:disabled { opacity: .55; }
 `
 
 /** Install one scoped stylesheet; tolerate headless Client boot. */

@@ -309,10 +309,11 @@ if (!deliverablesStyles.includes('[data-ds-dark-theme]')) {
 // Sibling 0.1.5-rc.2 aligned delivery cards with the upstream 18px/10px radius
 // and static-neutral fills (deepseek-harness 215bf40ad3); the audit follows.
 // 0.1.7 dropped the `.split` surface entirely, so only the surviving classes
-// are audited.
-for (const [selector, radius] of [['.file', '18px'], ['.fileIcon', '10px']]) {
+// are audited. rc.3 (deepseek-harness 同步) 把 .file 圆角从字面量 18px 改为令牌
+// var(--dsw-radius-lg)（=16px），合同随上游令牌基线走；.fileIcon 仍是字面量 10px。
+for (const [selector, radius, token] of [['.file', '18px', 'var(--dsw-radius-lg)'], ['.fileIcon', '10px', undefined]]) {
   const selectorRule = deliverablesStyles.match(new RegExp(`\\${selector} \\{[^}]*\\}`, 'u'))?.[0] || ''
-  if (!selectorRule.includes(`border-radius: ${radius}`)) {
+  if (!selectorRule.includes(`border-radius: ${radius}`) && (token === undefined || !selectorRule.includes(`border-radius: ${token}`))) {
     failures.push(`ui-deliverables: ${selector} does not follow the ${radius} surface radius contract`)
   }
 }

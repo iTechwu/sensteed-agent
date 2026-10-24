@@ -547,7 +547,11 @@ async function intentSearch(query: string, tools: SalesToolsRuntime | undefined)
   const schema = tools.schemas().find(item => /lead.?discovery|lead.?monitor|hotspot.?discovery|browser.?intelligence/i.test(`${item.name} ${item.description || ''}`))
   if (schema === undefined) return { status: 'unavailable', reason: 'lead_discovery_tool_unavailable', items: [] }
   try {
-    const result = await tools.execute({ callId: ToolCallId(`yootun-sales-intent-${randomUUID()}`), name: schema.name, arguments: { query }, signal: AbortSignal.timeout(15_000) })
+    const batch = await tools.execute({
+      calls: [{ type: 'tool-call' as const, id: ToolCallId(`yootun-sales-intent-${randomUUID()}`), name: schema.name, arguments: JSON.stringify({ query }) }],
+      signal: AbortSignal.timeout(15_000),
+    })
+    const result = batch.results[0]?.result
     return sanitizeIntentResult(result)
   } catch { return { status: 'error', reason: 'lead_discovery_request_failed', items: [] } }
 }

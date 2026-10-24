@@ -135,12 +135,12 @@ try {
   assert.equal(activeSchedule?.enabled, true, `Schedule switch must re-enable: ${JSON.stringify(activeSchedule)}`)
   assert.equal(activeSchedule?.fiberPhase, 'active', JSON.stringify(activeSchedule))
   console.log('verify-host: Web-composed Schedule switch and restart persistence passed')
-  // rc.2 的 market 特性改挂到官方 plugin-market bundle,bridge 停用不再联动
-  // TODO(rc.2): market 三包(community-market/dshmarket/bridge)的 official/optional/
+  // rc.3 的 market 特性改挂到官方 plugin-market bundle,bridge 停用不再联动
+  // TODO(rc.3): market 三包(community-market/dshmarket/bridge)的 official/optional/
   // removable 分类、插件行模型、AA 行与 recovery/reconcile 断言全部基于 alpha.3 的
-  // plugin-manager 契约;rc.2 将 market 特性改挂官方 plugin-market bundle。恢复这些
-  // 场景属于插件市场专项集成任务,不属本次上游同步。
-  console.log(`Next Host smoke passed (reduced on rc.2: boot, credentials, Schedule switch, shutdown; market/AA/recovery sections deferred to the plugin-market integration task) (${process.argv.includes('--electron') ? 'Electron Node mode' : 'Node'})`)
+  // plugin-manager 契约;rc.3 将 market 特性改挂官方 plugin-market bundle。恢复这些
+  // 场景属于插件市场专项集成任务,不随上游钉值迁移。
+  console.log(`Next Host smoke passed (reduced on rc.3: boot, credentials, Schedule switch, shutdown; market/AA/recovery sections deferred to the plugin-market integration task) (${process.argv.includes('--electron') ? 'Electron Node mode' : 'Node'})`)
 } finally {
   await runner?.dispose()
   await host?.stop()

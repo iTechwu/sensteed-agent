@@ -4,6 +4,7 @@ import {
   useCallback, useEffect, useId, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode,
 } from 'react'
 import type { DesktopSettingsForm } from './settings-bridge.ts'
+import { IconChevronDownOutlineRegular, Menu } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Check, Copy } from 'lucide-react'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {
@@ -28,6 +29,10 @@ export interface DesktopShellSettings {
   readonly networkExposure: 'loopback' | 'lan'
   readonly developerLogging?: boolean
   readonly logLevel: 'debug' | 'info' | 'warn' | 'error'
+  /** Render compact sidebar footer actions on a single row while the sidebar is expanded. */
+  readonly sidebarFooterCompat?: boolean
+  /** Balance multi-row sidebar footer icons across columns. */
+  readonly sidebarFooterBalanced?: boolean
 }
 
 /** Browser view of the Host `dsh-desktop-notifications` settings namespace. */
@@ -247,12 +252,15 @@ function RepositoryLink({ href, children }: { href: string; children: ReactNode 
 export function DesktopSettingsToggleRow({
   label,
   badge,
+  description,
   checked,
   disabled,
   onChange,
 }: {
   label: ReactNode
   badge?: ReactNode
+  /** Secondary hint line rendered under the label; Next's shared settings pass it. */
+  description?: ReactNode
   checked: boolean
   disabled: boolean
   onChange: (checked: boolean) => void
@@ -264,6 +272,7 @@ export function DesktopSettingsToggleRow({
         {label}
         {badge !== undefined && <span className="sensteedAgentSettingsBadge">{badge}</span>}
       </span>
+      {description !== undefined && <span className="sensteedAgentSettingsToggleLabel">{description}</span>}
       <button
         type="button"
         role="switch"
@@ -276,6 +285,51 @@ export function DesktopSettingsToggleRow({
         <span className="sensteedAgentSettingsToggleKnob" aria-hidden="true" />
       </button>
     </div>
+  )
+}
+
+export function DesktopSettingsSelect<T extends string>({
+  value,
+  options,
+  disabled,
+  ariaLabel,
+  onChange,
+}: {
+  value: T
+  options: readonly { readonly value: T; readonly label: ReactNode }[]
+  disabled?: boolean
+  ariaLabel?: string
+  onChange: (value: T) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const selected = options.find(option => option.value === value) ?? options[0]
+  return (
+    <Menu
+      open={open}
+      onClose={() => { setOpen(false) }}
+      items={options.map(option => ({ id: option.value, label: option.label }))}
+      selectedId={value}
+      onSelect={(id) => {
+        setOpen(false)
+        if (id !== value) onChange(id as T)
+      }}
+      align="end"
+      portal
+      anchor={(
+        <button
+          type="button"
+          className="dshDesktopSettingsSelect"
+          aria-label={ariaLabel}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          disabled={disabled}
+          onClick={() => { setOpen(current => !current) }}
+        >
+          <span>{selected?.label ?? value}</span>
+          <IconChevronDownOutlineRegular className="dshDesktopSettingsSelectChevron" />
+        </button>
+      )}
+    />
   )
 }
 

@@ -12,8 +12,8 @@ import {
 import { chmod, lstat, mkdir } from 'node:fs/promises'
 import { dirname, isAbsolute, join } from 'node:path'
 import { type Context, Service } from '@deepseek-ai/cordis'
+import { PROFILE_TEMPLATES } from '@deepseek-ai/dsh-official-bundles'
 import {
-  PROFILE_TEMPLATES,
   resolveProfileDir,
   type Profile,
 } from '@deepseek-ai/dsh-app-boot'

@@ -14,6 +14,8 @@ import { createDesktopBrowserBridge } from './preload-browser.ts'
 let hubDocumentNonce:string|undefined
 let boot:Promise<unknown>|undefined
 if (location.protocol === 'dsh-app:' && location.hostname === 'app') {
+  let documentId: string | undefined
+  let profile = ''
   markDocumentPlatform()
   syncNativeTheme()
   syncNativeLocale()
@@ -30,6 +32,10 @@ if (location.protocol === 'dsh-app:' && location.hostname === 'app') {
   contextBridge.exposeInMainWorld('desktopNext', {
     reportHubHealthy:()=>hubDocumentNonce?ipcRenderer.invoke('dsh-next:hub-renderer-healthy',hubDocumentNonce):Promise.resolve(),
     reportHubFailure:(message:string)=>ipcRenderer.invoke(IPC.failed,message),
+    renderer: {
+      profile: () => profile,
+      report: (status: unknown) => ipcRenderer.invoke(IPC.rendererStatus, documentId, status),
+    },
     permissions: permissionBridge(),
     onOpenSettings,
     state: () => ipcRenderer.invoke(IPC.state),
@@ -40,8 +46,13 @@ if (location.protocol === 'dsh-app:' && location.hostname === 'app') {
   // carrier; without `browser` the official plugin silently falls back to the sandboxed iframe.
   contextBridge.exposeInMainWorld('dshDesktop', { protocolVersion: 1, browser: createDesktopBrowserBridge(), ...createDesktopKeyboardBridge() })
   contextBridge.exposeInMainWorld('dshDesktopBoot', {
-    ready: () => boot??=ipcRenderer.invoke(IPC.boot).then(result=>{hubDocumentNonce=result.hubDocumentNonce;return result}),
-    failed: (message: string) => ipcRenderer.invoke(IPC.failed, message),
+    ready: () => boot ??= ipcRenderer.invoke(IPC.boot).then(result => {
+      hubDocumentNonce = result.hubDocumentNonce
+      documentId = result.documentId
+      profile = result.profile ?? ''
+      return result
+    }),
+    failed: (message: string) => ipcRenderer.invoke(IPC.failed, message, documentId),
   })
   contextBridge.exposeInMainWorld('__DSH_DIRECTORY_PICKER__', { pick: () => ipcRenderer.invoke(IPC.directory) })
   // The official composer cites dropped, picked, and pasted files and folders that have a

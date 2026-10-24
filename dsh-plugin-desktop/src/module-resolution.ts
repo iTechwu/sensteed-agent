@@ -184,7 +184,18 @@ function isLexicalProfileBoundary(
   // The native Loader has used the directory URL, package.json, and cordis
   // config files as its parentURL across supported Node releases. Restrict the
   // bridge to that directory and its direct files, never another Profile.
-  return offset === '' || (!offset.includes(sep) && offset !== '..' && !isAbsolute(offset))
+  // rc.3 的项目解析助手固定落在 <profile>/.cordis/resolve.mjs,同样属于本 Profile 的边界内。
+  if (offset === '' || offset === join('.cordis', 'resolve.mjs')
+    || (!offset.includes(sep) && offset !== '..' && !isAbsolute(offset))) return true
+  // Node 上报的 parentURL 可能是 realpath 形态(macOS 的 /var 与 /private/var):
+  // 仅当注册目录自身经 realpath 归一后发生变化(符号根场景)才用 canonical 重判,
+  // 且候选必须落在 canonical Profile 目录之内;避免对尚不存在的候选反复 realpath
+  // (canonicalPath 不缓存 ENOENT,是调用方的计数契约)。
+  const canonicalProfileDirectory = canonicalPath(registration, registration.profileDirectory)
+  if (canonicalProfileDirectory === registration.profileDirectory) return false
+  const canonicalOffset = relative(canonicalProfileDirectory, canonicalPath(registration, candidate))
+  return canonicalOffset === '' || canonicalOffset === join('.cordis', 'resolve.mjs')
+    || (!canonicalOffset.includes(sep) && canonicalOffset !== '..' && !isAbsolute(canonicalOffset))
 }
 
 function isCanonicalProfileBoundary(

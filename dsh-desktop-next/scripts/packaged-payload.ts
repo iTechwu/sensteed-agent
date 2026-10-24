@@ -5,7 +5,7 @@ import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { basename as posixBasename, dirname as posixDirname } from 'node:path/posix'
 import { getRawHeader } from '@electron/asar'
-import { nextRuntimeFileExclusion, type NextPackagingTarget } from './runtime-file-policy.ts'
+import { nextRuntimeFileExclusion, nextRuntimePackageExclusion, type NextPackagingTarget, type RuntimePackageConstraints } from './runtime-file-policy.ts'
 import { DESKTOP_RUNTIME_FILE, parseDesktopRuntime, verifyPayload, type DesktopRuntimeDescriptor, type DesktopRuntimeFile, type NextRelease, type PayloadEntry, type PayloadSource, type VerifyPayloadOptions } from '../src/runtime-tree.ts'
 
 /** Application-relative directory holding the prepared payload that Electron Builder archives verbatim. */
@@ -61,21 +61,33 @@ export function archivedPayload(resourcesDir: string): ArchivedPayload {
         const stat = lstatSync(physical, { throwIfNoEntry: false })
         if (stat === undefined || !stat.isFile()) throw new Error(`Next payload: unpacked entry ${path} has no physical file`)
         entries.set(path, { path, unpacked: true, executable: process.platform !== 'win32' && (stat.mode & 0o111) !== 0,
-          read: () => readFileSync(physical) })
+          read: () => readFileSync(physical),
+          readHeader: (bytes) => {
+            const unpackedFd = openSync(physical, 'r')
+            try {
+              const buffer = Buffer.alloc(bytes)
+              return buffer.subarray(0, readSync(unpackedFd, buffer, 0, bytes, 0))
+            } finally {
+              closeSync(unpackedFd)
+            }
+          } })
         continue
       }
       const { size } = node
       const offset = Number(node.offset)
-      entries.set(path, { path, unpacked: false, executable: node.executable === true, read: () => {
-        const buffer = Buffer.alloc(size)
+      const readSlice = (length: number): Buffer => {
+        const buffer = Buffer.alloc(length)
         let done = 0
-        while (done < size) {
-          const read = readSync(descriptor(), buffer, done, size - done, dataOffset + offset + done)
+        while (done < length) {
+          const read = readSync(descriptor(), buffer, done, length - done, dataOffset + offset + done)
           if (read === 0) throw new Error(`Next payload: truncated archive entry ${path}`)
           done += read
         }
         return buffer
-      } })
+      }
+      entries.set(path, { path, unpacked: false, executable: node.executable === true,
+        read: () => readSlice(size),
+        readHeader: bytes => readSlice(Math.min(bytes, size)) })
     }
   }
   visit(header, '')
@@ -193,10 +205,20 @@ export function auditNextPayload(source: PayloadSource, target: NextPackagingTar
     if (entry.path.startsWith('node_modules/')) {
       const reason = nextRuntimeFileExclusion(entry.path.slice('node_modules/'.length), target)
       if (reason !== undefined) problems.push(`${entry.path}: ${reason} must not be packaged`)
+      if (entry.path.endsWith('/package.json')) {
+        const parts = entry.path.split('/')
+        const packageParts = parts.slice(parts.lastIndexOf('node_modules') + 1)
+        const nameParts = packageParts[0]?.startsWith('@') ? 2 : 1
+        if (packageParts.length === nameParts + 1) {
+          const manifest = JSON.parse(entry.read().toString('utf8')) as RuntimePackageConstraints
+          const packageReason = nextRuntimePackageExclusion(manifest, target)
+          if (packageReason !== undefined) problems.push(`${entry.path}: ${packageReason} must not be packaged`)
+        }
+      }
     }
     if (entry.unpacked) continue
     if (REQUIRED_UNPACKED.some(pattern => pattern.test(entry.path))) problems.push(`${entry.path}: must be unpacked beside app.asar`)
-    else if (isNativeImage(entry.read().subarray(0, 4))) problems.push(`${entry.path}: native code is packed inside app.asar`)
+    else if (isNativeImage(entry.readHeader ? entry.readHeader(4) : entry.read().subarray(0, 4))) problems.push(`${entry.path}: native code is packed inside app.asar`)
   }
   return [...[...strayRoots].sort().map(root => `${root}: outside the declared application files`), ...problems]
 }
