@@ -22,6 +22,7 @@ const fixture = vi.hoisted(() => ({
   needsOnboarding: false, corruptProfile: false, restart: vi.fn(), hostReady: false,
   appPaths: new Map<string, string>(), lockPaths: [] as string[], ownsInstance: true,
   runtimeOptions: undefined as ConstructorParameters<typeof NextDesktopRuntime>[0] | undefined,
+  authObject: { url: 'http://127.0.0.1:1234/' } as { url: string },
   onPermission: undefined as ConstructorParameters<typeof NextDesktopRuntime>[0]['onPermission'],
 }))
 vi.mock('../src/desktop-runtime.ts', async () => { const { NextProfiles } = await import('../src/profiles.ts'); const { NextRecovery } = await import('../src/recovery.ts'); return { NextDesktopRuntime: class {
@@ -32,7 +33,9 @@ vi.mock('../src/desktop-runtime.ts', async () => { const { NextProfiles } = awai
   recoveryMode = false
   backend = { stop: fixture.stop, get host() { return fixture.hostReady ? {} : undefined }, get state() { return { phase: fixture.phase } } }
   startup = Promise.resolve()
-  get auth() { return fixture.hostReady ? { url: 'http://127.0.0.1:1234/' } : undefined }
+  // 生产中 runtime.auth 是 Host 就绪时固定下来的稳定引用;fork 的 boot 门对其做
+  // 身份校验(防流式基址 mid-boot 轮换),夹具同样返回稳定对象而非每次新建。
+  get auth() { return fixture.hostReady ? fixture.authObject : undefined }
   async injections() { return [] }
   profiles: NextProfiles
   recovery: import('../src/recovery.ts').NextRecovery
