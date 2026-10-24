@@ -61,7 +61,7 @@ it.each(['normal', 'store'].flatMap(compression => [true, false].map(enabled => 
 })
 
 it('retains long paths, scoped process detection, direct extraction and macOS keychain fixes after rollback', () => {
-  expect(require('app-builder-lib/package.json').version).toBe('26.15.7')
+  expect(require('app-builder-lib/package.json').version).toBe('26.17.0')
   const template = (path: string): string => readFileSync(join(builderRoot, 'templates/nsis', path), 'utf8')
   for (const file of ['installer.nsi', 'portable.nsi']) expect(template(file)).toMatch(/^ManifestLongPathAware true\r?$/mu)
   const processes = template('include/allowOnlyOneInstallerInstance.nsh')
