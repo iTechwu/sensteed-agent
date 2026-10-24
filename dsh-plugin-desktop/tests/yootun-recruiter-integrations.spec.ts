@@ -4,17 +4,19 @@ import { createRecruiterKnowledgePublisher } from '@dofe/dsh-sensteed-product/yo
 
 describe('Yootun recruiter integrations', () => {
   it('creates and confirms one ACL-scoped HR memory through registered knowledge tools', async () => {
-    const calls: Array<{ name: string; arguments: unknown }> = []
+    const calls: Array<any> = []
     const publisher = createRecruiterKnowledgePublisher({
       schemas: () => [
         { name: 'knowledge_remember', description: '', parameters: {} },
         { name: 'knowledge_confirm_memory', description: '', parameters: {} },
       ],
-      execute: vi.fn(async (input: { name: string; arguments: unknown }) => {
+      execute: vi.fn(async (input: { calls: Array<{ name: string; arguments: string }> }) => {
         calls.push(input)
-        return input.name === 'knowledge_remember'
+        const name = input.calls[0]?.name
+        const result = name === 'knowledge_remember'
           ? { isError: false, value: { ok: true, result: { structuredContent: { id: 'memory-1' } } }, content: [] }
           : { isError: false, value: { ok: true, result: {} }, content: [] }
+        return { results: [{ callId: 'probe', result }] }
       }),
     } as any)
     const result = await publisher!.publish({
@@ -24,31 +26,34 @@ describe('Yootun recruiter integrations', () => {
     })
     expect(result).toEqual({ status: 'succeeded', reasonCode: 'knowledge_confirmed', memoryId: 'memory-1' })
     expect(calls).toHaveLength(2)
-    expect(calls[0]).toMatchObject({ arguments: { input: {
+    expect(JSON.parse(String(calls[0].calls?.[0]?.arguments))).toMatchObject({ input: {
       scope: 'TEAM', spaceId: '20000000-0000-4000-8000-000000000001',
-    } } })
-    expect(calls[1]).toMatchObject({ arguments: { input: {
+    } })
+    expect(JSON.parse(String(calls[1].calls?.[0]?.arguments))).toMatchObject({ input: {
       memoryId: 'memory-1', shareWithSpace: true,
-    } } })
+    } })
   })
 
   it('lets the Knowledge service resolve the tenant HR space by default', async () => {
-    const calls: Array<{ name: string; arguments: any }> = []
+    const calls: Array<any> = []
     const publisher = createRecruiterKnowledgePublisher({
       schemas: () => [
         { name: 'knowledge_remember', description: '', parameters: {} },
         { name: 'knowledge_confirm_memory', description: '', parameters: {} },
       ],
-      execute: vi.fn(async (input: any) => {
+      execute: vi.fn(async (input: { calls: Array<{ name: string; arguments: string }> }) => {
         calls.push(input)
-        return input.name === 'knowledge_remember'
+        const name = input.calls[0]?.name
+        const result = name === 'knowledge_remember'
           ? { isError: false, value: { ok: true, result: { structuredContent: { id: 'memory-2' } } }, content: [] }
           : { isError: false, value: { ok: true, result: {} }, content: [] }
+        return { results: [{ callId: 'probe', result }] }
       }),
     } as any)
     await publisher!.publish({ content: '统一 HR 空间', idempotencyKey: 'knowledge-default-1' })
-    expect(calls[0]!.arguments.input).toMatchObject({ scope: 'TEAM' })
-    expect(calls[0]!.arguments.input).not.toHaveProperty('spaceId')
+    const remembered = JSON.parse(String(calls[0].calls?.[0]?.arguments)).input
+    expect(remembered).toMatchObject({ scope: 'TEAM' })
+    expect(remembered).not.toHaveProperty('spaceId')
   })
 
   it('does not invoke the BOSS official client before authorization', async () => {

@@ -8,12 +8,19 @@ import WebServer, {
   type Config,
   type WebRoute,
   type WebUpgradeRoute,
+  type WebResourceRoute,
 } from '@deepseek-ai/dsh-host-webserver'
-import { decideDesktopBrowserAccess } from './desktop-browser-access.ts'
+import { decideDesktopBrowserAccess, DESKTOP_RENDERER_ACCESS_HEADER, desktopBrowserUrlHasRendererMarkers } from './desktop-browser-access.ts'
 import { DESKTOP_WEB_PORT_RETRY_LIMIT } from './desktop-port.ts'
 
-function isAddressInUse(cause: unknown): boolean {
-  return (cause as NodeJS.ErrnoException | null)?.code === 'EADDRINUSE'
+/**
+ * Bind failures that mean "this port is unavailable", not "binding is broken".
+ * Windows reports ports inside Hyper-V/WinNAT excluded ranges as `EACCES` even
+ * though no process owns them (`netsh interface ipv4 show excludedportrange`).
+ */
+function isPortUnavailable(cause: unknown): boolean {
+  const code = (cause as NodeJS.ErrnoException | null)?.code
+  return code === 'EADDRINUSE' || code === 'EACCES'
 }
 
 /** Close an unbound server left behind by a failed listen attempt. */
@@ -78,21 +85,64 @@ export class DesktopWebServer extends WebServer {
     }
   }
 
-  override register(route: WebRoute): () => void {
+  /** The same access contract as {@link permits}, for rc.3 fetch-style resource routes. */
+  private permitsResource(request: Request): boolean {
+    const access = this.ctx.get('desktopBrowserAccess')
+    if (access === undefined) return true
+    const token = request.headers.get(DESKTOP_RENDERER_ACCESS_HEADER)
+    if (typeof token === 'string' && token.length > 0 && token === access.rendererHeader.value) return true
+    if (!access.ordinaryBrowserEnabled) return false
+    return !desktopBrowserUrlHasRendererMarkers(request.url)
+  }
+
+  override register(route: WebRoute | WebResourceRoute): () => void {
+    // rc.3 的资源路由(handler 缺席、resource 为 fetch 形态)不能走 req/res 包装:
+    // 无条件展开 handler 会让分发器在资源路由上拿到 undefined 处理器(400)。
+    if (!('handler' in route) || typeof route.handler !== 'function') {
+      const resource = (route as WebResourceRoute).resource
+      return super.register({
+        ...(route as WebResourceRoute),
+        resource: async (request, peer) => {
+          if (!this.permitsResource(request)) {
+            return new Response('browser access denied', {
+              status: 403,
+              headers: { 'cache-control': 'no-store', 'content-type': 'text/plain; charset=utf-8', 'x-content-type-options': 'nosniff' },
+            })
+          }
+          return resource(request, peer)
+        },
+      })
+    }
+    const handler = route.handler as WebRoute['handler']
     return super.register({
       ...route,
       handler: this.traceHttp(String(route.path), async (req, res) => {
         if (!this.permits(req)) return rejectBrowserRequest(res)
-        await route.handler(req, res)
+        await handler(req, res)
       }),
     })
   }
 
-  override registerFallback(handler: WebRoute['handler']): () => void {
-    return super.registerFallback(this.traceHttp('fallback', async (req, res) => {
-      if (!this.permits(req)) return rejectBrowserRequest(res)
-      await handler(req, res)
-    }))
+  override registerFallback(fallback: WebRoute['handler'] | Pick<WebResourceRoute, 'resource'>): () => void {
+    if (typeof fallback === 'function') {
+      return super.registerFallback(this.traceHttp('fallback', async (req, res) => {
+        if (!this.permits(req)) return rejectBrowserRequest(res)
+        await fallback(req, res)
+      }))
+    }
+    // rc.3 资源形态的 SPA fallback:同样过浏览器访问门。
+    const resource = fallback.resource
+    return super.registerFallback({
+      resource: async (request, peer) => {
+        if (!this.permitsResource(request)) {
+          return new Response('browser access denied', {
+            status: 403,
+            headers: { 'cache-control': 'no-store', 'content-type': 'text/plain; charset=utf-8', 'x-content-type-options': 'nosniff' },
+          })
+        }
+        return resource(request, peer)
+      },
+    })
   }
 
   override registerUpgrade(route: WebUpgradeRoute): () => void {
@@ -116,13 +166,17 @@ export class DesktopWebServer extends WebServer {
         await super[Service.init]()
         return
       } catch (cause) {
-        const nextPort = requestedPort + attempt + 1
-        if (!isAddressInUse(cause)
-          || attempt >= DESKTOP_WEB_PORT_RETRY_LIMIT
-          || nextPort > 65_535) {
-          throw cause
-        }
+        if (!isPortUnavailable(cause)) throw cause
         closeFailedServer(this)
+        const nextPort = requestedPort + attempt + 1
+        if (attempt >= DESKTOP_WEB_PORT_RETRY_LIMIT || nextPort > 65_535) {
+          // A Windows excluded range is usually wider than the sequential
+          // window, so finish with one OS-assigned port instead of failing
+          // startup; Electron reads the bound port from the Host either way.
+          this.desktopConfig.port = 0
+          await super[Service.init]()
+          return
+        }
         this.desktopConfig.port = nextPort
       }
     }

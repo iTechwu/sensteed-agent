@@ -2,12 +2,15 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
-import Agents, { agentEvents, type Agent } from '@deepseek-ai/dsh-agent'
+import Agents, { AgentModel, agentEvents, modelSelectionProjectionDefinition, type Agent, type ModelSelection } from '@deepseek-ai/dsh-agent'
+import AgentDefaultModelConfig from '@deepseek-ai/dsh-agent-default-model'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import type {} from '@deepseek-ai/dsh-working-directory'
 import Sessions, { SessionId } from '@deepseek-ai/dsh-session'
 import { createUserMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import Tools from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import Skills from '@deepseek-ai/dsh-skill'
 import * as SkillFilesystem from '@deepseek-ai/dsh-skill-filesystem'
 import * as ToolSkill from '@deepseek-ai/dsh-tool-skill'
@@ -24,9 +27,12 @@ async function runtime(home: string): Promise<Context> {
   try {
     ctx.provide('workingDirectory', { ensure: async () => home } as never)
     await ctx.plugin(Sessions)
+    await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(Agents)
+    await ctx.plugin(AgentDefaultModelConfig, { provider: 'test-provider', model: 'test-model' })
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(Tools)
+    await ctx.plugin(NativeToolExecutor)
     await ctx.plugin(Storage)
     await ctx.plugin(StorageJson, { root: join(home, 'storage') })
     await ctx.plugin(StorageDomain, { backend: 'json' })
@@ -51,16 +57,21 @@ it('loads the bundled automation skill from an explicit invocation and persists 
   try {
     ctx = await runtime(home)
     const session = ctx.sessions.create(SessionId('automation-creation'))
+    const projection = await ctx.sessionProjections.register(modelSelectionProjectionDefinition)
     const agent: Agent = {
       ctx: ctx.extend(), id: session.id, session, options: {}, status: 'idle', inbox: {} as never,
+      // 本测试只走技能调用与工具执行边界；模型面挂真实 AgentModel，由投影喂默认选择。
+      model: new AgentModel(() => projection.stateOf(session), session, {}),
       send() {}, followup() {}, steer() {}, inject() {}, cancel() {},
       whenIdle: async () => {}, runMaintenance: operation => operation(new AbortController().signal),
     }
+    await (ctx as unknown as { agents: { register(a: Agent): Promise<void> } }).agents.register(agent)
     const messages = [createUserMessage({ source: { kind: 'user' }, content: [{ type: 'text',
       text: '/sensteed-automation 帮我新建自动化任务，我的时区为 Asia/Shanghai。',
     }] })]
     const decision = await agentEvents(ctx, agent).waterfall('agent/pre-step', {
       messages, turn: 1, step: 1, signal: new AbortController().signal,
+      modelSelection: undefined as unknown as ModelSelection,
     }, async () => ({ kind: 'enter' as const, messages }))
     expect(decision.kind).toBe('enter')
     if (decision.kind !== 'enter') throw new Error('skill invocation was refused')
@@ -71,9 +82,13 @@ it('loads the bundled automation skill from an explicit invocation and persists 
     const skill = await readFile(resolve(import.meta.dirname, '../bundled/skills/sensteed-automation/SKILL.md'), 'utf8')
     const example = skill.match(/```json\n([\s\S]+?)\n```/)?.[1]
     if (example === undefined) throw new Error('missing runnable scheduling example')
-    const execute = async (name: string, args: unknown) => ctx!.tools.execute({
-      callId: ToolCallId(`automation-${name}`), signal: new AbortController().signal, name, arguments: args, agent,
-    })
+    const execute = async (name: string, args: unknown) => {
+      const batch = await ctx!.tools.execute({
+        calls: [{ type: 'tool-call' as const, id: ToolCallId(`automation-${name}`), name, arguments: JSON.stringify(args) }],
+        signal: new AbortController().signal, agent,
+      })
+      return batch.results[0]!.result
+    }
     const invalid = await execute('schedule_create', { title: '检查进展', prompt: '检查项目进展', every_seconds: 10 })
     expect(invalid.value).toMatchObject({ code: 'frequency_too_high' })
     expect(await ctx.schedule.catalog()).toEqual([])

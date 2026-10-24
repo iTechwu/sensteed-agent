@@ -163,7 +163,7 @@ describe('installed DSH product version', () => {
 
   it('reads the package actually resolvable from the Desktop installation graph', () => {
     // workspace:* 链接下解析出的运行时版本即 sibling 的源版本。
-    expect(dshProductVersion()).toBe('0.2.1-rc.2')
+    expect(dshProductVersion()).toBe('0.2.1-rc.3')
   })
 
   it('resolves and validates a canonical prerelease from the caller package graph', () => {

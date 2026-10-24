@@ -36,6 +36,9 @@ const ALLOWED_LICENSES = new Set([
   '(MIT OR CC0-1.0)',
   'Zlib',
   'Python-2.0',
+  // lru-cache(rc.3 依赖链):BlueOak-1.0.0 为宽松可再分发许可,随包分发需保留其
+  // LICENSE 文本,第三方通知清单已覆盖。
+  'BlueOak-1.0.0',
 ])
 
 /**

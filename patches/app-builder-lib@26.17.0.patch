@@ -1,7 +1,8 @@
 diff --git a/out/node-module-collector/pnpmNodeModulesCollector.js b/out/node-module-collector/pnpmNodeModulesCollector.js
+index 56194e32d222602e78db13793b9d4af568154a1a..fa60d92ac02dc4975172d33c3f0d286d2036de61 100644
 --- a/out/node-module-collector/pnpmNodeModulesCollector.js
 +++ b/out/node-module-collector/pnpmNodeModulesCollector.js
-@@ -152,12 +152,10 @@
+@@ -152,12 +152,10 @@ class PnpmNodeModulesCollector extends nodeModulesCollector_1.NodeModulesCollect
       * versions of a dep exist in the workspace.
       */
      async locateFromDepOrRoot(pkgName, parentPath, requiredRange) {
@@ -18,7 +19,7 @@ diff --git a/out/node-module-collector/pnpmNodeModulesCollector.js b/out/node-mo
          if (memoKey != null) {
              const cached = this.locateMemo.get(memoKey);
              if (cached != null) {
-@@ -187,15 +185,28 @@
+@@ -187,15 +185,28 @@ class PnpmNodeModulesCollector extends nodeModulesCollector_1.NodeModulesCollect
                  satisfying !== null && satisfying !== void 0 ? satisfying : (satisfying = await this.cache.locatePackageVersion({ pkgName, parentDir: dir, requiredRange, skipDownwardSearch, skipOverrideFallback: true }));
              }
              if (satisfying) {
@@ -50,7 +51,7 @@ diff --git a/out/node-module-collector/pnpmNodeModulesCollector.js b/out/node-mo
          })();
          if (memoKey != null) {
              this.locateMemo.set(memoKey, promise);
-@@ -285,8 +296,25 @@
+@@ -285,8 +296,25 @@ class PnpmNodeModulesCollector extends nodeModulesCollector_1.NodeModulesCollect
      async resolveOmittedDependency(depName, declaredRange, parentPath) {
          const range = typeof declaredRange === "string" ? declaredRange : undefined;
          const located = await this.locateFromDepOrRoot(depName, parentPath, range);
@@ -78,7 +79,7 @@ diff --git a/out/node-module-collector/pnpmNodeModulesCollector.js b/out/node-mo
      }
      async collectAllDependencies(_tree, _appPackageName) {
          for (const root of this.allWorkspacePackages) {
-@@ -296,9 +324,6 @@
+@@ -296,9 +324,6 @@ class PnpmNodeModulesCollector extends nodeModulesCollector_1.NodeModulesCollect
      async collectDepsRecursively(tree) {
          const visit = async (key, value) => {
              var _a, _b;
@@ -88,14 +89,21 @@ diff --git a/out/node-module-collector/pnpmNodeModulesCollector.js b/out/node-mo
              const id = `${key}@${value.version}`;
              // The pnpm list output can include the same `name@version` thousands of times across a
              // deep workspace; without this guard we re-resolve and re-recurse each occurrence.
-@@ -336,4 +361,4 @@
-     }
- }
- exports.PnpmNodeModulesCollector = PnpmNodeModulesCollector;
--//# sourceMappingURL=pnpmNodeModulesCollector.js.map
-\ No newline at end of file
-+//# sourceMappingURL=pnpmNodeModulesCollector.js.map
+diff --git a/out/targets/nsis/NsisTarget.js b/out/targets/nsis/NsisTarget.js
+index 2eea3d627af1937d09aad77503b4bddf4b65b708..28decfff059d2cc88ed09bbed4ced9e4bfbb39c3 100644
+--- a/out/targets/nsis/NsisTarget.js
++++ b/out/targets/nsis/NsisTarget.js
+@@ -81,6 +81,8 @@ class NsisTarget extends core_1.Target {
+         const archiveOptions = {
+             withoutDir: true,
+             compression: packager.compression,
++            // Next keeps the official fast archive settings without changing Stable defaults.
++            ...(process.env.DSH_NEXT_WINDOWS_FAST_COMPRESSION === "1" ? { dictSize: 1, solid: false } : {}),
+             // The install-time Nsis7z extractor only decodes plain LZMA2/Copy and single-stream BCJ — not
+             // the CPU branch converters modern 7za applies to executables (BCJ2 on x86/x64, ARM64 on
+             // arm64), which it silently skips, dropping the main exe and every native binary from the
 diff --git a/out/util/appFileCopier.js b/out/util/appFileCopier.js
+index aa2e321e45762850e83971e13c3865b90521a0dd..a0196d52c66e963ea282e7a085d591acd08c5f11 100644
 --- a/out/util/appFileCopier.js
 +++ b/out/util/appFileCopier.js
 @@ -155,8 +155,50 @@ async function computeNodeModuleFileSets(platformPackager, mainMatcher) {

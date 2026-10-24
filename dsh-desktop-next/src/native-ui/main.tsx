@@ -67,7 +67,8 @@ function NativePages({ adapter }: { adapter: NextSettingsAdapter }) {
     document.addEventListener('click', navigate)
     return () => document.removeEventListener('click', navigate)
   }, [adapter, busy, state])
-  if (!state) return <><DesktopFrame /><main className="dshNativeContent p-6"><Alert><AlertDescription>{t('正在读取桌面状态…', 'Loading Desktop state…')}</AlertDescription></Alert></main></>
+  if (!state) return <><DesktopFrame /><main className={page === 'onboarding' ? 'next-onboarding dshNativeContent p-6' : 'dshNativeContent p-6'} data-platform={new URLSearchParams(location.search).get('platform') ?? undefined} data-material="transparent"><Alert><AlertDescription>{t('正在读取桌面状态…', 'Loading Desktop state…')}</AlertDescription></Alert></main></>
+  if (page === 'onboarding') return null
   if (page === 'create-profile') return <ProfileCreateApp onCancel={() => { void perform({ type: 'close-controls' }) }} onCreate={async name => {
     await adapter.command({ type: 'create', name })
     await adapter.command({ type: 'switch', name })

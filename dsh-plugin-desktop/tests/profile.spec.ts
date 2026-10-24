@@ -12,11 +12,8 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
-import {
-  composeEntries,
-  initProfile,
-  PROFILE_TEMPLATES,
-} from '@deepseek-ai/dsh-app-boot'
+import { composeEntries, initProfile } from '@deepseek-ai/dsh-app-boot'
+import { PROFILE_TEMPLATES } from '@deepseek-ai/dsh-official-bundles'
 import {
   DESKTOP_PACKAGE_NAME,
   desktopShellModeFromSettings,

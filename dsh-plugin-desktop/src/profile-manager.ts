@@ -17,8 +17,8 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
+import { PROFILE_TEMPLATES } from '@deepseek-ai/dsh-official-bundles'
 import {
-  PROFILE_TEMPLATES,
   initProfile,
   readProfileManifest,
   resolveProfileDir,

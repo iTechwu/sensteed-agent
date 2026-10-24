@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { Context } from '@deepseek-ai/cordis'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import { describe, expect, it } from 'vitest'
 
 const packageRoot = new URL('../', import.meta.url)
@@ -28,6 +29,7 @@ describe('OpenMontage workflow guard composition', () => {
     try {
       await ctx.plugin(SystemPrompt)
       await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
       await ctx.plugin(OpenMontage, { stalledOutcomeThreshold: 3 })
 
       const prompt = (await ctx.systemPrompt.assemble()).sections

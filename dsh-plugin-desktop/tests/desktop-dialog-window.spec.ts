@@ -14,7 +14,9 @@ const electron = vi.hoisted(() => {
     accessibleTitle = ''
     readonly isDestroyed = vi.fn(() => false)
     readonly isMinimized = vi.fn(() => false)
+    readonly isVisible = vi.fn(() => true)
     readonly show = vi.fn()
+    readonly hide = vi.fn()
     readonly focus = vi.fn()
     readonly restore = vi.fn()
     readonly removeMenu = vi.fn()
@@ -53,7 +55,6 @@ import {
   DesktopDialogWindow,
   desktopDialogPreferredHeight,
   parseDesktopDialogResponse,
-  parseDesktopDialogResult,
   showDesktopMessageBox,
 } from '../src/desktop-dialog-window.ts'
 
@@ -71,30 +72,24 @@ describe('DesktopDialogWindow', () => {
     expect(parseDesktopDialogResponse('https://response/?id=1', 2)).toBeUndefined()
   })
 
-  it('round trips a MessageBox checkbox and clears it on native close', async () => {
+  it('keeps the MessageBox adapter checkbox-free and resolves the clicked response', async () => {
     const options = { message: 'Next', checkboxLabel: 'Do not show again', buttons: ['OK'] }
     const pending = showDesktopMessageBox(options)
     const window = electron.windows[0]!
     const query = (window.loadFile.mock.calls[0] as unknown as unknown[])?.[1] as { query: { state: string } } | undefined
-    expect(JSON.parse(Buffer.from(query!.query.state, 'base64url').toString())).toMatchObject({
-      checkboxLabel: 'Do not show again', checkboxChecked: false,
-    })
-    window.webListeners.get('will-navigate')?.({ preventDefault: vi.fn() }, 'sensteed-agent-dialog://response?id=0&checked=true')
-    await expect(pending).resolves.toEqual({ response: 0, checkboxChecked: true })
+    expect(JSON.parse(Buffer.from(query!.query.state, 'base64url').toString())).not.toHaveProperty('checkboxLabel')
+    window.webListeners.get('will-navigate')?.({ preventDefault: vi.fn() }, 'sensteed-agent-dialog://response?id=0')
+    await expect(pending).resolves.toEqual({ response: 0, checkboxChecked: false })
     const closed = showDesktopMessageBox(options)
     electron.windows[1]!.listeners.get('closed')?.()
     await expect(closed).resolves.toEqual({ response: 0, checkboxChecked: false })
   })
 
-  it('rejects malformed checkbox navigation and checkbox fields on ordinary dialogs', () => {
-    expect(parseDesktopDialogResult('sensteed-agent-dialog://response?id=0&checked=true', 1, true))
-      .toEqual({ response: 0, checkboxChecked: true })
+  it('rejects response navigation carrying fields beyond the button id', () => {
     for (const href of [
-      'sensteed-agent-dialog://response?id=0&checked=yes',
-      'sensteed-agent-dialog://response?id=0&checked=true&checked=false',
-      'sensteed-agent-dialog://response?id=0&id=0',
-    ]) expect(parseDesktopDialogResult(href, 1, true)).toBeUndefined()
-    expect(parseDesktopDialogResponse('sensteed-agent-dialog://response?id=0&checked=true', 1)).toBeUndefined()
+      'sensteed-agent-dialog://response?id=0&checked=true',
+      'sensteed-agent-dialog://response?id=0&command=reveal',
+    ]) expect(parseDesktopDialogResponse(href, 1)).toBeUndefined()
   })
 
   it('does not add the legacy action-row offset on Windows', () => {

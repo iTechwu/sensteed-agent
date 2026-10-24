@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import { afterEach, describe, expect, it } from 'vitest'
 import * as RecruiterTools from '../src/yootun-recruiter-tools.ts'
 
@@ -14,17 +15,17 @@ async function mount(statePath: string) {
   const ctx = new Context()
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+await ctx.plugin(NativeToolExecutor)
   await ctx.plugin(RecruiterTools, { statePath })
   return ctx
 }
 
-function call(ctx: Context, args: unknown) {
-  return ctx.tools.execute({
+async function call(ctx: Context, args: unknown) {
+  const batch = await ctx.tools.execute({
     signal,
-    callId: `recruiter-${String(++sequence)}` as never,
-    name: 'yootun_recruiter',
-    arguments: args,
+    calls: [{ type: 'tool-call' as const, id: `recruiter-${String(++sequence)}` as never, name: 'yootun_recruiter', arguments: JSON.stringify(args) }],
   })
+  return batch.results[0]!.result
 }
 
 describe('Yootun recruiter Agent tool', () => {

@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, expect, it, vi } from 'vitest'
-import { composeEntries, loadOverlayPatches, loadProfileDirectory, OPTIONAL_BUNDLES } from '@deepseek-ai/dsh-app-boot'
+import { OPTIONAL_BUNDLES } from '@deepseek-ai/dsh-official-bundles'
+import { composeEntries, loadOverlayPatches, loadProfileDirectory, } from '@deepseek-ai/dsh-app-boot'
 import { AA_PACKAGE, COMMUNITY_MARKET_PACKAGE, DSH_MARKET_PACKAGE, loadNextProfile, NEXT_PACKAGE, NextProfiles, OFFICIAL_MARKET_PACKAGE, profileName, readNextProfilePatches, WEB_BUNDLES } from '../src/profiles.ts'
 import { DEFAULT_OFFICIAL_MARKET_INDEX_URL } from '../src/profile-plugin-market.ts'
 import * as privateFiles from '../src/private-files.ts'
@@ -130,6 +131,8 @@ it('enables the official custom plugin market bundle and preconfigures the built
   expect(rows.find(row => row.id === 'plugin-market')?.config).toEqual({
     indexes: [DEFAULT_OFFICIAL_MARKET_INDEX_URL, 'https://example.com/custom-index.json'],
   })
+  manager.finishOnboarding('desktop', { features: { market: false, dshMarket: true, officialMarket: true, remoteControl: false }, computerUse: false })
+  expect(manager.features('desktop')).toEqual({ market: false, dshMarket: true, officialMarket: true, remoteControl: false })
 })
 
 it('skips onboarding without changing current choices, while a recreated Profile starts fresh', () => {
@@ -152,8 +155,6 @@ it('skips onboarding without changing current choices, while a recreated Profile
 
 it.each([
   { market: true, dshMarket: true, remoteControl: false },
-  { market: true, officialMarket: true, remoteControl: false },
-  { market: false, dshMarket: true, officialMarket: true, remoteControl: false },
   { market: true, remoteControl: 'yes' },
   { market: false, remoteControl: false, extra: true },
 ])('leaves onboarding incomplete and configuration untouched on invalid choices %j', value => {
@@ -384,19 +385,17 @@ it('migrates legacy switches once and preserves later official plugin selections
   expect(manager.features('work')).toEqual({ market: false, remoteControl: false })
 })
 
-it('keeps the recovery deselection ledger across a feature change and never reselects from it', () => {
+it('never reselects a disabled dependency across a feature change', () => {
   const manager = profiles()
   const dir = manager.ensure('desktop')
   const file = join(dir, 'package.json')
   const manifest = JSON.parse(readFileSync(file, 'utf8'))
   manifest.dependencies = { 'my-plugin': '1.0.0' }
-  manifest.dsh.desktopNextDeselectedBundles = ['my-plugin']
   writeFileSync(file, JSON.stringify(manifest))
 
   manager.finishOnboarding('desktop', { features: { market: false, dshMarket: true, remoteControl: true }, computerUse: false })
 
   const after = JSON.parse(readFileSync(file, 'utf8'))
-  expect(after.dsh.desktopNextDeselectedBundles).toEqual(['my-plugin'])
   expect(after.dsh.profile.bundles).not.toContain('my-plugin')
   expect(after.dependencies['my-plugin']).toBe('1.0.0')
   expect(after.dsh.profile.bundles).toContain(DSH_MARKET_PACKAGE)

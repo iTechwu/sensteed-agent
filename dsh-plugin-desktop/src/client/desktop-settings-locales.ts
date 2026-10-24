@@ -6,7 +6,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-slots'
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
     /** Desktop-only settings page copy. */
-    'desktop.settings': DesktopSettingsLocaleKey
+    'desktop.settings': DesktopSettingsLocaleKey | 'sidebarFooterCompat' | 'sidebarFooterCompatBody' | 'sidebarFooterBalanced' | 'sidebarFooterBalancedBody'
   }
 }
 
@@ -178,6 +178,10 @@ export const zh = {
   jobFailure: '后台任务失败',
   scheduleCompletion: '自动化任务完成',
   scheduleFailure: '自动化任务失败',
+  sidebarFooterCompat: '侧边栏底部图标横向排列',
+  sidebarFooterCompatBody: '展开侧边栏时将底部的紧凑图标按钮并排显示在同一行；关闭后恢复逐行纵向排列，更改后立即生效。',
+  sidebarFooterBalanced: '多行图标均衡排列',
+  sidebarFooterBalancedBody: '图标超出单行时自动均分每行数量并按列居中对齐；关闭后按顺序排满换行。',
 } as const
 
 export type DesktopSettingsLocaleKey = keyof typeof zh
@@ -350,4 +354,8 @@ export const en: Record<DesktopSettingsLocaleKey, string> = {
   jobFailure: 'Background job failed',
   scheduleCompletion: 'Automation task completed',
   scheduleFailure: 'Automation task failed',
+  sidebarFooterCompat: 'Arrange sidebar footer icons in a row',
+  sidebarFooterCompatBody: 'Place compact icon actions on a single row while the sidebar is expanded. Turn off to stack every item vertically. Changes apply immediately.',
+  sidebarFooterBalanced: 'Balance multi-row icon layout',
+  sidebarFooterBalancedBody: 'Distribute icons evenly across rows and align columns when wrapping. Turn off to wrap greedily in order.',
 }

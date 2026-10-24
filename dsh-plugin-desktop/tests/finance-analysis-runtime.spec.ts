@@ -3,13 +3,16 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
-import AgentRegistry, { agentEvents, type Agent } from '@deepseek-ai/dsh-agent'
+import AgentRegistry, { AgentModel, agentEvents, modelSelectionProjectionDefinition, type Agent } from '@deepseek-ai/dsh-agent'
+import AgentDefaultModelConfig from '@deepseek-ai/dsh-agent-default-model'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { Session, SessionId, SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
 import SkillRegistry from '@deepseek-ai/dsh-skill'
 import * as SkillFileSystem from '@deepseek-ai/dsh-skill-filesystem'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import * as ToolSkill from '@deepseek-ai/dsh-tool-skill'
 import { describe, expect, it } from 'vitest'
 
@@ -27,7 +30,10 @@ async function harness(run: (ctx: Context, home: string) => Promise<void>) {
     ctx.provide('workingDirectory', { ensure: async () => home } as never)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
+    await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(AgentRegistry)
+    await ctx.plugin(AgentDefaultModelConfig, { provider: 'test-provider', model: 'test-model' })
     await ctx.plugin(SkillRegistry)
     await ctx.plugin(SkillFileSystem, { dshHome: join(home, '.dsh'), agentsHome: join(home, '.agents'), bundledSkillDir: skillsRoot, watch: false })
     await ctx.plugin(ToolSkill)
@@ -38,15 +44,19 @@ async function harness(run: (ctx: Context, home: string) => Promise<void>) {
   }
 }
 
-function agent(home: string, name: string): Agent {
+async function agent(ctx: Context, home: string, name: string): Promise<Agent> {
   const id = SessionId(`finance-${name}`)
   const session = Session.create(id, [], { version: SESSION_FORMAT_VERSION, id, createdAt: 0, cwd: home, isSeeded: false })
-  return { id, ctx: new Context(), session, status: 'idle' } as Agent
+  const projection = await ctx.sessionProjections.register(modelSelectionProjectionDefinition)
+  return {
+    id, ctx: ctx.extend(), session, status: 'idle', options: {}, inbox: {} as never,
+    model: new AgentModel(() => projection.stateOf(session), session, {}),
+  } as unknown as Agent
 }
 
 async function propose(ctx: Context, current: Agent, text: string) {
   const messages = [createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } })]
-  return agentEvents(ctx, current).waterfall('agent/pre-step', { messages, turn: 1, step: 1, signal: new AbortController().signal }, () => Promise.resolve({ kind: 'enter' as const, messages }))
+  return agentEvents(ctx, current).waterfall('agent/pre-step', { messages, turn: 1, step: 1, signal: new AbortController().signal, modelSelection: undefined as unknown as never }, () => Promise.resolve({ kind: 'enter' as const, messages }))
 }
 
 describe('default finance skills at the Host step boundary', () => {
@@ -63,7 +73,7 @@ describe('default finance skills at the Host step boundary', () => {
   it.each(entries)('loads the full $skill instructions from the actual button prompt', async entry => {
     await harness(async (ctx, home) => {
       const prompt = analysisPrompt(entry, 2026, '合成主体', 'fixture-org')
-      const decision = await propose(ctx, agent(home, entry.skill), prompt)
+      const decision = await propose(ctx, await agent(ctx, home, entry.skill), prompt)
       expect(decision.kind).toBe('enter')
       if (decision.kind !== 'enter') return
       const injections = decision.messages.filter(message => message.source.kind === 'skill-invocation')
@@ -80,7 +90,7 @@ describe('default finance skills at the Host step boundary', () => {
 
   it('does not inject a stale or missing skill name', async () => {
     await harness(async (ctx, home) => {
-      const decision = await propose(ctx, agent(home, 'missing'), '/finance-missing-fixture\n只读分析')
+      const decision = await propose(ctx, await agent(ctx, home, 'missing'), '/finance-missing-fixture\n只读分析')
       expect(decision.kind).toBe('enter')
       if (decision.kind === 'enter') expect(decision.messages.filter(message => message.source.kind === 'skill-invocation')).toEqual([])
     })

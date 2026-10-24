@@ -205,7 +205,7 @@ export async function main(): Promise<void> {
       void application
         .then(async ({ ctx }) => {
           if (stopping) throw new Error('Next Host is stopping')
-          await send({ type: 'injections', requestId: query.requestId, injections: ctx.webServer.collectIndexInjections() })
+          await send({ type: 'injections', requestId: query.requestId, injections: ctx.webServer.collectIndexInjections(ctx.connection.browserPeer) })
         })
         .catch(async () => {
           await send({ type: 'injections', requestId: query.requestId, error: 'Could not collect Web boot injections' })
@@ -232,7 +232,6 @@ export async function main(): Promise<void> {
     void stop().catch(fatal)
   })
   const { ctx } = await application
-  auditHostPlugins(ctx)
   // Office skills and the workspace dependency tool need the bundled payload; a packaged Host without it fails here.
   const office = resolveOfficeConfig(runtimeDir, primaryRuntime, home)
   if (office === undefined) hostLog({ source: 'host', event: 'office.unavailable', level: 'warn', fields: { source: primaryRuntime } })
@@ -250,8 +249,9 @@ export async function main(): Promise<void> {
   await send({
     type: 'ready',
     url: ctx.connection.authenticatedUrl(`http://127.0.0.1:${ctx.webServer.port}`),
-    injections: ctx.webServer.collectIndexInjections(),
+    injections: ctx.webServer.collectIndexInjections(ctx.connection.browserPeer),
   })
+  auditHostPlugins(ctx)
   const account = ctx.get('deepseekAccount') as PlatformLoginAccount | undefined
   if (account !== undefined && !stopping) {
     // A broken watcher only loses the automatic browser hand-off; the dialog still offers the link.

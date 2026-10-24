@@ -731,7 +731,7 @@ describe('sidebar footer stacking', () => {
     }
   })
 
-  it('stacks launchers in one bounded seat without shaving their rounded corners', () => {
+  it('installs the shared footer sheet with the compat grid contract and the mode marker', () => {
     let css = ''
     const remove = vi.fn()
     const style = {
@@ -750,23 +750,10 @@ describe('sidebar footer stacking', () => {
 
     try {
       const dispose = installSidebarFooterStyles()
-      expect(css).toMatch(/body \[data-slot="sidebar\.footer\.action"\] \{[^}]*display: flex !important;[^}]*flex-direction: column;[^}]*max-height: min\(40vh, 240px\);[^}]*padding: 0 4px;[^}]*overflow-y: auto;/)
-      // Grow the anchor 4px per side and pay 4px back as padding: the content
-      // box keeps the slot's own width, so launchers that follow upstream's
-      // footer row convention (`.triggerRow`: `width: calc(100% + 4px);
-      // margin: 4px -2px`) land flush with the Settings row while the extra
-      // border-box width keeps the scroll container's clip edge off their
-      // rounded corners.
-      expect(css).toMatch(/body \[data-slot="sidebar\.footer\.action"\] \{[^}]*width: calc\(100% \+ 8px\);[^}]*margin-inline: -4px;/)
-      expect(css).toMatch(/body \[data-slot="sidebar\.footer\.action"\] > \* \{\s*flex: none;\s*min-width: 0;\s*\}/)
-      // Forcing a width on the children also hits the Tooltip bubbles React
-      // renders inside this anchor, stretching them to the viewport.
-      expect(css).not.toMatch(/> \* \{[^}]*\swidth:/)
-      // A reserved gutter shrank the seat asymmetrically; horizontal clipping
-      // sliced the corners off launchers that bleed past their content box.
-      expect(css).not.toContain('scrollbar-gutter')
-      expect(css).not.toContain('overflow-x: hidden')
-      // The seat must not depend on a mode marker: compatibility mode sets none.
+      // rc.3 起侧栏底栏由 compat/balanced 设置驱动:默认单行网格,关闭 compat 退回纵向。
+      expect(css).toMatch(/body \[data-slot="sidebar\.footer\.action"\] \{[^}]*display: grid !important;[^}]*grid-template-columns: var\(--dsh-footer-grid-columns/)
+      expect(css).toMatch(/html\[data-dsh-sidebar-footer-balanced="off"\]:not\(\[data-dsh-sidebar-footer-compat="off"\]\) body \[data-slot="sidebar\.footer\.action"\] \{[^}]*display: flex !important;[^}]*flex-direction: row;[^}]*flex-wrap: wrap;/)
+      // 供设置面读取的样式 id 与命名空间必须稳定(next 设置开关与 settings-adapter 依赖)。
       expect(css).not.toContain('data-sensteed-agent-mode')
       expect(appendChild).toHaveBeenCalledWith(style)
       dispose()

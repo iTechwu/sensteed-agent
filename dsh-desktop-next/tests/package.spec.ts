@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { OPTIONAL_BUNDLES } from '@deepseek-ai/dsh-app-boot'
+import { OPTIONAL_BUNDLES } from '@deepseek-ai/dsh-official-bundles'
 import { expect, it } from 'vitest'
 const read = (path: string) => JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8'))
 it('declares every official optional bundle as a discoverable, version-aligned installation dependency', () => {
@@ -18,7 +18,7 @@ it('archives the application like upstream Desktop while keeping fuses and nativ
   const next = read('../package.json'); const beta = read('../../dsh-plugin-desktop/package.json')
   // Sensteed 的 stable 把 electron-builder 配置放在独立文件里，fuse 面与原生清单从这里读取。
   const betaBuilder = read('../../dsh-plugin-desktop/electron-builder.json')
-  expect(next.version).toBe('2.0.19-next')
+  expect(next.version).toBe('2.0.20-next')
   expect(next.build.appId).toBe('ai.deepseek.dsh.desktop.next')
   expect(next.build.asar).toBe(true)
   for (const platform of ['mac', 'win', 'linux']) expect(next.build[platform].asar, platform).toBeUndefined()

@@ -8,14 +8,17 @@ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import { installDesktopSettingsStyles } from '../../../dsh-plugin-desktop/src/client/desktop-settings-styles.ts'
-import { installSidebarFooterStyles } from '../../../dsh-plugin-desktop/src/client/sidebar-footer-styles.ts'
+import { installSidebarFooterStyles, setSidebarFooterBalanced, setSidebarFooterCompat } from '../../../dsh-plugin-desktop/src/client/sidebar-footer-styles.ts'
 import { NextSettingsAdapter } from './settings-adapter.ts'
 import { NextDesktopSettings, NextDesktopActions, NextVersionsSettingsPage } from './settings.tsx'
 import { installWindowStyles } from './styles.ts'
 import { registerPluginControls } from './plugin-controls.tsx'
 import { installPluginControlsStyles } from './plugin-controls-styles.ts'
+import { registerComputerUseCommandUi } from './computer-use-command-ui.tsx'
+import { desktopDirectoryPicker, registerDesktopDirectoryPicker } from './directory-picker.ts'
 import { SettingsRequests } from './settings-requests.tsx'
 import type { DesktopSettingsLocaleKey } from '../../../dsh-plugin-desktop/src/client/desktop-settings-locales.ts'
+import { installRendererRecovery } from './renderer-recovery.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
@@ -25,7 +28,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     'plugins.bundle.hidden': { kind: 'keyed'; scope: 'root' }
   }
   interface LocaleNamespaceMap {
-    'desktop.settings': DesktopSettingsLocaleKey
+    'desktop.settings': DesktopSettingsLocaleKey | 'sidebarFooterCompat' | 'sidebarFooterCompatBody' | 'sidebarFooterBalanced' | 'sidebarFooterBalancedBody'
     'desktop-next': 'settings' | 'versions' | 'language' | 'safeMode' | 'safeModeDetail' | 'recovery' | 'dismiss'
   }
 }
@@ -48,7 +51,16 @@ export function apply(ctx: Context): void {
   ctx.effect(() => installDesktopSettingsStyles('dsh-desktop-next'), 'Shared Desktop settings styles')
   ctx.effect(installPluginControlsStyles, 'Plugin controls and permission dialog styles')
   registerPluginControls(ctx)
+  registerComputerUseCommandUi(ctx)
+  // The Desktop window adds workspaces through the system folder dialog like upstream
+  // Desktop, whatever directory flow the Host mounted; ordinary browsers have no bridge.
+  const directoryPicker = desktopDirectoryPicker()
+  if (directoryPicker) registerDesktopDirectoryPicker(ctx, directoryPicker)
   if (window.desktopNext) {
+    ctx.slots.inject('shell.overlay', () => ctx.slots.register({
+      name: 'shell.overlay', id: 'desktop-next-renderer-health', order: 0,
+      inject: () => ({ ctx }),
+    }, RendererHealth))
     const permissions = window.desktopNext.permissions
     if (permissions) ctx.effect(() => {
       const dispose = ctx.reflect.provide('desktopPermissions', permissions)
@@ -80,6 +92,15 @@ export function apply(ctx: Context): void {
       const dispose = ctx.reflect.provide('desktopRemoteControl', remoteControl)
       return () => { void dispose() }
     }, 'Desktop remote control settings service')
+    ctx.effect(() => {
+      const syncSidebarFooterCompat = (): void => {
+        const value = adapter.desktopSettings.getSnapshot().value
+        setSidebarFooterCompat(value?.sidebarFooterCompat !== false)
+        setSidebarFooterBalanced(value?.sidebarFooterBalanced !== false)
+      }
+      syncSidebarFooterCompat()
+      return adapter.desktopSettings.subscribe(syncSidebarFooterCompat)
+    }, 'Sync Desktop sidebar footer compatibility setting')
     const t = ctx.locale.bind('desktop-next')
     // The shared settings shell maps the legacy section ID to our display icon.
     ctx.slots.inject('settings.section', () => ctx.slots.register({
@@ -102,6 +123,15 @@ export function apply(ctx: Context): void {
   }
   ctx.slots.inject('shell.overlay',()=>ctx.slots.register({name:'shell.overlay',id:'next-hub-health',order:110,locale:'desktop-next'},NextHubHealth))
   ctx.effect(installWindowStyles, 'Next native materials and header interactions')
+}
+
+/** The effect runs only after React mounts the assembled shell. */
+function RendererHealth({ ctx }: { ctx: Context }) {
+  useEffect(() => {
+    const bridge = window.desktopNext?.renderer
+    if (bridge) return installRendererRecovery(ctx, bridge)
+  }, [ctx])
+  return null
 }
 
 /** Temporary, metadata-only trace for the AA dialog and its sibling Plugins UI. */

@@ -3,7 +3,8 @@ import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSy
 import { createRequire } from 'node:module'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { initProfile, loadOverlayPatches, loadProfileDirectory, PROFILE_TEMPLATES, readProfilePatches, type Profile, type ProfileContext } from '@deepseek-ai/dsh-app-boot'
+import { initProfile, loadOverlayPatches, loadProfileDirectory,  readProfilePatches, type Profile, type ProfileContext } from '@deepseek-ai/dsh-app-boot'
+import { PROFILE_TEMPLATES } from '@deepseek-ai/dsh-official-bundles'
 import { withFileLock } from '@deepseek-ai/dsh-atomic-write'
 import { atomicJson, atomicText, readPrivateFile } from './private-files.ts'
 import { NextRecovery } from './recovery.ts'
@@ -12,6 +13,7 @@ import { computerUsePatch } from './profile-computer-use.ts'
 import { pluginMarketPatch } from './profile-plugin-market.ts'
 import { RETIRED_SCHEDULE_BUNDLE, retiredSchedulePatch } from './profile-schedule.ts'
 import { removeLinkProjectionsSafely } from '../../dsh-plugin-desktop/src/link-projections.ts'
+import { dshProductVersion } from '../../dsh-plugin-desktop/src/dsh-product-version.ts'
 import { insideArchive, unpackedPath } from './asar-archive-policy.ts'
 
 export const NEXT_PACKAGE = fileURLToPath(new URL('../package.json', import.meta.url))
@@ -35,8 +37,6 @@ interface ProfileManifest {
      */
     desktopNextScheduleBundle?: number
     desktopNextOnboarding?: { version: number; outcome: 'completed' | 'skipped'; accountPending?: boolean }
-    /** Names recovery removed from `profile.bundles`; a UI ledger, never a policy. */
-    desktopNextDeselectedBundles?: string[]
     profile: { bundles: string[] }
   }
   [key: string]: unknown
@@ -189,7 +189,7 @@ export class NextProfiles {
         || Object.keys(value).some(key => !['features', 'computerUse'].includes(key))) throw new Error('Invalid onboarding choices')
       const choices = value as Record<string, unknown>
       const features = parseFeatures(choices.features)
-      if ([features.market, features.dshMarket, features.officialMarket].filter(Boolean).length > 1) throw new Error('Select only one plugin market')
+      if (features.market && features.dshMarket) throw new Error('Select only one plugin market')
       if (typeof choices.computerUse !== 'boolean') throw new Error('Invalid Computer Use choice')
       originalPatch = readPrivateFile(patchPath)
       nextPatch = computerUsePatch(originalPatch ?? '[]\n', choices.computerUse).text
@@ -290,6 +290,9 @@ function retireLinkProjections(projectDir: string): void {
 
 /** Add product capabilities without replacing the upstream Web presentation. */
 export function loadNextProfile(projectDir: string, home: string, installAnchor = NEXT_PACKAGE): Profile {
+  // rc.3 的 desktop-product-telemetry 行以 !!js process.env.DSH_CLIENT_VERSION 取
+  // serviceVersion 且必填;Stable 的 launcher 同样在准备期固定它。
+  process.env.DSH_CLIENT_VERSION ??= dshProductVersion()
   const manager = new NextProfiles(home)
   if (manager.directory(basename(projectDir)) !== resolve(projectDir)) throw new Error('Profile must belong to Next home')
   manager.ensure(basename(projectDir))

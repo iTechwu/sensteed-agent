@@ -47,29 +47,29 @@ export function createRecruiterKnowledgePublisher(
     async publish(request) {
       const signal = AbortSignal.timeout(30_000)
       const created = await tools.execute({
-        callId: ToolCallId(`recruiter-knowledge-${randomUUID()}`),
-        name: remember,
-        arguments: { input: {
-          content: request.content,
-          type: 'SEMANTIC',
-          scope: 'TEAM',
-          ...(request.spaceId === undefined ? {} : { spaceId: request.spaceId }),
-          captureReason: `hr-workbench:${request.idempotencyKey}`,
-        } },
+        calls: [{ type: 'tool-call' as const, id: ToolCallId(`recruiter-knowledge-${randomUUID()}`), name: remember,
+          arguments: JSON.stringify({ input: {
+            content: request.content,
+            type: 'SEMANTIC',
+            scope: 'TEAM',
+            ...(request.spaceId === undefined ? {} : { spaceId: request.spaceId }),
+            captureReason: `hr-workbench:${request.idempotencyKey}`,
+          } }) }],
         signal,
       })
-      if (created.isError || record(created.value)?.ok !== true) {
+      const createdCall = created.results[0]?.result
+      if (createdCall === undefined || createdCall.isError || record(createdCall.value)?.ok !== true) {
         return { status: 'failed', reasonCode: 'knowledge_remember_failed' }
       }
-      const id = memoryId(created.value)
+      const id = memoryId(createdCall.value)
       if (id === undefined) return { status: 'failed', reasonCode: 'knowledge_memory_id_missing' }
       const confirmed = await tools.execute({
-        callId: ToolCallId(`recruiter-knowledge-confirm-${randomUUID()}`),
-        name: confirm,
-        arguments: { input: { memoryId: id, reason: 'hr-workbench-user-confirmed', shareWithSpace: true } },
+        calls: [{ type: 'tool-call' as const, id: ToolCallId(`recruiter-knowledge-confirm-${randomUUID()}`), name: confirm,
+          arguments: JSON.stringify({ input: { memoryId: id, reason: 'hr-workbench-user-confirmed', shareWithSpace: true } }) }],
         signal,
       })
-      if (confirmed.isError || record(confirmed.value)?.ok !== true) {
+      const confirmedCall = confirmed.results[0]?.result
+      if (confirmedCall === undefined || confirmedCall.isError || record(confirmedCall.value)?.ok !== true) {
         return { status: 'failed', reasonCode: 'knowledge_confirm_failed' }
       }
       return { status: 'succeeded', reasonCode: 'knowledge_confirmed', memoryId: id }

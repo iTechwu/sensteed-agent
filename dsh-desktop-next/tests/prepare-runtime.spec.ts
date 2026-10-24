@@ -1,8 +1,10 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
-import { expectedNextVersion, nextRuntimeBuildPaths, nextRuntimeTargets, officeSkillsDirectory, primaryRuntimeDirectory, verifyNextRuntimeTree, type NextRuntimeArch } from '../scripts/prepare-runtime.ts'
+import { primaryRuntimePayloadDigest, readPrimaryRuntimeLock } from '../scripts/primary-runtime.ts'
+import { expectedNextVersion, nextRuntimeBuildPaths, nextRuntimeTargets, officeSkillsDirectory, primaryRuntimeDirectory, reusableNextRuntimeTree, verifyNextRuntimeTree, type NextRuntimeArch } from '../scripts/prepare-runtime.ts'
 
 const roots: string[] = []
 afterEach(() => { for (const path of roots.splice(0)) rmSync(path, { recursive: true, force: true }) })
@@ -19,7 +21,7 @@ interface PayloadOptions {
 function writePayload(runtimeRoot: string, arch: NextRuntimeArch, options: PayloadOptions = {}): string {
   const directory = primaryRuntimeDirectory(runtimeRoot, arch)
   const files: Record<string, Buffer | string> = {
-    'runtime.json': JSON.stringify({ desktopVersion: '2.0.0-next', platform: 'darwin', arch, payloadDigest: 'a'.repeat(64), python: '3.12.14', node: '24.21.0', pnpm: '11.8.0',
+    'runtime.json': JSON.stringify({ desktopVersion: '2.0.0-next', platform: 'darwin', arch, payloadDigest: 'a'.repeat(64), python: '3.12.14', node: '24.21.0', pnpm: '11.28.5',
       pythonPackages: { numpy: '2.3.5' }, ...options.manifest }),
     'dependencies/python/bin/python3': machO[options.cpu ?? arch],
     'dependencies/python/lib/python3.12/site-packages/numpy/__init__.py': '',
@@ -46,10 +48,16 @@ function fixture(): string {
   return root
 }
 
-it('ships both Darwin CPUs, Windows x64 and nothing elsewhere', () => {
-  expect(nextRuntimeTargets('darwin')).toEqual([{ target: 'mac-arm64', arch: 'arm64' }, { target: 'mac-x64', arch: 'x64' }])
+it('ships the Apple Silicon payload only, Windows x64, the Linux host CPU and nothing elsewhere', () => {
+  // Sensteed 的 macOS 包是 arm64-only:共享的 macSmokeArchitecture 只认 arm64,其余显式拒绝。
+  expect(nextRuntimeTargets('darwin', 'arm64', {})).toEqual([{ target: 'mac-arm64', arch: 'arm64' }])
+  expect(nextRuntimeTargets('darwin', 'arm64', { DSH_MAC_SMOKE_ARCH: 'arm64' })).toEqual([{ target: 'mac-arm64', arch: 'arm64' }])
+  expect(() => nextRuntimeTargets('darwin', 'arm64', { DSH_MAC_SMOKE_ARCH: 'x64' })).toThrow('Apple Silicon arm64 only')
   expect(nextRuntimeTargets('win32')).toEqual([{ target: 'win-x64', arch: 'x64' }])
-  expect(nextRuntimeTargets('linux')).toEqual([])
+  expect(nextRuntimeTargets('linux', 'x64')).toEqual([{ target: 'linux-x64', arch: 'x64' }])
+  expect(nextRuntimeTargets('linux', 'arm64')).toEqual([{ target: 'linux-arm64', arch: 'arm64' }])
+  expect(nextRuntimeTargets('linux', 'ia32')).toEqual([])
+  expect(nextRuntimeTargets('freebsd')).toEqual([])
 })
 
 it('lays out each CPU payload beside its Office resources under the build directory', () => {
@@ -65,24 +73,25 @@ it('reads the drill version over the source manifest', () => {
   expect(expectedNextVersion(root, { DSH_NEXT_BUILD_VERSION: '2.0.18-next.1' })).toBe('2.0.18-next.1')
 })
 
-it('accepts a complete two-CPU tree and reports each manifest', () => {
+it('accepts the Apple Silicon tree on Darwin and a single-CPU tree on Linux', () => {
   const root = fixture()
   const arm64 = writePayload(root, 'arm64')
-  const x64 = writePayload(root, 'x64')
   expect(verifyNextRuntimeTree(root, 'darwin', '2.0.0-next')).toEqual([
-    { arch: 'arm64', directory: arm64, manifest: expect.objectContaining({ platform: 'darwin', arch: 'arm64', node: '24.21.0', pnpm: '11.8.0' }) },
-    { arch: 'x64', directory: x64, manifest: expect.objectContaining({ platform: 'darwin', arch: 'x64' }) },
+    { arch: 'arm64', directory: arm64, manifest: expect.objectContaining({ platform: 'darwin', arch: 'arm64', node: '24.21.0', pnpm: '11.28.5' }) },
   ])
-  expect(verifyNextRuntimeTree(root, 'linux', '2.0.0-next')).toEqual([])
+  const linuxRoot = fixture()
+  const linuxX64 = writePayload(linuxRoot, 'x64', { manifest: { platform: 'linux' } })
+  expect(verifyNextRuntimeTree(linuxRoot, 'linux', '2.0.0-next', 'x64')).toEqual([
+    { arch: 'x64', directory: linuxX64, manifest: expect.objectContaining({ platform: 'linux', arch: 'x64', node: '24.21.0', pnpm: '11.28.5' }) },
+  ])
+  expect(verifyNextRuntimeTree(root, 'freebsd', '2.0.0-next')).toEqual([])
 })
 
 it('rejects a missing CPU, another version, a payload without Node, or a foreign CPU slice', () => {
   const missing = fixture()
-  writePayload(missing, 'arm64')
-  expect(() => verifyNextRuntimeTree(missing, 'darwin', '2.0.0-next')).toThrow('missing x64 payload manifest')
+  expect(() => verifyNextRuntimeTree(missing, 'darwin', '2.0.0-next')).toThrow('missing arm64 payload manifest')
   const version = fixture()
-  writePayload(version, 'arm64')
-  writePayload(version, 'x64', { manifest: { desktopVersion: '2.0.1-next' } })
+  writePayload(version, 'arm64', { manifest: { desktopVersion: '2.0.1-next' } })
   expect(() => verifyNextRuntimeTree(version, 'darwin', '2.0.0-next')).toThrow('declares version 2.0.1-next, expected 2.0.0-next')
   const swapped = fixture()
   writePayload(swapped, 'arm64', { manifest: { arch: 'x64' } })
@@ -91,21 +100,32 @@ it('rejects a missing CPU, another version, a payload without Node, or a foreign
   writePayload(noNode, 'arm64', { manifest: { node: undefined, pnpm: undefined } })
   expect(() => verifyNextRuntimeTree(noNode, 'darwin', '2.0.0-next')).toThrow('must bundle Node and pnpm')
   const slice = fixture()
-  writePayload(slice, 'arm64')
-  writePayload(slice, 'x64', { cpu: 'arm64' })
-  expect(() => verifyNextRuntimeTree(slice, 'darwin', '2.0.0-next')).toThrow('expected a thin x64 executable')
+  writePayload(slice, 'arm64', { cpu: 'x64' })
+  expect(() => verifyNextRuntimeTree(slice, 'darwin', '2.0.0-next')).toThrow('expected a thin arm64 executable')
 })
 
 it('rejects missing entry points and Office resources', () => {
   const python = fixture()
   writePayload(python, 'arm64', { omit: ['dependencies/python/bin/python3'] })
-  writePayload(python, 'x64')
   expect(() => verifyNextRuntimeTree(python, 'darwin', '2.0.0-next')).toThrow('missing arm64 Python interpreter')
   const router = fixture()
-  writePayload(router, 'arm64')
-  writePayload(router, 'x64', { omit: ['office-skills/office/SKILL.md'] })
-  expect(() => verifyNextRuntimeTree(router, 'darwin', '2.0.0-next')).toThrow('missing x64 office skill')
+  writePayload(router, 'arm64', { omit: ['office-skills/office/SKILL.md'] })
+  expect(() => verifyNextRuntimeTree(router, 'darwin', '2.0.0-next')).toThrow('missing arm64 office skill')
   const skill = fixture()
   writePayload(skill, 'arm64', { omit: ['office-skills/office-xlsx/SKILL.md'] })
   expect(() => verifyNextRuntimeTree(skill, 'darwin', '2.0.0-next')).toThrow('missing arm64 office-xlsx skill')
+})
+
+it('reuses a runtime tree only when every target matches the current lock digest and version', () => {
+  const lock = readPrimaryRuntimeLock()
+  const pnpmVersion = (JSON.parse(readFileSync(createRequire(import.meta.url).resolve('pnpm'), 'utf8')) as { version: string }).version
+  const root = fixture()
+  writePayload(root, 'arm64', { manifest: { payloadDigest: primaryRuntimePayloadDigest('mac-arm64', lock, pnpmVersion) } })
+  expect(reusableNextRuntimeTree(root, 'darwin', '2.0.0-next')).toHaveLength(1)
+  expect(reusableNextRuntimeTree(root, 'darwin', '2.0.1-next')).toEqual([])
+  mkdirSync(join(root, 'stale'))
+  expect(reusableNextRuntimeTree(root, 'darwin', '2.0.0-next')).toEqual([])
+  rmSync(join(root, 'stale'), { recursive: true, force: true })
+  writePayload(root, 'arm64', { manifest: { payloadDigest: '0'.repeat(64) } })
+  expect(reusableNextRuntimeTree(root, 'darwin', '2.0.0-next')).toEqual([])
 })
