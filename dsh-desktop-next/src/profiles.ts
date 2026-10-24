@@ -13,6 +13,7 @@ import { computerUsePatch } from './profile-computer-use.ts'
 import { pluginMarketPatch } from './profile-plugin-market.ts'
 import { RETIRED_SCHEDULE_BUNDLE, retiredSchedulePatch } from './profile-schedule.ts'
 import { removeLinkProjectionsSafely } from '../../dsh-plugin-desktop/src/link-projections.ts'
+import { dshProductVersion } from '../../dsh-plugin-desktop/src/dsh-product-version.ts'
 import { insideArchive, unpackedPath } from './asar-archive-policy.ts'
 
 export const NEXT_PACKAGE = fileURLToPath(new URL('../package.json', import.meta.url))
@@ -289,6 +290,9 @@ function retireLinkProjections(projectDir: string): void {
 
 /** Add product capabilities without replacing the upstream Web presentation. */
 export function loadNextProfile(projectDir: string, home: string, installAnchor = NEXT_PACKAGE): Profile {
+  // rc.3 的 desktop-product-telemetry 行以 !!js process.env.DSH_CLIENT_VERSION 取
+  // serviceVersion 且必填;Stable 的 launcher 同样在准备期固定它。
+  process.env.DSH_CLIENT_VERSION ??= dshProductVersion()
   const manager = new NextProfiles(home)
   if (manager.directory(basename(projectDir)) !== resolve(projectDir)) throw new Error('Profile must belong to Next home')
   manager.ensure(basename(projectDir))
