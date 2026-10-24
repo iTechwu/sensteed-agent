@@ -1,8 +1,8 @@
 /** Keep upstream HTTP routing while requiring Host credentials for Market routes. */
 import { hostLog, hostOperation } from './host/logging.ts'
-import WebServer, { type WebRoute, type WebUpgradeRoute } from '@deepseek-ai/dsh-host-webserver'
+import WebServer, { type WebResourceRoute, type WebRoute, type WebUpgradeRoute } from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-client-connection'
-import { decideDesktopBrowserAccess, nextBrowserAccess } from './desktop-browser-access.ts'
+import { decideDesktopBrowserAccess, nextBrowserAccess, DESKTOP_RENDERER_ACCESS_HEADER } from './desktop-browser-access.ts'
 import type { Duplex } from 'node:stream'
 
 export default class NextWebServer extends WebServer {
@@ -25,7 +25,28 @@ export default class NextWebServer extends WebServer {
     return !access || decideDesktopBrowserAccess(access, request) !== 'denied'
   }
 
-  override register(route: WebRoute): () => void {
+  /** 资源形态(fetch 签名)的浏览器访问门,与 permits 的 req/res 判定同契约。 */
+  private permitsResource(request: Request): boolean {
+    const access = nextBrowserAccess()
+    if (!access) return true
+    // fetch Headers 是访问器对象,转成判定函数期望的普通头形态。
+    const headers = { [DESKTOP_RENDERER_ACCESS_HEADER]: request.headers.get(DESKTOP_RENDERER_ACCESS_HEADER) ?? undefined }
+    return decideDesktopBrowserAccess(access, { headers, url: request.url }) !== 'denied'
+  }
+
+  private denyResource(): Response {
+    return new Response('Browser access is disabled', { status: 403, headers: { 'cache-control': 'no-store' } })
+  }
+
+  override register(route: WebRoute | WebResourceRoute): () => void {
+    // rc.3 的资源路由不带 handler;无条件展开会让分发器拿到 undefined(400)。
+    if (!('handler' in route) || typeof route.handler !== 'function') {
+      const resource = (route as WebResourceRoute).resource
+      return super.register({ ...(route as WebResourceRoute), resource: async (request, peer) => {
+        if (!this.permitsResource(request)) return this.denyResource()
+        return resource(request, peer)
+      } })
+    }
     return super.register({ ...route, handler: this.observeHttp(route.path, async (request, response) => {
       if (!this.permits(request)) { response.writeHead(403, { 'cache-control': 'no-store' }); response.end('Browser access is disabled'); return }
       if (route.path !== '/api/community-market' && !route.path.startsWith('/api/community-market/')) {
@@ -38,7 +59,7 @@ export default class NextWebServer extends WebServer {
         response.end('Market request authentication required')
         return
       }
-      await route.handler(request, response)
+      await (route.handler as WebRoute['handler'])(request, response)
     }) })
   }
 
@@ -51,11 +72,19 @@ export default class NextWebServer extends WebServer {
     }
   }
 
-  override registerFallback(handler: WebRoute['handler']): () => void {
-    return super.registerFallback(this.observeHttp('fallback', async (request, response) => {
-      if (!this.permits(request)) { response.writeHead(403, { 'cache-control': 'no-store' }); response.end('Browser access is disabled'); return }
-      await handler(request, response)
-    }))
+  override registerFallback(fallback: WebRoute['handler'] | Pick<WebResourceRoute, 'resource'>): () => void {
+    if (typeof fallback === 'function') {
+      return super.registerFallback(this.observeHttp('fallback', async (request, response) => {
+        if (!this.permits(request)) { response.writeHead(403, { 'cache-control': 'no-store' }); response.end('Browser access is disabled'); return }
+        await fallback(request, response)
+      }))
+    }
+    // rc.3 资源形态的 SPA fallback:同样过浏览器访问门。
+    const resource = fallback.resource
+    return super.registerFallback({ resource: async (request, peer) => {
+      if (!this.permitsResource(request)) return this.denyResource()
+      return resource(request, peer)
+    } })
   }
 
   override registerUpgrade(route: WebUpgradeRoute): () => void {
