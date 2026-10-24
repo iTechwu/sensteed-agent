@@ -17649,6 +17649,9 @@ importers:
       '@deepseek-ai/dsh':
         specifier: 0.2.1-rc.3
         version: link:../deepseek-harness/apps/cli
+      '@deepseek-ai/dsh-action-cards':
+        specifier: 0.2.1-rc.3
+        version: link:../deepseek-harness/packages/experimental/action-cards
       '@deepseek-ai/dsh-agent':
         specifier: 0.2.1-rc.3
         version: link:../deepseek-harness/packages/core/agent
@@ -17757,6 +17760,9 @@ importers:
       '@deepseek-ai/dsh-client-store':
         specifier: 0.2.1-rc.3
         version: link:../deepseek-harness/packages/client/store
+      '@deepseek-ai/dsh-client-ui-action-cards':
+        specifier: 0.2.1-rc.3
+        version: link:../deepseek-harness/packages/experimental/client-ui-action-cards
       '@deepseek-ai/dsh-client-ui-agent-preset':
         specifier: 0.2.1-rc.3
         version: link:../deepseek-harness/packages/client/ui-agent-preset
@@ -17781,6 +17787,9 @@ importers:
       '@deepseek-ai/dsh-client-ui-cordis':
         specifier: 0.2.1-rc.3
         version: link:../deepseek-harness/packages/extensions/ui-cordis
+      '@deepseek-ai/dsh-client-ui-creation-recommendations':
+        specifier: 0.2.1-rc.3
+        version: link:../deepseek-harness/packages/experimental/client-ui-creation-recommendations
       '@deepseek-ai/dsh-client-ui-deepseek-model-label-1017':
         specifier: 0.2.1-rc.3
         version: link:../deepseek-harness/packages/client/ui-deepseek-model-label-1017
@@ -17793,6 +17802,12 @@ importers:
       '@deepseek-ai/dsh-client-ui-directory-picker-native':
         specifier: 0.2.1-rc.3
         version: link:../deepseek-harness/packages/client/ui-directory-picker-native
+      '@deepseek-ai/dsh-client-ui-entry-customization':
+        specifier: 0.2.1-rc.3
+        version: link:../deepseek-harness/packages/client/ui-entry-customization
+      '@deepseek-ai/dsh-client-ui-file-drag':
+        specifier: 0.2.1-rc.3
+        version: link:../deepseek-harness/packages/client/ui-file-drag
       '@deepseek-ai/dsh-client-ui-goal':
         specifier: 0.2.1-rc.3
         version: link:../deepseek-harness/packages/client/ui-goal
@@ -17823,6 +17838,9 @@ importers:
       '@deepseek-ai/dsh-client-ui-plugin-manager':
         specifier: 0.2.1-rc.3
         version: link:../deepseek-harness/packages/client/ui-plugin-manager
+      '@deepseek-ai/dsh-client-ui-plugin-recommendations':
+        specifier: 0.2.1-rc.3
+        version: link:../deepseek-harness/packages/experimental/client-ui-plugin-recommendations
       '@deepseek-ai/dsh-client-ui-primitives':
         specifier: 0.2.1-rc.3
         version: link:../deepseek-harness/packages/client/ui-primitives
@@ -17961,12 +17979,21 @@ importers:
       '@deepseek-ai/dsh-cordis-host-runner':
         specifier: 0.2.1-rc.3
         version: link:../deepseek-harness/packages/extensions/cordis-host-runner
+      '@deepseek-ai/dsh-creation-recommendations':
+        specifier: 0.2.1-rc.3
+        version: link:../deepseek-harness/packages/experimental/creation-recommendations
       '@deepseek-ai/dsh-credentials':
         specifier: 0.2.1-rc.3
         version: link:../deepseek-harness/packages/credentials/credentials
       '@deepseek-ai/dsh-credentials-local':
         specifier: 0.2.1-rc.3
         version: link:../deepseek-harness/packages/credentials/credentials-local
+      '@deepseek-ai/dsh-cua':
+        specifier: 0.2.1-rc.3
+        version: link:../deepseek-harness/packages/experimental/cua
+      '@deepseek-ai/dsh-cua-bundle':
+        specifier: 0.2.1-rc.3
+        version: link:../deepseek-harness/packages/experimental/cua-bundle
       '@deepseek-ai/dsh-deepseek-account':
         specifier: 0.2.1-rc.3
         version: link:../deepseek-harness/packages/credentials/deepseek-account
@@ -17976,6 +18003,9 @@ importers:
       '@deepseek-ai/dsh-deepseek-llm-api-extensions':
         specifier: 0.2.1-rc.3
         version: link:../deepseek-harness/packages/llm/deepseek-llm-api-extensions
+      '@deepseek-ai/dsh-deliverable-file-references':
+        specifier: 0.2.1-rc.3
+        version: link:../deepseek-harness/packages/deliverables/deliverable-file-references
       '@deepseek-ai/dsh-experimental-agent-team':
         specifier: 0.2.1-rc.3
         version: link:../deepseek-harness/packages/experimental/agent-team
@@ -18126,6 +18156,9 @@ importers:
       '@deepseek-ai/dsh-message-feedback':
         specifier: 0.2.1-rc.3
         version: link:../deepseek-harness/packages/feedback/message-feedback
+      '@deepseek-ai/dsh-message-quotes':
+        specifier: 0.2.1-rc.3
+        version: link:../deepseek-harness/packages/session/message-quotes
       '@deepseek-ai/dsh-native-command':
         specifier: 0.2.1-rc.3
         version: link:../deepseek-harness/packages/util/native-command
@@ -18147,15 +18180,24 @@ importers:
       '@deepseek-ai/dsh-persona':
         specifier: 0.2.1-rc.3
         version: link:../deepseek-harness/packages/preset/persona
+      '@deepseek-ai/dsh-personalized-recommendations':
+        specifier: 0.2.1-rc.3
+        version: link:../deepseek-harness/packages/experimental/personalized-recommendations
       '@deepseek-ai/dsh-plan-mode':
         specifier: 0.2.1-rc.3
         version: link:../deepseek-harness/packages/plan/plan-mode
+      '@deepseek-ai/dsh-plugin-detail':
+        specifier: 0.2.1-rc.3
+        version: link:../deepseek-harness/packages/util/plugin-detail
       '@deepseek-ai/dsh-plugin-manager':
         specifier: 0.2.1-rc.3
         version: link:../deepseek-harness/packages/boot/plugin-manager
       '@deepseek-ai/dsh-plugin-package-inventory-deepseek':
         specifier: 0.2.1-rc.3
         version: link:../deepseek-harness/packages/llm/plugin-package-inventory-deepseek
+      '@deepseek-ai/dsh-plugin-recommendations':
+        specifier: 0.2.1-rc.3
+        version: link:../deepseek-harness/packages/experimental/plugin-recommendations
       '@deepseek-ai/dsh-ptc-runtime':
         specifier: 0.2.1-rc.3
         version: link:../deepseek-harness/packages/ptc-runtime/ptc-runtime
@@ -18333,6 +18375,12 @@ importers:
       '@deepseek-ai/dsh-tool-cordis':
         specifier: 0.2.1-rc.3
         version: link:../deepseek-harness/packages/extensions/tool-cordis
+      '@deepseek-ai/dsh-tool-executor-native':
+        specifier: 0.2.1-rc.3
+        version: link:../deepseek-harness/packages/core/tool-executor-native
+      '@deepseek-ai/dsh-tool-executor-ptc':
+        specifier: 0.2.1-rc.3
+        version: link:../deepseek-harness/packages/core/tool-executor-ptc
       '@deepseek-ai/dsh-tool-fs':
         specifier: 0.2.1-rc.3
         version: link:../deepseek-harness/packages/fs/tool-fs
